@@ -322,6 +322,40 @@ suite =
                         , \_ -> Expect.equal Nothing (sendData "#c" "1bad" "hi")
                         ]
                         ()
+            , test "checked builders enforce the UTF-8 line-body limit" <|
+                \_ ->
+                    let
+                        fitsExactly =
+                            sendData "#c" "tag" (String.repeat 4089 "é" ++ "a")
+
+                        exceeds =
+                            sendData "#c" "tag" (String.repeat 4089 "é" ++ "ab")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Maybe.map (String.endsWith "\r\n") fitsExactly |> Maybe.withDefault False)
+                        , \_ -> Expect.equal Nothing exceeds
+                        ]
+                        ()
+            , test "checked builders reject original CR and NUL without stripping" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (sendData "#c" "tag" "safe\r\nJOIN #evil")
+                        , \_ -> Expect.equal Nothing (sendData "#c" "tag" "safe\u{0000}text")
+                        ]
+                        ()
+            , test "builders reject excess PROP query params and leading-colon targets" <|
+                \_ ->
+                    let
+                        tooManyKeys =
+                            List.map (\n -> "key" ++ String.fromInt n) (List.range 1 15)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (propGet "#c" tooManyKeys)
+                        , \_ -> Expect.equal Nothing (propList ":#c")
+                        , \_ -> Expect.equal Nothing (propGet ":#c" [ "key" ])
+                        , \_ -> Expect.equal Nothing (accessList ":#c" (Just "host") Nothing)
+                        ]
+                        ()
             , test "ACCESS builders shape subcommands" <|
                 \_ ->
                     Expect.all
@@ -342,6 +376,8 @@ suite =
                         [ \_ -> Expect.equal (Just "PROP #c\r\n") (propList "#c")
                         , \_ -> Expect.equal (Just "PROP #c ocean.display-name\r\n") (propGet "#c" [ "ocean.display-name" ])
                         , \_ -> Expect.equal (Just "PROP #c ocean.display-name Lounge\r\n") (propSet "#c" "ocean.display-name" "Lounge")
+                        , \_ -> Expect.equal (Just "PROP #c ocean.display-name café\r\n") (propSet "#c" "ocean.display-name" "café")
+                        , \_ -> Expect.equal (Just "PROP #c ocean.display-name :\r\n") (propSet "#c" "ocean.display-name" "")
                         , \_ -> Expect.equal Nothing (propSet "#c" "__proto__" "x")
                         ]
                         ()

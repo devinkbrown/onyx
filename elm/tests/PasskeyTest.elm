@@ -131,12 +131,12 @@ suite =
                         [ \_ ->
                             Expect.equal ( blankPasskeySession, NoEffect )
                                 (fold blankPasskeySession
-                                    (reply Wire.Note "REGISTER-CHALLENGE" [ chal16, "irc.example" ] "alice")
+                                    (reply Wire.Event "REGISTER-CHALLENGE" [ chal16, "irc.example" ] "alice")
                                 )
                         , \_ ->
                             case
                                 fold { blankPasskeySession | lastAction = Just ActionRegister }
-                                    (reply Wire.Note "REGISTER-CHALLENGE" [ chal16, "irc.example" ] "alice")
+                                    (reply Wire.Event "REGISTER-CHALLENGE" [ chal16, "irc.example" ] "alice")
                             of
                                 ( _, RunCreateCeremony args ) ->
                                     Expect.equal "irc.example" args.rpId
@@ -146,7 +146,7 @@ suite =
                         , \_ ->
                             case
                                 fold { blankPasskeySession | lastAction = Just ActionRegister }
-                                    (reply Wire.Note "REGISTER-CHALLENGE" [ "short", "irc.example" ] "alice")
+                                    (reply Wire.Event "REGISTER-CHALLENGE" [ "short", "irc.example" ] "alice")
                             of
                                 ( session, ReportError _ ) ->
                                     Expect.equal (Just "Malformed passkey challenge.") session.error
@@ -159,7 +159,7 @@ suite =
                 \_ ->
                     case
                         fold { blankPasskeySession | lastAction = Just ActionRegister, busy = True }
-                            (reply Wire.Note "REGISTERED" [] "desk")
+                            (reply Wire.Event "REGISTERED" [] "desk")
                     of
                         ( session, SendLine line ) ->
                             Expect.all
@@ -178,7 +178,7 @@ suite =
                             beginList blankPasskeySession
 
                         step session code context description =
-                            Tuple.first (fold session (reply Wire.Note code context description))
+                            Tuple.first (fold session (reply Wire.Event code context description))
 
                         withRows =
                             listing
@@ -187,7 +187,7 @@ suite =
                                 |> (\s -> step s "CRED" [ "!!", "1" ] "bad")
 
                         ( committed, _ ) =
-                            fold withRows (reply Wire.Note "LIST" [] "end (1)")
+                            fold withRows (reply Wire.Event "LIST" [] "end (1)")
                     in
                     Expect.all
                         [ \_ -> Expect.equal 1 (List.length committed.creds)
@@ -199,7 +199,7 @@ suite =
             , test "CRED without a pending list is ignored" <|
                 \_ ->
                     Expect.equal ( blankPasskeySession, NoEffect )
-                        (fold blankPasskeySession (reply Wire.Note "CRED" [ "QUJD", "1" ] "desk"))
+                        (fold blankPasskeySession (reply Wire.Event "CRED" [ "QUJD", "1" ] "desk"))
             , test "REMOVED drops by id or label" <|
                 \_ ->
                     let
@@ -210,7 +210,7 @@ suite =
                             }
 
                         ( next, _ ) =
-                            fold session (reply Wire.Note "REMOVED" [] "desk")
+                            fold session (reply Wire.Event "REMOVED" [] "desk")
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] next.creds
@@ -227,22 +227,22 @@ suite =
                             }
 
                         ( next, _ ) =
-                            fold session (reply Wire.Note "RENAMED" [ "QUJD" ] "new")
+                            fold session (reply Wire.Event "RENAMED" [ "QUJD" ] "new")
                     in
                     Expect.equal (Just "new") (Maybe.map .label (List.head next.creds))
             , test "STATUS marks the feature supported" <|
                 \_ ->
                     Expect.equal (Just True)
-                        (.supported (Tuple.first (fold blankPasskeySession (reply Wire.Note "STATUS" [] ""))))
+                        (.supported (Tuple.first (fold blankPasskeySession (reply Wire.Event "STATUS" [] ""))))
             , test "AUTH collects allow-creds and settles" <|
                 \_ ->
                     let
                         ( challenged, _ ) =
                             fold blankPasskeySession
-                                (reply Wire.Note "AUTH-CHALLENGE" [ chal16, "irc.example" ] "")
+                                (reply Wire.Event "AUTH-CHALLENGE" [ chal16, "irc.example" ] "")
 
                         ( withCred, _ ) =
-                            fold challenged (reply Wire.Note "ALLOW-CRED" [] "QUJD")
+                            fold challenged (reply Wire.Event "ALLOW-CRED" [] "QUJD")
 
                         ( settled, effect ) =
                             settleAuth withCred
@@ -263,10 +263,10 @@ suite =
                     let
                         ( challenged, _ ) =
                             fold blankPasskeySession
-                                (reply Wire.Note "AUTH-CHALLENGE" [ chal16, "irc.example" ] "")
+                                (reply Wire.Event "AUTH-CHALLENGE" [ chal16, "irc.example" ] "")
 
                         ( withBad, _ ) =
-                            fold challenged (reply Wire.Note "ALLOW-CRED" [] "!!")
+                            fold challenged (reply Wire.Event "ALLOW-CRED" [] "!!")
 
                         ( _, effect ) =
                             settleAuth withBad

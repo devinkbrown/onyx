@@ -45,8 +45,8 @@ module Schedule exposing
 `src/lib/schedule/dispatch.ts` (persistence parse + due/pending
 split) and `src/lib/composer/scheduledSend.ts` (create / enqueue /
 cancel / classify). Pure decision only: no clock, no storage, no
-side effects. The firing loop, composer scheduling surface, and
-sheet UI join in a later slice.
+side effects. `App` fires due rows; `View.Composer` and
+`View.Scheduled` render the picker and the queue.
 -}
 
 import Dict exposing (Dict)

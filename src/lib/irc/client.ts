@@ -6,6 +6,7 @@ import {
   parseIRCMessage,
   formatIRCLine,
   formatTaggedLine,
+  normalizeCase,
   parsePREFIX,
   selectSaslMechanism,
   splitWireFrame,
@@ -49,6 +50,32 @@ export const MAX_CLIENT_ISUPPORT_TOKENS = 256;
 export const MAX_CLIENT_ISUPPORT_KEY_LENGTH = 64;
 export const MAX_CLIENT_ISUPPORT_VALUE_LENGTH = 1024;
 const MAX_CLIENT_ISUPPORT_NUMBER = 1_000_000;
+const SENSITIVE_PAYLOAD_TOKEN = /(?:^|[\s:\r\n])(?:AUTHENTICATE|E2EEGROUP|E2EE\.KEYPACKAGE|E2EE\.COMMIT|E2EE\.WELCOME|E2EEKEY|SESSION\s+(?:M?TOKEN)|SESSIONTOKEN|MEDIA\s+MACKEY)(?=$|[\s:\r\n])/iu;
+const SENSITIVE_ENVELOPE_COMMANDS = new Set([
+  'AUTHENTICATE', 'E2EEGROUP', 'E2EE.KEYPACKAGE', 'E2EE.COMMIT', 'E2EE.WELCOME', 'E2EEKEY',
+  'EVENT', 'FAIL', 'NOTICE', 'PRIVMSG', 'WARN',
+]);
+const REGISTERED_NICK_REFUSAL = 'Nickname is registered; authenticate as this account before using it';
+
+function isRegisteredNicknameAuthenticationRefusal(
+  message: IRCMessage,
+  currentNick: string,
+  registered: boolean,
+  learnedServerPrefix: string | null,
+  casemapping: string,
+): boolean {
+  if (registered || message.command !== '432' || message.params.length !== 3) return false;
+  const prefix = message.prefix;
+  if (!prefix || /[!@\u0000-\u0020\u007f]/u.test(prefix)) return false;
+  if (learnedServerPrefix !== null && prefix !== learnedServerPrefix) return false;
+  const fold = (value: string) => normalizeCase(value, casemapping);
+  const recipient = message.params[0];
+  const refusedNick = message.params[1];
+  return (recipient === '*' || (recipient !== undefined && fold(recipient) === fold(currentNick)))
+    && refusedNick !== undefined
+    && fold(refusedNick) === fold(currentNick)
+    && message.params[2] === REGISTERED_NICK_REFUSAL;
+}
 
 function parseIsupportPositiveInt(value: string): number | null {
   if (!/^[1-9]\d*$/u.test(value)) return null;
@@ -132,7 +159,7 @@ function redactSensitiveLineForLog(line: string): string {
   // spelling so a NUL-split sensitive token cannot be logged and then become a
   // valid command downstream. The original bytes still go to wire/parser.
   line = line.replaceAll('\0', '');
-  const containsSensitiveToken = /(?:^|[\s:\r\n])(?:AUTHENTICATE|E2EEGROUP|E2EE\.KEYPACKAGE|E2EE\.COMMIT|E2EE\.WELCOME|E2EEKEY)(?=$|[\s:\r\n])/iu;
+  const containsSensitiveToken = SENSITIVE_PAYLOAD_TOKEN;
   let cursor = line.trimStart();
   if (cursor.startsWith('@')) {
     const end = cursor.indexOf(' ');
@@ -167,7 +194,7 @@ function redactSensitiveLineForLog(line: string): string {
       : rest.includes(' :') ? rest.slice(rest.indexOf(' :') + 2) : rest.replace(/^\S+\s+:?/u, '');
     if (/^E2EEKEY(?:\s|$)/iu.test(trailing)) return 'NOTICE E2EEKEY <redacted>';
   }
-  if (command === 'FAIL' || command === 'WARN' || command === 'NOTE') {
+  if (command === 'FAIL' || command === 'WARN') {
     const subject = rest.match(/^:?([^\s]+)/u)?.[1]?.toUpperCase();
     if (subject === 'E2EEGROUP' || subject === 'E2EEKEY') return `${command} ${subject} <redacted>`;
   }
@@ -175,6 +202,11 @@ function redactSensitiveLineForLog(line: string): string {
   // This is a log-copy policy only: parsing and wire delivery still receive
   // the original bytes.
   return containsSensitiveToken.test(line) ? '<sensitive> <redacted>' : line;
+}
+
+function isUnknownSensitivePayload(message: IRCMessage, line: string): boolean {
+  return SENSITIVE_PAYLOAD_TOKEN.test(line.replaceAll('\0', ''))
+    && !SENSITIVE_ENVELOPE_COMMANDS.has(message.command);
 }
 
 /** RFC 4616 SASL PLAIN fields are UTF-8; btoa itself accepts Latin-1 only. */
@@ -270,6 +302,8 @@ export class IRCClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Monotonic owner for delayed work tied to one concrete WebSocket. */
   private _socketGeneration = 0;
+  /** Server prefix learned from the first valid 001 on this physical socket. */
+  private _learnedServerPrefix: string | null = null;
   private pingTimer: ReturnType<typeof setTimeout> | null = null;
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private _destroyed = false;
@@ -400,6 +434,7 @@ export class IRCClient {
     // Advance the owner before tearing down the old socket so delayed work can
     // distinguish socket A from its replacement socket B.
     this._socketGeneration++;
+    this._learnedServerPrefix = null;
     // Never run two sockets in parallel. Tear down any prior socket first, and
     // detach its handlers so its close event can't trigger another reconnect.
     if (this.ws) {
@@ -472,6 +507,7 @@ export class IRCClient {
 
   destroy() {
     this._destroyed = true;
+    this._learnedServerPrefix = null;
     this._attribution.stop();
     this._clearTimers();
     if (this.ws) {
@@ -595,6 +631,11 @@ export class IRCClient {
   /** Current concrete WebSocket generation (increments on every connect call). */
   get socketGeneration(): number {
     return this._socketGeneration;
+  }
+
+  /** Exact server prefix learned from 001 for the current physical socket. */
+  get learnedServerPrefix(): string | null {
+    return this._learnedServerPrefix;
   }
 
   /**
@@ -753,7 +794,7 @@ export class IRCClient {
    * Push freshly-issued resume tokens back into the LIVE client.
    *
    * The server hands out a new session token after every registration (arriving
-   * as `NOTE SESSION TOKEN`, plus `NOTE SESSION MTOKEN` on a mesh), which the
+   * as `NOTICE SESSION TOKEN`, plus `NOTICE SESSION MTOKEN` on a mesh), which the
    * store parses and persists. But auto-reconnect reuses THIS same instance
    * (`reconnectNow → connect()`), and `opts.sessionToken` / `opts.meshToken`
    * are otherwise frozen at construction. Without this, every reconnect would
@@ -761,7 +802,7 @@ export class IRCClient {
    * began without a saved token — so the 001 resume (`SESSION RESUME <token>`)
    * would silently fail and the session would come back as brand-new.
    *
-   * Only the provided fields are merged, so a lone `TOKEN` note never clobbers a
+   * Only the provided fields are merged, so a lone `TOKEN` notice never clobbers a
    * held `MTOKEN` (and vice versa). Invalid values are refused fail-closed —
    * the previously held bearer for that field is left intact rather than
    * replaced with garbage that would become a multi-word / control-bearing
@@ -896,16 +937,20 @@ export class IRCClient {
     // lines, all of which it returns. No mutable buffer lives here to tempt a
     // reintroduction of the stash.
     for (const line of splitWireFrame(data)) {
-      const logLine = redactSensitiveLineForLog(line);
-      this.opts.onRaw?.(logLine, 'in');
       try {
         const msg = parseIRCMessage(line);
+        const logLine = redactSensitiveLineForLog(line);
+        this.opts.onRaw?.(logLine, 'in');
+        const registeredNickRefusal = isRegisteredNicknameAuthenticationRefusal(
+          msg, this.opts.nick, this._registered, this._learnedServerPrefix, this.isupport.CASEMAPPING,
+        );
+        if (isUnknownSensitivePayload(msg, line) && !registeredNickRefusal) continue;
         this._handleMessage(msg);
       } catch (e) {
         // A malformed line must not abort processing of the rest of the frame.
         // Handler/parser exceptions are not a safe diagnostic channel: their
         // messages may contain the original remote control payload.
-        console.warn('[nexus] failed to handle IRC line:', logLine);
+        console.warn('[nexus] failed to handle IRC line:', redactSensitiveLineForLog(line));
       }
     }
   }
@@ -927,6 +972,7 @@ export class IRCClient {
   }
 
   private _onClose(ev: CloseEvent) {
+    this._learnedServerPrefix = null;
     this._attribution.stop(); // no residence refresh on a dead socket
     this._clearPingTimers();
     const reason = ev.reason || `code ${ev.code}`;
@@ -944,6 +990,7 @@ export class IRCClient {
   }
 
   private _handleMessage(msg: IRCMessage) {
+    this._learnServerPrefixFromWelcome(msg);
     // Internal protocol handling before passing to store handler
     switch (msg.command) {
       case 'PING':
@@ -1154,9 +1201,9 @@ export class IRCClient {
       case '432': // Erroneous nickname
       case '437': // Nick/channel unavailable
         if (
-          msg.command === '432'
-          && !this._registered
-          && /nickname is registered; authenticate/i.test(msg.params.at(-1) ?? '')
+          isRegisteredNicknameAuthenticationRefusal(
+            msg, this.opts.nick, this._registered, this._learnedServerPrefix, this.isupport.CASEMAPPING,
+          )
         ) {
           this.opts.onError?.('That nickname is registered. Sign in as its account before using it.');
           try {
@@ -1224,7 +1271,7 @@ export class IRCClient {
         // Now that the connection is registered, the post-registration SESSION
         // command is valid. Reclaim a prior detached session if we hold a token,
         // then request a fresh token for this session (arrives as
-        // NOTE SESSION TOKEN, plus NOTE SESSION MTOKEN on mesh deployments).
+        // NOTICE SESSION TOKEN, plus NOTICE SESSION MTOKEN on mesh deployments).
         // Onyx Server requires the live connection to authenticate to the owning
         // account before accepting SESSION RESUME. Password SASL has already
         // completed here; passwordless/passkey reconnects wait for their
@@ -1267,6 +1314,19 @@ export class IRCClient {
         try { h(msg); } catch { /* keep other subscribers alive */ }
       }
     }
+  }
+
+  private _learnServerPrefixFromWelcome(msg: IRCMessage): void {
+    if (msg.command !== '001' || this._learnedServerPrefix !== null) return;
+    const prefix = msg.prefix;
+    const recipient = msg.params[0];
+    if (
+      !prefix
+      || !recipient
+      || recipient.toLowerCase() !== this.opts.nick.toLowerCase()
+      || /[!@\u0000-\u0020\u007f]/u.test(prefix)
+    ) return;
+    this._learnedServerPrefix = prefix;
   }
 
   /**

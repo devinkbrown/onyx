@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CallState } from '@/lib/cadence-media/types';
 import { store } from '@/lib/store/store';
+import { resetCallRejoinState } from './voice/callRejoinState';
 
 import { AppShell, _setMediaModuleLoaderForTests } from './AppShell';
 
@@ -97,7 +98,7 @@ describe('AppShell standalone CallsHub integration', () => {
     expect(source).not.toMatch(/function\s+CallsHub\s*\(/u);
     expect(source).toContain("import { retryableLazy } from '@/app/StaleChunkRecovery';");
     expect(source).toMatch(
-      /const CallsHub = retryableLazy<any>\(\(\) => import\('\.\/CallsHub'\)\.then\(\(m\) => \(\{ default: m\.CallsHub \}\)\), 'calls'\);/u,
+      /const CallsHub = retryableLazy\(\(\) => import\('\.\/CallsHub'\)\.then\(\(m\) => \(\{ default: m\.CallsHub \}\)\), 'calls'\);/u,
     );
     expect(source).toContain('callState={voice().callState}');
     expect(source).toContain('callChannel={voice().callChannel}');
@@ -147,6 +148,54 @@ describe('AppShell standalone CallsHub integration', () => {
     expect(hub).toHaveAttribute('data-call-presentation', 'established');
     expect(within(hub).getByRole('heading', { name: 'Your call is still here.' })).toBeInTheDocument();
     expect(hub.textContent).not.toMatch(/end-to-end|encrypted|secure call|protected call/iu);
+  });
+
+  it('acknowledges an established call that ended', async () => {
+    resetCallRejoinState();
+    const hub = await mountCallsHub({
+      callState: 'in_call',
+      callChannel: '#lounge',
+      callWith: '',
+      callStartedAt: 1_700_000_000_000,
+    });
+    store.setState((s) => ({
+      voice: { ...s.voice, callState: 'idle' as CallState, callChannel: null, callStartedAt: null },
+    }));
+    const notice = await within(hub).findByTestId('calls-hub-outcome');
+    expect(notice).toHaveAttribute('data-outcome', 'ended');
+    expect(notice).toHaveTextContent('That call ended.');
+  });
+
+  it('stays silent when a ring is declined', async () => {
+    resetCallRejoinState();
+    const hub = await mountCallsHub({
+      callState: 'ringing_in',
+      callChannel: null,
+      callWith: 'alice',
+      callStartedAt: null,
+    });
+    store.setState((s) => ({
+      voice: { ...s.voice, callState: 'idle' as CallState, callChannel: null, callStartedAt: null },
+    }));
+    await within(hub).findByTestId('calls-hub-status');
+    expect(within(hub).queryByTestId('calls-hub-outcome')).toBeNull();
+  });
+
+  it('reports a transport drop with a pending rejoin', async () => {
+    resetCallRejoinState();
+    const hub = await mountCallsHub({
+      callState: 'in_call',
+      callChannel: '#lounge',
+      callWith: '',
+      callStartedAt: 1_700_000_000_000,
+    });
+    store.setState({ connectionStatus: 'reconnecting' });
+    store.setState((s) => ({
+      voice: { ...s.voice, callState: 'idle' as CallState, callChannel: null, callStartedAt: null },
+    }));
+    const notice = await within(hub).findByTestId('calls-hub-outcome');
+    expect(notice).toHaveAttribute('data-outcome', 'dropped');
+    expect(notice).toHaveTextContent('The connection dropped.');
   });
 
   it.each([null, 1_700_000_000_000])('returns to an existing DM call with start time %s without initiating media', async (callStartedAt) => {

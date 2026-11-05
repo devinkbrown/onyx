@@ -137,29 +137,50 @@ suite =
                         (Maybe.map (List.map .text << List.concat)
                             (planMultilineBatches "hel\u{0000}lo\n\u{0000}\nworld" defaultLimits)
                         )
-            , test "never splits inside a multi-byte code point" <|
+            , test "never splits inside a multi-byte code point: exact fragments within the UTF-8 byte budget" <|
                 \_ ->
-                    case planMultilineBatches "€€€€\nx" { maxBytes = 4, maxLines = 24 } of
-                        Just batches ->
-                            let
-                                fragments =
-                                    List.map .text (List.concat batches)
-                            in
-                            Expect.all
-                                [ \_ ->
-                                    Expect.equal False
-                                        (List.any (String.contains "�") fragments)
-                                , \_ ->
-                                    Expect.equal fragments
-                                        (List.map
-                                            (\f -> String.fromList (String.toList f))
-                                            fragments
-                                        )
-                                ]
-                                ()
+                    let
+                        -- max-bytes bounds both each fragment and each batch
+                        -- total (oracle multiline.ts), so a byte-split line
+                        -- spans batches and each continuation opening a new
+                        -- batch degrades to a standalone line (concat False).
+                        plan text limit =
+                            planMultilineBatches text { maxBytes = limit, maxLines = 24 }
 
-                        Nothing ->
-                            Expect.fail "expected batches"
+                        line text =
+                            { text = text, concat = False }
+
+                        euros =
+                            plan "\u{20AC}\u{20AC}\u{20AC}\u{20AC}\nx" 4
+
+                        mixed =
+                            plan "a\u{20AC}b\nx" 3
+
+                        emoji =
+                            plan "a\u{1F600}\nx" 4
+
+                        texts =
+                            Maybe.map (List.concat >> List.map .text)
+
+                        withinBudget limit batches =
+                            Maybe.map (List.all (\batch -> List.sum (List.map (.text >> utf8Bytes) batch) <= limit)) batches
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just [ [ line "\u{20AC}" ], [ line "\u{20AC}" ], [ line "\u{20AC}" ], [ line "\u{20AC}", line "x" ] ])
+                                euros
+                        , \_ -> Expect.equal (Just [ 3, 3, 3, 3, 1 ]) (Maybe.map (List.map utf8Bytes) (texts euros))
+                        , \_ -> Expect.equal (Just True) (withinBudget 4 euros)
+                        , \_ -> Expect.equal (Just "\u{20AC}\u{20AC}\u{20AC}\u{20AC}x") (Maybe.map String.concat (texts euros))
+                        , \_ -> Expect.equal (Just [ [ line "a" ], [ line "\u{20AC}" ], [ line "b", line "x" ] ]) mixed
+                        , \_ -> Expect.equal (Just [ 1, 3, 1, 1 ]) (Maybe.map (List.map utf8Bytes) (texts mixed))
+                        , \_ -> Expect.equal (Just True) (withinBudget 3 mixed)
+                        , \_ -> Expect.equal (Just "a\u{20AC}bx") (Maybe.map String.concat (texts mixed))
+                        , \_ -> Expect.equal (Just [ [ line "a" ], [ line "\u{1F600}" ], [ line "x" ] ]) emoji
+                        , \_ -> Expect.equal (Just [ 1, 4, 1 ]) (Maybe.map (List.map utf8Bytes) (texts emoji))
+                        ]
+                        ()
             , test "caps huge direct-call limits before planning" <|
                 \_ ->
                     let
@@ -329,3 +350,30 @@ suite =
 withDefault : a -> Maybe a -> a
 withDefault fallback value =
     Maybe.withDefault fallback value
+
+
+{-| Independent UTF-8 byte count (not the planner's own helper). -}
+utf8Bytes : String -> Int
+utf8Bytes text =
+    String.foldl
+        (\c acc ->
+            let
+                code =
+                    Char.toCode c
+            in
+            acc
+                + (if code < 0x80 then
+                    1
+
+                   else if code < 0x0800 then
+                    2
+
+                   else if code < 0x00010000 then
+                    3
+
+                   else
+                    4
+                  )
+        )
+        0
+        text

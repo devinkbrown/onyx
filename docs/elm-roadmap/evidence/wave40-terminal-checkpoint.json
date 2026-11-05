@@ -1,0 +1,30 @@
+{
+  "candidate": 40,
+  "verificationHandle": 92998,
+  "handleTerminal": true,
+  "runnerExitStatus": 1,
+  "receiptOutcome": "failed",
+  "sourceUnchanged": true,
+  "stages": [
+    [
+      "elm-full",
+      0
+    ],
+    [
+      "chromium-mock",
+      0
+    ],
+    [
+      "stress-browser",
+      0
+    ],
+    [
+      "paired-e90",
+      2
+    ]
+  ],
+  "runnerPrintError": "TypeError: flush passed to json.dumps after final receipt persistence; observations and terminal source guard were already saved",
+  "affectedReceiptSha256": "95977316242e200e12bfb995729015b4c9335b3b19bdbe530c9c810080f9eedf",
+  "pairedReceiptSha256": "1f944b3e5cbf5afddcecf6c32546bbe8bb46bacd7c64b29cf623a52c9866a1fa",
+  "performanceStatus": "observed-with-open-failures"
+}

@@ -34,6 +34,10 @@
 #   DEPLOY_DRY_RUN  Exactly 0 or 1 (default 0). If 1, build/stage/assert only —
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
+#   ONYX_CLIENT     Which client to ship: `solid` (default, Vite build) or `elm`
+#                   (Elm rewrite via tools/build-elm-site.mjs; requires `elm`
+#                   0.19.1 on PATH). Either way only dist/ is staged and only
+#                   this script writes out/.
 #   ONYX_LANDING    Override path to the legacy landing tree (default: /home/kain/landing)
 #   ONYX_STAGE_RELEASE_DOWNLOADS  If 1, copy unsigned public release archives
 #                   (Windows zip + Linux/FreeBSD/OpenBSD tar.gz + macOS Intel/ARM DMGs)
@@ -263,6 +267,67 @@ is_source_dirty() {
   else
     echo 0
   fi
+}
+
+# Other-execute bit set on a path? Traverse is effective for every user
+# (including the web account) exactly when this bit is set — the ACL mask
+# never restricts the other class.
+other_execute_set() {
+  local mode
+  mode="$(stat -c '%a' "$1" 2>/dev/null)" || return 1
+  [[ "$(( 8#${mode} & 001 ))" -ne 0 ]]
+}
+
+# Grant the web user traverse on the live parent. Returns 0 when traverse is
+# granted or already effective; fails closed otherwise. Named-ACL writes can
+# fail where the kernel/container does not support them — in that case
+# proceed only if traverse is already effective via other+x, never skip a
+# needed grant.
+ensure_web_traverse() {
+  local web_user="$1" live_parent="$2"
+  if ! id -u "${web_user}" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "==> ensuring ${web_user} can traverse live parent ${live_parent}"
+  if command -v setfacl >/dev/null 2>&1 \
+    && setfacl -m "u:${web_user}:--x" "${live_parent}" 2>/dev/null; then
+    return 0
+  fi
+  if other_execute_set "${live_parent}"; then
+    echo "WARN: setfacl grant failed — traverse already effective via other+x on ${live_parent}" >&2
+    return 0
+  fi
+  echo "FAIL: cannot grant ${web_user} traverse access to ${live_parent}" >&2
+  return 1
+}
+
+# Build the Elm client site into dist/, replacing any SolidJS leftovers.
+# Fails closed when the Elm toolchain is missing or the staging checks fail.
+build_elm_site() {
+  echo "==> building Elm client site -> dist/"
+  rm -rf "${ROOT}/dist"
+  mkdir -p "${ROOT}/dist"
+  node "${ROOT}/tools/build-elm-site.mjs" "${ROOT}/dist" \
+    || { echo "FAIL: Elm site build failed — NOT deploying" >&2; return 1; }
+
+  test -f dist/index.html || { echo "FAIL: dist/index.html missing — build broken, NOT deploying" >&2; return 1; }
+  test -f dist/app.js || { echo "FAIL: dist/app.js missing — build broken, NOT deploying" >&2; return 1; }
+  test -f dist/ports.js || { echo "FAIL: dist/ports.js missing — build broken, NOT deploying" >&2; return 1; }
+  test -f dist/sw.js || { echo "FAIL: dist/sw.js missing" >&2; return 1; }
+
+  # Guard: staged root must still be the Elm landing after build.
+  verify_public_title dist/index.html \
+    || { echo "FAIL: dist/index.html missing authoritative public title — refusing deploy" >&2; return 1; }
+
+  test -f dist/app/index.html \
+    || { echo "FAIL: dist/app/index.html missing after materialise" >&2; return 1; }
+  test -f dist/download/index.html \
+    || { echo "FAIL: dist/download/index.html missing after materialise" >&2; return 1; }
+  test -f dist/404.html \
+    || { echo "FAIL: dist/404.html missing after materialise" >&2; return 1; }
+  test ! -e dist/404/index.html \
+    || { echo "FAIL: materialiser must emit flat dist/404.html, never dist/404/index.html" >&2; return 1; }
+  return 0
 }
 
 # Copy one allowlist entry if present. Fail on symlink / unsafe type.
@@ -585,7 +650,14 @@ verify_live_out() {
     echo "FAIL: live sw.js missing after sync" >&2
     return 1
   fi
-  if ! grep -q "onyx-shell-${version}" "${live_out}/sw.js"; then
+  if [[ "${ONYX_CLIENT:-solid}" == "elm" ]]; then
+    # Elm sw.js carries a content-addressed build envelope; the live copy must
+    # be byte-identical to the staged one.
+    if ! cmp -s "${ROOT}/dist/sw.js" "${live_out}/sw.js"; then
+      echo "FAIL: live sw.js differs from the staged Elm build" >&2
+      return 1
+    fi
+  elif ! grep -q "onyx-shell-${version}" "${live_out}/sw.js"; then
     echo "FAIL: live sw.js version stamp mismatch (expected onyx-shell-${version})" >&2
     return 1
   fi
@@ -738,8 +810,12 @@ deploy_main() {
 
   assert_no_spa_owned_in_landing_dist "${LANDING}/dist" || exit 1
 
-  echo "==> building static export -> dist/"
-  NODE_OPTIONS="--disable-warning=DEP0205" pnpm build
+  client="${ONYX_CLIENT:-solid}"
+  if [[ "${client}" == "elm" ]]; then
+    build_elm_site || exit 1
+  elif [[ "${client}" == "solid" ]]; then
+    echo "==> building static export -> dist/"
+    NODE_OPTIONS="--disable-warning=DEP0205" pnpm build
 
   test -f dist/index.html || { echo "FAIL: dist/index.html missing — build broken, NOT deploying"; exit 1; }
   test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
@@ -761,6 +837,10 @@ deploy_main() {
     || { echo "FAIL: dist/404.html missing after materialise"; exit 1; }
   test ! -e dist/404/index.html \
     || { echo "FAIL: materialiser must emit flat dist/404.html, never dist/404/index.html"; exit 1; }
+  else
+    echo "FAIL: ONYX_CLIENT must be solid or elm (got: ${client})" >&2
+    exit 1
+  fi
 
   # Optional: stage site-local public release artifacts (never the default).
   # Six public lanes: windows + linux + macos-x86_64 + macos-arm64 + freebsd + openbsd.
@@ -782,10 +862,20 @@ deploy_main() {
     echo "==> skipping release download artifact staging (set ONYX_STAGE_RELEASE_DOWNLOADS=1 to enable)"
   fi
 
-  echo "==> stamping service-worker cache: onyx-shell-${version}"
-  sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/" dist/sw.js
-  grep -q "onyx-shell-${version}" dist/sw.js \
-    || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
+  if [[ "${ONYX_CLIENT:-solid}" == "elm" ]]; then
+    # The Elm service worker carries a content-addressed build envelope written
+    # by tools/build-elm-site.mjs. sw.js is part of the hashed shell, so it must
+    # not be rewritten here; verify the envelope was stamped instead.
+    echo "==> verifying Elm service-worker build envelope"
+    if grep -q "__ONYX_SW_BUILD_CONFIG__" dist/sw.js || ! grep -q '"buildId":"[0-9a-f]\{32\}"' dist/sw.js; then
+      echo "FAIL: Elm sw.js build envelope missing or unstamped — NOT deploying"; exit 1
+    fi
+  else
+    echo "==> stamping service-worker cache: onyx-shell-${version}"
+    sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/" dist/sw.js
+    grep -q "onyx-shell-${version}" dist/sw.js \
+      || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
+  fi
 
   # Build legacy landing only to harvest allowlisted support resources.
   echo "==> building legacy landing (allowlisted support resources only)"
@@ -839,12 +929,7 @@ deploy_main() {
   # Runs only after a successful snapshot (or intentional skip for empty/missing).
   web_user="${ONYX_WEB_USER:-http}"
   live_parent="$(dirname "${live_out}")"
-  if id -u "${web_user}" >/dev/null 2>&1; then
-    command -v setfacl >/dev/null 2>&1 \
-      || { echo "FAIL: setfacl is required to grant ${web_user} traverse access to ${live_parent}"; exit 1; }
-    echo "==> ensuring ${web_user} can traverse live parent ${live_parent}"
-    setfacl -m "u:${web_user}:--x" "${live_parent}"
-  fi
+  ensure_web_traverse "${web_user}" "${live_parent}" || exit 1
 
   sync_live_with_rollback "${ROOT}/dist" "${live_out}" "${version}" || exit 1
 

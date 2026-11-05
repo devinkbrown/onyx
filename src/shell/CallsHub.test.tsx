@@ -210,3 +210,41 @@ describe('CallsHub', () => {
     expect(screen.getByText(/Choose a room to see its call controls and live status/i)).toBeInTheDocument();
   });
 });
+
+describe('CallsHub call outcomes', () => {
+  it('stays silent about the past when no outcome is known', () => {
+    renderHub();
+    expect(screen.queryByTestId('calls-hub-outcome')).toBeNull();
+  });
+
+  it.each([
+    ['ended', 'That call ended.', 'whenever you are ready'],
+    ['failed', 'Couldn\u2019t start the call.', 'try again'],
+    ['dropped', 'The connection dropped.', 'your place in the conversation is kept'],
+  ] as const)('acknowledges an idle %s call with a next step', (outcome, title, detail) => {
+    renderHub({ lastCallOutcome: outcome });
+    const notice = screen.getByTestId('calls-hub-outcome');
+    expect(notice).toHaveAttribute('data-outcome', outcome);
+    expect(notice).toHaveTextContent(title);
+    expect(notice).toHaveTextContent(detail);
+    // Still a starting point: no join/accept invented.
+    expect(screen.queryByRole('button', { name: /accept|join|start/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Choose a room' })).toBeInTheDocument();
+  });
+
+  it('lets a live call win over history', () => {
+    renderHub({
+      callState: 'in_call',
+      callChannel: '#room',
+      callStartedAt: 1_700_000_000_000,
+      lastCallOutcome: 'dropped',
+    });
+    expect(screen.queryByTestId('calls-hub-outcome')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Return to call' })).toBeInTheDocument();
+  });
+
+  it('hides history while ringing', () => {
+    renderHub({ callState: 'ringing_in', callWith: 'alice', lastCallOutcome: 'failed' });
+    expect(screen.queryByTestId('calls-hub-outcome')).toBeNull();
+  });
+});

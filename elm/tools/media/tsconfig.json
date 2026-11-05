@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["./webrtc-server-investigation.ts"]
+}

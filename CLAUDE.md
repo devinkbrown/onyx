@@ -99,7 +99,7 @@ go to dist/, so tests/e2e can never wipe or half-replace production.
 | MEDIA subcommands + Event Spine MEDIA | Voice/video channel |
 
 ## Services (Onyx Server built-in — NO NickServ pseudo-clients)
-Real server commands with structured replies (NOTE/FAIL/WARN): `REGISTER`,
-`VERIFY`, `IDENTIFY`, `LOGOUT`, `DROP`, `ACCOUNTINFO`, `ACCOUNTSET`,
-`GHOST`, `CERTADD`/`CERTLIST`/`CERTDEL`. Session resume: after SASL the
-server issues `NOTE SESSION TOKEN`/`MTOKEN`; reconnect with `SESSION RESUME`.
+Account and session replies use source-shaped `NOTICE`, `FAIL`, and `WARN`
+messages; session credentials arrive as `NOTICE SESSION TOKEN` and, when
+available, `NOTICE SESSION MTOKEN`. Reclaim them with `SESSION RESUME`.
+Media signaling and state use `EVENT ... MEDIA ...` on the Event Spine.

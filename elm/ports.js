@@ -18,6 +18,14 @@
   var VAULT_META = "vault_meta";
   var SCHEDULED_CLEAR_EPOCH_KEY = "clear-epoch";
   var SCHEDULED_MAX_ROWS = 256;
+  var UNKNOWN_SENSITIVE_MARKER = /(?:AUTHENTICATE|E2EEGROUP|E2EE[._-](?:KEYPACKAGE|COMMIT|WELCOME)|E2EEKEY|SESSION\s+(?:TOKEN|MTOKEN)|SESSIONTOKEN|MEDIA\s+MACKEY)/i;
+  var SUPPORTED_SENSITIVE_ENVELOPES = { AUTHENTICATE: true, E2EEGROUP: true, "E2EE.KEYPACKAGE": true,
+    "E2EE.COMMIT": true, "E2EE.WELCOME": true, E2EEKEY: true, EVENT: true, FAIL: true, NOTICE: true, PRIVMSG: true, WARN: true };
+  function normalizeRuntimeLine(line) {
+    if (typeof line !== "string") return null;
+    var normalized = line.endsWith("\r\n") ? line.slice(0, -2) : line;
+    return normalized.length > 0 && !/[\r\n\u0000]/u.test(normalized) ? normalized : null;
+  }
   /* Mirrors historyVault OUTBOX_MAX_ENTRIES / OUTBOX_MAX_AGE_MS. */
   var OUTBOX_MAX_ENTRIES = 100;
   var OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -41,7 +49,7 @@
     return "q" + Date.now().toString(36) + outboxLabelCounter.toString(36);
   }
 
-  function openVault(onReady) {
+  function openVault(onReady, onVersionChange) {
     if (!("indexedDB" in global)) {
       onReady(null);
       return;
@@ -68,7 +76,14 @@
         db.createObjectStore(VAULT_META, { keyPath: "id" });
       }
     };
-    req.onsuccess = function () { onReady(req.result); };
+    req.onsuccess = function () {
+      var db = req.result;
+      db.onversionchange = function () {
+        try { db.close(); } catch (err) { /* connection already closed */ }
+        if (typeof onVersionChange === "function") onVersionChange(db);
+      };
+      onReady(db);
+    };
     req.onerror = function () { onReady(null); };
   }
 
@@ -95,6 +110,7 @@
     var reply = row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null;
     return {
       id: String(row.id || ""),
+      wireMessageId: typeof row.wireMessageId === "string" ? row.wireMessageId : null,
       target: String(row.target || ""),
       from: String(row.from || ""),
       body: String(row.body || ""),
@@ -241,7 +257,6 @@
     var tx = db.transaction(STORE, "readwrite");
     var store = tx.objectStore(STORE);
     var index = store.index("by-target");
-    var pending = names.length;
     names.forEach(function (target) {
       var seen = [];
       var cursor = index.openCursor(IDBKeyRange.only(target));
@@ -260,7 +275,6 @@
           prune.forEach(function (id) {
             if (keyById[id] !== undefined) { try { store.delete(keyById[id]); } catch (err) {} }
           });
-          pending -= 1;
         }
       };
     });
@@ -1042,7 +1056,7 @@
       tx2.onabort = function () { done(false); };
     }
     tx1.oncomplete = function () {
-      var open = false;
+      var open;
       try { open = sock.isOpen(); } catch (err) { open = false; }
       var waitingRows = held.map(outboxElmRow);
       if (!open || live.length === 0) {
@@ -1060,7 +1074,7 @@
         }
         try { sock.send(line); } catch (err) {}
       });
-      var stillOpen = false;
+      var stillOpen;
       try { stillOpen = sock.isOpen(); } catch (err) { stillOpen = false; }
       if (!stillOpen) {
         /* Bytes may have reached the socket before it died: uncertain, and
@@ -1090,115 +1104,14 @@
     };
   }
 
-  /* Session resume credentials — ports-side subset of
-     credentials.ts (`onyx:credentials` localStorage). Only the
-     server-issued resume Bearer [REDACTED] (local TOKEN + mesh MTOKEN) live
-     here; passwords, remembered identities, and account handoffs need
-     a login UI the Elm client has not built yet. Shape:
-       { v: 1, slots: { "<server>|<nick>": { sessionToken?,
-         meshToken?, meshExpiresAtMs? } } }
-     with per-server/nick keying so an account switch never replays a
-     stranger's bearer. Bounds mirror the oracle (4 KiB Bearer [REDACTED]
-     no whitespace/control). */
-  var CRED_KEY = "onyx:credentials";
-  var MAX_RESUME_TOKEN_LENGTH = 4 * 1024;
-
-  function credentialSlotKey(server, nick) {
-    return String(server || "").toLowerCase() + "|" + String(nick || "").toLowerCase();
-  }
-
-  function validResumeToken(token) {
-    return typeof token === "string"
-      && token.length > 0
-      && token.length <= MAX_RESUME_TOKEN_LENGTH
-      && !/[\s\u0000-\u001f\u007f]/.test(token);
-  }
-
-  function readCredentialsStore() {
-    try {
-      var raw = global.localStorage.getItem(CRED_KEY);
-      if (!raw) return { v: 1, slots: {} };
-      var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { v: 1, slots: {} };
-      if (!parsed.slots || typeof parsed.slots !== "object" || Array.isArray(parsed.slots)) return { v: 1, slots: {} };
-      return { v: 1, slots: parsed.slots };
-    } catch (err) {
-      return { v: 1, slots: {} };
-    }
-  }
-
-  function writeCredentialsStore(store) {
-    try {
-      var serialized = JSON.stringify({ v: 1, slots: store.slots || {} });
-      if (serialized.length > 64 * 1024) return false;
-      global.localStorage.setItem(CRED_KEY, serialized);
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function finiteMs(value) {
-    return (typeof value === "number" && isFinite(value) && value >= 0) ? Math.floor(value) : null;
-  }
-
-  /* Persist one captured Bearer [REDACTED] Merge into the slot, never clobber
-     the sibling kind (mirrors updateResumeTokens). */
-  function storeResumeToken(server, nick, kind, token, expiresAtSec) {
-    if (!validResumeToken(token)) return false;
-    var store = readCredentialsStore();
-    var key = credentialSlotKey(server, nick);
-    var slot = store.slots[key];
-    if (!slot || typeof slot !== "object" || Array.isArray(slot)) slot = {};
-    if (kind === "mtoken") {
-      slot.meshToken = token;
-      var ms = (typeof expiresAtSec === "number" && isFinite(expiresAtSec) && expiresAtSec >= 0)
-        ? Math.floor(expiresAtSec * 1000)
-        : null;
-      if (ms === null) {
-        delete slot.meshExpiresAtMs;
-      } else {
-        slot.meshExpiresAtMs = ms;
-      }
-    } else if (kind === "token") {
-      slot.sessionToken = token;
-    } else {
-      return false;
-    }
-    store.slots[key] = slot;
-    return writeCredentialsStore(store);
-  }
-
-  /* Load validated holdings for one slot; never throws, never leaks. */
-  function loadResumeTokens(server, nick) {
-    var store = readCredentialsStore();
-    var slot = store.slots[credentialSlotKey(server, nick)];
-    if (!slot || typeof slot !== "object" || Array.isArray(slot)) return null;
-    var out = {};
-    if (validResumeToken(slot.sessionToken)) out.sessionToken = slot.sessionToken;
-    if (validResumeToken(slot.meshToken)) out.meshToken = slot.meshToken;
-    var ms = finiteMs(slot.meshExpiresAtMs);
-    if (ms !== null && out.meshToken) out.meshExpiresAtMs = ms;
-    return out;
-  }
-
-  /* Drop the credential slot after a terminal `FAIL SESSION
-     INVALID_TOKEN/NO_SESSION` (mirrors `clearSessionToken`): a rejected
-     Bearer [REDACTED] never replay on the next 001. */
-  function clearResumeTokens(server, nick) {
-    var store = readCredentialsStore();
-    var key = credentialSlotKey(server, nick);
-    if (store.slots[key] === undefined) return false;
-    delete store.slots[key];
-    return writeCredentialsStore(store);
-  }
+  /* Resume credential bytes are owned by the private runtime module. */
 
   /* SASL credential exchange, mirroring `client.ts`: secrets live here,
-     never in Elm state. Elm owns mechanism selection, the exchange state
-     machine, and 400-byte chunking; this side holds the password, computes
+     never in Elm state. Elm owns mechanism selection and exchange state;
+     this side holds the password, computes
      the PLAIN blob (UTF-8, since `btoa` is Latin-1 only), and runs the
      SCRAM-SHA-256 exchange (WebCrypto PBKDF2/HMAC) with its own challenge
-     state. Answers return through `saslPayload` / `saslFailed`. */
+     state. Answers go directly to the private transport / saslFailed. */
   var SASL_TIMEOUT_MS = 15000;
 
   function b64encodeUtf8(value) {
@@ -2096,7 +2009,7 @@
     textarea.style.inset = "0 auto auto -9999px";
     textarea.style.opacity = "0";
     document.body.append(textarea);
-    var copied = false;
+    var copied;
     try {
       textarea.focus({ preventScroll: true });
       textarea.select();
@@ -2383,7 +2296,7 @@
   var UPLOAD_BRIDGE_MAX_BYTES = 64 * 1024;
 
   function readBoundedBridgeText(response, cap) {
-    var rawLength = null;
+    var rawLength;
     try {
       rawLength = response.headers ? response.headers.get("content-length") : null;
     } catch (err) { rawLength = null; }
@@ -2435,7 +2348,7 @@
           resolve({ ok: false, status: xhr.status, body: "", contentType: null });
           return;
         }
-        var contentType = null;
+        var contentType;
         try { contentType = xhr.getResponseHeader("content-type"); } catch (err) { contentType = null; }
         var text = (typeof xhr.responseText === "string") ? xhr.responseText : "";
         if (text.length > UPLOAD_BRIDGE_MAX_BYTES) {
@@ -2516,6 +2429,7 @@
   var MEDIA_MAX_BINARY_BYTES = 4 * 1024 * 1024;
   var MEDIA_MAX_BUFFERED_BYTES = 8 * 1024 * 1024;
   var MEDIA_TEXT_SUBPROTOCOL = "text.ircv3.net";
+  var MEDIA_BINARY_SUBPROTOCOL = "onyx.irc-media.v1";
 
   function mediaToBytes(data) {
     if (typeof ArrayBuffer !== "undefined" && data instanceof ArrayBuffer) {
@@ -2540,7 +2454,7 @@
 
   function mediaAdmitsBinary(socket) {
     try {
-      return !!socket && socket.readyState === 1 && socket.protocol !== MEDIA_TEXT_SUBPROTOCOL;
+      return !!socket && socket.readyState === 1 && socket.protocol === MEDIA_BINARY_SUBPROTOCOL;
     } catch (err) {
       return false;
     }
@@ -2562,8 +2476,8 @@
   function mediaReceiveRaw(app, data, protocol, close) {
     var bytes = mediaToBytes(data);
     if (!bytes) return "text";
-    if (protocol === MEDIA_TEXT_SUBPROTOCOL) {
-      try { close(1002, "Binary frame on text.ircv3.net"); } catch (err) { /* already closing */ }
+    if (protocol !== MEDIA_BINARY_SUBPROTOCOL) {
+      try { close(1002, "Binary frame without onyx.irc-media.v1"); } catch (err) { /* already closing */ }
       return "closed";
     }
     if (bytes.byteLength > MEDIA_MAX_BINARY_BYTES) {
@@ -2648,22 +2562,50 @@
     }
   }
 
-  function connectSocket(app, url, sendPort, onClose) {
+  function isPrivateCredentialWireLine(line) {
+    if (typeof line !== "string") return false;
+    if (line.length > 512 * 1024) return true;
+    var normalized = line.replace(/\u0000/g, " ");
+    var withoutTags = normalized.replace(/^@[^ ]+ +/, "");
+    var withoutPrefix = withoutTags.charAt(0) === ":" ? withoutTags.slice(withoutTags.indexOf(" ") + 1) : withoutTags;
+    var outer = /^([A-Za-z0-9._-]+)(?:\s|$)/.exec(withoutPrefix);
+    var command = outer && outer[1] ? outer[1].toUpperCase() : "";
+    if (UNKNOWN_SENSITIVE_MARKER.test(normalized)
+        && (!command || (!SUPPORTED_SENSITIVE_ENVELOPES[command] && !/^\d{3}$/.test(command)))) return true;
+    var notice = /^:([^\s]+) (?:NOTICE [^\s]+|FAIL|WARN) :(.*)$/i.exec(line);
+    var body = notice && notice[2] ? notice[2] : null;
+    if (body === null) return false;
+    return /^(?:SESSION\s+(?:TOKEN|MTOKEN)(?:\s|$)|SESSIONTOKEN(?:\s|$)|MACKEY(?:\s|$)|ACCOUNT\s+RECOVERY\s+(?:CODE|CODES?)(?:\s|$)|RECOVERY\s+(?:CODE|CODES?)(?:\s|$)|PASSKEY\s+(?:CHALLENGE|ASSERTION)(?:\s|$)|KEYTRANS\s+(?:PROOF|CHALLENGE)(?:\s|$)|TOTP:|RECOVERYCODES:)/i.test(body);
+  }
+
+  function connectSocket(app, url, sendPort, isCurrent, onClose, runtime) {
     var socket = null;
     try {
-      socket = new WebSocket(url);
+      socket = new WebSocket(url, [MEDIA_TEXT_SUBPROTOCOL]);
     } catch (err) {
-      app.ports.wsClosed.send({ clean: false, reason: String(err) });
+      if (!isCurrent || isCurrent()) app.ports.wsClosed.send({ clean: false, reason: String(err) });
       return { send: function () {}, close: function () {}, isOpen: function () { return false; } };
+    }
+    function currentSocket() {
+      try { return !isCurrent || isCurrent(); } catch (err) { return false; }
     }
     /* Binary media datagrams arrive as ArrayBuffers (never Blobs), so the
        bridge gets bytes synchronously — mirroring the oracle client. */
     try { socket.binaryType = "arraybuffer"; } catch (err) { /* text still flows */ }
-    var buffer = "";
     socket.addEventListener("open", function () {
+      if (!currentSocket()) return;
+      if (socket.protocol !== MEDIA_TEXT_SUBPROTOCOL) {
+        try { socket.close(1002, "Unsupported WebSocket subprotocol"); } catch (err) { /* already closing */ }
+        return;
+      }
       app.ports.wsOpened.send({ url: url });
     });
     socket.addEventListener("message", function (event) {
+      if (!currentSocket()) return;
+      if (socket.protocol !== MEDIA_TEXT_SUBPROTOCOL && socket.protocol !== MEDIA_BINARY_SUBPROTOCOL) {
+        try { socket.close(1002, "Unsupported WebSocket subprotocol"); } catch (err) { /* already closing */ }
+        return;
+      }
       /* Binary frames carry media datagrams, not IRC lines: classify first
          so binary bytes can never pollute the text buffer. */
       if (mediaReceiveRaw(app, event.data, socket.protocol, function (code, reason) {
@@ -2671,25 +2613,39 @@
       }) !== "text") {
         return;
       }
-      buffer += String(event.data);
-      var lines = buffer.split("\r\n");
-      buffer = lines.pop();
-      var batch = lines.filter(function (line) { return line.length > 0; });
+      /* Each browser message is a complete WS frame. Onyx Server omits
+         CRLF; retaining a remainder here stalls CAP and registration. */
+      var frame = String(event.data);
+      var batch = frame.split("\n").map(function (line) {
+        return line.replace(/\r$/, "");
+      }).filter(function (line) {
+        if (!line) return false;
+        if (runtime && typeof runtime.consumePrivateLine === "function") {
+          try { if (runtime.consumePrivateLine(line)) return false; } catch (err) { return false; }
+        }
+        return !isPrivateCredentialWireLine(line);
+      });
       if (batch.length > 0) {
         sendPort(batch);
       }
     });
     socket.addEventListener("close", function (event) {
+      if (!currentSocket()) return;
       app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
       if (onClose) { try { onClose(); } catch (err) {} }
     });
     socket.addEventListener("error", function () {
+      if (!currentSocket()) return;
       app.ports.wsClosed.send({ clean: false, reason: "error" });
     });
     return {
       send: function (line) {
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(line + "\r\n");
+        if (currentSocket() && socket.readyState === WebSocket.OPEN && socket.protocol === MEDIA_TEXT_SUBPROTOCOL) {
+          /* Elm's formatter includes a transport terminator. WS carries
+             one complete IRC line; reject embedded line separators. */
+          var payload = typeof line === "string" ? line.replace(/\r?\n$/, "") : "";
+          if (!payload || /[\r\n\x00]/.test(payload)) return;
+          socket.send(payload);
         }
       },
       close: function (code, reason) {
@@ -2783,23 +2739,543 @@ function fetchPublicFeed(url) {
     .then(function (outcome) { return finish(outcome); })
     .catch(function () { return finish({ ok: false, status: 0, body: "" }); });
 }
-  function wire(app) {
+  function wire(app, options) {
+    var runtime = options && options.runtime ? options.runtime : null;
+    var privateRuntimeRequired = !!(options && options.requirePrivateRuntime === true);
+    if (privateRuntimeRequired) {
+      var requiredRuntimeMethods = ["ownerSnapshot", "isPrivateRuntimeActive", "connect", "sendLine", "sendBinary", "dispatchDomain", "flushOutgoing", "vaultPut", "vaultGet", "vaultGetAround", "vaultSearch", "vaultClear", "openDmFromCurrentPeer", "captureSaslContext", "sendSaslPayload", "issueCredentialBundle", "requestPrivatePassword", "requestPrivateAccountForm", "requestPrivateScheduledMessage", "reportClientSafetyState", "settleNotificationNavigation"];
+      if (!runtime || requiredRuntimeMethods.some(function (name) { return typeof runtime[name] !== "function"; })) return false;
+      if (typeof runtime.subscribeSessionTokenSaslStatus !== "function") return false;
+    }
     var socket = { send: function () {}, close: function () {}, isOpen: function () { return false; }, rawSocket: function () { return null; } };
+    var socketGeneration = 0;
     var vault = null;
     var keepalive = null;
+    var captureIntents = Object.create(null);
 
-    openVault(function (db) { vault = db; });
+    function safeRetentionScope(scope) {
+      if (!scope || (scope.kind !== "live" && scope.kind !== "cached")) {
+        return { kind: "unknown", policyRevision: null, lastSyncMs: null };
+      }
+      var revision = typeof scope.policyRevision === "string" && scope.policyRevision.length <= 2048
+        && !/[\u0000-\u001f\u007f]/.test(scope.policyRevision) ? scope.policyRevision : null;
+      var synced = Number.isSafeInteger(scope.lastSyncMs) && scope.lastSyncMs >= 0 ? scope.lastSyncMs : null;
+      if (revision === null || synced === null) return { kind: "unknown", policyRevision: null, lastSyncMs: null };
+      return { kind: scope.kind, policyRevision: revision, lastSyncMs: synced };
+    }
+
+    function historyRequestStamp(req) {
+      return {
+        ownerRef: req && typeof req.ownerRef === "string" ? req.ownerRef : null,
+        accountGeneration: req && Number.isSafeInteger(req.accountGeneration) ? req.accountGeneration : null,
+        connectionGeneration: req && Number.isSafeInteger(req.connectionGeneration) ? req.connectionGeneration : null
+      };
+    }
+
+    function safeRetentionScopes(scopes) {
+      if (!Array.isArray(scopes)) return [{ conversationId: "", scope: safeRetentionScope(null) }];
+      if (scopes.length > 2048) return [{ conversationId: "", scope: safeRetentionScope(null) }];
+      if (scopes.some(function (entry) { return !entry || typeof entry.conversationId !== "string" || entry.conversationId.length === 0 || entry.conversationId.length > 512; })) {
+        return [{ conversationId: "", scope: safeRetentionScope(null) }];
+      }
+      return scopes.map(function (entry) {
+        return { conversationId: entry.conversationId, scope: safeRetentionScope(entry.scope) };
+      });
+    }
+
+    /* Media permission must be requested inside the trusted DOM gesture.
+       Waiting for an Elm port round trip loses transient user activation.
+       The result sent back to Elm contains only opaque refs and safe status. */
+    if (global.document && typeof global.document.addEventListener === "function"
+      && runtime && typeof runtime.createCaptureIntentRef === "function"
+      && typeof runtime.prepareCaptureFromGesture === "function") {
+      var captureClick = function (event) {
+        if (!event || event.isTrusted !== true) return;
+        var target = event.target;
+        var control = target && typeof target.closest === "function"
+          ? target.closest("[data-onyx-media-capture][data-onyx-media-conversation]") : null;
+        if (!control) return;
+        var kind = control.getAttribute("data-onyx-media-capture");
+        var conversationId = control.getAttribute("data-onyx-media-conversation");
+        var callRef = control.getAttribute("data-onyx-media-call-ref");
+        if (["voice", "video", "camera-preview", "screen", "soundcheck", "input-switch", "webrtc-voice", "webrtc-video"].indexOf(kind) < 0
+          || !conversationId || conversationId.length > 512) return;
+        if (kind === "soundcheck" && conversationId !== "soundcheck") return;
+        if (kind === "input-switch" && conversationId.length > 512) return;
+        if ((kind === "input-switch" || kind === "screen") && (typeof callRef !== "string" || !/^[A-Za-z0-9_-]{22,128}$/.test(callRef))) return;
+        var hasDeviceRef = typeof control.hasAttribute === "function" && control.hasAttribute("data-onyx-media-device-ref");
+        var deviceRef = hasDeviceRef ? control.getAttribute("data-onyx-media-device-ref") : undefined;
+        if (kind === "input-switch" && !hasDeviceRef) return;
+        if (hasDeviceRef && deviceRef !== "" && !/^[A-Za-z0-9_-]{22,128}$/.test(deviceRef)) return;
+        if (hasDeviceRef && deviceRef === "") deviceRef = null;
+        var owner;
+        var intentRef;
+        try {
+          owner = typeof runtime.ownerSnapshot === "function" ? runtime.ownerSnapshot() : null;
+          intentRef = runtime.createCaptureIntentRef();
+        } catch (_error) { return; }
+        if (!owner || typeof owner.ownerRef !== "string" || !intentRef) return;
+        Object.keys(captureIntents).forEach(function (key) {
+          var pending = captureIntents[key];
+          if (!pending || pending.ownerRef !== owner.ownerRef || pending.connectionGeneration !== owner.connectionGeneration
+            || pending.accountGeneration !== owner.accountGeneration) delete captureIntents[key];
+        });
+        while (Object.keys(captureIntents).length >= 32) delete captureIntents[Object.keys(captureIntents)[0]];
+        captureIntents[intentRef] = { kind: kind, conversationId: conversationId, ownerRef: owner.ownerRef,
+          connectionGeneration: owner.connectionGeneration, accountGeneration: owner.accountGeneration,
+          ...(callRef === null ? {} : { callRef: callRef }),
+          ...(deviceRef === undefined ? {} : { deviceRef: deviceRef }) };
+        try {
+          var captureKind = kind === "video" || kind === "camera-preview" || kind === "webrtc-video" ? "camera"
+            : kind === "screen" ? "screen" : "voice";
+          var purpose = kind === "camera-preview" ? "local-preview"
+            : kind === "soundcheck" ? "soundcheck"
+            : kind === "webrtc-voice" || kind === "webrtc-video" ? "webrtc-call" : "cadence-call";
+          var captureRequest = { intentRef: intentRef, owner: owner, conversationId: conversationId, kind: captureKind, purpose: purpose };
+          if (callRef !== null) captureRequest.callRef = callRef;
+          if (deviceRef !== undefined) captureRequest.deviceRef = deviceRef;
+          var readiness = runtime.prepareCaptureFromGesture(captureRequest);
+          /* The runtime normally reports synchronously through the observer.
+             Keep early call/owner failures visible even when no observer event
+             was emitted, and retain compatibility with simpler adapters. */
+          if (readiness && captureIntents[intentRef]
+            && (readiness.available !== true || typeof runtime.subscribeCapturePrepared !== "function")) {
+            delete captureIntents[intentRef];
+            if (app.ports.runtimeCapturePrepared) app.ports.runtimeCapturePrepared.send({
+              ownerRef: owner.ownerRef, connectionGeneration: owner.connectionGeneration,
+              accountGeneration: owner.accountGeneration, conversationId: conversationId,
+              captureRef: intentRef, kind: kind, available: readiness.available === true,
+              ...(callRef === null ? {} : { callRef: callRef }),
+              reason: typeof readiness.reason === "string" ? readiness.reason : null,
+              ...(deviceRef === undefined ? {} : { deviceRef: deviceRef })
+            });
+          }
+        } catch (_error) {
+          delete captureIntents[intentRef];
+        }
+      };
+      global.document.addEventListener("click", captureClick, true);
+      if (typeof runtime.subscribeCapturePrepared === "function") {
+        runtime.subscribeCapturePrepared(function (prepared) {
+          if (!prepared || typeof prepared.intentRef !== "string") return;
+          var intent = captureIntents[prepared.intentRef];
+          if (!intent || intent.ownerRef !== prepared.ownerRef || intent.conversationId !== prepared.conversationId) return;
+          if (Object.prototype.hasOwnProperty.call(intent, "callRef") && prepared.callRef !== intent.callRef) { delete captureIntents[prepared.intentRef]; return; }
+          delete captureIntents[prepared.intentRef];
+          if (app.ports.runtimeCapturePrepared) app.ports.runtimeCapturePrepared.send({
+            ownerRef: prepared.ownerRef, connectionGeneration: intent.connectionGeneration,
+            accountGeneration: intent.accountGeneration, conversationId: prepared.conversationId,
+            captureRef: prepared.captureRef, kind: intent.kind, available: prepared.available === true,
+            ...(Object.prototype.hasOwnProperty.call(intent, "callRef") ? { callRef: intent.callRef } : {}),
+            reason: typeof prepared.reason === "string" ? prepared.reason : null,
+            ...(Object.prototype.hasOwnProperty.call(intent, "deviceRef") ? { deviceRef: intent.deviceRef } : {})
+          });
+        });
+      }
+    }
+
+    /* These actions call browser APIs which require transient activation. Keep
+       their start on the trusted click stack, and return only bounded status. */
+    if (global.document && typeof global.document.addEventListener === "function" && runtime) {
+      var mediaGestureClick = function (event) {
+        if (!event || event.isTrusted !== true) return;
+        var target = event.target;
+        var control = target && typeof target.closest === "function"
+          ? target.closest("[data-onyx-media-gesture]") : null;
+        if (!control) return;
+        var gesture = control.getAttribute("data-onyx-media-gesture");
+        var conversationId = control.getAttribute("data-onyx-media-conversation");
+        var callRef = control.getAttribute("data-onyx-media-call-ref");
+        if (["caption-prepare", "audio-recover", "output-select"].indexOf(gesture) < 0
+          || conversationId === null || callRef === null || conversationId.length > 512) return;
+        var noCallScope = conversationId === "" && callRef === "";
+        if (gesture === "output-select" ? (!noCallScope && !/^[A-Za-z0-9_-]{22,128}$/.test(callRef))
+          : (!conversationId || !/^[A-Za-z0-9_-]{22,128}$/.test(callRef))) return;
+        var owner;
+        try { owner = typeof runtime.ownerSnapshot === "function" ? runtime.ownerSnapshot() : null; } catch (_error) { return; }
+        if (!owner || typeof owner.ownerRef !== "string") return;
+        var operation;
+        try {
+          if (gesture === "caption-prepare") {
+            var language = control.getAttribute("data-onyx-media-language");
+            if (!language || !/^[A-Za-z0-9-]{2,64}$/.test(language)
+              || typeof runtime.prepareCaptionLanguageFromGesture !== "function") return;
+            operation = runtime.prepareCaptionLanguageFromGesture({ owner: owner, conversationId: conversationId, callRef: callRef, language: language });
+          } else if (gesture === "audio-recover") {
+            if (typeof runtime.recoverAudioFromGesture !== "function") return;
+            operation = runtime.recoverAudioFromGesture({ owner: owner, conversationId: conversationId, callRef: callRef });
+          } else {
+            if (typeof runtime.setMediaOutputFromGesture !== "function"
+              || typeof control.hasAttribute !== "function" || !control.hasAttribute("data-onyx-media-device-ref")) return;
+            var rawDeviceRef = control.getAttribute("data-onyx-media-device-ref");
+            var deviceRef = rawDeviceRef === "" ? null : rawDeviceRef;
+            if (deviceRef !== null && !/^[A-Za-z0-9_-]{22,128}$/.test(deviceRef)) return;
+            if (typeof control.hasAttribute !== "function" || !control.hasAttribute("data-onyx-media-volume-percent")) return;
+            var volumePercent = Number(control.getAttribute("data-onyx-media-volume-percent"));
+            if (!Number.isInteger(volumePercent) || volumePercent < 0 || volumePercent > 100) return;
+            operation = runtime.setMediaOutputFromGesture({ owner: owner, conversationId: conversationId, callRef: callRef,
+              deviceRef: deviceRef, volumePercent: volumePercent });
+          }
+        } catch (_error) { return; }
+        Promise.resolve(operation).then(function (result) {
+          if (!result || !app.ports.runtimeMediaGestureResult) return;
+          var states = gesture === "caption-prepare" ? ["available", "installed", "unavailable", "failed"]
+            : ["idle", "pending", "applied", "deferred", "unknown", "rejected"];
+          var state = states.indexOf(result.state) >= 0 ? result.state : "failed";
+          var reasons = ["api-unavailable", "language-unavailable", "language-not-prepared", "explicit-consent-required",
+            "call-not-active", "membership-unknown", "consent-revoked", "owner-changed", "permission-denied",
+            "recognition-failed", "send-blocked", "invalid-selection", "device-ref-expired", "output-selection-unsupported",
+            "output-selection-failed", "activation-barrier"];
+          app.ports.runtimeMediaGestureResult.send({ ownerRef: owner.ownerRef,
+            accountGeneration: owner.accountGeneration, connectionGeneration: owner.connectionGeneration,
+            gesture: gesture, conversationId: conversationId, callRef: callRef, state: state,
+            reason: reasons.indexOf(result.reason) >= 0 ? result.reason : null });
+        }).catch(function () {
+          if (app.ports.runtimeMediaGestureResult) app.ports.runtimeMediaGestureResult.send({ ownerRef: owner.ownerRef,
+            accountGeneration: owner.accountGeneration, connectionGeneration: owner.connectionGeneration,
+            gesture: gesture, conversationId: conversationId, callRef: callRef, state: "failed", reason: null });
+        });
+      };
+      global.document.addEventListener("click", mediaGestureClick, true);
+    }
+
+    /* Roadmap domain commands are accepted only by the browser-private
+       runtime's explicit dispatcher. The fallback is a typed blocked result;
+       it never treats a missing factory as local/server success. */
+    if (app.ports.runtimeDraftAutosaveTimerStart && app.ports.runtimeDraftAutosaveTimerFired) {
+      var draftAutosaveTimers = Object.create(null);
+      if (app.ports.runtimeDraftAutosaveTimerCancel && typeof app.ports.runtimeDraftAutosaveTimerCancel.subscribe === "function") {
+        app.ports.runtimeDraftAutosaveTimerCancel.subscribe(function (request) {
+          if (!request || typeof request.target !== "string" || !Number.isSafeInteger(request.revision)
+            || typeof request.ownerRef !== "string" || !Number.isSafeInteger(request.accountGeneration)
+            || !Number.isSafeInteger(request.connectionGeneration)) return;
+          var key = request.ownerRef + "\u0000" + request.accountGeneration + "\u0000" + request.connectionGeneration + "\u0000" + request.target;
+          var record = draftAutosaveTimers[key];
+          /* A queued send clears only the timer for the exact submitted
+             revision. A newer edit keeps its own pending autosave. */
+          if (record && record.revision === request.revision) {
+            clearTimeout(record.timer);
+            delete draftAutosaveTimers[key];
+          }
+        });
+      }
+      app.ports.runtimeDraftAutosaveTimerStart.subscribe(function (request) {
+        if (!request || typeof request.target !== "string" || request.target.length < 1 || request.target.length > 512
+          || !Number.isSafeInteger(request.revision) || request.revision < 0
+          || typeof request.ownerRef !== "string" || !Number.isSafeInteger(request.accountGeneration)
+          || !Number.isSafeInteger(request.connectionGeneration)) return;
+        var key = request.ownerRef + "\u0000" + request.accountGeneration + "\u0000" + request.connectionGeneration + "\u0000" + request.target;
+        if (draftAutosaveTimers[key]) clearTimeout(draftAutosaveTimers[key].timer);
+        var record = { revision: request.revision, ownerRef: request.ownerRef,
+          accountGeneration: request.accountGeneration, connectionGeneration: request.connectionGeneration, timer: null };
+        record.timer = setTimeout(function () {
+          if (draftAutosaveTimers[key] !== record) return;
+          delete draftAutosaveTimers[key];
+          try { app.ports.runtimeDraftAutosaveTimerFired.send({ target: request.target, revision: record.revision,
+            ownerRef: record.ownerRef, accountGeneration: record.accountGeneration,
+            connectionGeneration: record.connectionGeneration }); } catch (_error) { /* app retired */ }
+        }, Math.max(100, Math.min(2000, Number.isFinite(request.delayMs) ? request.delayMs : 500)));
+        draftAutosaveTimers[key] = record;
+      });
+    }
+    if (app.ports.runtimeDomainCommand && typeof app.ports.runtimeDomainCommand.subscribe === "function") {
+      app.ports.runtimeDomainCommand.subscribe(function (command) {
+        if (!command || command.schemaVersion !== 1 || typeof command.requestId !== "string"
+          || typeof command.ownerRef !== "string" || typeof command.domain !== "string"
+          || typeof command.action !== "string") return;
+        if (!runtime || (typeof runtime.dispatchDomain !== "function" && typeof runtime.dispatchDomainCommand !== "function")) {
+          if (app.ports.runtimeDomainResult) app.ports.runtimeDomainResult.send({
+            schemaVersion: 1, requestId: command.requestId, ownerRef: command.ownerRef,
+            accountGeneration: command.accountGeneration, connectionGeneration: command.connectionGeneration,
+            domain: command.domain, action: command.action, status: "blocked", reason: "service-unavailable",
+            completionScope: "local", view: null
+          });
+          return;
+        }
+        try {
+          var deliverDomainResult = function (result) {
+            if (!result || result.requestId !== command.requestId || result.ownerRef !== command.ownerRef
+              || result.accountGeneration !== command.accountGeneration || result.connectionGeneration !== command.connectionGeneration
+              || result.domain !== command.domain || result.action !== command.action) return;
+            if (app.ports.runtimeDomainResult) app.ports.runtimeDomainResult.send(result);
+          };
+          if (typeof runtime.dispatchDomain === "function") {
+            Promise.resolve(runtime.dispatchDomain(command)).then(deliverDomainResult, function () {
+              deliverDomainResult({ schemaVersion: 1, requestId: command.requestId, ownerRef: command.ownerRef,
+                accountGeneration: command.accountGeneration, connectionGeneration: command.connectionGeneration,
+                domain: command.domain, action: command.action, status: "failed", reason: "internal-failure",
+                completionScope: "local", view: null });
+            });
+          } else {
+            runtime.dispatchDomainCommand(command, deliverDomainResult);
+          }
+        } catch (_error) {
+          if (app.ports.runtimeDomainResult) app.ports.runtimeDomainResult.send({
+            schemaVersion: 1, requestId: command.requestId, ownerRef: command.ownerRef,
+            accountGeneration: command.accountGeneration, connectionGeneration: command.connectionGeneration,
+            domain: command.domain, action: command.action, status: "failed", reason: "internal-failure",
+            completionScope: "local", view: null
+          });
+        }
+      });
+    }
+    if (app.ports.runtimePrivatePasswordRequest && typeof app.ports.runtimePrivatePasswordRequest.subscribe === "function") {
+      app.ports.runtimePrivatePasswordRequest.subscribe(function (request) {
+        if (!request || ["group-backup-export", "group-backup-import"].indexOf(request.purpose) < 0
+          || typeof request.ownerRef !== "string" || !Number.isSafeInteger(request.accountGeneration)
+          || !Number.isSafeInteger(request.connectionGeneration) || !runtime
+          || typeof runtime.requestPrivatePassword !== "function") return;
+        var captured;
+        try { captured = runtime.ownerSnapshot(); } catch (_error) { captured = null; }
+        if (!captured || captured.ownerRef !== request.ownerRef
+          || captured.accountGeneration !== request.accountGeneration
+          || captured.connectionGeneration !== request.connectionGeneration) return;
+        Promise.resolve().then(function () { return runtime.requestPrivatePassword(request); }).then(function (result) {
+          if (!result || typeof result.passwordRef !== "string" || !result.passwordRef
+            || result.purpose !== request.purpose || result.ownerRef !== request.ownerRef
+            || result.accountGeneration !== request.accountGeneration
+            || result.connectionGeneration !== request.connectionGeneration) return;
+          var current;
+          try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+          if (!current || current.ownerRef !== request.ownerRef
+            || current.accountGeneration !== request.accountGeneration
+            || current.connectionGeneration !== request.connectionGeneration) return;
+          if (app.ports.runtimePrivatePasswordSelected) app.ports.runtimePrivatePasswordSelected.send(result);
+        }).catch(function () { /* private form failures are reported by the runtime; never echo input */ });
+      });
+    }
+    if (app.ports.runtimePrivateAccountFormRequest && typeof app.ports.runtimePrivateAccountFormRequest.subscribe === "function") {
+      app.ports.runtimePrivateAccountFormRequest.subscribe(function (request) {
+        if (!request || typeof request.requestId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{8,63}$/u.test(request.requestId)
+          || ["totp-code", "recovery-password", "recovery-code", "account-email", "account-password", "account-certificate-reset", "account-drop", "password-reset-confirm", "account-register", "account-verify"].indexOf(request.kind) < 0
+          || ["totp-confirm", "recovery-generate", "recovery-clear", "recovery-login", "account-email", "account-password", "account-certificate-reset", "account-drop", "password-reset-confirm", "account-register", "account-verify"].indexOf(request.action) < 0
+          || typeof request.ownerRef !== "string" || !Number.isSafeInteger(request.accountGeneration)
+          || !Number.isSafeInteger(request.connectionGeneration) || !runtime
+          || typeof runtime.requestPrivateAccountForm !== "function") return;
+        var compatible = (request.action === "totp-confirm" && request.kind === "totp-code")
+          || (request.action === "recovery-login" && request.kind === "recovery-code")
+          || ((request.action === "recovery-generate" || request.action === "recovery-clear") && request.kind === "recovery-password")
+          || request.action === request.kind;
+        if (!compatible) return;
+        var captured;
+        try { captured = runtime.ownerSnapshot(); } catch (_error) { captured = null; }
+        if (!captured || captured.ownerRef !== request.ownerRef
+          || captured.accountGeneration !== request.accountGeneration
+          || captured.connectionGeneration !== request.connectionGeneration) return;
+        Promise.resolve().then(function () { return runtime.requestPrivateAccountForm(request); }).then(function (result) {
+          if (!result || typeof result.formRef !== "string" || !result.formRef
+            || result.requestId !== request.requestId || result.kind !== request.kind
+            || result.ownerRef !== request.ownerRef || result.accountGeneration !== request.accountGeneration
+            || result.connectionGeneration !== request.connectionGeneration
+            || (result.account !== null && typeof result.account !== "string")) return;
+          var current;
+          try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+          if (!current || current.ownerRef !== request.ownerRef
+            || current.accountGeneration !== request.accountGeneration
+            || current.connectionGeneration !== request.connectionGeneration) return;
+          if (app.ports.runtimePrivateAccountFormReady) app.ports.runtimePrivateAccountFormReady.send({
+            requestId: result.requestId, kind: result.kind, action: request.action, formRef: result.formRef,
+            account: typeof result.account === "string" ? result.account : null, ownerRef: result.ownerRef,
+            accountGeneration: result.accountGeneration, connectionGeneration: result.connectionGeneration
+          });
+        }).catch(function () { /* cancellation and private input errors never cross this port */ });
+      });
+    }
+    if (app.ports.runtimePrivateScheduledMessageRequest && typeof app.ports.runtimePrivateScheduledMessageRequest.subscribe === "function") {
+      app.ports.runtimePrivateScheduledMessageRequest.subscribe(function (request) {
+        if (!request || typeof request.requestId !== "string" || !/^scheduled(?:Form|Edit)[0-9]{12}$/u.test(request.requestId)
+          || typeof request.operationId !== "string" || !/^[A-Za-z0-9_-]{1,96}$/u.test(request.operationId)
+          || ["create", "edit"].indexOf(request.kind) < 0
+          || typeof request.ownerRef !== "string" || !request.ownerRef
+          || !Number.isSafeInteger(request.accountGeneration) || !Number.isSafeInteger(request.connectionGeneration)
+          || typeof request.conversationId !== "string" || !request.conversationId || request.conversationId.length > 256
+          || !Number.isSafeInteger(request.initialDueAtMs) || request.initialDueAtMs < Date.now()
+          || typeof request.prefillFromComposer !== "boolean"
+          || (request.kind === "edit" && request.prefillFromComposer)
+          || !runtime || typeof runtime.requestPrivateScheduledMessage !== "function") return;
+        var captured;
+        try { captured = runtime.ownerSnapshot(); } catch (_error) { captured = null; }
+        if (!captured || captured.ownerRef !== request.ownerRef
+          || captured.accountGeneration !== request.accountGeneration
+          || captured.connectionGeneration !== request.connectionGeneration) return;
+        function failed(reason) {
+          var current;
+          try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+          if (!current || current.ownerRef !== request.ownerRef
+            || current.accountGeneration !== request.accountGeneration
+            || current.connectionGeneration !== request.connectionGeneration) return;
+          if (app.ports.runtimePrivateScheduledMessageFailed) app.ports.runtimePrivateScheduledMessageFailed.send({
+            requestId: request.requestId, reason: reason, ownerRef: request.ownerRef,
+            accountGeneration: request.accountGeneration, connectionGeneration: request.connectionGeneration
+          });
+        }
+        Promise.resolve().then(function () { return runtime.requestPrivateScheduledMessage(request); }).then(function (result) {
+          if (!result) { failed("cancelled"); return; }
+          if (result.requestId !== request.requestId || result.operationId !== request.operationId || result.kind !== request.kind
+            || typeof result.inputRef !== "string" || !result.inputRef || result.inputRef.length > 128
+            || !Number.isSafeInteger(result.dueAtMs) || result.dueAtMs <= Date.now()
+            || typeof result.prefilledComposer !== "boolean"
+            || (request.kind === "edit" && result.prefilledComposer)
+            || result.ownerRef !== request.ownerRef || result.accountGeneration !== request.accountGeneration
+            || result.connectionGeneration !== request.connectionGeneration) { failed("unavailable"); return; }
+          var current;
+          try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+          if (!current || current.ownerRef !== request.ownerRef
+            || current.accountGeneration !== request.accountGeneration
+            || current.connectionGeneration !== request.connectionGeneration) { failed("stale"); return; }
+          if (app.ports.runtimePrivateScheduledMessageReady) app.ports.runtimePrivateScheduledMessageReady.send({
+            requestId: result.requestId, operationId: result.operationId, kind: result.kind, inputRef: result.inputRef, dueAtMs: result.dueAtMs,
+            prefilledComposer: result.prefilledComposer,
+            ownerRef: result.ownerRef, accountGeneration: result.accountGeneration,
+            connectionGeneration: result.connectionGeneration
+          });
+        }).catch(function () { failed("unavailable"); });
+      });
+    }
+    if (runtime && typeof runtime.subscribeSessionTokenSaslStatus === "function") {
+      runtime.subscribeSessionTokenSaslStatus(function (event) {
+        if (!event || typeof event.requestId !== "string" || !/^[A-Za-z][A-Za-z0-9_-]{8,63}$/u.test(event.requestId)
+          || ["accepted", "rejected", "unknown", "aborted"].indexOf(event.status) < 0
+          || typeof event.ownerRef !== "string" || !Number.isSafeInteger(event.accountGeneration)
+          || !Number.isSafeInteger(event.connectionGeneration)) return;
+        var owner;
+        try { owner = runtime.ownerSnapshot(); } catch (_error) { owner = null; }
+        if (!owner || owner.ownerRef !== event.ownerRef || owner.accountGeneration !== event.accountGeneration
+          || owner.connectionGeneration !== event.connectionGeneration) return;
+        if (app.ports.runtimeSessionTokenSaslStatus) app.ports.runtimeSessionTokenSaslStatus.send({
+          requestId: event.requestId, status: event.status, ownerRef: event.ownerRef,
+          accountGeneration: event.accountGeneration, connectionGeneration: event.connectionGeneration
+        });
+      });
+    }
+    if (app.ports.runtimeJournalFlush && typeof app.ports.runtimeJournalFlush.subscribe === "function") {
+      app.ports.runtimeJournalFlush.subscribe(function (request) {
+        if (!request || typeof request.ownerRef !== "string" || !Number.isSafeInteger(request.accountGeneration)
+          || !Number.isSafeInteger(request.connectionGeneration) || typeof request.requestId !== "string"
+          || !/^[A-Za-z][A-Za-z0-9_-]{8,63}$/u.test(request.requestId)) return;
+        var owner;
+        try { owner = runtime && typeof runtime.ownerSnapshot === "function" ? runtime.ownerSnapshot() : null; } catch (_error) { owner = null; }
+        var sendResult = function (result) {
+          if (!app.ports.runtimeDomainResult || !result) return;
+          app.ports.runtimeDomainResult.send(result);
+        };
+        if (!owner || owner.ownerRef !== request.ownerRef || owner.accountGeneration !== request.accountGeneration
+          || owner.connectionGeneration !== request.connectionGeneration || !runtime || typeof runtime.flushOutgoing !== "function") {
+          sendResult({ schemaVersion: 1, requestId: request.requestId, ownerRef: request.ownerRef,
+            accountGeneration: request.accountGeneration, connectionGeneration: request.connectionGeneration,
+            domain: "journal", action: "flush", status: "blocked", reason: "owner-changed",
+            completionScope: "local", view: null });
+          return;
+        }
+        Promise.resolve(runtime.flushOutgoing({ owner: owner, requestId: request.requestId })).then(sendResult, function () {
+          sendResult({ schemaVersion: 1, requestId: request.requestId, ownerRef: request.ownerRef,
+            accountGeneration: request.accountGeneration, connectionGeneration: request.connectionGeneration,
+            domain: "journal", action: "flush", status: "unknown", reason: "internal-failure",
+            completionScope: "transport", view: null });
+        });
+      });
+    }
+    if (app.ports.runtimePrivateFilePick && typeof app.ports.runtimePrivateFilePick.subscribe === "function") {
+      app.ports.runtimePrivateFilePick.subscribe(function (request) {
+        var purpose = request && request.purpose;
+        if (["operator-import", "settings-import", "group-backup-import"].indexOf(purpose) < 0
+          || !runtime || typeof runtime.selectPrivateFile !== "function") {
+          if (app.ports.runtimePrivateFileSelected) app.ports.runtimePrivateFileSelected.send({ purpose: purpose || "", inputRef: "" });
+          return;
+        }
+        Promise.resolve(runtime.selectPrivateFile(purpose)).then(function (inputRef) {
+          if (app.ports.runtimePrivateFileSelected) app.ports.runtimePrivateFileSelected.send({ purpose: purpose, inputRef: typeof inputRef === "string" ? inputRef : "" });
+        }, function () {
+          if (app.ports.runtimePrivateFileSelected) app.ports.runtimePrivateFileSelected.send({ purpose: purpose, inputRef: "" });
+        });
+      });
+    }
+    if (app.ports.runtimePrivateOutputPick && typeof app.ports.runtimePrivateOutputPick.subscribe === "function") {
+      app.ports.runtimePrivateOutputPick.subscribe(function (request) {
+        var purpose = request && request.purpose;
+        if (["settings-export", "storage-export", "group-backup-export"].indexOf(purpose) < 0
+          || !runtime || typeof runtime.selectPrivateOutput !== "function") {
+          if (app.ports.runtimePrivateOutputSelected) app.ports.runtimePrivateOutputSelected.send({ purpose: purpose || "", outputRef: "" });
+          return;
+        }
+        Promise.resolve(runtime.selectPrivateOutput(purpose)).then(function (outputRef) {
+          if (app.ports.runtimePrivateOutputSelected) app.ports.runtimePrivateOutputSelected.send({ purpose: purpose, outputRef: typeof outputRef === "string" ? outputRef : "" });
+        }, function () {
+          if (app.ports.runtimePrivateOutputSelected) app.ports.runtimePrivateOutputSelected.send({ purpose: purpose, outputRef: "" });
+        });
+      });
+    }
+    if (runtime && typeof runtime.subscribeDomainObservations === "function" && app.ports.runtimeDomainObservation) {
+      try {
+        var stopDomainObservations = runtime.subscribeDomainObservations(function (event) {
+          if (!event || event.schemaVersion !== 1 || typeof event.sequence !== "number"
+            || !Number.isSafeInteger(event.sequence) || !event.ownerRef || !event.domain || !event.view) return;
+          app.ports.runtimeDomainObservation.send({ schemaVersion: 1, ownerRef: event.ownerRef,
+            accountGeneration: event.accountGeneration, connectionGeneration: event.connectionGeneration,
+            domain: event.domain, sequence: event.sequence, view: event.view });
+        });
+        if (typeof stopDomainObservations === "function") {
+          if (typeof runtime.onDispose === "function") runtime.onDispose(stopDomainObservations);
+        }
+      } catch (_error) { /* service absence is surfaced through explicit command results */ }
+    }
+
+    if (app.ports.runtimeClientSafetyState && typeof app.ports.runtimeClientSafetyState.subscribe === "function") {
+      app.ports.runtimeClientSafetyState.subscribe(function (state) {
+        if (!runtime || typeof runtime.reportClientSafetyState !== "function") return;
+        try { runtime.reportClientSafetyState(state); } catch (_error) { /* unknown safety state keeps worker requests denied */ }
+      });
+    }
+
+    if (app.ports.runtimeNotificationNavigationReceipt && typeof app.ports.runtimeNotificationNavigationReceipt.subscribe === "function") {
+      app.ports.runtimeNotificationNavigationReceipt.subscribe(function (receipt) {
+        if (!runtime || typeof runtime.settleNotificationNavigation !== "function") return;
+        try { runtime.settleNotificationNavigation(receipt); } catch (_error) { /* stale or malformed receipts remain unopened */ }
+      });
+    }
+
+    /* The scoped runtime owns the v5 vault. Opening this legacy v3
+       connection alongside it blocks the runtime's schema upgrade, so
+       retain this database only for the standalone compatibility path. */
+    if (!runtime) {
+      openVault(function (db) { vault = db; }, function (db) {
+        if (vault === db) vault = null;
+      });
+    }
 
     app.ports.wsConnect.subscribe(function (req) {
-      socket.close();
+      var generation = ++socketGeneration;
+      var previous = socket;
       if (keepalive) keepalive.clear();
-      socket = connectSocket(app, req.url, function (batch) {
-        /* Receipt stamp: folds between Ticks (latency RTT) resolve
-           against receipt ms, not the last tick. */
-        app.ports.wsLines.send({ at: Date.now(), lines: batch });
-      }, function () {
-        if (keepalive) keepalive.clear();
-      });
+      if (privateRuntimeRequired && (!runtime || typeof runtime.connect !== "function" || typeof runtime.sendLine !== "function")) {
+        app.ports.wsClosed.send({ clean: false, reason: "Private client runtime is unavailable; reload after restoring the runtime bundle." });
+        return;
+      }
+      if (runtime && typeof runtime.connect === "function" && typeof runtime.sendLine === "function") {
+        socket = {
+          send: function (line) {
+            /* Elm's source formatter terminates each IRC line with CRLF.
+               The private transport accepts one line without framing; strip
+               exactly that final terminator and leave embedded delimiters for
+               strict rejection. */
+            var normalized = normalizeRuntimeLine(line);
+            if (normalized !== null) runtime.sendLine(normalized);
+          },
+          close: function () { runtime.close(); },
+          isOpen: function () { return runtime.isOpen(); },
+          rawSocket: function () { return null; }
+        };
+        runtime.connect(req.url);
+      } else {
+        socket = connectSocket(app, req.url, function (batch) {
+          /* Receipt stamp: folds between Ticks (latency RTT) resolve
+             against receipt ms, not the last tick. */
+          app.ports.wsLines.send({ at: Date.now(), lines: batch });
+        }, function () { return generation === socketGeneration; }, function () {
+          if (keepalive) keepalive.clear();
+        }, runtime);
+        previous.close();
+      }
       keepalive = createPingKeepalive(app, socket);
       keepalive.schedule();
     });
@@ -2812,26 +3288,123 @@ function fetchPublicFeed(url) {
     if (app.ports.probeNodes) {
       app.ports.probeNodes.subscribe(function (req) {
         var list = (req && Array.isArray(req.nodes)) ? req.nodes : [];
-        var nick = (req && typeof req.nick === "string") ? req.nick : "guest";
         selectBestNode(list, {
           pin: req ? req.pin : null,
           timeoutMs: req ? req.timeoutMs : null,
           maxConcurrency: req ? req.maxConcurrency : null
         }).then(function (winner) {
           if (!winner || typeof winner.wss !== "string") return;
-          var held = null;
           try {
-            held = loadResumeTokens(probeWinnerHost(winner.wss), nick) || null;
-          } catch (err) { held = null; }
-          try {
-            app.ports.nodesProbed.send({
-              wss: winner.wss,
-              sessionToken: (held && held.sessionToken) || null,
-              meshToken: (held && held.meshToken) || null,
-              meshExpiresAtMs: (held && typeof held.meshExpiresAtMs === "number") ? held.meshExpiresAtMs : null
-            });
+            app.ports.nodesProbed.send({ wss: winner.wss });
           } catch (err) { /* port gone */ }
         });
+      });
+    }
+
+    if (runtime && app.ports.runtimeResumeCredential && typeof runtime.resumeCredential === "function") {
+      app.ports.runtimeResumeCredential.subscribe(function (req) {
+        if (req && typeof req.credentialRef === "string") {
+          try {
+            Promise.resolve(runtime.resumeCredential(req.credentialRef)).then(function (admission) {
+              /* The credential owner publishes state separately. Keep the
+                 admission result observed so async lease failures cannot
+                 become unhandled rejections or be mistaken for success. */
+              if (!admission || (admission.kind !== "transport-admitted" && admission.kind !== "blocked" && admission.kind !== "unknown")) return;
+            }).catch(function () { /* private owner publishes bounded failure state */ });
+          } catch (_err) { /* private owner rejects stale references */ }
+        }
+      });
+    }
+
+    if (runtime && app.ports.runtimeForgetCredential && typeof runtime.forgetCredential === "function") {
+      app.ports.runtimeForgetCredential.subscribe(function (req) {
+        if (req && typeof req.credentialRef === "string") {
+          try { runtime.forgetCredential(req.credentialRef); } catch (err) { /* private owner rejects stale references */ }
+        }
+      });
+    }
+
+    if (runtime && app.ports.runtimeIssueCredentialBundle && typeof runtime.issueCredentialBundle === "function") {
+      app.ports.runtimeIssueCredentialBundle.subscribe(function () {
+        try {
+          Promise.resolve(runtime.issueCredentialBundle()).then(function (admission) {
+            if (!admission || (admission.kind !== "transport-admitted" && admission.kind !== "blocked" && admission.kind !== "unknown")) return;
+          }).catch(function () { /* private owner reports only bounded status */ });
+        } catch (_err) { /* private owner reports only bounded status */ }
+      });
+    }
+
+    if (runtime && app.ports.runtimeSetCredentialRemembered && typeof runtime.setCredentialRemembered === "function") {
+      app.ports.runtimeSetCredentialRemembered.subscribe(function (req) {
+        if (!req || typeof req.remember !== "boolean") return;
+        try { runtime.setCredentialRemembered(req.remember); } catch (err) { /* private owner reports bounded state */ }
+      });
+    }
+
+    if (runtime && app.ports.runtimeCapabilityRequest && typeof runtime.requestCapabilityGroup === "function") {
+      app.ports.runtimeCapabilityRequest.subscribe(function (req) {
+        if (!req || typeof req.roundRef !== "string" || !Array.isArray(req.names)) return;
+        var attempt = 0;
+        var sendRequest = function () {
+          var admission;
+          try { admission = runtime.requestCapabilityGroup({ roundRef: req.roundRef, names: req.names }); }
+          catch (err) { admission = { kind: "unknown", reason: "transport-error" }; }
+          var status = admission && admission.kind === "transport-admitted" ? "transport-admitted"
+            : admission && admission.kind === "blocked" ? "blocked:" + admission.reason : "unknown";
+          if (status === "blocked:backpressure" && attempt < 2) {
+            attempt += 1;
+            globalThis.setTimeout(sendRequest, 100 * attempt);
+            return;
+          }
+          try { app.ports.runtimeCapabilityAdmission.send({ roundRef: req.roundRef, names: req.names, status: status }); } catch (err) { /* Elm retired */ }
+        };
+        sendRequest();
+      });
+    }
+
+    if (runtime && app.ports.runtimeCapabilityEnd && typeof runtime.endCapabilityRound === "function") {
+      app.ports.runtimeCapabilityEnd.subscribe(function (req) {
+        if (!req || typeof req.roundRef !== "string") return;
+        var attempt = 0;
+        var sendEnd = function () {
+          var admission;
+          try { admission = runtime.endCapabilityRound(req.roundRef); }
+          catch (err) { admission = { kind: "unknown", reason: "transport-error" }; }
+          var status = admission && admission.kind === "transport-admitted" ? "transport-admitted"
+            : admission && admission.kind === "blocked" ? "blocked:" + admission.reason : "unknown";
+          try { app.ports.runtimeCapabilityAdmission.send({ roundRef: req.roundRef, names: [], status: status }); } catch (err) { /* Elm retired */ }
+          if (status === "blocked:backpressure" && attempt < 2) {
+            attempt += 1;
+            globalThis.setTimeout(sendEnd, 100 * attempt);
+          }
+        };
+        sendEnd();
+      });
+    }
+
+    /* Password input remains DOM-owned. The request is fenced to the live
+       socket/account generation before the field is read and cleared. */
+    if (runtime && app.ports.runtimePrivateIdentify && typeof runtime.privateIdentify === "function") {
+      app.ports.runtimePrivateIdentify.subscribe(function (req) {
+        if (!req || typeof req.account !== "string" || typeof req.requestId !== "string"
+          || !/^[A-Za-z][A-Za-z0-9_-]{8,63}$/u.test(req.requestId)
+          || typeof req.ownerRef !== "string" || !Number.isSafeInteger(req.accountGeneration)
+          || !Number.isSafeInteger(req.connectionGeneration)) return;
+        var owner;
+        try { owner = runtime.ownerSnapshot(); } catch (_error) { owner = null; }
+        if (!owner || owner.ownerRef !== req.ownerRef || owner.accountGeneration !== req.accountGeneration
+          || owner.connectionGeneration !== req.connectionGeneration) return;
+        var input = document.getElementById("connection-password");
+        var password = input && typeof input.value === "string" ? input.value : "";
+        if (input) input.value = "";
+        var current;
+        try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+        if (!current || current.ownerRef !== req.ownerRef || current.accountGeneration !== req.accountGeneration
+          || current.connectionGeneration !== req.connectionGeneration || !password) return;
+        try { runtime.privateIdentify({ account: req.account, password: password, requestId: req.requestId,
+          ownerRef: req.ownerRef, accountGeneration: req.accountGeneration, connectionGeneration: req.connectionGeneration }); }
+        catch (_error) { /* never log credentials */ }
+        password = "";
       });
     }
 
@@ -2864,9 +3437,9 @@ function fetchPublicFeed(url) {
        device scope: message text never leaves this browser. */
     if (app.ports.translationConfig) {
       (function sendTranslationConfig() {
-        var available = false;
-        var target = "";
-        var browserLang = "en";
+        var available;
+        var target;
+        var browserLang;
         try {
           var api = window.Translator;
           available = !!(api && (api.availability || api.create));
@@ -3029,28 +3602,118 @@ function fetchPublicFeed(url) {
         if (req && typeof req.json === "string") writeSlot("onyx:preferences", req.json);
       });
     }
-    /* Ignore/mute blocklists: Elm normalizes fail-closed; the bridge only
-       persists the validated arrays (plain keys — the oracle's
-       owner-suffixed slots stay ahead until Elm carries an owner). */
+    /* Owner remembered from `friendsRequest` (Elm already lowercases the
+       identity). Saves keep their plain keys and also mirror the oracle
+       owner document. A save before any announce writes the plain key
+       only. Ownerless oracle keys are purged on announce, never claimed. */
+    var deviceSlotOwner = null;
+    var DEVICE_SLOT_MAX_CHARS = 128 * 1024;
+    function rememberDeviceSlotOwner(req) {
+      if (!req || typeof req.serverUrl !== "string" || typeof req.identity !== "string") return;
+      var serverUrl = req.serverUrl;
+      var identity = req.identity.toLowerCase();
+      if (
+        serverUrl.length === 0 || serverUrl.length > 2048 || serverUrl !== serverUrl.trim()
+        || identity.length === 0 || identity.length > 256 || identity !== identity.trim()
+      ) return;
+      deviceSlotOwner = { serverUrl: serverUrl, identity: identity };
+    }
+    function deviceSlotStorageKey(base) {
+      if (!base || !deviceSlotOwner) return null;
+      try {
+        return base + ":owner:" + encodeURIComponent(JSON.stringify([deviceSlotOwner.serverUrl, deviceSlotOwner.identity]));
+      } catch (err) { return null; }
+    }
+    function writeDeviceSlot(base, json) {
+      var key = deviceSlotStorageKey(base);
+      if (key) writeSlot(key, json);
+    }
+    function removeDeviceSlot(base) {
+      var key = deviceSlotStorageKey(base);
+      if (!key) return;
+      try {
+        if (typeof window !== "undefined" && window.localStorage) window.localStorage.removeItem(key);
+      } catch (err) { /* storage unavailable */ }
+    }
+    function readDeviceJson(base) {
+      var key = deviceSlotStorageKey(base);
+      if (!key) return null;
+      try {
+        if (typeof window === "undefined" || !window.localStorage) return null;
+        var raw = window.localStorage.getItem(key);
+        if (typeof raw !== "string" || raw.length > DEVICE_SLOT_MAX_CHARS) return null;
+        return JSON.parse(raw);
+      } catch (err) { return null; }
+    }
+    function readDeviceArray(base) {
+      var parsed = readDeviceJson(base);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+    function readDeviceObject(base) {
+      var parsed = readDeviceJson(base);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+      return parsed;
+    }
+    function purgeLegacyDeviceSlots() {
+      var keys = [
+        "onyx:ignored-users", "onyx:muted-dms", "onyx:highlight-words",
+        "onyx:channel-notify", "onyx:autojoin", "onyx:channel-colors", "onyx:followed"
+      ];
+      try {
+        if (typeof window === "undefined" || !window.localStorage) return;
+        keys.forEach(function (key) { window.localStorage.removeItem(key); });
+      } catch (err) { /* storage unavailable */ }
+    }
+    function publishDeviceSlots() {
+      if (!app.ports.deviceSlotsLoaded || !deviceSlotOwner) return;
+      try {
+        app.ports.deviceSlotsLoaded.send({
+          ignored: readDeviceArray("onyx:ignored-users"),
+          muted: readDeviceArray("onyx:muted-dms"),
+          highlight: readDeviceArray("onyx:highlight-words"),
+          autoJoin: readDeviceArray("onyx:autojoin"),
+          followed: readDeviceArray("onyx:followed"),
+          notify: readDeviceObject("onyx:channel-notify"),
+          colors: readDeviceObject("onyx:channel-colors")
+        });
+      } catch (err) { /* port gone */ }
+    }
+    /* Ignore/mute blocklists: Elm normalizes fail-closed; the bridge
+       persists the validated arrays on the plain keys and, once an owner
+       is known, on `onyx:ignored-users:owner:…` / `onyx:muted-dms:owner:…`. */
     if (app.ports.blocklistsSave) {
       app.ports.blocklistsSave.subscribe(function (req) {
         if (!req) return;
-        if (Array.isArray(req.ignored)) writeSlot("onyx:ignored-users", JSON.stringify(req.ignored));
-        if (Array.isArray(req.muted)) writeSlot("onyx:muted-dms", JSON.stringify(req.muted));
+        if (Array.isArray(req.ignored)) {
+          var ignoredJson = JSON.stringify(req.ignored);
+          writeSlot("onyx:ignored-users", ignoredJson);
+          if (req.ignored.length === 0) removeDeviceSlot("onyx:ignored-users");
+          else writeDeviceSlot("onyx:ignored-users", ignoredJson);
+        }
+        if (Array.isArray(req.muted)) {
+          var mutedJson = JSON.stringify(req.muted);
+          writeSlot("onyx:muted-dms", mutedJson);
+          if (req.muted.length === 0) removeDeviceSlot("onyx:muted-dms");
+          else writeDeviceSlot("onyx:muted-dms", mutedJson);
+        }
       });
     }
-    /* Followed conversations: same validated-array persistence
-       (`onyx:followed`, plain key like the blocklists). */
+    /* Followed conversations: plain `onyx:followed` plus the owner
+       document (`onyx:followed:owner:…`) once an owner is known. The
+       oracle always writes the array, including an empty one. */
     if (app.ports.followedSave) {
       app.ports.followedSave.subscribe(function (req) {
-        if (req && Array.isArray(req.keys)) writeSlot("onyx:followed", JSON.stringify(req.keys));
+        if (req && Array.isArray(req.keys)) {
+          var followedJson = JSON.stringify(req.keys);
+          writeSlot("onyx:followed", followedJson);
+          writeDeviceSlot("onyx:followed", followedJson);
+        }
       });
     }
     /* Highlight terms: Elm normalizes fail-closed (trim/lower, 256-char
-       cap, no controls, 128 max); the bridge only persists the validated
-       array under the plain `onyx:highlight-words` key — the oracle's
-       owner-suffixed slots stay ahead until Elm carries an owner. An
-       emptied list removes the key, mirroring `saveHighlightWords`. */
+       cap, no controls, 128 max); the bridge persists the validated
+       array under `onyx:highlight-words` and the owner document. An
+       emptied list removes both keys, mirroring `saveHighlightWords`. */
     if (app.ports.highlightWordsSave) {
       app.ports.highlightWordsSave.subscribe(function (req) {
         if (!req || !Array.isArray(req.words)) return;
@@ -3059,8 +3722,11 @@ function fetchPublicFeed(url) {
             if (typeof window !== "undefined" && window.localStorage) {
               window.localStorage.removeItem("onyx:highlight-words");
             }
+            removeDeviceSlot("onyx:highlight-words");
           } else {
-            writeSlot("onyx:highlight-words", JSON.stringify(req.words));
+            var highlightJson = JSON.stringify(req.words);
+            writeSlot("onyx:highlight-words", highlightJson);
+            writeDeviceSlot("onyx:highlight-words", highlightJson);
           }
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
@@ -3083,12 +3749,60 @@ function fetchPublicFeed(url) {
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
     }
+    /* Quiet hours are optional on this port. A save that only carries
+       enabled/until must not wipe onyx:dnd-quiet-start / end. */
+    if (app.ports.dndQuietSave) {
+      app.ports.dndQuietSave.subscribe(function (req) {
+        if (!req) return;
+        try {
+          if (typeof req.start === "number" && req.start >= 0 && req.start <= 23) {
+            writeSlot("onyx:dnd-quiet-start", String(Math.floor(req.start)));
+          }
+          if (typeof req.end === "number" && req.end >= 0 && req.end <= 23) {
+            writeSlot("onyx:dnd-quiet-end", String(Math.floor(req.end)));
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.firstHourSeenSave) {
+      app.ports.firstHourSeenSave.subscribe(function () {
+        try { writeSlot("onyx:first-hour-seen", "1"); } catch (err) { /* non-fatal */ }
+      });
+    }
+    if (app.ports.composerFocus) {
+      app.ports.composerFocus.subscribe(function () {
+        try {
+          var input = document.querySelector(".onyx-composer input[aria-label='Message'], .onyx-composer input[aria-label='Edit message']");
+          if (input && typeof input.focus === "function") input.focus();
+        } catch (err) { /* no composer mounted */ }
+      });
+    }
+    if (app.ports.navigationLoad) {
+      app.ports.navigationLoad.subscribe(function (req) {
+        var value = null;
+        try {
+          var key = req && typeof req.key === "string" ? req.key : "";
+          if (key && typeof window !== "undefined" && window.localStorage) {
+            var raw = window.localStorage.getItem(key);
+            if (raw && raw.length <= 2 * 1024 * 1024) value = JSON.parse(raw);
+          }
+        } catch (err) { value = null; }
+        try {
+          if (app.ports.navigationLoaded) app.ports.navigationLoaded.send({ key: key, value: value });
+        } catch (err) { /* port gone */ }
+      });
+    }
+    if (app.ports.navigationSave) {
+      app.ports.navigationSave.subscribe(function (req) {
+        if (!req || typeof req.key !== "string" || !req.key || typeof req.json !== "string") return;
+        try { writeSlot(req.key, req.json); } catch (err) { /* non-fatal */ }
+      });
+    }
     /* Per-room notify levels: Elm normalizes fail-closed (lowercase
        `#`/`&` keys, `mentions`/`none` only, 256 cap); the bridge writes
-       the `{ [channel]: level }` object under the plain
-       `onyx:channel-notify` key — the oracle's owner-suffixed slots stay
-       ahead until Elm carries an owner. An emptied map removes the key,
-       mirroring `saveChannelNotify`. */
+       the `{ [channel]: level }` object under `onyx:channel-notify` and
+       the owner document. An emptied map removes both keys, mirroring
+       `saveChannelNotify`. */
     if (app.ports.channelNotifySave) {
       app.ports.channelNotifySave.subscribe(function (req) {
         if (!req || !Array.isArray(req.entries)) return;
@@ -3103,8 +3817,11 @@ function fetchPublicFeed(url) {
             if (typeof window !== "undefined" && window.localStorage) {
               window.localStorage.removeItem("onyx:channel-notify");
             }
+            removeDeviceSlot("onyx:channel-notify");
           } else {
-            writeSlot("onyx:channel-notify", JSON.stringify(obj));
+            var notifyJson = JSON.stringify(obj);
+            writeSlot("onyx:channel-notify", notifyJson);
+            writeDeviceSlot("onyx:channel-notify", notifyJson);
           }
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
@@ -3112,9 +3829,9 @@ function fetchPublicFeed(url) {
     /* Starred rooms: Elm normalizes fail-closed (trim+lower, `#`/`&`
        lead, 128-char cap, no space/comma/controls, 256 max); the bridge
        writes the validated array under the plain
-       `onyx:starred-channels` key — the oracle bundles stars into the
-       whole owner-scoped `onyx:channel-navigation` object instead, which
-       stays ahead until Elm carries navigation memory. An emptied set
+       `onyx:starred-channels` key. The owner document is a separate
+       `navigationSave` (`onyx:channel-navigation:owner:…`) so this
+       legacy array can stay without clobbering folders. An emptied set
        removes the key, like the highlight/notify rails. */
     if (app.ports.starredSave) {
       app.ports.starredSave.subscribe(function (req) {
@@ -3133,10 +3850,9 @@ function fetchPublicFeed(url) {
     /* Forum-pinned rooms: Elm normalizes fail-closed (trim+lower, `#`/`&`
        lead, 128-char cap, no space/comma/controls, 256 max); the bridge
        writes the validated array under the plain
-       `onyx:forum-channels` key — the oracle bundles forum pins into the
-       whole owner-scoped `onyx:channel-navigation` object instead, which
-       stays ahead until Elm carries navigation memory. An emptied set
-       removes the key, like the starred rail. */
+       `onyx:forum-channels` key. Forum pins also land in the owner
+       navigation document via `navigationSave`. An emptied set removes
+       the key, like the starred rail. */
     if (app.ports.forumChannelsSave) {
       app.ports.forumChannelsSave.subscribe(function (req) {
         if (!req || !Array.isArray(req.channels)) return;
@@ -3154,11 +3870,9 @@ function fetchPublicFeed(url) {
     /* Auto-join rooms: Elm normalizes fail-closed (trim+lower, `#`/`&`
        lead, 128-char cap, no space/comma/controls, first-wins dedupe,
        128 max, insertion-ordered); the bridge writes the validated array
-       under the plain `onyx:autojoin-channels` key — the plain
-       `onyx:autojoin` key is avoided because the oracle purges ownerless
-       reads, and its owner-suffixed slots stay ahead until Elm carries
-       an owner. An emptied list removes the key, exactly mirroring
-       `saveAutoJoinChannels`. */
+       under `onyx:autojoin-channels`. The oracle base is `onyx:autojoin`
+       (purged when ownerless), so the owner document is
+       `onyx:autojoin:owner:…`. An emptied list removes both keys. */
     if (app.ports.autoJoinSave) {
       app.ports.autoJoinSave.subscribe(function (req) {
         if (!req || !Array.isArray(req.channels)) return;
@@ -3167,8 +3881,11 @@ function fetchPublicFeed(url) {
             if (typeof window !== "undefined" && window.localStorage) {
               window.localStorage.removeItem("onyx:autojoin-channels");
             }
+            removeDeviceSlot("onyx:autojoin");
           } else {
-            writeSlot("onyx:autojoin-channels", JSON.stringify(req.channels));
+            var autoJoinJson = JSON.stringify(req.channels);
+            writeSlot("onyx:autojoin-channels", autoJoinJson);
+            writeDeviceSlot("onyx:autojoin", autoJoinJson);
           }
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
@@ -3176,12 +3893,11 @@ function fetchPublicFeed(url) {
     /* Room accent labels: Elm normalizes fail-closed (lowercase
        `#`/`&` room keys, hex-only `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`
        colors, 256 cap with duplicate-key overwrite); the bridge writes
-       the `{ [channel]: color }` object under the plain
-       `onyx:channel-color-labels` key — the plain `onyx:channel-colors`
-       key is avoided because the oracle purges ownerless reads, and its
-       owner-suffixed slots stay ahead until Elm carries an owner. An
-       emptied map removes the key, exactly mirroring
-       `saveChannelColors`. */
+       the `{ [channel]: color }` object under
+       `onyx:channel-color-labels`. The oracle base is
+       `onyx:channel-colors` (purged when ownerless), so the owner
+       document is `onyx:channel-colors:owner:…`. An emptied map removes
+       both keys. */
     if (app.ports.channelColorsSave) {
       app.ports.channelColorsSave.subscribe(function (req) {
         if (!req || !Array.isArray(req.entries)) return;
@@ -3196,521 +3912,37 @@ function fetchPublicFeed(url) {
             if (typeof window !== "undefined" && window.localStorage) {
               window.localStorage.removeItem("onyx:channel-color-labels");
             }
+            removeDeviceSlot("onyx:channel-colors");
           } else {
-            writeSlot("onyx:channel-color-labels", JSON.stringify(obj));
+            var colorsJson = JSON.stringify(obj);
+            writeSlot("onyx:channel-color-labels", colorsJson);
+            writeDeviceSlot("onyx:channel-colors", colorsJson);
           }
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
     }
-    /* Scheduled-message queue projection (`onyx:scheduled`): Elm owns
-       validation, owner scoping, and encoding (mirroring
-       `_persistScheduledMessages`, which always writes — even an empty
-       queue — rather than removing the key), and the bridge reports the
-       write back so Elm can mark `scheduledProjectionDegraded` exactly
-       when the projection fails. The durable IndexedDB admission fence
-       joins in a later slice. */
-    if (app.ports.scheduledSave) {
-      app.ports.scheduledSave.subscribe(function (req) {
-        var ok = false;
-        try {
-          if (req && req.rows !== undefined) {
-            if (typeof window !== "undefined" && window.localStorage) {
-              window.localStorage.setItem("onyx:scheduled", JSON.stringify(req.rows));
-            }
-            ok = true;
-          }
-        } catch (err) { ok = false; /* storage unavailable / quota */ }
-        try {
-          if (app.ports.scheduledPersisted) {
-            app.ports.scheduledPersisted.send({ ok: ok });
-          }
-        } catch (err) { /* port gone */ }
-      });
+    /* Keep only the local clock conversion used by the private scheduled
+       editor. These helpers never persist or dispatch schedule content. */
+    function scheduleLocalParts(date) {
+      function two(value) { return String(value).padStart(2, "0"); }
+      return String(date.getFullYear()).padStart(4, "0") + "-" + two(date.getMonth() + 1) + "-" + two(date.getDate());
     }
-    /* Durable scheduled-message queue — structurally-identical mirror
-       of the `historyVault.ts` scheduled ops (`captureScheduledFence`,
-       `addScheduledRow`, `reconcileScheduledRows`, `claimScheduledRow`,
-       `settleScheduledClaim`, `cancelScheduledRow`,
-       `cancelScheduledRowsForOwner`). Elm owns validation, owner
-       scoping, due selection, and claim tokens; this mirror enforces
-       the same-origin CAS fences (erase epoch, owner generation,
-       capacity, claim exclusivity, cancellation tombstones) in
-       IndexedDB transactions, so tabs and reloads serialize exactly
-       like the oracle. Owner keys are byte-identical to
-       `deviceMemoryOwnerKey` (`JSON.stringify([serverUrl, lowered])`). */
-    function scheduledSafeInt(n) {
-      return typeof n === "number" && Number.isSafeInteger(n);
-    }
-    function scheduledOwnerKey(owner) {
-      if (!owner || typeof owner !== "object") return "legacy";
-      var url = owner.serverUrl, identity = owner.identity;
-      if (typeof url !== "string" || url.length === 0 || url.length > 2048 || url !== url.trim()) return "legacy";
-      if (typeof identity !== "string" || identity.length === 0 || identity.length > 256 || identity !== identity.trim()) return "legacy";
-      try {
-        return JSON.stringify([url, identity.toLowerCase()]);
-      } catch (err) {
-        return "legacy";
-      }
-    }
-    function scheduledCleanOwner(raw) {
-      if (!raw || typeof raw !== "object") return null;
-      var url = raw.serverUrl, identity = raw.identity;
-      if (typeof url !== "string" || url.length === 0 || url.length > 2048 || url !== url.trim()) return null;
-      if (typeof identity !== "string" || identity.length === 0 || identity.length > 256 || identity !== identity.trim()) return null;
-      return { serverUrl: url, identity: identity.toLowerCase() };
-    }
-    function scheduledCleanClaim(raw) {
-      if (!raw || typeof raw !== "object") return undefined;
-      if (typeof raw.token !== "string" || raw.token.length === 0 || raw.token.length > 128) return undefined;
-      if (!scheduledSafeInt(raw.claimedAt) || raw.claimedAt <= 0) return undefined;
-      return { token: raw.token, claimedAt: raw.claimedAt };
-    }
-    /* Presence is significant like the oracle parse: a present-but-bad
-       generation/clearEpoch drops the row, while a present-but-bad
-       owner/claim only clears that slot. */
-    function scheduledCleanRow(raw) {
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-      var id = raw.id, channel = raw.channel, text = raw.text, sendAt = raw.sendAt;
-      if (typeof id !== "string" || id.length === 0 || id.length > 128) return null;
-      if (typeof channel !== "string" || channel.length === 0 || channel.length > 256) return null;
-      if (typeof text !== "string" || text.trim().length === 0 || text.length > 65536) return null;
-      if (!scheduledSafeInt(sendAt) || sendAt <= 0) return null;
-      if (raw.generation !== undefined && (!scheduledSafeInt(raw.generation) || raw.generation < 0)) return null;
-      if (raw.clearEpoch !== undefined && (!scheduledSafeInt(raw.clearEpoch) || raw.clearEpoch < 0)) return null;
-      var row = { id: id, channel: channel, text: text, sendAt: sendAt, owner: scheduledCleanOwner(raw.owner) };
-      var claim = scheduledCleanClaim(raw.claim);
-      if (claim !== undefined) row.claim = claim;
-      if (raw.generation !== undefined) row.generation = raw.generation;
-      if (raw.clearEpoch !== undefined) row.clearEpoch = raw.clearEpoch;
-      return row;
-    }
-    function scheduledVisibleRow(stored) {
-      if (!stored || typeof stored !== "object" || stored.status) return null;
-      if (typeof stored.channel !== "string" || typeof stored.text !== "string" || typeof stored.sendAt !== "number") return null;
-      var key = String(stored.id || "");
-      var sep = key.indexOf("\u0000");
-      if (sep < 0) return null;
-      var row = {
-        id: key.slice(sep + 1),
-        channel: stored.channel,
-        text: stored.text,
-        sendAt: stored.sendAt,
-        owner: stored.owner && typeof stored.owner === "object" ? stored.owner : null
-      };
-      if (stored.claim && typeof stored.claim === "object") row.claim = stored.claim;
-      if (stored.generation !== undefined) row.generation = stored.generation;
-      if (stored.clearEpoch !== undefined) row.clearEpoch = stored.clearEpoch;
-      return row;
-    }
-    function scheduledRowActive(row, epoch) {
-      return !row.status && (row.clearEpoch === epoch || (row.clearEpoch === undefined && epoch === 0));
-    }
-    function scheduledOwnerGenerationKey(owner) {
-      return "owner-generation:" + scheduledOwnerKey(owner);
-    }
-    /* Read the erase + owner-generation fences (mirroring
-       `captureScheduledFence`: a pristine vault reads the zero fence,
-       not a failure; only a missing database or a failed read is
-       null). */
-    function scheduledFence(db, owner, done) {
-      if (!db) { done(null); return; }
-      var tx;
-      try {
-        tx = db.transaction(VAULT_META, "readonly");
-      } catch (err) { done(null); return; }
-      var epoch = 0, generation = 0, failed = false;
-      try {
-        var meta = tx.objectStore(VAULT_META);
-        var epochReq = meta.get(SCHEDULED_CLEAR_EPOCH_KEY);
-        epochReq.onsuccess = function () { epoch = Number(epochReq.result && epochReq.result.value) || 0; };
-        epochReq.onerror = function () { failed = true; };
-        var genReq = meta.get(scheduledOwnerGenerationKey(owner));
-        genReq.onsuccess = function () { generation = Number(genReq.result && genReq.result.value) || 0; };
-        genReq.onerror = function () { failed = true; };
-      } catch (err) { done(null); return; }
-      tx.oncomplete = function () { done(failed ? null : { clearEpoch: epoch, generation: generation }); };
-      tx.onerror = function () { done(null); };
-      tx.onabort = function () { done(null); };
-    }
-    /* Add one row without replacing a newer durable record (mirroring
-       `addScheduledRow`: expected-fence CAS, existing-row no-op,
-       capacity fence, cross-tab add races resolve as success). */
-    function scheduledAdd(db, row, expectedEpoch, expectedGeneration, done) {
-      var clean = scheduledCleanRow(row);
-      if (!db || !clean) { done(false); return; }
-      var tx;
-      try {
-        tx = db.transaction([SCHEDULED, VAULT_META], "readwrite");
-      } catch (err) { done(false); return; }
-      var meta = tx.objectStore(VAULT_META);
-      var epochReq = meta.get(SCHEDULED_CLEAR_EPOCH_KEY);
-      epochReq.onerror = function () { tx.abort(); };
-      epochReq.onsuccess = function () {
-        var epoch = Number(epochReq.result && epochReq.result.value) || 0;
-        var genReq = meta.get(clean.owner ? scheduledOwnerGenerationKey(clean.owner) : "unused");
-        genReq.onerror = function () { tx.abort(); };
-        genReq.onsuccess = function () {
-          var generation = clean.owner ? (Number(genReq.result && genReq.result.value) || 0) : 0;
-          if (expectedEpoch !== undefined && expectedEpoch !== epoch) { tx.abort(); return; }
-          if (expectedEpoch === undefined && epoch !== 0) { tx.abort(); return; }
-          if (clean.owner && expectedGeneration !== undefined && expectedGeneration !== generation) { tx.abort(); return; }
-          var os = tx.objectStore(SCHEDULED);
-          var key = scheduledRowKey(clean);
-          var existing = os.get(key);
-          existing.onerror = function () { tx.abort(); };
-          existing.onsuccess = function () {
-            if (existing.result !== undefined) return;
-            var all = os.getAll();
-            all.onerror = function () { tx.abort(); };
-            all.onsuccess = function () {
-              var active = 0;
-              (all.result || []).forEach(function (candidate) {
-                if (scheduledRowActive(candidate, epoch)) active += 1;
-              });
-              if (active >= SCHEDULED_MAX_ROWS) { tx.abort(); return; }
-              var stored = {
-                id: key,
-                owner: clean.owner,
-                channel: clean.channel,
-                text: clean.text,
-                sendAt: clean.sendAt,
-                clearEpoch: epoch,
-                generation: generation
-              };
-              if (clean.claim !== undefined) stored.claim = clean.claim;
-              var add = os.add(stored);
-              add.onerror = function (event) {
-                if (add.error && add.error.name === "ConstraintError") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                } else {
-                  tx.abort();
-                }
-              };
-            };
-          };
-        };
-      };
-      tx.oncomplete = function () { done(true); };
-      tx.onerror = function () { done(false); };
-      tx.onabort = function () { done(false); };
-      function scheduledRowKey(r) {
-        return scheduledOwnerKey(r.owner) + "\u0000" + r.id;
-      }
-    }
-    /* Reconcile the projection into the durable queue and claim due
-       rows in one transaction (mirroring `reconcileScheduledRows` plus
-       the dispatcher's claim loop: missing rows migrate in, existing
-       claims/statuses are never overwritten, canceled rows stay out,
-       and each claim CAS-excludes claimed/canceled/foreign rows).
-       Responds `{ queue, granted }` or null when no durable queue
-       could be established. */
-    function scheduledReconcile(db, rows, owner, tokens, done) {
-      if (!db) { done(null); return; }
-      var tx;
-      try {
-        tx = db.transaction([SCHEDULED, VAULT_META], "readwrite");
-      } catch (err) { done(null); return; }
-      var os = tx.objectStore(SCHEDULED);
-      var meta = tx.objectStore(VAULT_META);
-      var epoch = 0;
-      var projection = [];
-      var granted = [];
-      var clean = [];
-      (rows || []).forEach(function (raw) {
-        var row = scheduledCleanRow(raw);
-        if (row) clean.push(row);
-      });
-      var pendingTokens = [];
-      (tokens || []).forEach(function (tok) {
-        if (tok && typeof tok.id === "string" && typeof tok.token === "string" && scheduledSafeInt(tok.claimedAt)) {
-          pendingTokens.push(tok);
-        }
-      });
-      var ownerKey = scheduledOwnerKey(owner);
-      tx.onerror = function () { done(null); };
-      tx.onabort = function () { done(null); };
-      tx.oncomplete = function () {
-        var queue = [];
-        projection.forEach(function (stored) {
-          if (!scheduledRowActive(stored, epoch)) return;
-          var visible = scheduledVisibleRow(stored);
-          if (visible) queue.push(visible);
-        });
-        done({ queue: queue, granted: granted });
-      };
-      var epochReq = meta.get(SCHEDULED_CLEAR_EPOCH_KEY);
-      epochReq.onerror = function () { tx.abort(); };
-      epochReq.onsuccess = function () {
-        epoch = Number(epochReq.result && epochReq.result.value) || 0;
-        migrateNext(0);
-      };
-      function migrateNext(index) {
-        var row = clean[index];
-        if (!row) { claimNext(0); return; }
-        var get = os.get(scheduledOwnerKey(row.owner) + "\u0000" + row.id);
-        get.onerror = function () { tx.abort(); };
-        get.onsuccess = function () {
-          if (get.result !== undefined) { migrateNext(index + 1); return; }
-          if ((row.clearEpoch !== undefined && row.clearEpoch !== epoch)
-            || (row.clearEpoch === undefined && epoch !== 0)) { migrateNext(index + 1); return; }
-          var genReq = row.owner ? meta.get(scheduledOwnerGenerationKey(row.owner)) : null;
-          var addAt = function (generation) {
-            if (row.owner && row.generation !== undefined && row.generation !== generation) { migrateNext(index + 1); return; }
-            var all = os.getAll();
-            all.onerror = function () { tx.abort(); };
-            all.onsuccess = function () {
-              var active = 0;
-              (all.result || []).forEach(function (candidate) {
-                if (scheduledRowActive(candidate, epoch)) active += 1;
-              });
-              if (active >= SCHEDULED_MAX_ROWS) { migrateNext(index + 1); return; }
-              var stored = {
-                id: scheduledOwnerKey(row.owner) + "\u0000" + row.id,
-                owner: row.owner,
-                channel: row.channel,
-                text: row.text,
-                sendAt: row.sendAt,
-                clearEpoch: epoch,
-                generation: generation
-              };
-              if (row.claim !== undefined) stored.claim = row.claim;
-              var add = os.add(stored);
-              add.onerror = function (event) {
-                if (add.error && add.error.name === "ConstraintError") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  migrateNext(index + 1);
-                } else {
-                  tx.abort();
-                }
-              };
-              add.onsuccess = function () { migrateNext(index + 1); };
-            };
-          };
-          if (!genReq) { addAt(0); return; }
-          genReq.onerror = function () { tx.abort(); };
-          genReq.onsuccess = function () { addAt(Number(genReq.result && genReq.result.value) || 0); };
-        };
-      }
-      function claimNext(index) {
-        var tok = pendingTokens[index];
-        if (!tok) {
-          var all = os.getAll();
-          all.onerror = function () { tx.abort(); };
-          all.onsuccess = function () { projection = all.result || []; };
-          return;
-        }
-        var get = os.get(ownerKey + "\u0000" + tok.id);
-        get.onerror = function () { tx.abort(); };
-        get.onsuccess = function () {
-          var stored = get.result;
-          if (stored && !stored.status && !stored.claim && stored.owner
-            && typeof stored.channel === "string" && typeof stored.text === "string" && typeof stored.sendAt === "number"
-            && scheduledOwnerKey(stored.owner) === ownerKey) {
-            var claimed = {
-              id: stored.id,
-              owner: stored.owner,
-              channel: stored.channel,
-              text: stored.text,
-              sendAt: stored.sendAt,
-              claim: { token: tok.token, claimedAt: tok.claimedAt }
-            };
-            if (stored.generation !== undefined) claimed.generation = stored.generation;
-            if (stored.clearEpoch !== undefined) claimed.clearEpoch = stored.clearEpoch;
-            var put = os.put(claimed);
-            put.onerror = function () { tx.abort(); };
-            put.onsuccess = function () {
-              granted.push(tok.id);
-              claimNext(index + 1);
-            };
-          } else {
-            claimNext(index + 1);
-          }
-        };
-      }
-    }
-    /* Close one durable claim (mirroring `settleScheduledClaim`:
-       admitted rows become plaintext-free tombstones so a stale tab
-       snapshot can never migrate and replay them; rejected rows keep
-       their content with the claim released). */
-    function scheduledSettle(db, id, owner, token, admitted, done) {
-      if (!db) { if (done) done(false); return; }
-      var tx;
-      try {
-        tx = db.transaction(SCHEDULED, "readwrite");
-      } catch (err) { if (done) done(false); return; }
-      var os = tx.objectStore(SCHEDULED);
-      var get = os.get(scheduledOwnerKey(owner) + "\u0000" + id);
-      get.onerror = function () { tx.abort(); };
-      get.onsuccess = function () {
-        var stored = get.result;
-        if (!stored || !stored.claim || stored.claim.token !== token || stored.status) { tx.abort(); return; }
-        if (admitted) {
-          var tomb = { id: stored.id, owner: stored.owner, status: "admitted", statusAt: Date.now() };
-          if (stored.generation !== undefined) tomb.generation = stored.generation;
-          if (stored.clearEpoch !== undefined) tomb.clearEpoch = stored.clearEpoch;
-          os.put(tomb);
-        } else {
-          delete stored.claim;
-          os.put(stored);
-        }
-      };
-      tx.oncomplete = function () { if (done) done(true); };
-      tx.onerror = function () { if (done) done(false); };
-      tx.onabort = function () { if (done) done(false); };
-    }
-    /* Tombstone one row even when it has not migrated yet (mirroring
-       `cancelScheduledRow`: tombstones carry no channel/text so a
-       racing migration can never resurrect plaintext). */
-    function scheduledCancel(db, id, owner, done) {
-      if (!db) { done(false); return; }
-      var tx;
-      try {
-        tx = db.transaction(SCHEDULED, "readwrite");
-      } catch (err) { done(false); return; }
-      try {
-        tx.objectStore(SCHEDULED).put({
-          id: scheduledOwnerKey(owner) + "\u0000" + id,
-          owner: owner && typeof owner === "object" ? owner : null,
-          status: "canceled",
-          statusAt: Date.now()
-        });
-      } catch (err) { done(false); return; }
-      tx.oncomplete = function () { done(true); };
-      tx.onerror = function () { done(false); };
-      tx.onabort = function () { done(false); };
-    }
-    /* Tombstone one owner's rows and turn its generation (mirroring
-       `cancelScheduledRowsForOwner`: another tab's rows this tab never
-       hydrated are still retired). */
-    function scheduledCancelForOwner(db, owner, done) {
-      if (!db) { if (done) done(false); return; }
-      var tx;
-      try {
-        tx = db.transaction([SCHEDULED, VAULT_META], "readwrite");
-      } catch (err) { if (done) done(false); return; }
-      var os = tx.objectStore(SCHEDULED);
-      var prefix = scheduledOwnerKey(owner) + "\u0000";
-      try {
-        var meta = tx.objectStore(VAULT_META);
-        var genKey = scheduledOwnerGenerationKey(owner);
-        var genReq = meta.get(genKey);
-        genReq.onsuccess = function () {
-          meta.put({ id: genKey, value: (Number(genReq.result && genReq.result.value) || 0) + 1 });
-        };
-        var range = globalThis.IDBKeyRange
-          ? globalThis.IDBKeyRange.bound(prefix, prefix + "\uffff")
-          : null;
-        var cursorReq = range ? os.openCursor(range) : os.openCursor();
-        cursorReq.onsuccess = function () {
-          var cursor = cursorReq.result;
-          if (!cursor) return;
-          var row = cursor.value;
-          if (row && typeof row.id === "string" && row.id.indexOf(prefix) === 0 && row.status !== "canceled") {
-            cursor.update({ id: row.id, owner: row.owner, status: "canceled", statusAt: Date.now() });
-          } else if (row && typeof row.id === "string" && row.id.indexOf(prefix) !== 0 && range === null) {
-            /* No key-range support: skip foreign rows by key. */
-          }
-          cursor.continue();
-        };
-      } catch (err) { if (done) done(false); return; }
-      tx.oncomplete = function () { if (done) done(true); };
-      tx.onerror = function () { if (done) done(false); };
-      tx.onabort = function () { if (done) done(false); };
-    }
-    /* Scheduled-queue durable legs: fence + add for queueing, one
-       reconcile-and-claim round per dispatch, settle/cancel closes.
-       Elm revalidates owners at every async step; the bridge only
-       enforces the CAS fences. */
-    if (app.ports.scheduledFenceRequest) {
-      app.ports.scheduledFenceRequest.subscribe(function (req) {
-        var tag = req && typeof req.tag === "string" ? req.tag : "";
-        scheduledFence(vault, req && req.owner, function (fence) {
-          try {
-            app.ports.scheduledFenceResult.send(fence
-              ? { tag: tag, ok: true, epoch: fence.clearEpoch, generation: fence.generation }
-              : { tag: tag, ok: false, epoch: 0, generation: 0 });
-          } catch (err) { /* port gone */ }
-        });
-      });
-    }
-    if (app.ports.scheduledAddRequest) {
-      app.ports.scheduledAddRequest.subscribe(function (req) {
-        var id = req && req.row && typeof req.row.id === "string" ? req.row.id : "";
-        scheduledAdd(
-          vault,
-          req && req.row,
-          req && req.expectedEpoch != null ? req.expectedEpoch : undefined,
-          req && req.expectedGeneration != null ? req.expectedGeneration : undefined,
-          function (ok) {
-            try {
-              app.ports.scheduledAddResult.send({ id: id, ok: !!ok });
-            } catch (err) { /* port gone */ }
-          }
-        );
-      });
-    }
-    if (app.ports.scheduledDispatchRequest) {
-      app.ports.scheduledDispatchRequest.subscribe(function (req) {
-        scheduledReconcile(
-          vault,
-          req && req.rows,
-          req && req.owner,
-          req && req.candidates,
-          function (result) {
-            try {
-              app.ports.scheduledDispatchResult.send(result
-                ? { queue: result.queue, granted: result.granted }
-                : { queue: null, granted: [] });
-            } catch (err) { /* port gone */ }
-          }
-        );
-      });
-    }
-    if (app.ports.scheduledSettle) {
-      app.ports.scheduledSettle.subscribe(function (req) {
-        if (!req || typeof req.id !== "string") return;
-        scheduledSettle(vault, req.id, req.owner, req.token, !!req.admitted);
-      });
-    }
-    if (app.ports.scheduledCancelRequest) {
-      app.ports.scheduledCancelRequest.subscribe(function (req) {
-        var id = req && typeof req.id === "string" ? req.id : "";
-        scheduledCancel(vault, id, req && req.owner, function (ok) {
-          try {
-            app.ports.scheduledCancelResult.send({ id: id, owner: (req && req.owner) || null, ok: !!ok });
-          } catch (err) { /* port gone */ }
-        });
-      });
-    }
-    if (app.ports.scheduledOwnerCancel) {
-      app.ports.scheduledOwnerCancel.subscribe(function (req) {
-        if (!req) return;
-        scheduledCancelForOwner(vault, req.owner);
-      });
-    }
-    /* Send-later clock + datetime-local parse (mirroring
-       `scheduleTime.ts`): Elm owns the schedulability window and the
-       preset table, but only this side can do local-zone wall-clock
-       math. The clock answer carries the `tomorrow-9` epoch plus the
-       datetime-local floor; the parse answer echoes the submitted
-       value with the epoch (or null) so Elm can drop stale answers.
-       The parse never applies the schedule window — Elm owns
-       `isSchedulable` and maps out-of-window instants to the custom
-       error copy exactly like the oracle's null-folding parser. */
     function nextScheduleHour(now, hour) {
-      var d = new Date(now);
-      d.setHours(hour, 0, 0, 0);
-      if (d.getTime() <= now) d.setDate(d.getDate() + 1);
-      return d.getTime();
+      var date = new Date(now);
+      if (!Number.isFinite(date.getTime()) || !Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+      date.setDate(date.getDate() + 1);
+      date.setHours(hour, 0, 0, 0);
+      var result = date.getTime();
+      return Number.isSafeInteger(result) ? result : null;
     }
-    function toScheduleLocalValue(epoch) {
-      var d = new Date(epoch);
-      function pad(n) { return n < 10 ? "0" + n : "" + n; }
-      return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
-        "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    function toScheduleLocalValue(now) {
+      var date = new Date(now);
+      if (!Number.isFinite(date.getTime())) return "";
+      return scheduleLocalParts(date) + "T" + String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
     }
+
+    /* Scheduled plaintext persistence and legacy owner-blind claims are retired.
+       All schedule operations now go through runtime scheduled custody. */
     if (app.ports.scheduleClockRequest) {
       app.ports.scheduleClockRequest.subscribe(function () {
         var now = Date.now();
@@ -4123,6 +4355,11 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.friendsRequest) {
       app.ports.friendsRequest.subscribe(function (req) {
+        rememberDeviceSlotOwner(req);
+        if (deviceSlotOwner) {
+          purgeLegacyDeviceSlots();
+          publishDeviceSlots();
+        }
         var key = (req && contactsOwnerKey(FRIENDS_BASE_KEY, req.serverUrl, req.identity)) || null;
         if (!key || !app.ports.friendsLoaded) return;
         contactsPendingKey = key;
@@ -4425,8 +4662,8 @@ function fetchPublicFeed(url) {
         try { app.ports.searchHotkey.send(null); } catch (err) { /* best-effort */ }
       });
     }
-    /* Image lightbox dialog focus (mirroring `createDialogFocus` for
-       `MessageImageLightbox`: while the lightbox dialog is mounted the
+    /* Shared modal focus (mirroring `createDialogFocus`): while a
+       modal dialog is mounted the
        background is isolated and scroll-locked, Tab cycles inside the
        dialog, opening moves focus into it, and closing returns focus
        to the opener. A document stamp keeps re-wiring idempotent. */
@@ -4440,13 +4677,26 @@ function fetchPublicFeed(url) {
         (typeof MutationObserver !== "undefined" && MutationObserver)
         || (typeof window !== "undefined" && window && window.MutationObserver)
         || null;
-      var dialogSelector = ".shell-msg-lightbox-dialog";
-      var returnFocus = null;
+      var activePanel = null;
+      var returnTargets = new WeakMap();
       function panel() {
-        try { return document.querySelector(dialogSelector); } catch (err) { return null; }
+        try {
+          var dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+          var top = null;
+          var highest = -Infinity;
+          Array.prototype.forEach.call(dialogs, function (dialog) {
+            var layer = 0;
+            for (var node = dialog; node && node !== document.body; node = node.parentElement) {
+              var value = parseInt(window.getComputedStyle(node).zIndex, 10);
+              if (!isNaN(value)) layer = Math.max(layer, value);
+            }
+            if (layer >= highest) { top = dialog; highest = layer; }
+          });
+          return top;
+        } catch (err) { return null; }
       }
       function focusables(root) {
-        var nodes = [];
+        var nodes;
         try {
           nodes = root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
         } catch (err) { return []; }
@@ -4460,6 +4710,17 @@ function fetchPublicFeed(url) {
         var root = panel();
         if (!root) return;
         if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+        if (e.key === "Escape") {
+          /* Close the selected visual layer through its typed Elm button
+             action, rather than a competing page-level priority list. */
+          var close = root.querySelector('button[aria-label^="Close"]');
+          if (close) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!close.disabled) close.click();
+            return;
+          }
+        }
         if (e.key !== "Tab") return;
         var scope = root.parentNode || root;
         try {
@@ -4472,7 +4733,7 @@ function fetchPublicFeed(url) {
         }
         var first = items[0];
         var last = items[items.length - 1];
-        var active = null;
+        var active;
         try { active = document.activeElement; } catch (err) { active = null; }
         var onFirst = active === first || active === root;
         try {
@@ -4486,7 +4747,7 @@ function fetchPublicFeed(url) {
         } catch (err) { /* best-effort */ }
       }
       try {
-        document.addEventListener("keydown", trapTab);
+        document.addEventListener("keydown", trapTab, true);
       } catch (err) { /* no DOM events */ }
       if (!Mutation) return;
       var lockedOverflow = null;
@@ -4496,58 +4757,75 @@ function fetchPublicFeed(url) {
         // mounted (mirroring the oracle background isolation); the
         // lightbox container itself stays exposed.
         release();
-        var host = null;
+        var host;
         try {
           var root = panel();
           host = root && (root.parentNode || root);
         } catch (err) { host = null; }
-        var body = null;
+        var body;
         try { body = document.body; } catch (err) { body = null; }
         if (!host || !body) return;
         try { lockedOverflow = body.style.overflow || ""; } catch (err) { lockedOverflow = ""; }
         try { body.style.overflow = "hidden"; } catch (err) { /* best-effort */ }
-        Array.prototype.forEach.call(body.children, function (child) {
-          if (child === host || child.contains(host)) return;
-          try {
-            if (child.getAttribute("aria-hidden") !== "true") {
-              isolated.push(child);
+        /* Isolate siblings along the full ancestor path. Elm mounts
+           sheets inside #app, so body-only isolation leaves chat exposed. */
+        var current = host;
+        while (current && current !== body) {
+          var parent = current.parentElement;
+          if (!parent) break;
+          Array.prototype.forEach.call(parent.children, function (child) {
+            if (child === current) return;
+            try {
+              isolated.push({ node: child, hidden: child.getAttribute("aria-hidden"), inert: child.inert });
               child.setAttribute("aria-hidden", "true");
-            }
-          } catch (err) { /* best-effort */ }
-        });
+              child.inert = true;
+            } catch (err) { /* best-effort */ }
+          });
+          current = parent;
+        }
       }
       function release() {
-        var body = null;
+        var body;
         try { body = document.body; } catch (err) { body = null; }
         if (body && lockedOverflow !== null) {
           try { body.style.overflow = lockedOverflow; } catch (err) { /* best-effort */ }
           lockedOverflow = null;
         }
         while (isolated.length > 0) {
-          var child = isolated.pop();
-          try { child.removeAttribute("aria-hidden"); } catch (err) { /* best-effort */ }
+          var entry = isolated.pop();
+          try {
+            if (entry.hidden === null) entry.node.removeAttribute("aria-hidden");
+            else entry.node.setAttribute("aria-hidden", entry.hidden);
+            if (entry.inert === undefined) delete entry.node.inert;
+            else entry.node.inert = entry.inert;
+          } catch (err) { /* best-effort */ }
         }
       }
       function settle() {
         var root = panel();
-        if (root && !root.__onyxFocusReady) {
-          try { root.__onyxFocusReady = true; } catch (err) { /* best-effort */ }
-          try { returnFocus = document.activeElement || null; } catch (err) { returnFocus = null; }
-          isolate();
-          try { root.focus({ preventScroll: true }); } catch (err) {
-            try { root.focus(); } catch (ignored) { /* best-effort */ }
+        if (root === activePanel) return;
+        var previous = activePanel;
+        var back = previous ? returnTargets.get(previous) : null;
+        var closing = previous && !previous.isConnected;
+        release();
+        activePanel = root;
+        if (root) {
+          try {
+            if (!returnTargets.has(root)) returnTargets.set(root, document.activeElement || null);
+            if (!root.hasAttribute("tabindex")) root.setAttribute("tabindex", "-1");
+          } catch (err) { /* best-effort */ }
+          var destination = closing && back && root.contains(back) ? back : root;
+          try { destination.focus({ preventScroll: true }); } catch (err) {
+            try { destination.focus(); } catch (ignored) { /* best-effort */ }
           }
-        } else if (!root && returnFocus) {
-          var back = returnFocus;
-          returnFocus = null;
-          release();
+          /* Focus must leave the opener before its ancestry is hidden. */
+          isolate();
+        } else if (back) {
           try {
             if (back.isConnected) back.focus({ preventScroll: true });
           } catch (err) {
             try { if (back.isConnected) back.focus(); } catch (ignored) { /* best-effort */ }
           }
-        } else if (!root) {
-          release();
         }
       }
       try {
@@ -4631,6 +4909,12 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.retentionPolicySave) {
       app.ports.retentionPolicySave.subscribe(function (req) {
+        if (runtime) {
+          if (app.ports.retentionPolicyApplied) {
+            try { app.ports.retentionPolicyApplied.send({ saved: false, pruned: false }); } catch (err) { /* port gone */ }
+          }
+          return;
+        }
         var saved = false;
         try {
           var parsed = (req && typeof req.json === "string") ? JSON.parse(req.json) : null;
@@ -4839,6 +5123,138 @@ function fetchPublicFeed(url) {
             window.history.replaceState(null, "", url);
           }
         } catch (err) { /* jsdom / sandboxed documents may reject URL mutation */ }
+      });
+    }
+
+    // Reveal only the current conversation after Elm's render. Row ids are
+    // compared as data values; no network-provided selector is constructed.
+    if (app.ports.threadReveal) {
+      var threadRevealGeneration = 0;
+      var followedPane = null;
+      var followingTail = true;
+      var lastFollowProjection = "";
+      var pendingFollowFrame = null;
+      var lastAutomaticFollow = null;
+      var overflowAnchorOverride = null;
+      // While tail-follow is active, this bridge owns scroll positioning.
+      // Suppress native anchoring so appended rows cannot move the reader away;
+      // restore the authored inline declaration as soon as following ends.
+      function restoreOverflowAnchor(pane) {
+        var override = overflowAnchorOverride;
+        if (!override || override.pane !== pane) return;
+        if (override.value) pane.style.setProperty("overflow-anchor", override.value, override.priority);
+        else pane.style.removeProperty("overflow-anchor");
+        overflowAnchorOverride = null;
+      }
+      function syncOverflowAnchor() {
+        if (!followedPane) return;
+        if (!followingTail) {
+          restoreOverflowAnchor(followedPane);
+          return;
+        }
+        if (!overflowAnchorOverride || overflowAnchorOverride.pane !== followedPane) {
+          if (overflowAnchorOverride) restoreOverflowAnchor(overflowAnchorOverride.pane);
+          overflowAnchorOverride = {
+            pane: followedPane,
+            value: followedPane.style.getPropertyValue("overflow-anchor"),
+            priority: followedPane.style.getPropertyPriority("overflow-anchor")
+          };
+        }
+        followedPane.style.setProperty("overflow-anchor", "none");
+      }
+      function tailPosition(pane) {
+        return window.getComputedStyle(pane).flexDirection === "column-reverse"
+          ? 0 : Math.max(0, pane.scrollHeight - pane.clientHeight);
+      }
+      function publishFollowState() {
+        if (!followedPane || !app.ports.threadFollowState) return;
+        var target = followedPane.getAttribute("data-conversation") || "";
+        var projection = target + "|" + followingTail;
+        if (projection === lastFollowProjection) return;
+        lastFollowProjection = projection;
+        app.ports.threadFollowState.send({ target: target, following: followingTail });
+      }
+      function rememberTail() {
+        var pending = pendingFollowFrame;
+        var automatic = lastAutomaticFollow;
+        if (followingTail && followedPane && pending && automatic
+          && pending.pane === followedPane
+          && pending.generation === threadRevealGeneration
+          && automatic.pane === followedPane
+          && automatic.generation === pending.generation
+          && followedPane.scrollTop === automatic.top) return;
+        lastAutomaticFollow = null;
+        if (followedPane) followingTail = Math.abs(followedPane.scrollTop - tailPosition(followedPane)) < 64;
+        syncOverflowAnchor();
+        publishFollowState();
+      }
+      function followTranscript() {
+        var pane = document.querySelector(".onyx-thread-pane");
+        if (pane !== followedPane) {
+          if (followedPane) {
+            followedPane.removeEventListener("scroll", rememberTail);
+            restoreOverflowAnchor(followedPane);
+          }
+          followedPane = pane;
+          followingTail = true;
+          lastAutomaticFollow = null;
+          if (pane) pane.addEventListener("scroll", rememberTail, { passive: true });
+        }
+        syncOverflowAnchor();
+        publishFollowState();
+        if (!pane || !followingTail) return;
+        var generation = threadRevealGeneration;
+        // Several MutationObserver deliveries can describe the same pending
+        // render. One latest-layout scroll per pane/reveal generation is enough.
+        if (pendingFollowFrame
+          && pendingFollowFrame.pane === pane
+          && pendingFollowFrame.generation === generation) return;
+        var scheduledFollow = { pane: pane, generation: generation };
+        pendingFollowFrame = scheduledFollow;
+        window.requestAnimationFrame(function () {
+          if (pendingFollowFrame === scheduledFollow) pendingFollowFrame = null;
+          if (pane === followedPane && pane.isConnected && followingTail && generation === threadRevealGeneration) {
+            pane.scrollTop = tailPosition(pane);
+            lastAutomaticFollow = { pane: pane, top: pane.scrollTop, generation: generation };
+          }
+        });
+      }
+      if (typeof window !== "undefined" && typeof document !== "undefined" && window.MutationObserver && window.requestAnimationFrame) {
+        new window.MutationObserver(followTranscript).observe(document.body, { childList: true, subtree: true });
+        window.addEventListener("resize", followTranscript);
+        followTranscript();
+      }
+
+      app.ports.threadReveal.subscribe(function (req) {
+        if (!req || typeof req.target !== "string" || !/^(latest|earlier|row)$/.test(req.mode)) return;
+        var generation = ++threadRevealGeneration;
+        lastAutomaticFollow = null;
+        function reveal() {
+          if (generation !== threadRevealGeneration || typeof document === "undefined") return;
+          var pane = document.querySelector(".onyx-thread-pane");
+          if (!pane || pane.getAttribute("data-conversation") !== req.target) return;
+          if (req.mode === "latest") {
+            var reverse = window.getComputedStyle(pane).flexDirection === "column-reverse";
+            followingTail = true;
+            syncOverflowAnchor();
+            pane.scrollTop = reverse ? 0 : Math.max(0, pane.scrollHeight - pane.clientHeight);
+            lastAutomaticFollow = { pane: pane, top: pane.scrollTop, generation: generation };
+            publishFollowState();
+            return;
+          }
+          lastAutomaticFollow = null;
+          var rows = pane.querySelectorAll("[data-message-id]");
+          var row = req.mode === "earlier" ? rows[0] : Array.prototype.find.call(rows, function (item) {
+            return item.getAttribute("data-message-id") === req.rowId;
+          });
+          if (!row) return;
+          pane.scrollTop += row.getBoundingClientRect().top - pane.getBoundingClientRect().top - 12;
+          if (typeof row.focus === "function") row.focus({ preventScroll: true });
+          rememberTail();
+        }
+        var raf = typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+          ? window.requestAnimationFrame.bind(window) : function (callback) { setTimeout(callback, 0); };
+        raf(function () { raf(reveal); });
       });
     }
 
@@ -5064,18 +5480,6 @@ function fetchPublicFeed(url) {
       });
     }
 
-    if (app.ports.sessionTokenStore) {
-      app.ports.sessionTokenStore.subscribe(function (req) {
-        storeResumeToken(req.server, req.nick, req.kind, req.token, req.expiresAt);
-      });
-    }
-
-    if (app.ports.sessionTokensClear) {
-      app.ports.sessionTokensClear.subscribe(function (req) {
-        clearResumeTokens(req.server, req.nick);
-      });
-    }
-
   var reclaimTimers = createReclaimTimers(app);
     if (app.ports.reclaimTimerStart) {
       app.ports.reclaimTimerStart.subscribe(function (req) {
@@ -5088,11 +5492,15 @@ function fetchPublicFeed(url) {
       });
     }
 
-    /* SASL exchange: credentials in, crypto answers out. Elm chunks and
-       sends every payload; a failure answer tears the Elm exchange down. */
+    /* SASL credentials are read from the DOM only at the private boundary.
+       Elm carries the account name and capability state, never the password. */
     if (app.ports.saslStoreCredentials) {
       app.ports.saslStoreCredentials.subscribe(function (req) {
-        sasl.setCredentials(req && req.account, req && req.password, req && req.hasClientCert);
+        var passwordInput = document.getElementById("sasl-password");
+        var password = passwordInput && typeof passwordInput.value === "string" ? passwordInput.value : "";
+        if (passwordInput) passwordInput.value = "";
+        sasl.setCredentials(req && req.account, password, req && req.hasClientCert);
+        password = "";
       });
     }
     if (app.ports.saslRespond) {
@@ -5100,26 +5508,50 @@ function fetchPublicFeed(url) {
         var mech = req && req.mech;
         var nick = req && req.nick;
         var param = req && req.param;
+        var saslContext = runtime && typeof runtime.captureSaslContext === "function"
+          ? runtime.captureSaslContext()
+          : null;
+        var sendPrivateSasl = function (payload) {
+          if (!saslContext || !runtime || typeof runtime.sendSaslPayload !== "function"
+            || typeof runtime.isSaslContextCurrent !== "function"
+            || !runtime.isSaslContextCurrent(saslContext)) return null;
+          return runtime.sendSaslPayload(payload, saslContext);
+        };
         if (mech === "PLAIN") {
           var blob = sasl.plainPayload(nick);
           if (blob === null) {
             app.ports.saslFailed.send({ reason: "SASL authentication failed: no password held" });
           } else {
-            app.ports.saslPayload.send({ payload: blob });
+            var admission = sendPrivateSasl(blob);
+            blob = "";
+            if (admission && admission.kind !== "transport-admitted" && runtime.isSaslContextCurrent(saslContext)) app.ports.saslFailed.send({ reason: "SASL response could not be sent" });
+            if (saslContext) runtime.clearSaslContext(saslContext);
           }
           return;
         }
         if (mech === "SCRAM-SHA-256") {
           var done = function (out) {
-            if (out.kind === "send") app.ports.saslPayload.send({ payload: out.payload });
-            else if (out.kind === "fail") app.ports.saslFailed.send({ reason: out.reason });
+            if (!saslContext || !runtime || typeof runtime.isSaslContextCurrent !== "function"
+              || !runtime.isSaslContextCurrent(saslContext)) return;
+            if (out.kind === "send") {
+              var admission = sendPrivateSasl(out.payload);
+              out.payload = "";
+              if (admission && admission.kind !== "transport-admitted" && runtime.isSaslContextCurrent(saslContext)) app.ports.saslFailed.send({ reason: "SASL response could not be sent" });
+              runtime.clearSaslContext(saslContext);
+            }
+            else if (out.kind === "fail") {
+              app.ports.saslFailed.send({ reason: "SASL authentication failed" });
+              runtime.clearSaslContext(saslContext);
+            } else if (out.kind === "verified") {
+              runtime.clearSaslContext(saslContext);
+            }
             /* "verified" needs no reply: the trailing 903 completes login. */
           };
           if (param === "+") {
             done({ kind: "send", payload: sasl.scramFirst(nick).payload });
           } else {
             sasl.scramNext(param).then(done, function (err) {
-              app.ports.saslFailed.send({ reason: "SASL authentication failed: SCRAM error: " + (err && err.message ? err.message : err) });
+              if (saslContext && runtime && runtime.isSaslContextCurrent(saslContext)) app.ports.saslFailed.send({ reason: "SASL authentication failed" });
             });
           }
           return;
@@ -5196,7 +5628,7 @@ function fetchPublicFeed(url) {
     if (app.ports.savedSearchesExport) {
       app.ports.savedSearchesExport.subscribe(function () {
         savedSearches.exportAll().then(function (snapshot) {
-          var json = "";
+          var json;
           try { json = JSON.stringify(snapshot); } catch (err) { json = ""; }
           try { app.ports.savedSearchesExported.send({ json: json }); }
           catch (err) { /* port gone */ }
@@ -5205,7 +5637,7 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.savedSearchesImport) {
       app.ports.savedSearchesImport.subscribe(function (req) {
-        var raw = null;
+        var raw;
         try { raw = JSON.parse(req && req.json); } catch (err) { raw = null; }
         savedSearches.importRows(raw).then(function (result) {
           try { app.ports.savedSearchesImported.send({ imported: result.imported }); }
@@ -5320,6 +5752,7 @@ function fetchPublicFeed(url) {
       });
     }
     app.ports.wsSend.subscribe(function (line) {
+      if (privateRuntimeRequired && (!runtime || !runtime.isPrivateRuntimeActive())) return;
       socket.send(line);
     });
 
@@ -5328,27 +5761,107 @@ function fetchPublicFeed(url) {
     });
 
     app.ports.vaultPut.subscribe(function (req) {
+      if (privateRuntimeRequired && !runtime) {
+        app.ports.vaultStored.send({ target: req && req.target || "", stored: 0 });
+        return;
+      }
+      if (runtime) {
+        var owner;
+        try { owner = runtime.ownerSnapshot(); } catch (_error) { owner = null; }
+        if (!owner || typeof req.ownerRef !== "string" || req.ownerRef !== owner.ownerRef
+          || req.accountGeneration !== owner.accountGeneration || req.connectionGeneration !== owner.connectionGeneration) {
+          app.ports.vaultStored.send({ target: req && req.target || "", stored: 0 });
+          return;
+        }
+        /* The runtime re-derives the current target policy and projects each
+           row into the owner-scoped v5 store. Elm's privacy label is ignored. */
+        Promise.resolve(runtime.vaultPut(req && Array.isArray(req.rows) ? req.rows : [])).then(function (result) {
+          app.ports.vaultStored.send({ target: req && req.target || "", stored: result && result.status === "ready" ? result.affected : 0 });
+        }, function () { app.ports.vaultStored.send({ target: req && req.target || "", stored: 0 }); });
+        return;
+      }
       vaultPut(vault, req.rows, function (stored) {
         app.ports.vaultStored.send({ target: req.target, stored: stored });
       });
     });
 
     app.ports.vaultGet.subscribe(function (req) {
+      if (privateRuntimeRequired && !runtime) {
+        app.ports.vaultRows.send(Object.assign({ target: req && req.target || "", rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+        return;
+      }
+      if (runtime) {
+        var target = req && typeof req.target === "string" ? req.target : "";
+        var readOwner;
+        try { readOwner = runtime.ownerSnapshot(); } catch (_error) { readOwner = null; }
+        if (!readOwner || req.ownerRef !== readOwner.ownerRef || req.accountGeneration !== readOwner.accountGeneration || req.connectionGeneration !== readOwner.connectionGeneration) {
+          app.ports.vaultRows.send(Object.assign({ target: target, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+          return;
+        }
+        Promise.resolve(runtime.vaultGet(target, req && req.limit)).then(function (rows) {
+          var current;
+          try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+          if (!current || current.ownerRef !== req.ownerRef || current.accountGeneration !== req.accountGeneration || current.connectionGeneration !== req.connectionGeneration) return;
+          var scope = safeRetentionScope(rows && rows.retentionScope);
+          var ready = !!rows && rows.status === "ready" && scope.kind !== "unknown";
+          app.ports.vaultRows.send(Object.assign({ target: target, rows: ready ? rows.rows || [] : [], status: ready ? "ok" : "unavailable", retentionScope: scope }, historyRequestStamp(req)));
+        }, function () {
+          app.ports.vaultRows.send(Object.assign({ target: target, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+        });
+        return;
+      }
       vaultGet(vault, req.target, req.limit, function (rows, status) {
-        app.ports.vaultRows.send({ target: req.target, rows: rows, status: status });
+        app.ports.vaultRows.send(Object.assign({ target: req.target, rows: rows, status: status, retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
       });
     });
 
     if (app.ports.vaultGetAround) {
       app.ports.vaultGetAround.subscribe(function (req) {
+        if (privateRuntimeRequired && !runtime) {
+          app.ports.vaultRowsAround.send(Object.assign({ target: req && req.target || "", at: req && Number.isFinite(req.at) ? req.at : 0, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+          return;
+        }
+        if (runtime) {
+          var target = req && typeof req.target === "string" ? req.target : "";
+          var at = req && Number.isFinite(req.at) ? req.at : 0;
+          var aroundOwner;
+          try { aroundOwner = runtime.ownerSnapshot(); } catch (_error) { aroundOwner = null; }
+          if (!aroundOwner || req.ownerRef !== aroundOwner.ownerRef || req.accountGeneration !== aroundOwner.accountGeneration || req.connectionGeneration !== aroundOwner.connectionGeneration) {
+            app.ports.vaultRowsAround.send(Object.assign({ target: target, at: at, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+            return;
+          }
+          if (Math.abs(at) > 8640000000000000) {
+            app.ports.vaultRowsAround.send(Object.assign({ target: target, at: at, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+            return;
+          }
+          Promise.resolve(runtime.vaultGetAround(target, new Date(at).toISOString(), req && req.limit)).then(function (rows) {
+            var current;
+            try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+            if (!current || current.ownerRef !== req.ownerRef || current.accountGeneration !== req.accountGeneration || current.connectionGeneration !== req.connectionGeneration) return;
+            var scope = safeRetentionScope(rows && rows.retentionScope);
+            var ready = !!rows && rows.status === "ready" && scope.kind !== "unknown";
+            app.ports.vaultRowsAround.send(Object.assign({ target: target, at: at, rows: ready ? rows.rows || [] : [], status: ready ? "ok" : "unavailable", retentionScope: scope }, historyRequestStamp(req)));
+          }, function () {
+            app.ports.vaultRowsAround.send(Object.assign({ target: target, at: at, rows: [], status: "unavailable", retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
+          });
+          return;
+        }
         vaultGetAround(vault, req.target, req.at, req.limit, function (rows, status) {
-          app.ports.vaultRowsAround.send({ target: req.target, at: req.at, rows: rows, status: status });
+          app.ports.vaultRowsAround.send(Object.assign({ target: req.target, at: req.at, rows: rows, status: status, retentionScope: safeRetentionScope(null) }, historyRequestStamp(req)));
         });
       });
     }
 
     if (app.ports.outboxQueue) {
       app.ports.outboxQueue.subscribe(function (req) {
+        if (privateRuntimeRequired && !runtime) {
+          if (app.ports.outboxQueueFailed) app.ports.outboxQueueFailed.send({ target: req && typeof req.target === "string" ? req.target : "" });
+          return;
+        }
+        if (runtime) {
+          if (app.ports.outboxQueueFailed) app.ports.outboxQueueFailed.send({ target: req && typeof req.target === "string" ? req.target : "" });
+          return;
+        }
         outboxQueue(vault, req, function (entry) {
           app.ports.outboxQueued.send(entry);
         }, function (target) {
@@ -5359,6 +5872,16 @@ function fetchPublicFeed(url) {
 
     if (app.ports.outboxFlush) {
       app.ports.outboxFlush.subscribe(function (req) {
+        if (privateRuntimeRequired && !runtime) {
+          if (app.ports.outboxFlushed) app.ports.outboxFlushed.send({ sent: [], uncertain: [], dropped: [], rows: [], sentLabels: [], waiting: 0, pruneFailed: 0, expiredPruneFailed: 0, admittedPruneFailed: 0, walkOk: false });
+          return;
+        }
+        if (runtime) {
+          /* The legacy v3 queue is quarantined when the scoped runtime is
+             present. The runtime journal owns reconnect dispatch; never
+             report an empty legacy walk as a flush acknowledgement. */
+          return;
+        }
         var labeled = !!(req && req.labeled);
         outboxFlush(vault, socket, function (report) {
           app.ports.outboxFlushed.send(report);
@@ -5416,6 +5939,33 @@ function fetchPublicFeed(url) {
 
     if (app.ports.vaultSearch) {
       app.ports.vaultSearch.subscribe(function (req) {
+        if (privateRuntimeRequired && !runtime) {
+          var unavailableSeq = req && Number.isSafeInteger(req.seq) ? req.seq : 0;
+          try { app.ports.vaultSearched.send(Object.assign({ rows: [], status: "unavailable", seq: unavailableSeq, mode: req && req.mode || "exact", retentionScopes: [] }, historyRequestStamp(req))); } catch (_error) { /* port gone */ }
+          return;
+        }
+        if (runtime) {
+          var searchSeq = req && Number.isSafeInteger(req.seq) ? req.seq : 0;
+          var searchMode = req && req.mode || "exact";
+          var searchOwner;
+          try { searchOwner = runtime.ownerSnapshot(); } catch (_error) { searchOwner = null; }
+          if (!searchOwner || req.ownerRef !== searchOwner.ownerRef || req.accountGeneration !== searchOwner.accountGeneration || req.connectionGeneration !== searchOwner.connectionGeneration) {
+            try { app.ports.vaultSearched.send(Object.assign({ rows: [], status: "unavailable", seq: searchSeq, mode: searchMode, retentionScopes: [] }, historyRequestStamp(req))); } catch (_error) { /* port gone */ }
+            return;
+          }
+          Promise.resolve(runtime.vaultSearch(req && typeof req.query === "string" ? req.query : "", req && req.limit)).then(function (rows) {
+            var current;
+            try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+            if (!current || current.ownerRef !== req.ownerRef || current.accountGeneration !== req.accountGeneration || current.connectionGeneration !== req.connectionGeneration) return;
+            var scopes = safeRetentionScopes(rows && rows.retentionScopes);
+            var hasCoverage = scopes.length > 0 || !!rows && Array.isArray(rows.rows) && rows.rows.length === 0;
+            var complete = !!rows && rows.status === "ready" && rows.complete === true && hasCoverage && scopes.every(function (entry) { return entry.scope.kind !== "unknown"; });
+            try { app.ports.vaultSearched.send(Object.assign({ rows: complete ? rows.rows || [] : [], status: complete ? "ok" : (rows && rows.status === "ready" ? "incomplete" : "unavailable"), seq: searchSeq, mode: searchMode, retentionScopes: scopes }, historyRequestStamp(req))); } catch (_error) { /* port gone */ }
+          }, function () {
+            try { app.ports.vaultSearched.send(Object.assign({ rows: [], status: "unavailable", seq: searchSeq, mode: searchMode, retentionScopes: [] }, historyRequestStamp(req))); } catch (_error) { /* port gone */ }
+          });
+          return;
+        }
         var query = req && req.query ? String(req.query) : "";
         var limit = req && req.limit ? req.limit : 80;
         var seq = req && req.seq ? req.seq | 0 : 0;
@@ -5427,13 +5977,21 @@ function fetchPublicFeed(url) {
           nowMs: req ? req.nowMs : undefined
         };
         vaultSearchMode(vault, query, mode, scanOpts, function (rows, status) {
-          try { app.ports.vaultSearched.send({ rows: rows, status: status, seq: seq, mode: mode }); } catch (err) { /* port gone */ }
+          try { app.ports.vaultSearched.send(Object.assign({ rows: rows, status: status, seq: seq, mode: mode, retentionScopes: [] }, historyRequestStamp(req))); } catch (err) { /* port gone */ }
         });
       });
     }
 
     if (app.ports.vaultExportRequest) {
       app.ports.vaultExportRequest.subscribe(function () {
+        if (privateRuntimeRequired && !runtime) {
+          try { app.ports.vaultExported.send({ targets: 0, messages: 0 }); } catch (_error) { /* port gone */ }
+          return;
+        }
+        if (runtime) {
+          try { app.ports.vaultExported.send({ targets: 0, messages: 0 }); } catch (_error) { /* port gone */ }
+          return;
+        }
         vaultExportAll(vault, function (snapshot) {
           var targets = snapshot.targets.length;
           var messages = 0;
@@ -5463,6 +6021,10 @@ function fetchPublicFeed(url) {
     if (app.ports.deviceHistoryCopyRequest) {
       app.ports.deviceHistoryCopyRequest.subscribe(function (req) {
         var seq = (req && typeof req.seq === "number") ? req.seq : 0;
+        if (runtime) {
+          try { app.ports.deviceHistoryCopyRows.send({ seq: seq, exportedAt: "", json: "[]" }); } catch (_error) { /* port gone */ }
+          return;
+        }
         vaultExportAll(vault, function (snapshot) {
           try {
             var targets = (snapshot.targets || []).map(function (entry) {
@@ -5495,6 +6057,7 @@ function fetchPublicFeed(url) {
        merge reuses the normal `vaultPut` path. */
     if (app.ports.vaultImportPick) {
       app.ports.vaultImportPick.subscribe(function () {
+        if (runtime) return;
         try {
           var picker = document.createElement("input");
           picker.type = "file";
@@ -5619,46 +6182,50 @@ function fetchPublicFeed(url) {
     var e2ee = createE2ee();
     wireE2ee(app, e2ee, function (line) {
       socket.send(line);
-    });
+    }, runtime);
 
     var rooms = createRoomCrypto();
-    wireRoom(app, rooms);
+    wireRoom(app, rooms, runtime);
 
     var groupControl = createGroupControlVerify();
-    wireGroupControl(app, groupControl);
+    wireGroupControl(app, groupControl, runtime);
 
     var groupDirectory = createGroupDirectory();
-    wireGroupDirectory(app, groupDirectory);
+    wireGroupDirectory(app, groupDirectory, runtime);
 
     var groupPublisher = createGroupPublisherIdentity({
       ecdhPublicB64: function () { return e2ee.devicePublicB64(); }
     });
-    wireGroupPublisher(app, groupPublisher);
+    wireGroupPublisher(app, groupPublisher, runtime);
 
     var attribution = createAttributionIdentity({});
     wireAttribution(app, attribution);
 
-    var webPush = createWebPush({
-      sendLine: function (line) {
-        if (socket.isOpen()) {
-          socket.send(line);
-          return true;
-        }
-        return false;
-      },
-      socketOpen: function () { return socket.isOpen(); }
-    });
-    wireWebPush(app, webPush);
+    if (!runtime) {
+      var webPush = createWebPush({
+        sendLine: function (line) {
+          if (socket.isOpen()) {
+            socket.send(line);
+            return true;
+          }
+          return false;
+        },
+        socketOpen: function () { return socket.isOpen(); }
+      });
+      wireWebPush(app, webPush);
+    }
 
     /* Binary media plane: prebuilt datagrams out, socket bytes in
        (Elm validates the Cadence header before the engine sees them).
        `socket` here is the connectSocket facade; the live check reads
        through it so reconnects need no rewiring. */
-    var mediaBinary = createMediaBinary({
-      socket: function () { return socket.rawSocket ? socket.rawSocket() : null; },
-      engine: voiceEngine
-    });
-    wireMediaBinary(app, mediaBinary);
+    if (!runtime) {
+      var mediaBinary = createMediaBinary({
+        socket: function () { return socket.rawSocket ? socket.rawSocket() : null; },
+        engine: voiceEngine
+      });
+      wireMediaBinary(app, mediaBinary);
+    }
 
     var groupWelcome = createGroupWelcome({
       devicePrivateKey: function () {
@@ -5666,7 +6233,8 @@ function fetchPublicFeed(url) {
       },
       roomProvision: function (room, epoch, raw) { return rooms.provisionRoomKey(room, epoch, raw); }
     });
-    wireGroupWelcome(app, groupWelcome);
+    wireGroupWelcome(app, groupWelcome, runtime);
+    return true;
   }
 
   var CEREMONY_TIMEOUT_MS = 120000;
@@ -7272,10 +7840,7 @@ function fetchPublicFeed(url) {
   var GROUP_WELCOME_MAGIC = [0x4f, 0x47, 0x57, 0x31]; // "OGW1"
   var GROUP_WELCOME_VERSION = 1;
   var GROUP_WELCOME_EPHEMERAL_BYTES = 65;
-  var GROUP_WELCOME_NONCE_BYTES = 12;
   var GROUP_WELCOME_COMMIT_ID_BYTES = 32;
-  var GROUP_WELCOME_DIGEST_BYTES = 32;
-  var GROUP_WELCOME_KEY_BYTES = 32;
   var GROUP_WELCOME_PLAINTEXT_MAGIC = [0x4f, 0x47, 0x57, 0x50, 0x31]; // "OGWP1"
   var GROUP_WELCOME_PLAINTEXT_BYTES = 109;
   var GROUP_WELCOME_MAX_BYTES = 207;
@@ -7596,9 +8161,15 @@ function fetchPublicFeed(url) {
     };
   }
 
-  function wireGroupWelcome(app, welcome) {
+  function wireGroupWelcome(app, welcome, runtime) {
     if (app.ports.groupWelcomeOpen) {
       app.ports.groupWelcomeOpen.subscribe(function (req) {
+        if (runtime) {
+          /* The scoped provider owns verification and installation. Never
+             install a second copy into the legacy in-memory room keyring. */
+          app.ports.groupWelcomeOpened.send({ key: req && req.key || "", room: req && req.room || "", epoch: req && req.epoch || 0, ok: false, reason: "private-runtime-required" });
+          return;
+        }
         welcome.openAndInstall(req).then(function (outcome) {
           if (outcome.ok) {
             app.ports.groupWelcomeOpened.send({ room: outcome.room, epoch: outcome.epoch, ok: true, reason: "" });
@@ -7612,9 +8183,10 @@ function fetchPublicFeed(url) {
     }
   }
 
-  function wireGroupPublisher(app, publisher) {
+  function wireGroupPublisher(app, publisher, runtime) {
     if (app.ports.groupPublisherProject) {
       app.ports.groupPublisherProject.subscribe(function () {
+        if (runtime) { app.ports.groupPublisherIdentity.send(null); return; }
         publisher.project().then(function (identity) {
           app.ports.groupPublisherIdentity.send(identity);
         }).catch(function () {
@@ -7624,6 +8196,7 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.groupPublisherScheduleRetry) {
       app.ports.groupPublisherScheduleRetry.subscribe(function () {
+        if (runtime) return;
         setTimeout(function () {
           app.ports.groupPublisherRetryDue.send(null);
         }, GROUP_PUBLISH_RETRY_MS);
@@ -7801,8 +8374,12 @@ function fetchPublicFeed(url) {
     };
   }
 
-  function wireRoom(app, roomCrypto) {
+  function wireRoom(app, roomCrypto, runtime) {
     app.ports.roomSealRequest.subscribe(function (req) {
+      if (runtime) {
+        app.ports.roomSealFailed.send({ room: req && req.room || "", recoveryRequired: true, notProvisioned: true });
+        return;
+      }
       roomCrypto.sealRoomMessage(req.room, req.plaintext).then(function (outcome) {
         // Unprovisioned rooms and seal failures yield no ciphertext:
         // the App drops the pending seal instead of downgrading. A room
@@ -7820,6 +8397,20 @@ function fetchPublicFeed(url) {
     });
 
     app.ports.roomOpenRequest.subscribe(function (req) {
+      if (runtime) {
+        var fail = function () { app.ports.roomOpenFailed.send({ room: req && req.room || "", messageId: req && req.messageId || "", envelope: req && req.envelope || "" }); };
+        var owner = null; try { owner = runtime.ownerSnapshot(); } catch (_e) { owner = null; }
+        if (!owner || !req || typeof req.room !== "string" || typeof req.envelope !== "string" || typeof runtime.openRoomFromCurrentEpoch !== "function") { fail(); return; }
+        var bytes = new Uint8Array(18); crypto.getRandomValues(bytes);
+        var requestId = Array.from(bytes, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("").slice(0, 32);
+        Promise.resolve(runtime.openRoomFromCurrentEpoch({ owner: owner, conversationId: req.room, envelope: req.envelope, requestId: requestId })).then(function (plaintext) {
+          var current = null; try { current = runtime.ownerSnapshot(); } catch (_e) { current = null; }
+          if (!current || current.ownerRef !== owner.ownerRef || current.connectionGeneration !== owner.connectionGeneration || current.accountGeneration !== owner.accountGeneration) return;
+          if (typeof plaintext === "string") app.ports.roomOpened.send({ room: req.room, messageId: req.messageId, envelope: req.envelope, plaintext: plaintext });
+          else fail();
+        }, fail);
+        return;
+      }
       roomCrypto.openRoomMessage(req.room, req.envelope).then(function (outcome) {
         if (outcome.ok) {
           app.ports.roomOpened.send({
@@ -7951,8 +8542,12 @@ function fetchPublicFeed(url) {
     };
   }
 
-  function wireGroupDirectory(app, directory) {
+  function wireGroupDirectory(app, directory, runtime) {
     app.ports.groupDirectoryDerive.subscribe(function (req) {
+      if (runtime) {
+        app.ports.groupDirectoryDerived.send({ account: req && req.account || "", rows: [] });
+        return;
+      }
       directory.deriveSnapshot(req).then(function (verdicts) {
         app.ports.groupDirectoryDerived.send(verdicts);
       });
@@ -8208,16 +8803,32 @@ function fetchPublicFeed(url) {
     };
   }
 
-  function wireGroupControl(app, groupControl) {
+  function wireGroupControl(app, groupControl, runtime) {
     app.ports.groupControlInstall.subscribe(function (req) {
+      if (runtime) {
+        /* Metadata-only verification cannot install accepted state. The
+           runtime's private ingress owns original signed records and pins. */
+        app.ports.groupControlVerified.send({
+          channel: req && req.channel || "", epoch: req && req.epoch || 0,
+          signerB64: req && req.signerB64 || "", fromAccount: req && req.fromAccount || "",
+          fromDevice: req && req.fromDevice || "", toAccount: req && req.toAccount || null,
+          toDevice: req && req.toDevice || null, kind: req && req.kind || "",
+          payload: "", signatureValid: false, trust: "private-runtime-required"
+        });
+        return;
+      }
       groupControl.verifyDelivery(req).then(function (verdict) {
         app.ports.groupControlVerified.send(verdict);
       });
     });
   }
 
-  function wireE2ee(app, e2ee, sendLine) {
+  function wireE2ee(app, e2ee, sendLine, runtime) {
     app.ports.dmSealRequest.subscribe(function (req) {
+      if (runtime) {
+        app.ports.dmSealFailed.send({ target: req && req.target || "", keyChanged: false, schedId: req && req.schedId !== undefined ? req.schedId : null });
+        return;
+      }
       e2ee.sealToDevices(req.target, req.keys, req.plaintext, req.owner).then(function (outcome) {
         // A seal-time key change flags the peer with no toast (the App
         // drops the pending seal like the oracle flag-only path).
@@ -8234,6 +8845,48 @@ function fetchPublicFeed(url) {
     });
 
     app.ports.dmOpenRequest.subscribe(function (req) {
+      if (runtime) {
+        var owner = null;
+        try { owner = typeof runtime.ownerSnapshot === "function" ? runtime.ownerSnapshot() : null; } catch (_error) { owner = null; }
+        var stampMatches = !!(owner && req && req.runtimeOwnerRef === owner.ownerRef
+          && req.accountGeneration === owner.accountGeneration
+          && req.connectionGeneration === owner.connectionGeneration);
+        if (!stampMatches || typeof runtime.openDmFromCurrentPeer !== "function") {
+          app.ports.dmOpenFailed.send({ peer: req && req.peer || "", messageId: req && req.messageId || "", keyChanged: true });
+          return;
+        }
+        var requestId = "";
+        try {
+          var requestBytes = new Uint8Array(16);
+          global.crypto.getRandomValues(requestBytes);
+          requestId = "dmopen-" + Array.prototype.map.call(requestBytes, function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
+          requestBytes.fill(0);
+        } catch (_error) { requestId = ""; }
+        if (!requestId) {
+          app.ports.dmOpenFailed.send({ peer: req.peer, messageId: req.messageId, keyChanged: true });
+          return;
+        }
+        Promise.resolve(runtime.openDmFromCurrentPeer({ owner: owner, conversationId: req.peer, envelope: req.envelope, requestId: requestId }))
+          .then(function (plaintext) {
+            var current = null;
+            try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+            if (!current || current.ownerRef !== owner.ownerRef || current.accountGeneration !== owner.accountGeneration
+              || current.connectionGeneration !== owner.connectionGeneration) return;
+            if (typeof plaintext === "string") {
+              app.ports.dmOpened.send({ peer: req.peer, messageId: req.messageId, envelope: req.envelope, plaintext: plaintext });
+            } else {
+              app.ports.dmOpenFailed.send({ peer: req.peer, messageId: req.messageId, keyChanged: true });
+            }
+          }, function () {
+            var current = null;
+            try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
+            if (current && current.ownerRef === owner.ownerRef && current.accountGeneration === owner.accountGeneration
+              && current.connectionGeneration === owner.connectionGeneration) {
+              app.ports.dmOpenFailed.send({ peer: req.peer, messageId: req.messageId, keyChanged: true });
+            }
+          });
+        return;
+      }
       // The presented key travels with the request from Elm's live
       // directory. Trust is still verified against the pin store
       // inside openFrom, so a rotated key fails locked, never open.
@@ -8257,6 +8910,7 @@ function fetchPublicFeed(url) {
     });
 
     app.ports.dmPublishKey.subscribe(function () {
+      if (runtime) return;
       e2ee.publishKeys(sendLine);
     });
     /* Manual "publish this device key" (Account panel): resolve the
@@ -8265,6 +8919,10 @@ function fetchPublicFeed(url) {
        and Elm stays silent — mirroring `publishThisDeviceKey`. */
     if (app.ports.e2eeDeviceIdentityRequest) {
       app.ports.e2eeDeviceIdentityRequest.subscribe(function () {
+        if (runtime) {
+          try { app.ports.e2eeDeviceIdentity.send({ deviceId: "", publicKey: "" }); } catch (err) { /* port gone */ }
+          return;
+        }
         function failed() {
           try { app.ports.e2eeDeviceIdentity.send({ deviceId: "", publicKey: "" }); } catch (err) { /* port gone */ }
         }
@@ -8352,17 +9010,6 @@ function fetchPublicFeed(url) {
       copy: copyTextToClipboard,
       legacyCopy: legacyCopyText
     },
-    resumeCredentials: {
-      slotKey: credentialSlotKey,
-      validToken: validResumeToken,
-      store: storeResumeToken,
-      load: loadResumeTokens,
-      clear: clearResumeTokens,
-      reclaimConfirmMs: RECLAIM_CONFIRM_MS,
-      reclaimDismissMs: RECLAIM_DISMISS_MS,
-      key: CRED_KEY,
-      maxTokenLength: MAX_RESUME_TOKEN_LENGTH
-    },
     sasl: {
       setCredentials: sasl.setCredentials,
       clearCredentials: sasl.clearCredentials,
@@ -8399,6 +9046,7 @@ function fetchPublicFeed(url) {
     wireMediaBinary: wireMediaBinary,
     mediaReceiveRaw: mediaReceiveRaw,
     mediaMaxBinaryBytes: MEDIA_MAX_BINARY_BYTES,
+    normalizeRuntimeLine: normalizeRuntimeLine,
     createGroupWelcome: createGroupWelcome,
     wireGroupWelcome: wireGroupWelcome,
     memKV: memKV

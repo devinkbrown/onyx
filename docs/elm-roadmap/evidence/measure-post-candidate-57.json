@@ -1,0 +1,3876 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-05T16:49:06.803Z",
+  "suite": "measure",
+  "status": "failed",
+  "sourceCut": {
+    "selectionVersion": "elm-performance-observation-v1",
+    "scope": "bounded-performance-observation",
+    "reconstructibleSourceCut": false,
+    "fullRoadmapSourceAcceptance": "pending validated shared full closure",
+    "includes": [
+      "elm/** (source/build inputs; excluding generated caches and private paths)",
+      "tests/e2e/elm.config.ts",
+      "tests/e2e/elm-performance*.spec.ts",
+      "tests/e2e/elm-stress*.spec.ts",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      ".npmrc",
+      "tools/build-elm-site.mjs",
+      "tools/materialize-elm-routes.mjs",
+      "tools/minify-elm-script.mjs",
+      "tools/serve-dir.mjs",
+      "public/brand/mark.png",
+      "public/brand/mascot-still.png",
+      "public/manifest.json",
+      "public/favicon.ico",
+      "public/favicon.svg",
+      "public/favicon-32.png",
+      "public/apple-touch-icon.png",
+      "public/icon-192.png",
+      "public/icon-192-maskable.png",
+      "public/icon-512.png",
+      "public/icon-512-maskable.png",
+      "public/og.png",
+      "public/robots.txt",
+      "public/sitemap.xml"
+    ],
+    "excludes": [
+      ".git/**",
+      "node_modules/**",
+      "elm/elm-stuff/**",
+      "elm-stuff/**",
+      "elm/out/**",
+      "elm/dist/**",
+      "dist/**",
+      "out/**",
+      "coverage/**",
+      ".cache/**",
+      ".pnpm-store/**",
+      "private/**",
+      "secrets/**",
+      "elm/private/**",
+      "elm/secrets/**"
+    ],
+    "fileCount": 461,
+    "digestAlgorithm": "sha256(sorted path NUL byte-count NUL mode NUL file-sha256 LF)",
+    "digest": "e9ea06bd223a7719541b64811d1e79f66eb961036f33c0e587b36cea410b7b3c",
+    "files": [
+      {
+        "path": "elm/accountData.smoke.mjs",
+        "bytes": 2425,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2a779550d27ff1fa4842c7f5acc97b5040406d8fec20679df4b7e1728193d073"
+      },
+      {
+        "path": "elm/app.css",
+        "bytes": 65918,
+        "mode": 384,
+        "type": "file",
+        "sha256": "177452e7c9d3f2701877b536d22609d5b902529f782835140de896ff7d3c7a54"
+      },
+      {
+        "path": "elm/attribution.smoke.mjs",
+        "bytes": 9247,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e3f76eb454b2b00f0e988a4683135b7f51d666bab44dc2c4fc13c2bc9478ae1a"
+      },
+      {
+        "path": "elm/autoJoinSave.smoke.mjs",
+        "bytes": 2664,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a368d8f05a0409a9ff21de1a1cac1e8b712ce70195842ddb5dfcfd8edfa47091"
+      },
+      {
+        "path": "elm/blocklists.smoke.mjs",
+        "bytes": 3022,
+        "mode": 384,
+        "type": "file",
+        "sha256": "24459b57ac64ef110dc6537e44d06461a63a433249c31100b02c3a3512bdccf8"
+      },
+      {
+        "path": "elm/cadenceBridge.smoke.mjs",
+        "bytes": 6386,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ceb7a739c18fe8e8d089f728aef7c1437c624da01ae67b876b1320cfb516bbd6"
+      },
+      {
+        "path": "elm/channelColorsSave.smoke.mjs",
+        "bytes": 3141,
+        "mode": 384,
+        "type": "file",
+        "sha256": "99e24c9feb801d4c21b70ca66a03f7fc980c52f6534c2439d94ffd913c9df567"
+      },
+      {
+        "path": "elm/channelNotifySave.smoke.mjs",
+        "bytes": 3111,
+        "mode": 384,
+        "type": "file",
+        "sha256": "46513c9688a0be7c442c240375d466bacb64c50f08edc19a23babd1515ea8eab"
+      },
+      {
+        "path": "elm/clipboard.smoke.mjs",
+        "bytes": 2379,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4e5d7a3c7cc945fc428c7d1c6f573b97647e861b10fd690a91272c30410dd7fa"
+      },
+      {
+        "path": "elm/contactsPresence.smoke.mjs",
+        "bytes": 3154,
+        "mode": 384,
+        "type": "file",
+        "sha256": "af8674538bc24869f4e824f975db17cec4b5f3b37a6edcb339029c9854c5093a"
+      },
+      {
+        "path": "elm/COVERAGE.md",
+        "bytes": 108343,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ce73f397d33d808857c48c4b3f7acd33c753cf0eeefc26539a49fa22b6d66af9"
+      },
+      {
+        "path": "elm/ctcpQuery.smoke.mjs",
+        "bytes": 5602,
+        "mode": 384,
+        "type": "file",
+        "sha256": "20b1afad01629cd1aecdaf12b663381101db9f937890a7dfea4a94dbdd4ce862"
+      },
+      {
+        "path": "elm/deviceSlots.smoke.mjs",
+        "bytes": 3461,
+        "mode": 420,
+        "type": "file",
+        "sha256": "b6b80723ba87fc934016b6c0818fe19f8fb56b87dd748d7dd4af21c05a703597"
+      },
+      {
+        "path": "elm/dmSearchScope.smoke.mjs",
+        "bytes": 3270,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8582ca804b6d08c649cf1d338fbdc0260d6f80b28f04e7b366d3622856ab8701"
+      },
+      {
+        "path": "elm/dndSave.smoke.mjs",
+        "bytes": 3083,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e11dadd2e88e396404928910aef8011502c914e6b00bfffcb5025a0733fe7a82"
+      },
+      {
+        "path": "elm/e2ee.smoke.mjs",
+        "bytes": 22602,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cd8561da7b235e123f615897bffb42bb59e2fed69a2dcf5c29b411c3bcd9192a"
+      },
+      {
+        "path": "elm/e2eeDevice.smoke.mjs",
+        "bytes": 2277,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1da3dd0dc5d2e90ac3ef5b751b3d3eab629c6639ce591f55c1772e455f012776"
+      },
+      {
+        "path": "elm/elm.json",
+        "bytes": 682,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2a9a1cd66ad584484f036754c2c656361fb08d884572daf63c312ba1ed1a9ffa"
+      },
+      {
+        "path": "elm/fixtures/roadmap/catalog.json",
+        "bytes": 2609,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ffa7604b88b69c9114effd5537091b08f526352240979998242c580874a55151"
+      },
+      {
+        "path": "elm/groupPublisher.smoke.mjs",
+        "bytes": 4981,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b3e0dda671b8b70454c87becf9a8618abf7a80318a39a51de6c0cdd69eb4fc3c"
+      },
+      {
+        "path": "elm/groupWelcome.smoke.mjs",
+        "bytes": 9784,
+        "mode": 384,
+        "type": "file",
+        "sha256": "382f1fad892fbe7b40ad75d568332c44da71895ed53e11acba8ac7b19449190f"
+      },
+      {
+        "path": "elm/guestClaimDismiss.smoke.mjs",
+        "bytes": 3874,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ebc30ac86f5ec6f207e8cc30a3af42779955acf41b9ad2d171007f7343a28864"
+      },
+      {
+        "path": "elm/guidesProgress.smoke.mjs",
+        "bytes": 3185,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0a27c66bd9e9a271228f13741ba62ed86fa363893af8734708d89d64808c6298"
+      },
+      {
+        "path": "elm/highlightWords.smoke.mjs",
+        "bytes": 3200,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e53dd62e33943dca4d2aee21a4ec9a802cbc129d0de874a105c2180560b26163"
+      },
+      {
+        "path": "elm/identityOverrides.smoke.mjs",
+        "bytes": 6444,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d3690d74c70ed31ccf134e9e707e569192b435ba20d9e36dc679c5ea22d1bfb3"
+      },
+      {
+        "path": "elm/identityProfile.smoke.mjs",
+        "bytes": 5971,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0b9b8f3d145b4eb1fa2e0b6a5d627fdccb60ccc0d443a7966f99488fe23d6cf0"
+      },
+      {
+        "path": "elm/index.html",
+        "bytes": 15547,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0eb1138a556b0ae764b576195f83fc1d7b943037fc3d7e02e2771386442e63c7"
+      },
+      {
+        "path": "elm/lightboxFocus.smoke.mjs",
+        "bytes": 8483,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c09d4ad64afaad7ae84dd3025eacd3666801a471b9dd6aa94aaa0e6ad6ad9aa2"
+      },
+      {
+        "path": "elm/mediaSave.smoke.mjs",
+        "bytes": 2720,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c4c856361973f630e7c4665917a9043ae5170bf88e2447e5f630ca0a247571cc"
+      },
+      {
+        "path": "elm/nickAliases.smoke.mjs",
+        "bytes": 4441,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0771fc6f797f2b7ba5ca113260fd41d1fdca57c6fe4116b8e7496e589715c0dc"
+      },
+      {
+        "path": "elm/nodesProbe.smoke.mjs",
+        "bytes": 2090,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ba3e57abccbaced4b73364cf55a363de3a0b9be7f542fc56d20d7e6365d22ec0"
+      },
+      {
+        "path": "elm/notifyAlerts.smoke.mjs",
+        "bytes": 7168,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2edc5e5bb8c70349f2a8d6d6971265aa488af0ba271232cbd7c48df46837b3f2"
+      },
+      {
+        "path": "elm/offlineMemo.smoke.mjs",
+        "bytes": 3043,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7789cf7d28aec5c5efc2c031f45df8c012b3702c3a6818fc822cdf16740090d4"
+      },
+      {
+        "path": "elm/outbox.smoke.mjs",
+        "bytes": 13318,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a2d48d6f287adc313acb19d0fea8aa50c096567a8b5f69e1f0ac367de91f59b6"
+      },
+      {
+        "path": "elm/personReportReceipt.smoke.mjs",
+        "bytes": 4220,
+        "mode": 384,
+        "type": "file",
+        "sha256": "797d1dbed92f7586833a52b5464787324818ea50c5f8a074da22d40e579ae60e"
+      },
+      {
+        "path": "elm/pingKeepalive.smoke.mjs",
+        "bytes": 2201,
+        "mode": 384,
+        "type": "file",
+        "sha256": "db516f9a33ecb247b690cbaeac3ab2043058be0d7ded3ac24c2ef1d7814279b8"
+      },
+      {
+        "path": "elm/ports.js",
+        "bytes": 407334,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4b70a6fe6438ce22e329d815ca023d15731f752a178dbaff984639cd59ca7b62"
+      },
+      {
+        "path": "elm/publicFeed.smoke.mjs",
+        "bytes": 3835,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b6c6766d56807becd10793b7276873a84e5794ee642ff559380110482527f742"
+      },
+      {
+        "path": "elm/rail.css",
+        "bytes": 2961,
+        "mode": 420,
+        "type": "file",
+        "sha256": "71d545d1fbda54b4044065454adc8c1e668169e2e85e31074b583d1380727b59"
+      },
+      {
+        "path": "elm/README.md",
+        "bytes": 25355,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1c0dc9266a5390bb674f3d5480d29bdc64202de3922389572f9429549446a25a"
+      },
+      {
+        "path": "elm/retentionPolicy.smoke.mjs",
+        "bytes": 3653,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7cbe91ecd22851408b6940b01e2fb8c416d68df4dbf679119876d4118387e038"
+      },
+      {
+        "path": "elm/runtime/account-community-service.test.ts",
+        "bytes": 10089,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c90dd8db0c670cdbf13c36a798483833038a639e740b309a607f7d2f53103a90"
+      },
+      {
+        "path": "elm/runtime/account-community-service.ts",
+        "bytes": 18695,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c84ef36f94182a4240e939d75e86b58dd0ab8be729e2b8297dccf92aff89cd69"
+      },
+      {
+        "path": "elm/runtime/authenticated-facts.test.ts",
+        "bytes": 13333,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0ace33a6100b96638fd2aad93f60cf2b4c50e418a8d83caabc9480267d8bd5f7"
+      },
+      {
+        "path": "elm/runtime/authenticated-facts.ts",
+        "bytes": 46752,
+        "mode": 384,
+        "type": "file",
+        "sha256": "43ec483127f794f925f58a9ba3e9129dd77f5f14d766b7fcb527d0accf1999b4"
+      },
+      {
+        "path": "elm/runtime/bootstrap-activation.dom.test.ts",
+        "bytes": 7997,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e0358e02dbee2b7c31edf39a644c77905b6f2c056b35c4ff571508136aabaac0"
+      },
+      {
+        "path": "elm/runtime/bootstrap-domain-integration.test.ts",
+        "bytes": 69995,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8be6a12180bcc924cb47ac4e67f7878424e6e955e568cf64ed714fb67ecd37fb"
+      },
+      {
+        "path": "elm/runtime/bootstrap-private-presentation.dom.test.ts",
+        "bytes": 4970,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3cd3e6e24f20238fbd781b7155f8c8f92f15a00dc9569f506fb2a67119b94842"
+      },
+      {
+        "path": "elm/runtime/bootstrap.ts",
+        "bytes": 460659,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d1ea0eb496bbd874bc4e3b4d2e9f4b71df5d1ee95a68eb69a366ec699c1b787d"
+      },
+      {
+        "path": "elm/runtime/browser-entry.ts",
+        "bytes": 836,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8b6d7c8a595f65049c7ae44ba1a44b4dd7706ca8f10e08656be9469af196915b"
+      },
+      {
+        "path": "elm/runtime/browser-lifecycle.ts",
+        "bytes": 5835,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cbd7bc89c96c56ea494fb97c197f9af43c61366a28acd110d9d7acc0f4b27973"
+      },
+      {
+        "path": "elm/runtime/browser-platform.test.ts",
+        "bytes": 9171,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4ca97a1742b580e86f3218d733879b0379f4e9ed1ae8e6996f3166058b9fdd34"
+      },
+      {
+        "path": "elm/runtime/browser-platform.ts",
+        "bytes": 17709,
+        "mode": 384,
+        "type": "file",
+        "sha256": "966d9d51bc6ab164db623101b9446cb50b2099b5fcc62ac1999cc0ac88c61cc5"
+      },
+      {
+        "path": "elm/runtime/cadence-transport-adapter.test.ts",
+        "bytes": 5138,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c9955af9bbc05382537563086ca2a482198846042fe6fa8b948b46c7e5ff4575"
+      },
+      {
+        "path": "elm/runtime/cadence-transport-adapter.ts",
+        "bytes": 9595,
+        "mode": 384,
+        "type": "file",
+        "sha256": "436e0e8979199fc440b5531fc8bdc93db9f5739df4c477828ffbad216e0911b0"
+      },
+      {
+        "path": "elm/runtime/caption-producer.test.ts",
+        "bytes": 4694,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b7528ffeeb11017634149f49a9e63149893be02fb7fc215493846d0575339f4b"
+      },
+      {
+        "path": "elm/runtime/caption-producer.ts",
+        "bytes": 16707,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8e876c2e172ff0c653072a1e3dbce5d147aeeaa12d5bba6f567e6666d9fc7e45"
+      },
+      {
+        "path": "elm/runtime/client-line-validator.test.ts",
+        "bytes": 3626,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b3afc88c985a003095c5a26fcd4273604f9fd06ac030120f4ebf29ae2a4480c8"
+      },
+      {
+        "path": "elm/runtime/client-line-validator.ts",
+        "bytes": 5030,
+        "mode": 384,
+        "type": "file",
+        "sha256": "14572527f27ea8424a68fc36f79c32ce8741386bd22faae15dda803bb82a8467"
+      },
+      {
+        "path": "elm/runtime/contracts-identity.test.ts",
+        "bytes": 3634,
+        "mode": 420,
+        "type": "file",
+        "sha256": "f779d20001632db5208cf6e3331cb8409ec10a7dbb92e1c6c73278236997b7b7"
+      },
+      {
+        "path": "elm/runtime/contracts.ts",
+        "bytes": 49400,
+        "mode": 384,
+        "type": "file",
+        "sha256": "164a4be514c4c49bdedd88745f65942cb577b434e2a1c231ed76c1f2ddcda946"
+      },
+      {
+        "path": "elm/runtime/credential-owner.test.ts",
+        "bytes": 6300,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4e9a3ea32992a9a690df46937c91ecb37878b023f54b61c33e39f78958142e98"
+      },
+      {
+        "path": "elm/runtime/credential-owner.ts",
+        "bytes": 27648,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d7ce9940a9e22bd0a1e5286c8911a2ac8000928ae0c57b5db61d138efcfa5124"
+      },
+      {
+        "path": "elm/runtime/crypto-backup.test.ts",
+        "bytes": 5154,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a768da44d2f321cee792114ae62a3b0c7b825a93ad05c71d545519e7397bc8ae"
+      },
+      {
+        "path": "elm/runtime/crypto-backup.ts",
+        "bytes": 18012,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8bfa9f59d6685f4c2209ffe9f99979175695a9dde57aec66cb69a10f380f36c9"
+      },
+      {
+        "path": "elm/runtime/draft-store.test.ts",
+        "bytes": 20417,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0ee1ee2bdae7c011395622085428ff2b8fdc8e859b1a4c22cee332b1b99c78ed"
+      },
+      {
+        "path": "elm/runtime/draft-store.ts",
+        "bytes": 26153,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8c1c5cea7b9aec6f7f5a1fc52069d86985d7910acffe682d6939dbacfd14eddb"
+      },
+      {
+        "path": "elm/runtime/eviction-policy.ts",
+        "bytes": 6229,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f991bd59b9658a5e0482b15fc8be14eea67d3417918718ccbcaa556bc9da349f"
+      },
+      {
+        "path": "elm/runtime/group-authoring.ts",
+        "bytes": 36491,
+        "mode": 384,
+        "type": "file",
+        "sha256": "22d356b372979a61719937c5979efa6e9e256e82b540b2bb52dc6bdfbe95518f"
+      },
+      {
+        "path": "elm/runtime/group-directory-trust.ts",
+        "bytes": 5404,
+        "mode": 384,
+        "type": "file",
+        "sha256": "56fd52f875fefce73907f63f5b5a86026d762adb8558129d93a483869cf4a284"
+      },
+      {
+        "path": "elm/runtime/group-recovery.test.ts",
+        "bytes": 3141,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f554936f90eaa799e4fbd21905e668785cd2ddf12fc9c4974c17cc91b9e00297"
+      },
+      {
+        "path": "elm/runtime/group-recovery.ts",
+        "bytes": 16785,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c3c025e7daca9ea1a2a3368ad8a8e59ce1faf6f94d87746de0b218974d2d7962"
+      },
+      {
+        "path": "elm/runtime/identity-owner.test.ts",
+        "bytes": 7122,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ce2faf3361cdc07eee13ee10598471ff130551c0ba25228c1279419da8d068c2"
+      },
+      {
+        "path": "elm/runtime/identity-owner.ts",
+        "bytes": 21778,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2df78e38c0d8525294d2fde570947f62904b48e8fb1f51615b68f3753f01bb48"
+      },
+      {
+        "path": "elm/runtime/integration-operations.test.ts",
+        "bytes": 11745,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6b6ea8db96bdb9c310b507523c7323ebe1de3f03ed6b392d8a4878cc6890f83b"
+      },
+      {
+        "path": "elm/runtime/integration-operations.ts",
+        "bytes": 61777,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3d3ccfbea3566899ef1f13c1bfe4bd749cd75bb8bd3b06e2469876d128ed6036"
+      },
+      {
+        "path": "elm/runtime/jsdom.d.ts",
+        "bytes": 242,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ca6d08978ee98eeb9c00434cd7098f793261911c4a65eb132c03448a88f1ffea"
+      },
+      {
+        "path": "elm/runtime/local-namespace-stores.test.ts",
+        "bytes": 5973,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a8d75f6b969a32b6c6261021b6624f0a111cefed5edb4b97e4d8c9d834556c8a"
+      },
+      {
+        "path": "elm/runtime/local-workspace-owner.test.ts",
+        "bytes": 13718,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a1e3955cccec85614c319f48c7885848bb9bd57fea0164aebed3c4415086776d"
+      },
+      {
+        "path": "elm/runtime/local-workspace-owner.ts",
+        "bytes": 33309,
+        "mode": 384,
+        "type": "file",
+        "sha256": "669ad2dbb343878248314cc34657b21a0dcd8d060f55781162c21387b605f535"
+      },
+      {
+        "path": "elm/runtime/media-capture.test.ts",
+        "bytes": 3856,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3aa66863a843ca16b3e3c2d9b858548bf20bfb82c459781e291ec6f8d7e3c780"
+      },
+      {
+        "path": "elm/runtime/media-capture.ts",
+        "bytes": 8438,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ce082fcacc88f955d9cd38757caf9fb6a7c792511dc1d9ad8f5b58e8311cc9ac"
+      },
+      {
+        "path": "elm/runtime/media-control-types.ts",
+        "bytes": 5566,
+        "mode": 384,
+        "type": "file",
+        "sha256": "fb797fa2b3d8b9638fd6533123ece2f2f8ee983c9d9ddbbd08648039a49e2889"
+      },
+      {
+        "path": "elm/runtime/media-devices.test.ts",
+        "bytes": 5228,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a7cb041734ed0f75dc8892d109789c0207c7ba05e5a70e8f509f6b36d3c12ba6"
+      },
+      {
+        "path": "elm/runtime/media-devices.ts",
+        "bytes": 8394,
+        "mode": 384,
+        "type": "file",
+        "sha256": "10b9dc5bc175c67efdd18d731747546c9dc727b5ff1a5ed70f9e4b4b6b2bfb36"
+      },
+      {
+        "path": "elm/runtime/media-engine.transport.test.ts",
+        "bytes": 18812,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bf51caa78f877d4242a0215a22f00805795756a7cb094d65d100d9483623f1aa"
+      },
+      {
+        "path": "elm/runtime/media-engine.ts",
+        "bytes": 56943,
+        "mode": 384,
+        "type": "file",
+        "sha256": "731dcdbe546db30aa75b407e64c6513452c9da025c11c69bb6da36a4569861fb"
+      },
+      {
+        "path": "elm/runtime/media-entry.ts",
+        "bytes": 654,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8001d36ade259130c06d596b8fcd2cf27b0fff0c33b545470c9fdee52c438851"
+      },
+      {
+        "path": "elm/runtime/media-playout.ts",
+        "bytes": 1768,
+        "mode": 384,
+        "type": "file",
+        "sha256": "39cd2cc4ebb0e8831252202be2c319d0e837a9e442697c642d3119d4ca6d7b38"
+      },
+      {
+        "path": "elm/runtime/media-recording-control.test.ts",
+        "bytes": 15692,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e84946381ad07a9ebc8e791e6f28f0739084dc7c6fa5544284db05ac324102f7"
+      },
+      {
+        "path": "elm/runtime/media-recording-control.ts",
+        "bytes": 37372,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9c841ab65ae37396c161ad6493c0ecea2bd30bdba295f579841f5a0f2ea69402"
+      },
+      {
+        "path": "elm/runtime/media-telemetry.test.ts",
+        "bytes": 1521,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9d939d690048f3fb57d3e9b7e85dead7b8720af946dd3adf5797089a53ccb868"
+      },
+      {
+        "path": "elm/runtime/media-telemetry.ts",
+        "bytes": 2820,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9bd161c49fd622bc7fc2b43143096b937cd1b84b5d9ee0d64c1d341dac99a653"
+      },
+      {
+        "path": "elm/runtime/memory-send-owner.test.ts",
+        "bytes": 7550,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5707552c644378e5d7b0ccf064a4ca6ced921bef8c847f77010f09ea76f7bb2e"
+      },
+      {
+        "path": "elm/runtime/memory-send-owner.ts",
+        "bytes": 22707,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f40335e6e1bf6943a792d3c1f6b7af93de332898738805b25dae5b1e8d7a7472"
+      },
+      {
+        "path": "elm/runtime/metrics.ts",
+        "bytes": 9976,
+        "mode": 384,
+        "type": "file",
+        "sha256": "308e94af4f7be50a9b12f08c7a09472b34ae95353651b7e87dfffc91ca14c0d0"
+      },
+      {
+        "path": "elm/runtime/migrations.ts",
+        "bytes": 6746,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8768c4e876ec9ce04748936ad36b95d1ff935b0a62f98a2feeb6391449438546"
+      },
+      {
+        "path": "elm/runtime/notification-router.ts",
+        "bytes": 8429,
+        "mode": 384,
+        "type": "file",
+        "sha256": "95475fec4c54f67bc1251ffcd64be56b748db17aee3617cef4440c1e5bc28724"
+      },
+      {
+        "path": "elm/runtime/operator-import.test.ts",
+        "bytes": 8317,
+        "mode": 384,
+        "type": "file",
+        "sha256": "57670497ae0c59f65b08a037981bd0fe3da6b4bb38e1f8268be5ef34f6f17b36"
+      },
+      {
+        "path": "elm/runtime/operator-import.ts",
+        "bytes": 13462,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e25240c27d3e7844cf5a0c74c25307436dec7bfc95fbffc94650ef425beeced2"
+      },
+      {
+        "path": "elm/runtime/outbox-journal.test.ts",
+        "bytes": 16357,
+        "mode": 384,
+        "type": "file",
+        "sha256": "26802772d1b3ff149ea05110f19f3c42877dfb6be6677ee2186135e8746f19be"
+      },
+      {
+        "path": "elm/runtime/outbox-journal.ts",
+        "bytes": 56037,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7bcb1d0b1e44ac43cc9f8ee3621465c252ad75a29b715077b5a82fe6c45aa8bc"
+      },
+      {
+        "path": "elm/runtime/owned-storage-retention.test.ts",
+        "bytes": 21131,
+        "mode": 384,
+        "type": "file",
+        "sha256": "390595fb949907128fa0536d7ab1fb6e044635381011a3ac040928c914bb59b8"
+      },
+      {
+        "path": "elm/runtime/owned-storage.ts",
+        "bytes": 89349,
+        "mode": 384,
+        "type": "file",
+        "sha256": "737dccbc38b9b782c5e9310bdcf2d2c06b1931556e18e6cc5aa08cb8d1f3ea9c"
+      },
+      {
+        "path": "elm/runtime/private-account-security.dom.test.ts",
+        "bytes": 21706,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c57971306f82df78b76f9541038bd5a0c66f5214e0057d40ee7ff695248b4076"
+      },
+      {
+        "path": "elm/runtime/private-account-security.ts",
+        "bytes": 57881,
+        "mode": 384,
+        "type": "file",
+        "sha256": "07dca4af6cd9370a00961768d3e788f7e24d008b49517fde65749c50852b24d2"
+      },
+      {
+        "path": "elm/runtime/private-backup-storage.ts",
+        "bytes": 10255,
+        "mode": 384,
+        "type": "file",
+        "sha256": "14e4f533eeae16f851ddd1779383bbfce1ff5b0cfb55b207b6c62028a2f73dbc"
+      },
+      {
+        "path": "elm/runtime/private-crypto-provider.test.ts",
+        "bytes": 57616,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5944c0d2733d1411150d2c8b407be699765df7a103269cee2e2cf25115470c8f"
+      },
+      {
+        "path": "elm/runtime/private-crypto-provider.ts",
+        "bytes": 195957,
+        "mode": 384,
+        "type": "file",
+        "sha256": "df4de3708c8512cb4c80042d1aa3e57ba72d69dfe8cd01e44b129afdb734686a"
+      },
+      {
+        "path": "elm/runtime/private-draft-selection.test.ts",
+        "bytes": 5266,
+        "mode": 384,
+        "type": "file",
+        "sha256": "05a04663c54aafca82d1af805e356b8cbbdf54c76b79d47af7c2c76fef5903bc"
+      },
+      {
+        "path": "elm/runtime/private-draft-selection.ts",
+        "bytes": 6667,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2c61264da5892b5a8bec28491de1b23bf2ff1a399e2ee417f933fb5bf9313e19"
+      },
+      {
+        "path": "elm/runtime/private-passkey-management.test.ts",
+        "bytes": 8457,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2688f1275b3be774de64653fd4c7d5b8a821a796f59d20cca04c20895dc70df0"
+      },
+      {
+        "path": "elm/runtime/private-passkey-management.ts",
+        "bytes": 20362,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5c18f7116d01343b6fa6890ab6a5b5ff9da7c28c1d9e052e0b4db8adb45ddf4e"
+      },
+      {
+        "path": "elm/runtime/private-webauthn-reply.test.ts",
+        "bytes": 2637,
+        "mode": 384,
+        "type": "file",
+        "sha256": "85b77d4c543ffe65c4149e58de3d37d9fccfa989295474a0c4bb0ae7e19d1296"
+      },
+      {
+        "path": "elm/runtime/private-webauthn-reply.ts",
+        "bytes": 2908,
+        "mode": 384,
+        "type": "file",
+        "sha256": "06c7a571b74630f3ffeb43b79d6a63c92c3def317a5fa924343d9842b500321b"
+      },
+      {
+        "path": "elm/runtime/private-webhook-reply.test.ts",
+        "bytes": 1304,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f303a4fe126540d1cfeef187dae7f2eb42d18b0b43b1211cac09ea5cc084017e"
+      },
+      {
+        "path": "elm/runtime/private-webhook-reply.ts",
+        "bytes": 895,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c0948a5ec8c168d0fc4290f4113d1720055dd26e47b9df40426fd805f1cedd89"
+      },
+      {
+        "path": "elm/runtime/public-ingress-batcher.test.ts",
+        "bytes": 11291,
+        "mode": 420,
+        "type": "file",
+        "sha256": "93ef696517c14e481b44d9c5e3daf9426fce067f912ef0f5e69088cdcb97eea1"
+      },
+      {
+        "path": "elm/runtime/public-ingress-batcher.ts",
+        "bytes": 5311,
+        "mode": 420,
+        "type": "file",
+        "sha256": "ae32a605a85471e91d2618214c8f88e66c3a83614760e78c8c67fc991ee18a7d"
+      },
+      {
+        "path": "elm/runtime/push-lifecycle.ts",
+        "bytes": 37146,
+        "mode": 384,
+        "type": "file",
+        "sha256": "88a40ff9760bb10a114e5bf60620cf7df3cb3329ad79ecdc1763cf824ca7fd51"
+      },
+      {
+        "path": "elm/runtime/read-anchor-store.ts",
+        "bytes": 11634,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1d14f4d288b970918933b7ba76023692fd199b49111e420f37c3e744150040f4"
+      },
+      {
+        "path": "elm/runtime/scheduled-custody.test.ts",
+        "bytes": 22369,
+        "mode": 384,
+        "type": "file",
+        "sha256": "85b2710b6cb8e593a8570dcc98a27b8322ca13aca6757bb19891a731cb355623"
+      },
+      {
+        "path": "elm/runtime/scheduled-custody.ts",
+        "bytes": 68340,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f90a106a2cb8b38f2c178b1528929ec1ed8fffbcc01b6e8053dbf341d4bdfb8e"
+      },
+      {
+        "path": "elm/runtime/scheduled-due-pump.test.ts",
+        "bytes": 1880,
+        "mode": 384,
+        "type": "file",
+        "sha256": "88bd8f595139fa29698a56b78240295c7eed676c2e8e20c472fb93114551b264"
+      },
+      {
+        "path": "elm/runtime/scheduled-due-pump.ts",
+        "bytes": 2149,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4b1d5e868d15775ffdfd03f12d8fbd2031d21362e1db3c96280afd829672584a"
+      },
+      {
+        "path": "elm/runtime/send-acceptance-registry.test.ts",
+        "bytes": 8026,
+        "mode": 384,
+        "type": "file",
+        "sha256": "75242e846f866fc98d596af7d03a072a3fbe438535db411e43e66afcf52fa2dd"
+      },
+      {
+        "path": "elm/runtime/send-acceptance-registry.ts",
+        "bytes": 31951,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d5e8d31afa7f705094c3880457f85ced296cb33b931faf680094c7d6d43b985d"
+      },
+      {
+        "path": "elm/runtime/service-worker-notification-route.test.ts",
+        "bytes": 12228,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9da2ebe5feb3a54c219ab85219dce88cfeee82e44bb7966f08ade6b23d2bcb9d"
+      },
+      {
+        "path": "elm/runtime/session-mesh-control.test.ts",
+        "bytes": 4257,
+        "mode": 384,
+        "type": "file",
+        "sha256": "78f96c72b47a2782fd1b8f82934453b2aa6a143b1ed919857cd7a522e01f9043"
+      },
+      {
+        "path": "elm/runtime/session-mesh-control.ts",
+        "bytes": 46028,
+        "mode": 384,
+        "type": "file",
+        "sha256": "26580ce84d5016bf35dff499a58fabea3908728b1a1b724048bbbd293d9bcc72"
+      },
+      {
+        "path": "elm/runtime/session-operation-owner.test.ts",
+        "bytes": 2547,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bb7cdf0d420137ba461b99f8bc5674dc1077e255a4864e309186e867e8f29396"
+      },
+      {
+        "path": "elm/runtime/session-operation-owner.ts",
+        "bytes": 4384,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2efc4f7ae3593a92f3c4fda83609b4c88cbc1490f412a4d017be5bddfe45efe3"
+      },
+      {
+        "path": "elm/runtime/session-recovery-controller.test.ts",
+        "bytes": 15028,
+        "mode": 384,
+        "type": "file",
+        "sha256": "09dcd24adf36df3024867e4585c5548425272a53f0a6f71b8f11bb53f30421bc"
+      },
+      {
+        "path": "elm/runtime/session-recovery-controller.ts",
+        "bytes": 23321,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ee4224289d8a662483cf19588e38efd3bf1ad1cbb2eaeae2d2b73f9aed90ec7b"
+      },
+      {
+        "path": "elm/runtime/settings-store.ts",
+        "bytes": 10556,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0f02205b8f9976865904b4dcb132692a4d94f19b105524473d46e910b2f71954"
+      },
+      {
+        "path": "elm/runtime/tab-intent-owner.test.ts",
+        "bytes": 2320,
+        "mode": 384,
+        "type": "file",
+        "sha256": "00fdc538eafcad0e68d65179c4f78ae735bbf25390693b34fc05059c53ba2fb4"
+      },
+      {
+        "path": "elm/runtime/tab-intent-owner.ts",
+        "bytes": 21991,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9b4adafc85c2fe429c88641fe79d566f45d2de6a8df51fbd3cec4898e518981d"
+      },
+      {
+        "path": "elm/runtime/test-setup.ts",
+        "bytes": 919,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b45de174bfe8a7c96f826f8760b52c903bcb28828785b11aabc4e6123a9a6aa5"
+      },
+      {
+        "path": "elm/runtime/transport-owner.test.ts",
+        "bytes": 26391,
+        "mode": 384,
+        "type": "file",
+        "sha256": "20be95d823a922ed637a023930ff805e52838f8a83eae0cafaa9cfb909913bf6"
+      },
+      {
+        "path": "elm/runtime/transport-owner.ts",
+        "bytes": 24100,
+        "mode": 384,
+        "type": "file",
+        "sha256": "95254e09149ccc99fa41893e5e73fa58f786837d419c7790922033a39c87eb2e"
+      },
+      {
+        "path": "elm/runtime/tsconfig.json",
+        "bytes": 494,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5a855d7261f5ec8eb46f82b6eca16cf45552eaa4a977943718b6de2a0ad860a8"
+      },
+      {
+        "path": "elm/runtime/webrtc-experiment.ts",
+        "bytes": 21872,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c60f0ec06becac1fb15261886a61f17b979e148c96c1ec3bd65930c061b15945"
+      },
+      {
+        "path": "elm/runtime/webtransport-adapter.test.ts",
+        "bytes": 15044,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cdf21a18e32e3843820c9204adccdf7945da3de85909ea6da1f818ae8615d023"
+      },
+      {
+        "path": "elm/runtime/webtransport-adapter.ts",
+        "bytes": 22842,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9855d5bf236f40e8e58ef1f0185cfad0920bf485ae72003509ef8f9b267acac3"
+      },
+      {
+        "path": "elm/runtime/worker-lifecycle.ts",
+        "bytes": 17160,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b8ce1492bde6455f05e70b6c68cdfa79559ab1cccd5b9cbb4498075745c3bae2"
+      },
+      {
+        "path": "elm/sasl.smoke.mjs",
+        "bytes": 4906,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a055d44545b9b2e387d298185d42a160b2477f40c22660e9f77284171f3b651a"
+      },
+      {
+        "path": "elm/savedSearches.smoke.mjs",
+        "bytes": 11589,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f200cbde79fcf65dabc9e17fba5d59368ac777b9558586e6bc8cff044b3b7108"
+      },
+      {
+        "path": "elm/scheduleClock.smoke.mjs",
+        "bytes": 3555,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1390d2499605177bbd54a9bf08cb6417bc26dbed48a1a6f026fe9be249fd3e52"
+      },
+      {
+        "path": "elm/scheduledRuntimePorts.smoke.mjs",
+        "bytes": 9011,
+        "mode": 384,
+        "type": "file",
+        "sha256": "992316faffdb896c48d41e74f5de9995004e1683b716b5b8b47cd1870ddbcc84"
+      },
+      {
+        "path": "elm/scheduledSave.smoke.mjs",
+        "bytes": 2025,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1c4433dc4d9a108f2aa1a817d055c5b2b841a11ab448429b0af2788c78d8c015"
+      },
+      {
+        "path": "elm/scheduledVault.smoke.mjs",
+        "bytes": 2276,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e093f4a6cc3d09a845e3ebd299681345e2e3e14c6c335571b50da6a539b03c72"
+      },
+      {
+        "path": "elm/searchHotkey.smoke.mjs",
+        "bytes": 3930,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7d49b2dc0edab2ba946fe9937f98be9ee840fb427aa5b54ada13c448fc834cd7"
+      },
+      {
+        "path": "elm/sessionResume.smoke.mjs",
+        "bytes": 1336,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c087171be099471aab6c02c934314045fd70c6a753652fcba6b9547bc195eb87"
+      },
+      {
+        "path": "elm/site.css",
+        "bytes": 29358,
+        "mode": 420,
+        "type": "file",
+        "sha256": "ae7b454c562b1b4614b0db91f064c4c722e09c09c90de4316ad53e3cacaa4e4b"
+      },
+      {
+        "path": "elm/src/AiPolicy.elm",
+        "bytes": 2003,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7f21b7394df177fced282a9bd426e329cad7313683163e34927a87d61ed6a107"
+      },
+      {
+        "path": "elm/src/App.elm",
+        "bytes": 1822105,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b2a00c44355e93335c345b753b6fe56e8b995cbc8c0c0795b863269c7aeb0fac"
+      },
+      {
+        "path": "elm/src/Attribution.elm",
+        "bytes": 11848,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f5f0a2928b60e978891076e1f6bca25e02ebde48bd21f98304d3da39674fe74d"
+      },
+      {
+        "path": "elm/src/Avatar.elm",
+        "bytes": 6406,
+        "mode": 384,
+        "type": "file",
+        "sha256": "88d610ab79d87c1817a0e29ae962cfb6db42e4f9421e9280d5fcd31e8b6a7bc4"
+      },
+      {
+        "path": "elm/src/Base64Url.elm",
+        "bytes": 7358,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c911f5a8301e281f6df712f2cb9dace550383d3f5c138fc411a7324ce29784c3"
+      },
+      {
+        "path": "elm/src/Cadence.elm",
+        "bytes": 12727,
+        "mode": 384,
+        "type": "file",
+        "sha256": "44e909a95c1255848ee1411c34814f8e67feec3901dc9b3799d6159b2a967643"
+      },
+      {
+        "path": "elm/src/CaptionLifecycle.elm",
+        "bytes": 3391,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7fdd98bb8937a82ee1bd739b0f9f59393a6135d91705089b7924d8870dab7c72"
+      },
+      {
+        "path": "elm/src/ChannelNavigation.elm",
+        "bytes": 8771,
+        "mode": 420,
+        "type": "file",
+        "sha256": "d27f69bc5aeda3c972231e132fe8b71d9cf9cafc752f44b5cd56a58439e6a99b"
+      },
+      {
+        "path": "elm/src/ComposerInject.elm",
+        "bytes": 4432,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2a1c468ee587cade6d1fc910bd479814b30eb3b8a6d5112c1632dc518ec3add7"
+      },
+      {
+        "path": "elm/src/Credentials.elm",
+        "bytes": 15887,
+        "mode": 384,
+        "type": "file",
+        "sha256": "fe90c7b973849a0181a5c9278a69b4e8f2452a628e04d3563b994b725f78f526"
+      },
+      {
+        "path": "elm/src/DeliveryJournal.elm",
+        "bytes": 3708,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2ad19ac8862e06a26b847ee4c6a25950ca092da328ab2fbfd6de5a5b78860ebe"
+      },
+      {
+        "path": "elm/src/DmCipher.elm",
+        "bytes": 18324,
+        "mode": 384,
+        "type": "file",
+        "sha256": "667bab5f1cffa6ab9fccb030ad97029ddd3583697475f86ee1de233b4ebb9b4e"
+      },
+      {
+        "path": "elm/src/Download.elm",
+        "bytes": 18167,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d0dfb91ca7a3f6b9e3cd291d8f74965f0bd5c2c620ee3d07b3b4728df1b334ce"
+      },
+      {
+        "path": "elm/src/Drafts.elm",
+        "bytes": 1963,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bb9fb51576ad7c40e33480e69a72a7188b8c43884deac38d84087d33f8e35612"
+      },
+      {
+        "path": "elm/src/Emoji.elm",
+        "bytes": 3768,
+        "mode": 384,
+        "type": "file",
+        "sha256": "81e64efd16eb7cb1a12d08a63b4c16f5b7c8e48aeadc49446068fa4ef8ec7ce2"
+      },
+      {
+        "path": "elm/src/EventReplay.elm",
+        "bytes": 10863,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a55d191357a738b3b0fc5151e96e466832e1f809dfcfc558be3ef9669d562191"
+      },
+      {
+        "path": "elm/src/Facepile.elm",
+        "bytes": 6113,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3f02d7101760f6944e8d18b9ccd37650cf22101dcfafd152276fee8e4ff1c619"
+      },
+      {
+        "path": "elm/src/FirstHour.elm",
+        "bytes": 3783,
+        "mode": 420,
+        "type": "file",
+        "sha256": "0dc329a8b8f68a0385305368bb54ca49fc0cb823f3387e3d319e766bf231cd90"
+      },
+      {
+        "path": "elm/src/GroupAuthoring.elm",
+        "bytes": 6089,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8b586edff21291c314ce4f6491435bd791b63572c08a4732eac8b6e8af35ae95"
+      },
+      {
+        "path": "elm/src/GroupCommit.elm",
+        "bytes": 9508,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3d651527ae24d6a56d403c869ac8fb9f9953c444d41cf445c7a3661fe603cf99"
+      },
+      {
+        "path": "elm/src/GroupControl.elm",
+        "bytes": 46538,
+        "mode": 384,
+        "type": "file",
+        "sha256": "00aed711b40013a21c6c9094032493f9816ec6cffd3620ad9267fda15db42b9a"
+      },
+      {
+        "path": "elm/src/GroupDirectory.elm",
+        "bytes": 18449,
+        "mode": 384,
+        "type": "file",
+        "sha256": "30edb03f5fbd6c8e5c5046c4ad719630bbf54c91747b1050906a9f054ab7e520"
+      },
+      {
+        "path": "elm/src/GroupEnvelope.elm",
+        "bytes": 7411,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3f529963beb9d9d855b7216e3a35b415226e8dd03cd75725dbc318e3ad6d8d47"
+      },
+      {
+        "path": "elm/src/GroupPublisher.elm",
+        "bytes": 14500,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cde77981a19dc41ca6689a5f623be86be9f257a9b04c6ca0923612f58e05e2a9"
+      },
+      {
+        "path": "elm/src/GroupRecovery.elm",
+        "bytes": 3180,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6825473c99939893359eb337001bb2609df7506d0c25cbf613b804e23cdfe4d7"
+      },
+      {
+        "path": "elm/src/GroupSession.elm",
+        "bytes": 6133,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0b5c62b0b2675a423f8639896b8dc88d438f7c61919f9ae5fb28f8c2da9ea9f0"
+      },
+      {
+        "path": "elm/src/GroupWelcome.elm",
+        "bytes": 8069,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8a7f8e3f7df12546abc8ff992159a9fb76606ac9b24ecd9aee75a1edb17f4b17"
+      },
+      {
+        "path": "elm/src/Guides.elm",
+        "bytes": 8403,
+        "mode": 384,
+        "type": "file",
+        "sha256": "78c2b080bef06f071a18155074a289aba0e8a97861241bbcb38047f31c435e1f"
+      },
+      {
+        "path": "elm/src/HistoryPolicy.elm",
+        "bytes": 1154,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8d51c2fbb0be5d2ed2086c96c1c1766db18ca8992b09804c52cad31f6c3fe521"
+      },
+      {
+        "path": "elm/src/IdentityOverrides.elm",
+        "bytes": 7973,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8b33c66c71d2594f927e59b54c8f9476a9f83f1fe6645d01fc61cbe685c8f5da"
+      },
+      {
+        "path": "elm/src/Ids.elm",
+        "bytes": 12117,
+        "mode": 384,
+        "type": "file",
+        "sha256": "97742d0aed8f68a817e2c282d2625159f373d578194e8f36b33aebdeb4ce0c1a"
+      },
+      {
+        "path": "elm/src/Integrations.elm",
+        "bytes": 2579,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d0efdd1388a6ea770ea2a909607e73a3895705f9daacde70389727238796a631"
+      },
+      {
+        "path": "elm/src/Invite.elm",
+        "bytes": 22501,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d91ca211207c2c1ee4684c0e08d8ed0f441ab845e9ad4dcb08d33b4b7d57bda6"
+      },
+      {
+        "path": "elm/src/Ircx.elm",
+        "bytes": 37541,
+        "mode": 384,
+        "type": "file",
+        "sha256": "78af772f63f6b12ac58b2d47367b1ff581e0f65b9d83a8f4d20c505d74c98cc0"
+      },
+      {
+        "path": "elm/src/Isupport.elm",
+        "bytes": 22038,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b5391d6d2eecacf6e5b83a8e90e6bb4c10b65a4ec2e4e81270ee6f959cb5a0de"
+      },
+      {
+        "path": "elm/src/Keyring.elm",
+        "bytes": 8165,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2a16d6536db06c7db87948eb86fd9251dbfa430f28949ae8d6fa12972731d09a"
+      },
+      {
+        "path": "elm/src/Labels.elm",
+        "bytes": 2605,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3026aa5ae3b3115498c9790937401adb21480c43fea173209c6d3c47e9a97e60"
+      },
+      {
+        "path": "elm/src/Main.elm",
+        "bytes": 101031,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2b7715aac6085694d7a9e8b169996da03573c4557bc09c4ca96ae9fb50ceee28"
+      },
+      {
+        "path": "elm/src/Media.elm",
+        "bytes": 24188,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0fd7c61c5a4c70bad637f0f4fe3a9e43b5cac9bfea157fcf40e14928a1540212"
+      },
+      {
+        "path": "elm/src/MediaInterop.elm",
+        "bytes": 2547,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2ba55ebec97759ca92836fbf032d6dbc1cd560de3b9a42fd0905f6adaf4452af"
+      },
+      {
+        "path": "elm/src/MediaReadiness.elm",
+        "bytes": 3089,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a259217633af7a8c7576cb047bdfdfba2795b1049a6e1b4b8219a07807e4bd3b"
+      },
+      {
+        "path": "elm/src/MessageWindow.elm",
+        "bytes": 9241,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0889fe79cb327070bdb65128d3839dfc69bba7e6550632d5f244408ab5c18b71"
+      },
+      {
+        "path": "elm/src/Moderation.elm",
+        "bytes": 18406,
+        "mode": 384,
+        "type": "file",
+        "sha256": "fd614eba95ac2ae66722131780b52d2870cca133740afba4bef4400b89aa2bb1"
+      },
+      {
+        "path": "elm/src/Modes.elm",
+        "bytes": 32671,
+        "mode": 384,
+        "type": "file",
+        "sha256": "498786a3f83b093f7663f5343dab3eebb19b8df228fd12ab50f6053c1c3bd1ef"
+      },
+      {
+        "path": "elm/src/Multiline.elm",
+        "bytes": 12795,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6f183bae90e2bf310013f03532eabc5a6f96dd97277cff3f71e3c28432b9fa77"
+      },
+      {
+        "path": "elm/src/NickComplete.elm",
+        "bytes": 6274,
+        "mode": 420,
+        "type": "file",
+        "sha256": "53a8043d74705dfec9075833b1a756b5daf9e9fec4c46873ce5ed42222fa9e1e"
+      },
+      {
+        "path": "elm/src/Nodes.elm",
+        "bytes": 4131,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b26227fb745f3fc0944bfbbdbc18d501ff2bb9a589a41bccdf2066144fb037c6"
+      },
+      {
+        "path": "elm/src/NotificationRoute.elm",
+        "bytes": 906,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ed5189cd4f1d271b74b176a1c19302a22e7ceb6a2ebd5b22a779bf4cabfab010"
+      },
+      {
+        "path": "elm/src/Notify.elm",
+        "bytes": 3768,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d6845e7149748b109caaddc93c6ce0e0bc6f40455c591ac58c21ae7598ba5342"
+      },
+      {
+        "path": "elm/src/OperatorImport.elm",
+        "bytes": 4527,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a89b5ae0f749250917d9b7ff4700f4f67abc9c393b3eff74a7e6a4cb1657967e"
+      },
+      {
+        "path": "elm/src/Outbox.elm",
+        "bytes": 9734,
+        "mode": 384,
+        "type": "file",
+        "sha256": "02da7a285d4b39c4b338a478fc6850bdc608e1386e9fae0628fcb08c051c4b41"
+      },
+      {
+        "path": "elm/src/OwnedStorage.elm",
+        "bytes": 4028,
+        "mode": 384,
+        "type": "file",
+        "sha256": "12bc2eddd06787f64edd3406dd390c48bf96366e2c86f83a56433f16b067d948"
+      },
+      {
+        "path": "elm/src/Passkey.elm",
+        "bytes": 23597,
+        "mode": 384,
+        "type": "file",
+        "sha256": "06b0c972a024c97732ccae071e7f9080b2ba80b4695feeec2c28a6e74713fc8e"
+      },
+      {
+        "path": "elm/src/PersonSafety.elm",
+        "bytes": 8017,
+        "mode": 384,
+        "type": "file",
+        "sha256": "49659346d0033dc8780ca3fc24b4666be9a66ceb680da4bd20d0fa2468e81bd4"
+      },
+      {
+        "path": "elm/src/Prefs.elm",
+        "bytes": 17287,
+        "mode": 384,
+        "type": "file",
+        "sha256": "62983e3007299ac1481426c3254913bb72fa63096a0473c95f60ae3a0c52d1cf"
+      },
+      {
+        "path": "elm/src/Provenance.elm",
+        "bytes": 1632,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6134f7898f1053dfc5a23200d00e098fb5576be1d09d65dbff1336b99f84b79d"
+      },
+      {
+        "path": "elm/src/Push.elm",
+        "bytes": 6046,
+        "mode": 384,
+        "type": "file",
+        "sha256": "83f0f86e6e3714897abf7eeb56f79dc5d52cb60df14b7c564321dc1faa3a42ea"
+      },
+      {
+        "path": "elm/src/PushLifecycle.elm",
+        "bytes": 2667,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5d0efbcae64a25de124d60d5218ec2e71506dd0782de901223ff8e6e7ea5111b"
+      },
+      {
+        "path": "elm/src/QuietHours.elm",
+        "bytes": 2861,
+        "mode": 420,
+        "type": "file",
+        "sha256": "958f57654d35be885826f0d0d87805e605dc9907c87879fe7759b6ac1e1cf8dd"
+      },
+      {
+        "path": "elm/src/RecoveryCodes.elm",
+        "bytes": 5861,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b3f40332f3732ca15321c7763eb0f559c5f8d5f789319d0175947d38c6e43df2"
+      },
+      {
+        "path": "elm/src/Retention.elm",
+        "bytes": 9180,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b855f6c8486eed7f7e1f43ad1c1d6ee7eebcfb36b7bc18e8989c37665c49a2e3"
+      },
+      {
+        "path": "elm/src/RoomMedia.elm",
+        "bytes": 10091,
+        "mode": 384,
+        "type": "file",
+        "sha256": "93d01abca873f1f1caa10a6cdc28b5d80a9ce2efb1bec0fd66e55701726d3a60"
+      },
+      {
+        "path": "elm/src/Route.elm",
+        "bytes": 2691,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ea56ec1c8970e4276a278ced1682d2df0842b73923258db60c4244bf4f00f171"
+      },
+      {
+        "path": "elm/src/RuntimeDomain.elm",
+        "bytes": 148267,
+        "mode": 384,
+        "type": "file",
+        "sha256": "56634b12d9255151babe58d181a0a153068ee7cb0067b4955e12780a53dfae1a"
+      },
+      {
+        "path": "elm/src/SavedSearches.elm",
+        "bytes": 22381,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d2bfd3e36aff99fb2cb2de8761207a6c6aaa40e61ffe0818b65bddc3eb817636"
+      },
+      {
+        "path": "elm/src/Schedule.elm",
+        "bytes": 26752,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5da2ce0eefd9f3cf330336a1105bedd6a6b13e4abedf1a60558c72ef5947635d"
+      },
+      {
+        "path": "elm/src/Search.elm",
+        "bytes": 14365,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ea78c7d5acf341c142d0bd1c6ea3c12e38f97fa09c709061c3578001de63478d"
+      },
+      {
+        "path": "elm/src/Services.elm",
+        "bytes": 49075,
+        "mode": 384,
+        "type": "file",
+        "sha256": "58b8d4688df9b3af71acfa5f559c4394e22cc9ec1b3cabd83b0c7b2b956e385e"
+      },
+      {
+        "path": "elm/src/Session.elm",
+        "bytes": 26098,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1763dd86c81195d2d3db3542ec264237f5bca83bbfa53d37c88430937f7f3b0b"
+      },
+      {
+        "path": "elm/src/SlashSuggest.elm",
+        "bytes": 2892,
+        "mode": 420,
+        "type": "file",
+        "sha256": "83663e5c1666c6524f0a7e6acf4ff77a884f4a645156e0d5dd41315603e63ac2"
+      },
+      {
+        "path": "elm/src/Spine.elm",
+        "bytes": 18300,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5f66dce677c95268cda644eaa6f7b368a703ba8718d0bc522345d075479fcc2e"
+      },
+      {
+        "path": "elm/src/Stats.elm",
+        "bytes": 59135,
+        "mode": 384,
+        "type": "file",
+        "sha256": "181b035d9b382369f890953c7a208043508849e64c2190b1f83fe9cd29255f7f"
+      },
+      {
+        "path": "elm/src/Status.elm",
+        "bytes": 15142,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f74fdec6cc7043087302ca8c5415bc9c7ab4de3bdf4a5ecfe5fdc81936689de1"
+      },
+      {
+        "path": "elm/src/Stewardship.elm",
+        "bytes": 14000,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4bf0a068a915a4a391885691b2a3483fa5addf6ec493f85917b581403adc4c4a"
+      },
+      {
+        "path": "elm/src/Studio.elm",
+        "bytes": 59962,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9c2d8172d42361d6c472908d84ae2f17618c10b67fc67048996ebd368c0372bd"
+      },
+      {
+        "path": "elm/src/Theme.elm",
+        "bytes": 23176,
+        "mode": 384,
+        "type": "file",
+        "sha256": "23c73f1312bf8affd23e104aedfd515437f201f6e643bbac4b431c8fb75c5438"
+      },
+      {
+        "path": "elm/src/ThemeLook.elm",
+        "bytes": 16894,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9a50fbb5a215b4aa070ec5c9e185ba6266a73d757396354c7d1b3b09b8edf777"
+      },
+      {
+        "path": "elm/src/ThemeTokens.elm",
+        "bytes": 29258,
+        "mode": 384,
+        "type": "file",
+        "sha256": "90afd9fe86a23b1efc9b8f832dea17a559f8d68b4379eecec479d4fd2e478094"
+      },
+      {
+        "path": "elm/src/Topic.elm",
+        "bytes": 6958,
+        "mode": 384,
+        "type": "file",
+        "sha256": "fa392a3fba17b5bb594ba9d544047cdeed6e77dfcc33f7b371eb3c3eb81f8184"
+      },
+      {
+        "path": "elm/src/TopicRead.elm",
+        "bytes": 29607,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d0fda551609e6e63d9273113f39f3a7370a46639b72db96eac2e878b480d50f7"
+      },
+      {
+        "path": "elm/src/Transcript.elm",
+        "bytes": 6913,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a666cf6db77739637e490c4794ee2a9a60ef3d13d8ef90645d170d55fe7b3847"
+      },
+      {
+        "path": "elm/src/Translate.elm",
+        "bytes": 5993,
+        "mode": 384,
+        "type": "file",
+        "sha256": "50395d5b8474a791f5fec945fb45ae49a8b78b57eed1bf6ca2d44791a5680c8c"
+      },
+      {
+        "path": "elm/src/Upload.elm",
+        "bytes": 54435,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2ec039096e57a0da561be09587b083f561e23781cdc95ea9c3f0509cf18e1361"
+      },
+      {
+        "path": "elm/src/VaultImport.elm",
+        "bytes": 13869,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ba3056cf22124078b22850f2bdd3f9b0d5d33c3e85a4375f1c35a73559dd44c7"
+      },
+      {
+        "path": "elm/src/VaultSeenIds.elm",
+        "bytes": 2261,
+        "mode": 420,
+        "type": "file",
+        "sha256": "7ac689288483c2902fe55662e585322c9eef9938ff31280d1af60bf90da4aa7e"
+      },
+      {
+        "path": "elm/src/View.elm",
+        "bytes": 9874,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9809d31f62e8b94feeb773cd4f0bdcc6e0cbe2eadd0d56b3ee063e69c685c78e"
+      },
+      {
+        "path": "elm/src/View/About.elm",
+        "bytes": 17547,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d328d32d7812ae8703640121b7d8f0c89b6d301f31d7b5d8cebfca5289d45e1b"
+      },
+      {
+        "path": "elm/src/View/Account.elm",
+        "bytes": 81924,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d4c6085e77e9ab5a3c0fdf273d2307c5bfae367876dd917278bb61b4d00ecfbb"
+      },
+      {
+        "path": "elm/src/View/Appearance.elm",
+        "bytes": 23135,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ae5601844f7f17ebc4cb48514124f5afffab78dbbfae54da1c06d67fe6fbf012"
+      },
+      {
+        "path": "elm/src/View/Bans.elm",
+        "bytes": 23355,
+        "mode": 384,
+        "type": "file",
+        "sha256": "fdf17f9114849680251f207617f32386e0be6ec7d5f3a05cbe166e14e603e44f"
+      },
+      {
+        "path": "elm/src/View/Browser.elm",
+        "bytes": 10431,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bb5acdf08f1b62dff0f0d4ef9d9d99a8711d1fd2ea2ca56ba8a245b0299e6ad5"
+      },
+      {
+        "path": "elm/src/View/Calls.elm",
+        "bytes": 33270,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ebef301241b297afea0a1a8bfee74fea8c5e2856446c412f76b8b74b849de46a"
+      },
+      {
+        "path": "elm/src/View/CallSetup.elm",
+        "bytes": 3665,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bf9db7ecea321d5fe9c60f294aa762f2d2d9113a4ca8eb4adc92370c1d824453"
+      },
+      {
+        "path": "elm/src/View/CaptionControls.elm",
+        "bytes": 2903,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ab0e2618e583ff3a70e476a5fd07dcb63b33a3845db85a8241fd884bd15d6d5c"
+      },
+      {
+        "path": "elm/src/View/Composer.elm",
+        "bytes": 26181,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0e6bb9f3f580c27a74b6f3828dc05daeae6489b60ff92e54e9e2c69066a569c3"
+      },
+      {
+        "path": "elm/src/View/Connection.elm",
+        "bytes": 8792,
+        "mode": 420,
+        "type": "file",
+        "sha256": "2c8fb09caa91f86cea6bbeb5bbdc29ec9da8227039c2611bc6130878062872ce"
+      },
+      {
+        "path": "elm/src/View/Download.elm",
+        "bytes": 19815,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e99e92812ad326612643e9daf39009e02cde89e5ceb70d12c045a24b0903f8e2"
+      },
+      {
+        "path": "elm/src/View/EncryptedRoomSetup.elm",
+        "bytes": 2448,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ce5ac454b35d266a3224b5cc94d48dc815a9f5305b2fb8638d7e009c26e324ba"
+      },
+      {
+        "path": "elm/src/View/Formation.elm",
+        "bytes": 13751,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3704adc3a77906b4ca48e4390442362e5aea8af7f992ad3bb836f1ab7308c049"
+      },
+      {
+        "path": "elm/src/View/GuestClaim.elm",
+        "bytes": 12170,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a9e6dd26f3640ca676bd5668ea6b8f3fb6d73dd195835daf6f6b235183aff4d4"
+      },
+      {
+        "path": "elm/src/View/Guides.elm",
+        "bytes": 16968,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f871f080c676d566407bf0df6bc97002b8b7c405342f3e6481f6faf981c86a22"
+      },
+      {
+        "path": "elm/src/View/Inbox.elm",
+        "bytes": 6472,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3aad2e31e54040c08a198b870c3e5110b626e647a4273453199461dc01177cb3"
+      },
+      {
+        "path": "elm/src/View/InstallStatus.elm",
+        "bytes": 1864,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6ed378f6c1ca20dea9f46f4b89bb8c623f5d68f97078771517b3c691315635c1"
+      },
+      {
+        "path": "elm/src/View/Integrations.elm",
+        "bytes": 16117,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8b57e7584febd1d0a2596b62741db10ee6b6938d6c3a5e7ba10b8c92a6ea4455"
+      },
+      {
+        "path": "elm/src/View/Invite.elm",
+        "bytes": 7385,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6a2922dfa0a05078ece523b2328f0f20fdccf9d5a9123b4adb64fd7f974f4549"
+      },
+      {
+        "path": "elm/src/View/KeyRecovery.elm",
+        "bytes": 2140,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d50d3f44335e7d356b9e66f1bf53db281a1022ca06a382a5e889b58995347a26"
+      },
+      {
+        "path": "elm/src/View/Landing.elm",
+        "bytes": 6097,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5d4543f22ba7be710cc84d44b50ed150596a0e69fda08c231e40deecc09a2b36"
+      },
+      {
+        "path": "elm/src/View/Media.elm",
+        "bytes": 11828,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c3e4708804084a01c51be1709d26f04d40150ef535f30120fac833ecde8cd1b4"
+      },
+      {
+        "path": "elm/src/View/MediaDiagnostics.elm",
+        "bytes": 1842,
+        "mode": 384,
+        "type": "file",
+        "sha256": "98aeef1da01ddc7835cff0a26a7c0ac280e25169d9bfc7b5f2016d13542a3dc0"
+      },
+      {
+        "path": "elm/src/View/MediaInterop.elm",
+        "bytes": 3673,
+        "mode": 384,
+        "type": "file",
+        "sha256": "265fab70b63fea821f15225acb2e32b5938552cf35b85e7a0b62e65725916602"
+      },
+      {
+        "path": "elm/src/View/NotFound.elm",
+        "bytes": 1219,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d06f77110ede0ff4c2a25efc676aeda3b7d940746c74e762e4930d1710971455"
+      },
+      {
+        "path": "elm/src/View/Onyxos.elm",
+        "bytes": 14125,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5738251cba82c5840ef1dbc0a6228f6fb54e6e73810a954e49e9ad2fd89f6dda"
+      },
+      {
+        "path": "elm/src/View/OperatorImport.elm",
+        "bytes": 3562,
+        "mode": 384,
+        "type": "file",
+        "sha256": "30e400326ec7a9ea0ed0bb96788c3af81b895a82fb8f11b579f4fbd1d368ada8"
+      },
+      {
+        "path": "elm/src/View/Pins.elm",
+        "bytes": 7703,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c4719b58e475e8280c7beaf6adb6fda5d804d77e1d945fb6d9b1a3d526ebb779"
+      },
+      {
+        "path": "elm/src/View/Profile.elm",
+        "bytes": 41442,
+        "mode": 384,
+        "type": "file",
+        "sha256": "019497a06c29eb30cb6b72cb8dee53f1c19a0ff1d8148984db4cfda5d66b08ea"
+      },
+      {
+        "path": "elm/src/View/PublicFrame.elm",
+        "bytes": 6195,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d298b853ca705a39cf5c7a70ebb0e5fcc531ffdea4d76d7a91da6eaf7012fb2e"
+      },
+      {
+        "path": "elm/src/View/PublicInfo.elm",
+        "bytes": 5497,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b1b3bf06714c06df2ef92534610d1c69d34d26e010af4ff22358d8612d56c5ab"
+      },
+      {
+        "path": "elm/src/View/Rail.elm",
+        "bytes": 6845,
+        "mode": 384,
+        "type": "file",
+        "sha256": "22ba856ac659cee2b2475b9cd367dd3ca7c35cf2bd8c6410f9ae8defbe084e38"
+      },
+      {
+        "path": "elm/src/View/Roadmap.elm",
+        "bytes": 5772,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0f91ac3a288ad88a9b2c08fdf49ea558d3dbb4210691a81734d5924c7fbe9bfe"
+      },
+      {
+        "path": "elm/src/View/Roster.elm",
+        "bytes": 3994,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b8aaab45aa8058e9c252708087a0f54c1eda308c3129f2bb42f05b68869c30c0"
+      },
+      {
+        "path": "elm/src/View/RuntimeServices.elm",
+        "bytes": 35362,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7919638af06a2c351de6195c41f113eca9436ef0820704ba3d46e0cb55288912"
+      },
+      {
+        "path": "elm/src/View/Scheduled.elm",
+        "bytes": 15401,
+        "mode": 384,
+        "type": "file",
+        "sha256": "95fae0a190962710e4bb0c4305c0b351ddbe63599f56fe341a53110aca049f94"
+      },
+      {
+        "path": "elm/src/View/Search.elm",
+        "bytes": 21496,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1c8b66d573393eb4495cce83879499071f4305644041dcd76e51ea57e6d0da59"
+      },
+      {
+        "path": "elm/src/View/Stats.elm",
+        "bytes": 50876,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ed310e6fb9d48a209b313e74173da0cdb4881c85747c38f6bcd347e46e981a48"
+      },
+      {
+        "path": "elm/src/View/Status.elm",
+        "bytes": 3031,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e70ab76d75aba31357002c470786f95ce8d2ff8640d45e8f76c445b1101302ab"
+      },
+      {
+        "path": "elm/src/View/Stewardship.elm",
+        "bytes": 27068,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bec5b27fb76e0553e7ab6ca2ac0ead7eaeaddd97e31903abe5f930c46792b00f"
+      },
+      {
+        "path": "elm/src/View/StorageRecovery.elm",
+        "bytes": 3003,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f31040c1c6c1b7312881faa6acdba0b801e5eba9f7fcb42af8fe4d5d37c0693e"
+      },
+      {
+        "path": "elm/src/View/Studio.elm",
+        "bytes": 48273,
+        "mode": 384,
+        "type": "file",
+        "sha256": "53950ea648c95d14093bdf1b4a2537c6faf76aff5e85dad1362ed104d4c83fea"
+      },
+      {
+        "path": "elm/src/View/Thread.elm",
+        "bytes": 98343,
+        "mode": 384,
+        "type": "file",
+        "sha256": "98b4b4ddb831b21e9674f8487457e3fd85b9db5fb92040d7b7ac0c9223f94625"
+      },
+      {
+        "path": "elm/src/View/Toast.elm",
+        "bytes": 2376,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f1d8d5e88d33aaf584bd39db749bf67c77b928cf635baa5eca474f8d702dad95"
+      },
+      {
+        "path": "elm/src/View/Topbar.elm",
+        "bytes": 18071,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4615b3163232bc54602f1a650d1b6d7cb4b84ea9c1850f75a49a42e9b721214d"
+      },
+      {
+        "path": "elm/src/View/Trust.elm",
+        "bytes": 8071,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f0d5514623c3de612e66ec0263bce70aeefedaa2c16920725b5acd6c70628afc"
+      },
+      {
+        "path": "elm/src/Webhook.elm",
+        "bytes": 11347,
+        "mode": 384,
+        "type": "file",
+        "sha256": "90a28a8fe15a2b2bda7ce54813f2b4a3c4e6263bf500bbff94337ade5ee34fc5"
+      },
+      {
+        "path": "elm/src/Wire.elm",
+        "bytes": 63193,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3ddc81cfd5dd3b0c5578e6e7fdf2fedf5ac1107a38f08c40ae8c6a69431e6577"
+      },
+      {
+        "path": "elm/src/WorkerLifecycle.elm",
+        "bytes": 3414,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e0b39fa05c99827275157d8306a57043b47c46a62ac6dfa20f07d1368ef828b7"
+      },
+      {
+        "path": "elm/starredSave.smoke.mjs",
+        "bytes": 2641,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6e20c9364978ef6332024e59351c5e722ba7a7c077ca2f0a8bd363e7bbd4ded3"
+      },
+      {
+        "path": "elm/statsPorts.smoke.mjs",
+        "bytes": 3800,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6517d463a88b700f34faff5413966de51070b9b5363d242279ca52566a9023c3"
+      },
+      {
+        "path": "elm/studioPorts.smoke.mjs",
+        "bytes": 8073,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a8e3ab5b5c8fd1dfea4b02b676fcd0cfd6ee579df399edd491d3d6784d6e53ff"
+      },
+      {
+        "path": "elm/sw.js",
+        "bytes": 40358,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e68742917cc041bac9d8fad3d49e8eb35e96c17a5c49129c9835208ccd98b170"
+      },
+      {
+        "path": "elm/tempBan.smoke.mjs",
+        "bytes": 1788,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1d755dfa91ab6f262a7786332659debf3ace19c7fb02cd11841c7ce70f6ad3b2"
+      },
+      {
+        "path": "elm/tests/AccountDataTest.elm",
+        "bytes": 15313,
+        "mode": 384,
+        "type": "file",
+        "sha256": "db3e42652c98579687fca4437a24cd122957ff286f147565fe254eab08ba057e"
+      },
+      {
+        "path": "elm/tests/AiPolicyTest.elm",
+        "bytes": 2400,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5d9398d8c99567de8a96f67affc47cf0a676e117256e9c54134c2921a64cd834"
+      },
+      {
+        "path": "elm/tests/AppearanceTest.elm",
+        "bytes": 14066,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1f6a3dffdce1cc378a2e15db01bf5adccd9112c3c036c205ba0ae41e0eddfe72"
+      },
+      {
+        "path": "elm/tests/AppTest.elm",
+        "bytes": 1286943,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2ac746db3ea9dfd8641c9fae23cb1890278d7eb22ad4108f87eeaf0c58b08823"
+      },
+      {
+        "path": "elm/tests/AttributionTest.elm",
+        "bytes": 11686,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e7154e373118a1c2d7e6021eb7492100ce30f102b294e113f4874994a83a6ebb"
+      },
+      {
+        "path": "elm/tests/AvatarTest.elm",
+        "bytes": 7770,
+        "mode": 384,
+        "type": "file",
+        "sha256": "95a1b27eab3b644b776e3eef1e73b1755e9d81b21ddfbbcea61b6295fa6f31c3"
+      },
+      {
+        "path": "elm/tests/Base64UrlTest.elm",
+        "bytes": 3451,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d180dc6be0496b550fbc60d04683ef47083bb5fe128c005004c94ec9f43b1930"
+      },
+      {
+        "path": "elm/tests/CadenceTest.elm",
+        "bytes": 14600,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e57eb24b1bca97db1eee21ff1938dfa4aa975fb7a1bfdf266a719e321d6c34cb"
+      },
+      {
+        "path": "elm/tests/ChannelListTest.elm",
+        "bytes": 27537,
+        "mode": 384,
+        "type": "file",
+        "sha256": "295cd308d90d2c39b2d2dccc0cedfd2f0257b018ca4e6f730b6246351dd6c75f"
+      },
+      {
+        "path": "elm/tests/ChannelNavigationTest.elm",
+        "bytes": 4947,
+        "mode": 420,
+        "type": "file",
+        "sha256": "70aea4ccdbc31cdd3f2bdc9c9dd271abce86969624d45e2af0be4df2f025eb47"
+      },
+      {
+        "path": "elm/tests/ComposerInjectTest.elm",
+        "bytes": 1687,
+        "mode": 384,
+        "type": "file",
+        "sha256": "81ba688be4a7f8b784a5605153939be650229da86565f3f05ea2ad3306c48c02"
+      },
+      {
+        "path": "elm/tests/CredentialsTest.elm",
+        "bytes": 7965,
+        "mode": 384,
+        "type": "file",
+        "sha256": "96b1fde5a9ec4f8b00d4e161577d9bb0bc73b2e2a29f38721668b3520212d2c9"
+      },
+      {
+        "path": "elm/tests/DmCipherTest.elm",
+        "bytes": 12241,
+        "mode": 384,
+        "type": "file",
+        "sha256": "59b314659473edb426adfd1bfc8bb2b2881d7cfd5bc02277a99978e3f3fe2301"
+      },
+      {
+        "path": "elm/tests/DownloadTest.elm",
+        "bytes": 10933,
+        "mode": 384,
+        "type": "file",
+        "sha256": "82ade162dcdb40132af7ab949c1fbb58da7bbf4bda2d9901095f821d9b2d87a4"
+      },
+      {
+        "path": "elm/tests/EmojiTest.elm",
+        "bytes": 3669,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ded0b6db0b2052914ee596e8763eb0ecb979b6f8bb59de29cee95df5eaac3964"
+      },
+      {
+        "path": "elm/tests/EventReplayTest.elm",
+        "bytes": 8470,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1f9e88204a239e15d5c9000fddc4d9e1f5ca5238e0bff77969add94a8e3f0047"
+      },
+      {
+        "path": "elm/tests/FacepileTest.elm",
+        "bytes": 8066,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d1452ae594c36b4f4a5d0afe4e094f6d7e642dce914e9744e243a44c1f06c141"
+      },
+      {
+        "path": "elm/tests/FirstHourTest.elm",
+        "bytes": 4895,
+        "mode": 420,
+        "type": "file",
+        "sha256": "dabe3abfc2ad85f62d823d66626ca6aa8330d2b34377794eb8a73ef277565205"
+      },
+      {
+        "path": "elm/tests/FormationTest.elm",
+        "bytes": 22778,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4a80d330b1720fb38eb2998d1ac5f2994638d6961513e4e986aee3c44e1e993f"
+      },
+      {
+        "path": "elm/tests/GroupCommitTest.elm",
+        "bytes": 9811,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7707aea618fcd9cbe9f892a8f0d85b9978683ff781c274d574f5fd8b8edc577f"
+      },
+      {
+        "path": "elm/tests/GroupControlTest.elm",
+        "bytes": 43158,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5b1356eae22cfd74f13344881d83604c42bacc36a946c61abf96d7a2f79005d3"
+      },
+      {
+        "path": "elm/tests/GroupDirectoryTest.elm",
+        "bytes": 14556,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b594f87269d61fdb76b37046da7e932c6b9a85d94c24ee1aa36e353148ff7ddf"
+      },
+      {
+        "path": "elm/tests/GroupEnvelopeTest.elm",
+        "bytes": 8743,
+        "mode": 384,
+        "type": "file",
+        "sha256": "973dad4df7a4fa131a0840eb43061f9ddb87d6b3635b6b0dff876e77d917c406"
+      },
+      {
+        "path": "elm/tests/GroupPublisherTest.elm",
+        "bytes": 11798,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1007ceef079fb48c97d4fdc6b34f569ae97918893bd8da25804be185bb1f6b8b"
+      },
+      {
+        "path": "elm/tests/GroupSessionTest.elm",
+        "bytes": 6383,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cc236987d872f056cca4506a88be6a08389cf0b94ceca9d747cc6e065517b11f"
+      },
+      {
+        "path": "elm/tests/GroupWelcomeTest.elm",
+        "bytes": 7579,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0b2c7dc794d6c49041fbf616e7b52241270efbfd2cf408edfd86aad38ff2dc09"
+      },
+      {
+        "path": "elm/tests/GuestClaimTest.elm",
+        "bytes": 17972,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d923e5439042f0e62233be31a0dcbd1c52c8db6f3e6ae9f1d1061393659d7323"
+      },
+      {
+        "path": "elm/tests/GuideTest.elm",
+        "bytes": 5347,
+        "mode": 384,
+        "type": "file",
+        "sha256": "274f341912d87bc77758a3cb8de41fbebcf043ba0c8cfbf89d9c863a70074ba5"
+      },
+      {
+        "path": "elm/tests/HistoryPolicyTest.elm",
+        "bytes": 2022,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3c47a47d52bc63c257d699dc2ab3c039a6f3ada7f407b164341140e8e9e70592"
+      },
+      {
+        "path": "elm/tests/IdentityOverridesTest.elm",
+        "bytes": 4666,
+        "mode": 384,
+        "type": "file",
+        "sha256": "35b934e7d791e0766617b27f96647945d0b83deac43a019485795daa3b0efa1d"
+      },
+      {
+        "path": "elm/tests/IntegrationsViewTest.elm",
+        "bytes": 6770,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9c890c09b817936f7e9d7c4ee4cf0b1a6db5e865eaeac86ff0f078cc2d873ad5"
+      },
+      {
+        "path": "elm/tests/InviteTest.elm",
+        "bytes": 21443,
+        "mode": 384,
+        "type": "file",
+        "sha256": "22905a38d9d3c11e01372eae17972c28f93640fb4c771afb76c751a6bf54fc94"
+      },
+      {
+        "path": "elm/tests/IrcxTest.elm",
+        "bytes": 19299,
+        "mode": 384,
+        "type": "file",
+        "sha256": "46e5004febd70511aa5d7896ccc3fd636de821fa26358b95f4ef6bdf0106bc35"
+      },
+      {
+        "path": "elm/tests/IsupportTest.elm",
+        "bytes": 13356,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c7faf49793370f7f26a4c088a987489246a5b5d262c5221000355d8c40d96069"
+      },
+      {
+        "path": "elm/tests/KeyringTest.elm",
+        "bytes": 8102,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3e27b1b75558db6d57e0199f1bd7ae639cc7993e5daab96578c54aaec80e7861"
+      },
+      {
+        "path": "elm/tests/LabelsTest.elm",
+        "bytes": 3278,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f3fe71fdf3e82aa23df08850c35ed93e712e6e848d49b295c4953cef0506ee3d"
+      },
+      {
+        "path": "elm/tests/MainTest.elm",
+        "bytes": 4242,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8bf4f21ae9203adfcb63ab63c9e0d551a64532cac8e8c7f654a5bddad63ce092"
+      },
+      {
+        "path": "elm/tests/MediaTest.elm",
+        "bytes": 29758,
+        "mode": 384,
+        "type": "file",
+        "sha256": "645938f55e49a6b25116665b6a01d06152bcbe75eb1cac7f5355e9ce376a32e8"
+      },
+      {
+        "path": "elm/tests/MessageMenuTest.elm",
+        "bytes": 14120,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3948c28ac7e15e6c363ecb0637713a62faa7e5ccee88502e56217772c22465e4"
+      },
+      {
+        "path": "elm/tests/MessageWindowTest.elm",
+        "bytes": 33303,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7a8502f00de027aadab5989282bae0e4f27c09c13bcfadb9a912eaa505543c6f"
+      },
+      {
+        "path": "elm/tests/ModerationTest.elm",
+        "bytes": 14816,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2361c45f73b2bfeadc0efca21da9da227cab11a8947a0d1a253be5fbb34081d5"
+      },
+      {
+        "path": "elm/tests/ModesTest.elm",
+        "bytes": 19452,
+        "mode": 384,
+        "type": "file",
+        "sha256": "736375e384c3457ef37e4d0d0af224b0566f9bbaf6f02f0c500b4c06a3563bb4"
+      },
+      {
+        "path": "elm/tests/MultilineTest.elm",
+        "bytes": 16692,
+        "mode": 384,
+        "type": "file",
+        "sha256": "dc3b21d977f28973b0e7297620d36b21acedcc418ea40be48ff7da995d41451c"
+      },
+      {
+        "path": "elm/tests/NickCompleteTest.elm",
+        "bytes": 2261,
+        "mode": 420,
+        "type": "file",
+        "sha256": "a11c0f3694c1b727f034755ec82e1bc53d7b658947dd1cd499cb6386d5ba36a9"
+      },
+      {
+        "path": "elm/tests/NodesTest.elm",
+        "bytes": 3433,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c52b33b33f574952747aa5b515542b976a3c8133c31c1d8af2c0b12151f55f56"
+      },
+      {
+        "path": "elm/tests/NotifyTest.elm",
+        "bytes": 7298,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ce91eb7c5afb2e51ecd0a9b51f9d5087b16c1e9e18c2da259f6fcb65ecd21349"
+      },
+      {
+        "path": "elm/tests/OperWireAdmissionTest.elm",
+        "bytes": 4966,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7040df14908e94b9c44a4791ee20875c1f4fe20c33fffd2a9a6c7750cc7fbc18"
+      },
+      {
+        "path": "elm/tests/OutboxTest.elm",
+        "bytes": 19243,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7e5d9b450dc6c30e47da35c2ed90bef368bb3be0e410c35fdb7ad503759aaefd"
+      },
+      {
+        "path": "elm/tests/ParityShellTest.elm",
+        "bytes": 32413,
+        "mode": 420,
+        "type": "file",
+        "sha256": "8af7c79cf872d6984decad71e20cfc0f91411595cf87724429e663aacf9a90b8"
+      },
+      {
+        "path": "elm/tests/PasskeyTest.elm",
+        "bytes": 15575,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6a7c4685c66b47e51003a7331bb72dbe1468aeed68d8c180579f1cc4a2f0a1bb"
+      },
+      {
+        "path": "elm/tests/PersonSafetyTest.elm",
+        "bytes": 4737,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e71333d4d72c09cf4916baa89558f68d2a3fa5469a0de93e3fd51f9ebb67264c"
+      },
+      {
+        "path": "elm/tests/PrefsTest.elm",
+        "bytes": 6660,
+        "mode": 384,
+        "type": "file",
+        "sha256": "71f9e1cf3928b150b2796b1702a0ee21352efa9b435d8abcc6d3cd2ee3db2e53"
+      },
+      {
+        "path": "elm/tests/ProvenanceTest.elm",
+        "bytes": 1703,
+        "mode": 384,
+        "type": "file",
+        "sha256": "57623c4be2bf1e1ee9876cab432cc3c0106e1bf06486f9ed314171d79bc90340"
+      },
+      {
+        "path": "elm/tests/PushTest.elm",
+        "bytes": 5978,
+        "mode": 384,
+        "type": "file",
+        "sha256": "edb003f9610199d32cf7ec0ad0cdffceafb890ee05bd32e5a5b53316f49c0dcb"
+      },
+      {
+        "path": "elm/tests/QuietHoursTest.elm",
+        "bytes": 2641,
+        "mode": 420,
+        "type": "file",
+        "sha256": "f2bfa4e2a6c4479519aeac7cae2a2be2533c19216df33b5b7c5f3d712d881a50"
+      },
+      {
+        "path": "elm/tests/RecoveryCodesTest.elm",
+        "bytes": 2587,
+        "mode": 384,
+        "type": "file",
+        "sha256": "79f1994089d86ad8cd8d4194e3098c2a2ae2a73ae08fc15de942fe7e44aec8ee"
+      },
+      {
+        "path": "elm/tests/RetentionTest.elm",
+        "bytes": 12056,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c62b46dfe0429a587e0ce1f8b934423dd8b916cd6ebc386074202f97c8967b12"
+      },
+      {
+        "path": "elm/tests/RoadmapFixtures.elm",
+        "bytes": 3288,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b9f3602093694fc7fbc2fcf7fab00c877b9de171b3b1fcb8ac7cbd18d9ee211b"
+      },
+      {
+        "path": "elm/tests/RoadmapTranscriptTest.elm",
+        "bytes": 6895,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d9341fc80c7db1254249953f7d9c426ee2718207108a1eeb0d6701bebc2337af"
+      },
+      {
+        "path": "elm/tests/RoomMediaTest.elm",
+        "bytes": 8248,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1589ce7a1266e64fafdb8db30a3443380df8f9a476d4d48ad1db492294a863c7"
+      },
+      {
+        "path": "elm/tests/RouteTest.elm",
+        "bytes": 2607,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c5c571c8e91a9c25dbdcf171e21b40c48a34e5eaf5bebbc5212549a88f351600"
+      },
+      {
+        "path": "elm/tests/RuntimeDomainTest.elm",
+        "bytes": 10592,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0b33a8e0d1a89e75b84cf44abd333ae95d3035c90f05daa2e2899c1be5578b46"
+      },
+      {
+        "path": "elm/tests/SavedSearchesTest.elm",
+        "bytes": 22982,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6579a5299606f404f60941330e27fda293a93f4c8e1beddd518a515f64db4318"
+      },
+      {
+        "path": "elm/tests/ScheduleTest.elm",
+        "bytes": 29425,
+        "mode": 384,
+        "type": "file",
+        "sha256": "da63d8c919db66d96d159c6d1a5feff7b1a90f9c71959106c40a0fadacf40d21"
+      },
+      {
+        "path": "elm/tests/SearchTest.elm",
+        "bytes": 40269,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4e0543e43e1be301ef3c0fd6fe1468fa6188c530e5e1a7ae1e5c3b56ad363640"
+      },
+      {
+        "path": "elm/tests/ServicesTest.elm",
+        "bytes": 24830,
+        "mode": 384,
+        "type": "file",
+        "sha256": "e7f43a64e7300b92927f770f738c9265a552c237e2925e3fda8b52da6e03b685"
+      },
+      {
+        "path": "elm/tests/SessionTest.elm",
+        "bytes": 17280,
+        "mode": 384,
+        "type": "file",
+        "sha256": "1e9017a741d6241d1162046d75411044484a337a5534754375eaa268dcb14031"
+      },
+      {
+        "path": "elm/tests/SlashSuggestTest.elm",
+        "bytes": 2787,
+        "mode": 420,
+        "type": "file",
+        "sha256": "b175089c1c32d3273306e94b41a7a570c82dcad3b9f83ca263b97db77ccf713a"
+      },
+      {
+        "path": "elm/tests/SpineTest.elm",
+        "bytes": 9293,
+        "mode": 384,
+        "type": "file",
+        "sha256": "12c0ef52d8b42898509930c905cf0022140d7175ce2bdf1a52a277f4045cfce5"
+      },
+      {
+        "path": "elm/tests/StatsTest.elm",
+        "bytes": 17049,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0806e4ca237ca3da42f913e345948cb6e37eb6b7a01165013d641542ae532edd"
+      },
+      {
+        "path": "elm/tests/StatusTest.elm",
+        "bytes": 13955,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bbcaf1fec5dff5706fe4c1cc1ff407db79e87e35a156fd290bf5ef0c3845263c"
+      },
+      {
+        "path": "elm/tests/StewardshipTest.elm",
+        "bytes": 11055,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d03c1ea5334265cd914a7ce2ed999ea50b90568999610f98df9102827b23f82a"
+      },
+      {
+        "path": "elm/tests/StudioFoldTest.elm",
+        "bytes": 23491,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a773ffb322245f81f53a270a2d6b86b395e576cb1b7d9870c63a50dfd3130abf"
+      },
+      {
+        "path": "elm/tests/StudioTest.elm",
+        "bytes": 28452,
+        "mode": 384,
+        "type": "file",
+        "sha256": "79efb52b20d3e71890170b718c1b6be6dd2c68b6e37e16c6ebac96f0421147c7"
+      },
+      {
+        "path": "elm/tests/StudioViewTest.elm",
+        "bytes": 22477,
+        "mode": 384,
+        "type": "file",
+        "sha256": "5e6bdae5f9c20440a8c593df1ac5045edf06fce75a6ad214086113fc2d9717ba"
+      },
+      {
+        "path": "elm/tests/ThemeLookTest.elm",
+        "bytes": 7274,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f293dece950dd46bc200dfb279251a922e553d5591b6a110a64a74a0a7d3cfb3"
+      },
+      {
+        "path": "elm/tests/ThemeTest.elm",
+        "bytes": 10163,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7ff6d1ec1bf819f13380e94647ce87d1ac2afd373efe8023a705e3b624b35d0c"
+      },
+      {
+        "path": "elm/tests/ThreadDeliveryStatusTest.elm",
+        "bytes": 5298,
+        "mode": 384,
+        "type": "file",
+        "sha256": "0e95b5689542219657c8171eb7c3eec837dfe67a30836453fa484248bc28a939"
+      },
+      {
+        "path": "elm/tests/ToastTest.elm",
+        "bytes": 22448,
+        "mode": 384,
+        "type": "file",
+        "sha256": "93e6c3df6c36e47009b76232bddd7b340188fc5f9aa7d39ba54678c7d4ce472a"
+      },
+      {
+        "path": "elm/tests/TopicReadTest.elm",
+        "bytes": 26548,
+        "mode": 384,
+        "type": "file",
+        "sha256": "538a9575ca6479aec4b062601a12dcca298129ef7005fe17724cf4fc0ef7f07a"
+      },
+      {
+        "path": "elm/tests/TopicTest.elm",
+        "bytes": 8085,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f343f24852048eb8eaa16d6ab10dc1edb471d827f30a8bd60860cca4926a5ba8"
+      },
+      {
+        "path": "elm/tests/TranscriptTest.elm",
+        "bytes": 5976,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3f84df96490fe0c63b149e346956c0a66742ea3f7da1c85289a9acc04904e18e"
+      },
+      {
+        "path": "elm/tests/TranslateTest.elm",
+        "bytes": 9157,
+        "mode": 384,
+        "type": "file",
+        "sha256": "45264a63a7faaa73828a81d5c969a5c9441d0481c511a53e2f55427e3e6107e5"
+      },
+      {
+        "path": "elm/tests/UploadTest.elm",
+        "bytes": 20645,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c0df60858ced4e6a9f1d4a7f86ab58a8ee517450eaa7e9a059e87a4e0ad591d7"
+      },
+      {
+        "path": "elm/tests/VaultImportTest.elm",
+        "bytes": 14576,
+        "mode": 384,
+        "type": "file",
+        "sha256": "170fe78608cfa6b3ae0e752ce1e39b380b574e9efee8add2e9c0d5628fdb529d"
+      },
+      {
+        "path": "elm/tests/VaultSeenIdsTest.elm",
+        "bytes": 4192,
+        "mode": 420,
+        "type": "file",
+        "sha256": "8222e955218e9e9bad4a5dc2e19265dee74a55e61d7926bd4ab9c5790a01a4a9"
+      },
+      {
+        "path": "elm/tests/ViewTest.elm",
+        "bytes": 329251,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8007a96bd5de096e70ef1e1bf6d99875fae067fae900898864ef9310b7946e43"
+      },
+      {
+        "path": "elm/tests/WebhookTest.elm",
+        "bytes": 6769,
+        "mode": 384,
+        "type": "file",
+        "sha256": "22a2d5350279aa5cef647929cdae115cece8ee37ca7bb5a844fd3704d728fb8d"
+      },
+      {
+        "path": "elm/tests/WireTest.elm",
+        "bytes": 25178,
+        "mode": 384,
+        "type": "file",
+        "sha256": "87156ceae3fa083853e496af03004898cced3379aba351c5d2cf206e0b18a025"
+      },
+      {
+        "path": "elm/threadReveal.smoke.mjs",
+        "bytes": 20753,
+        "mode": 420,
+        "type": "file",
+        "sha256": "a4099ff57c31f95ccddfe87b213ebf1a6b31d6cec6a0b0b49002d47c16ceefc2"
+      },
+      {
+        "path": "elm/tools/freeze-source-cut.mjs",
+        "bytes": 11616,
+        "mode": 384,
+        "type": "file",
+        "sha256": "80b423e430f93be09ec3c0735a32d7725113b273bcccc9d49407b13cc50faf38"
+      },
+      {
+        "path": "elm/tools/generate-roadmap-fixtures.mjs",
+        "bytes": 1522,
+        "mode": 384,
+        "type": "file",
+        "sha256": "6d26e33a6cf6360ec59cd87c20c379692a271dd84c7f62f2f484a31985e3c665"
+      },
+      {
+        "path": "elm/tools/isolated-network.mjs",
+        "bytes": 15548,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f710320e7b99ec3fc850877204cb216494fc7406c2a599059414398e9718f206"
+      },
+      {
+        "path": "elm/tools/lab/config.mjs",
+        "bytes": 12706,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8629cf3fc564f89b97ea7dd9a773ab98ae85cdde373d6f5a2128c50d334d381d"
+      },
+      {
+        "path": "elm/tools/lab/config.test.mjs",
+        "bytes": 9991,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4723b178c3605e4532c8f96a5b2fc669ccf9855aafef760166bcfd8111cbadbc"
+      },
+      {
+        "path": "elm/tools/lab/raw-irc.mjs",
+        "bytes": 24008,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b421b5329099be5a2662437c44ded3d203f4bee908b0af770fd836aa92de4975"
+      },
+      {
+        "path": "elm/tools/lab/raw-scenarios.mjs",
+        "bytes": 41576,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cd752538d19078ee7cce2ec76c0aca203ee0b8f32bb0378d70f56a8328e6874c"
+      },
+      {
+        "path": "elm/tools/lab/README.md",
+        "bytes": 7864,
+        "mode": 384,
+        "type": "file",
+        "sha256": "95c836fb2833469ac503914407da13bff7d7e782e07b58c799dfbb063685412a"
+      },
+      {
+        "path": "elm/tools/lab/receipt.mjs",
+        "bytes": 17363,
+        "mode": 384,
+        "type": "file",
+        "sha256": "cd16143353e7f9fc54bf8c087eedaf8c7ae6b66fe3a1466d748e66f2577d9e3b"
+      },
+      {
+        "path": "elm/tools/lab/run.mjs",
+        "bytes": 22874,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f240daf6bf0d602602b322bfcb7916f8646e3a83cefdce5ad0ffdccf35786089"
+      },
+      {
+        "path": "elm/tools/lab/serve-https.mjs",
+        "bytes": 3028,
+        "mode": 384,
+        "type": "file",
+        "sha256": "2de2fa8503a6a7db2c2271b454fff95ff499cf0fe1d9a8de471048a9d73b11b2"
+      },
+      {
+        "path": "elm/tools/lab/serve-https.test.mjs",
+        "bytes": 4359,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3125f7b9bf78406d140b549427c8957d60d61fe569b33cd1eaec152860f054f7"
+      },
+      {
+        "path": "elm/tools/lab/tsconfig.json",
+        "bytes": 409,
+        "mode": 384,
+        "type": "file",
+        "sha256": "18de8435c2ccb7fdcd1179e703979bcc1eb798221763677a398f3e81bae8d092"
+      },
+      {
+        "path": "elm/tools/media/tsconfig.json",
+        "bytes": 228,
+        "mode": 384,
+        "type": "file",
+        "sha256": "19a32d839da95d20235016f4eac497f3505e1a4a0f2c93171b85837aef254101"
+      },
+      {
+        "path": "elm/tools/media/vite.config.ts",
+        "bytes": 4152,
+        "mode": 384,
+        "type": "file",
+        "sha256": "be311616b00439318d75ab55f48b8c2077e97ada39654b01c7e3cffb075ee15b"
+      },
+      {
+        "path": "elm/tools/media/webrtc-server-investigation.html",
+        "bytes": 691,
+        "mode": 420,
+        "type": "file",
+        "sha256": "4ac936d2bff33bd75a5a33dbb6bad49f3b3851ac45691a94b94b0d7e9644dea3"
+      },
+      {
+        "path": "elm/tools/media/webrtc-server-investigation.mjs",
+        "bytes": 41017,
+        "mode": 420,
+        "type": "file",
+        "sha256": "9f686741a8ba8528cf8980df1e749cdc114d9f3424f287c139f1c3d1cd8b4671"
+      },
+      {
+        "path": "elm/tools/media/webrtc-server-investigation.ts",
+        "bytes": 33090,
+        "mode": 420,
+        "type": "file",
+        "sha256": "8d9d9ff259d37fbdacd6b1445a48fc9fbac4f883e9110f5751fbaf468dadc510"
+      },
+      {
+        "path": "elm/tools/patch-elm-test-tcp.sh",
+        "bytes": 2485,
+        "mode": 448,
+        "type": "file",
+        "sha256": "f293561d32556a77a8be015449da954add2986d1ebcaad5e303b49fe1a80c0e0"
+      },
+      {
+        "path": "elm/tools/perf/fixtures.test.mjs",
+        "bytes": 2036,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a05bc5cc84ace3fc3ac9c99be181814e5a514618fbf1bf9a8dafb546f5c27ee1"
+      },
+      {
+        "path": "elm/tools/perf/fixtures.ts",
+        "bytes": 19283,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c4a56d2e84cfdbe286d4237a9d0ac9b484ad4f158c4705a37da20c3bdc0af05e"
+      },
+      {
+        "path": "elm/tools/perf/playwright.config.ts",
+        "bytes": 1324,
+        "mode": 384,
+        "type": "file",
+        "sha256": "81148dc415cf8747b6207f9e0c28a487c36121164f5e6f968c2e27371cee1cd6"
+      },
+      {
+        "path": "elm/tools/perf/receipt.ts",
+        "bytes": 571,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d627ae5ce7d47311a7de1d3459af96acf5c4f934c947e7678fc5851a935d794d"
+      },
+      {
+        "path": "elm/tools/perf/run.mjs",
+        "bytes": 18744,
+        "mode": 448,
+        "type": "file",
+        "sha256": "d4dff36dc4d45e7cbfe5ba465e56e45ba7c4b93cff2248cf2d582cd7bb8dcfb3"
+      },
+      {
+        "path": "elm/tools/perf/source-cut.mjs",
+        "bytes": 4451,
+        "mode": 384,
+        "type": "file",
+        "sha256": "188bf9be045fb9fdcd9965482348185b25d80d956e908cf2571b8c072c600180"
+      },
+      {
+        "path": "elm/tools/perf/tsconfig.json",
+        "bytes": 535,
+        "mode": 384,
+        "type": "file",
+        "sha256": "23c639ee5c4afe64891321dc2ceecfe7cd73a78289cb099c8327633f1f8b4c9b"
+      },
+      {
+        "path": "elm/tools/run-roadmap-checks.mjs",
+        "bytes": 30128,
+        "mode": 384,
+        "type": "file",
+        "sha256": "df047a4b75c6f47e5339b16fe95acb8e8bb31ca210fd2ccb89e2668d8bf3863a"
+      },
+      {
+        "path": "elm/tools/source-closure.mjs",
+        "bytes": 5022,
+        "mode": 384,
+        "type": "file",
+        "sha256": "02af87be61b7873b5fce51e655fc7928815c03d85184c3138f75423e69063809"
+      },
+      {
+        "path": "elm/tools/source-closure.test.mjs",
+        "bytes": 2868,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bb4e0c881fd48f5c4d438250e34ef49bcfe21426bfafd09b7d7700858fd8520e"
+      },
+      {
+        "path": "elm/tools/source-manifest.mjs",
+        "bytes": 2403,
+        "mode": 384,
+        "type": "file",
+        "sha256": "39b9661237bd4e0bf4cfe3055296cc0f67f2359931f82b4125f0d75bc0135e10"
+      },
+      {
+        "path": "elm/tools/tool-provenance.mjs",
+        "bytes": 4935,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f956757cb618ade391e673037599c45d4115a655d4157013f648a6654bfd1957"
+      },
+      {
+        "path": "elm/tools/transport/tsconfig.json",
+        "bytes": 328,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3df5492a1a79d74e0b55ebb8a51a2e5961ead6ededbfb8cd27b13f99923d3946"
+      },
+      {
+        "path": "elm/tools/transport/webtransport-server-investigation.html",
+        "bytes": 885,
+        "mode": 384,
+        "type": "file",
+        "sha256": "920b9754503d5beb2e265925cc9b996ed7e41c23e3127bf2254fcb1e75a57f77"
+      },
+      {
+        "path": "elm/tools/transport/webtransport-server-investigation.mjs",
+        "bytes": 44724,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ca2c672f4f7bf8088fa5c7f8db59e167861b264cc44689272ce1af52c3509d88"
+      },
+      {
+        "path": "elm/tools/transport/webtransport-server-investigation.ts",
+        "bytes": 34776,
+        "mode": 384,
+        "type": "file",
+        "sha256": "8b15230cd7d0a9e230371849fe82800fbd1b44bfbf4e6941d7041edc5df6e468"
+      },
+      {
+        "path": "elm/tools/validate-roadmap-evidence.mjs",
+        "bytes": 11074,
+        "mode": 384,
+        "type": "file",
+        "sha256": "940d47e132cbbb6e35b0f602f41a3c7ecdb475352e1fc83094090b7833074c4a"
+      },
+      {
+        "path": "elm/tools/validate-roadmap-evidence.smoke.mjs",
+        "bytes": 7408,
+        "mode": 384,
+        "type": "file",
+        "sha256": "16c3ce8f3b2d15ac279939dcc4b748a45275e86a1b477dc1e1616ec89512f1f3"
+      },
+      {
+        "path": "elm/tools/vendor-elm-packages.sh",
+        "bytes": 1486,
+        "mode": 448,
+        "type": "file",
+        "sha256": "f5871e8f5837a93c605d7f9d06aed32656bad52d227d37aabb2f65ed841c2400"
+      },
+      {
+        "path": "elm/topicFocus.smoke.mjs",
+        "bytes": 2475,
+        "mode": 384,
+        "type": "file",
+        "sha256": "626363806404b5d8afc3101e208966461614347c4a9319cb90b3ae9449adfacc"
+      },
+      {
+        "path": "elm/topicHistory.smoke.mjs",
+        "bytes": 5179,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4126c9b361f6e6ec866f6a3d80b65e0fcb4ea88e90b8f498f767f37602d240f9"
+      },
+      {
+        "path": "elm/topicReadSave.smoke.mjs",
+        "bytes": 5435,
+        "mode": 384,
+        "type": "file",
+        "sha256": "713c0edefff1b2ffefeb076d8ab9ef6407537f4acc093d6c766ed80ce554796c"
+      },
+      {
+        "path": "elm/transcriptDownload.smoke.mjs",
+        "bytes": 3482,
+        "mode": 384,
+        "type": "file",
+        "sha256": "20fc575342d249d6d937dfc84ac1500998186d4583fabe61683640eb3c5c0f5c"
+      },
+      {
+        "path": "elm/translate.smoke.mjs",
+        "bytes": 4779,
+        "mode": 384,
+        "type": "file",
+        "sha256": "058773ad9ac6c9d550cdb958869526575deb05fd88fe0f2351ad093f587ddd67"
+      },
+      {
+        "path": "elm/uploadBridge.smoke.mjs",
+        "bytes": 4167,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4ab4a3c256423e42b142bd61f2b251d9c960bd54da34eecd93d2a78ab0b9ff9d"
+      },
+      {
+        "path": "elm/vaultHistory.smoke.mjs",
+        "bytes": 9251,
+        "mode": 384,
+        "type": "file",
+        "sha256": "bc14a31a7807dace2b8daadf40913356d3fb01631b5e192823e04a38d82e61a7"
+      },
+      {
+        "path": "elm/vaultSearch.smoke.mjs",
+        "bytes": 1775,
+        "mode": 384,
+        "type": "file",
+        "sha256": "21b3c786bb7d53b0aa4f65b04b0f4eee07a48a0a7b722bbad5fe1831c6463bd1"
+      },
+      {
+        "path": "elm/vaultSemantic.smoke.mjs",
+        "bytes": 8738,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4e9243bb92224415d01320ff06f24dc897ec724662906103bc50feb42bb99c61"
+      },
+      {
+        "path": "elm/vhostRefresh.smoke.mjs",
+        "bytes": 2401,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c788e22777cb83d73da49fe5f7feb70c5368c6cdccadc144b51ba4db713781c3"
+      },
+      {
+        "path": "elm/vitest.runtime.config.ts",
+        "bytes": 1467,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ddcd51c1b0e598bb8b3fe131eed9903a7a015eed57ed250defd4a624fe293f52"
+      },
+      {
+        "path": "elm/voiceBridge.smoke.mjs",
+        "bytes": 4386,
+        "mode": 384,
+        "type": "file",
+        "sha256": "556da64924c5fc6f549bd553624ad141beb459077126cc98d1fe967e7023bffa"
+      },
+      {
+        "path": "elm/webPush.smoke.mjs",
+        "bytes": 9831,
+        "mode": 384,
+        "type": "file",
+        "sha256": "68e42418667fd5400b38953c8dbc36e566c71f0a89536556ec775097bc51aa63"
+      },
+      {
+        "path": "elm/websocket.smoke.mjs",
+        "bytes": 4411,
+        "mode": 420,
+        "type": "file",
+        "sha256": "4d0b5a8c7a383482bb11374536d15e908cc4d949ee2b1c4d54da7c29aad11f96"
+      },
+      {
+        "path": "elm/whoisTimeout.smoke.mjs",
+        "bytes": 2611,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f242bc3fa07e7b1f70c74fba6cff9dc5ee1f49998f1c3fc9a951b0dd49ada31f"
+      },
+      {
+        "path": "package.json",
+        "bytes": 4336,
+        "mode": 384,
+        "type": "file",
+        "sha256": "45d7be324282a578e01142ac0f44c1f4dc7eb1c8eaa0434785937df37c4b743d"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "bytes": 118742,
+        "mode": 384,
+        "type": "file",
+        "sha256": "85f819a9c09b7e89803cd8446ea6a2be51e4f2dd09b343672bbdad59d9546516"
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "bytes": 139,
+        "mode": 384,
+        "type": "file",
+        "sha256": "f06cb42c8d6354bd758215314a333a473379f01fb866beb7d51e39e6fd8f67e0"
+      },
+      {
+        "path": "public/apple-touch-icon.png",
+        "bytes": 4975,
+        "mode": 384,
+        "type": "file",
+        "sha256": "18e186fc6499cbd7a42fca6be835906eef485ea12898824c8573451261ecfbbc"
+      },
+      {
+        "path": "public/brand/mark.png",
+        "bytes": 11761,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9722f69b7c9ccf3f7b1ad8a241491a1d50cc07b2124fe5aaecc72bf0630a2bd7"
+      },
+      {
+        "path": "public/brand/mascot-still.png",
+        "bytes": 593879,
+        "mode": 384,
+        "type": "file",
+        "sha256": "b1c46dcc5de29ba50303900ff7f9e02f78b0fd5a6770000fdbeba74b34008cad"
+      },
+      {
+        "path": "public/favicon-32.png",
+        "bytes": 910,
+        "mode": 384,
+        "type": "file",
+        "sha256": "c6dee463b366f9f27f44f099fe4c9a63b3637894e8ea8988a3192efbb8df94e2"
+      },
+      {
+        "path": "public/favicon.ico",
+        "bytes": 956,
+        "mode": 384,
+        "type": "file",
+        "sha256": "9223630a85bdd80d8804c74d9b536cb88132ee1b68a9e74d2b6cee808022b057"
+      },
+      {
+        "path": "public/favicon.svg",
+        "bytes": 330,
+        "mode": 384,
+        "type": "file",
+        "sha256": "7ea5441bb1e3744aea410c1943add5af7f864a9198226153b06bfaecd986fbcd"
+      },
+      {
+        "path": "public/icon-192-maskable.png",
+        "bytes": 4277,
+        "mode": 384,
+        "type": "file",
+        "sha256": "3da2720e2f76d454e225ae2485a47a1473b2e49350cbb6dcabe595edb7dc2920"
+      },
+      {
+        "path": "public/icon-192.png",
+        "bytes": 5301,
+        "mode": 384,
+        "type": "file",
+        "sha256": "4643936ff6912fca541c1dda3bb84117f22b82d3ff6bd48f5b767ee48272b138"
+      },
+      {
+        "path": "public/icon-512-maskable.png",
+        "bytes": 12057,
+        "mode": 384,
+        "type": "file",
+        "sha256": "d1838a6b0b36cbb8531f69249ad768bf015a1a2f326247dfe4e8c127272ebf8d"
+      },
+      {
+        "path": "public/icon-512.png",
+        "bytes": 9859,
+        "mode": 384,
+        "type": "file",
+        "sha256": "15b6ca07117271c51294337e5f03f391e49658fb2fd5959f933dac363bf87b40"
+      },
+      {
+        "path": "public/manifest.json",
+        "bytes": 1888,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ee8e67cc0f2b020a886aef7b04cd1e853301782d53d784d0544d9a1c5e2fbbb6"
+      },
+      {
+        "path": "public/og.png",
+        "bytes": 961475,
+        "mode": 384,
+        "type": "file",
+        "sha256": "458ad6d27eb90754c7fefe4bf42f95dc8aacd327825be6b85fea05c7eaa7f354"
+      },
+      {
+        "path": "public/robots.txt",
+        "bytes": 64,
+        "mode": 420,
+        "type": "file",
+        "sha256": "b80d1353e8c9607550b8bd18c00366a5c09c11aa4565d292605b5a12744aad89"
+      },
+      {
+        "path": "public/sitemap.xml",
+        "bytes": 1996,
+        "mode": 384,
+        "type": "file",
+        "sha256": "a6fee669a62ed5916d4c33143cb73ec2de9487f91819201b948ba693e82170ec"
+      },
+      {
+        "path": "tests/e2e/elm-performance.measure.spec.ts",
+        "bytes": 36247,
+        "mode": 384,
+        "type": "file",
+        "sha256": "ace25da025457429a38bfd308b16a9cca8e15c67caa37a2a7223e940228ba8ba"
+      },
+      {
+        "path": "tests/e2e/elm-stress.browser.spec.ts",
+        "bytes": 16731,
+        "mode": 384,
+        "type": "file",
+        "sha256": "dcb9c78df8faff20917e4fecb294e90cd7b39a405515cb5d1136fc938c985e58"
+      },
+      {
+        "path": "tests/e2e/elm.config.ts",
+        "bytes": 1725,
+        "mode": 420,
+        "type": "file",
+        "sha256": "1f90419a8a4f9d6390eccb9c368000c895d41175290bca97348ddac85292cd86"
+      },
+      {
+        "path": "tools/build-elm-site.mjs",
+        "bytes": 10541,
+        "mode": 420,
+        "type": "file",
+        "sha256": "a59873af52ff2bff55ae189079fade547166317a9777022064a6be9f4575d130"
+      },
+      {
+        "path": "tools/materialize-elm-routes.mjs",
+        "bytes": 9141,
+        "mode": 420,
+        "type": "file",
+        "sha256": "752ad288038af7c7687d1de2fd95d2163a851b1f2077d374b33d800986daf05e"
+      },
+      {
+        "path": "tools/minify-elm-script.mjs",
+        "bytes": 579,
+        "mode": 420,
+        "type": "file",
+        "sha256": "0f45d6ea7090ad1d062ea8a6e28152971aba47483172783c79e46e92d62f8acb"
+      },
+      {
+        "path": "tools/serve-dir.mjs",
+        "bytes": 1694,
+        "mode": 420,
+        "type": "file",
+        "sha256": "8e53c01f6e9407bbf4b74634ec789a0e83ae979aeae3e19c08c12bc06854bbb1"
+      }
+    ]
+  },
+  "sourcePreSha256": "e9ea06bd223a7719541b64811d1e79f66eb961036f33c0e587b36cea410b7b3c",
+  "sourcePostSha256": "e9ea06bd223a7719541b64811d1e79f66eb961036f33c0e587b36cea410b7b3c",
+  "sourceChangedDuringRun": false,
+  "stageSha256BeforeServe": "be0a264440a5e79b4d9b1e79bfbfbc50d662cae9a63a70a961c46a13bb79761f",
+  "stageSha256AfterRun": "be0a264440a5e79b4d9b1e79bfbfbc50d662cae9a63a70a961c46a13bb79761f",
+  "stageChangedDuringRun": false,
+  "stagePath": "/tmp/onyx-elm-perf-7740-8e540a64-5938-489d-b731-c5931e9e405a/stage",
+  "comparisonMode": "candidate-only",
+  "measurementMethodologyVersion": "elm-active-page-post-gc-v3",
+  "baseline": {
+    "evidenceStatus": "unavailable",
+    "reason": "No prior baseline stage and receipt supplied"
+  },
+  "runId": "7740-8e540a64-5938-489d-b731-c5931e9e405a",
+  "runDirectory": "/tmp/onyx-elm-perf-7740-8e540a64-5938-489d-b731-c5931e9e405a",
+  "browserServerPort": 27740,
+  "gitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03",
+  "gitDirty": true,
+  "seed": "0x0E90",
+  "fixedEpoch": "2026-10-09T10:00:00Z",
+  "host": {
+    "platform": "linux",
+    "release": "6.18.57-0-lts",
+    "arch": "x64",
+    "node": "v24.18.1",
+    "cpuModels": [
+      "Intel(R) Xeon(R) CPU E5-2690 v2 @ 3.00GHz"
+    ],
+    "logicalCpus": 40
+  },
+  "provenance": {
+    "pnpm": {
+      "path": "/usr/local/lib/node_modules/pnpm/bin/pnpm.cjs",
+      "binarySha256": "b276da51dc8ca5b0d3ee3371695b50fc8b3244b281b091c63a3f082a88dadeb9",
+      "version": "10.33.0"
+    },
+    "elm": {
+      "path": "/tmp/onyx-elm-tools/elm",
+      "binarySha256": "f8f12a61a61f64ac71a85d57284cc4d14fb81f1cbebb8b150839d9731034092e",
+      "version": "0.19.1"
+    },
+    "chromium": {
+      "path": "/usr/lib/chromium/chromium-launcher.sh",
+      "binarySha256": "314ea0a8831178893e35f24f9a9570d089864d97345da8a0f0c55425bb61b2fc",
+      "version": "Chromium 155.0.8059.39 Alpine Linux"
+    },
+    "elmHome": "/tmp/onyx-elm-home"
+  },
+  "dataset": {
+    "diskTargets": 250,
+    "rowsPerTarget": 400,
+    "requestedVaultRows": 100000,
+    "joinedRooms": 50,
+    "activeRosterOffered": 1000,
+    "activeLoadedRequested": [
+      500,
+      1000
+    ],
+    "initialRenderTarget": 120
+  },
+  "workloadSettings": {
+    "seed": "0x0E90",
+    "desktopViewport": "1280x900",
+    "mobileViewport": "390x844",
+    "mobileCpuThrottle": 4,
+    "inputKeystrokes": 50,
+    "ingestCycles": 5,
+    "eventsPerCycle": 1000,
+    "idbSamples": 100,
+    "idbBatchSize": 100,
+    "laneOperationalTimeoutMs": 600000,
+    "ingestionCohortAssertionTimeoutMs": 10000,
+    "persistenceSettlementGuardMs": 10000,
+    "persistenceEvaluationWatchdogMs": 15000
+  },
+  "thresholds": {
+    "desktopInputP95Ms": 100,
+    "emulatedMobileInputP95Ms": 200,
+    "maxIngestLongTaskMs": 200,
+    "lastThreeCycleActivePostGcHeapGrowthPercent": 10
+  },
+  "heapMethodology": {
+    "rawDiagnosticField": "last3EqualWorkloadHeapGrowthPercent",
+    "retainedMetricField": "lastThreeCycleActivePostGcHeapGrowthPercent",
+    "perCycleSampleField": "activePagePostGcHeapUsedBytes",
+    "collectionScope": "same active page after each UI and target-vault persistence settlement",
+    "persistenceDrainBarrier": "latest runtime vaultPut snapshot containing cycle evt-999 settled ready, no pending calls for its exact owner/target, and that owned target row is present before GC",
+    "persistenceSettlementGuardMs": 10000,
+    "persistenceEvaluationWatchdogMs": 15000,
+    "unavailablePolicy": "open threshold failure; never substitute zero"
+  },
+  "limitations": [
+    "Bounded performance observation only; not reconstructible full roadmap source acceptance",
+    "CPU-throttled viewport emulation is not real mobile or OS evidence",
+    "No battery or media acceptance evidence"
+  ],
+  "sourcePostFileCount": 461,
+  "lanes": [
+    {
+      "mode": "desktop",
+      "viewport": "1280x900",
+      "cpuThrottle": 1,
+      "heapMeasurementMethodologyVersion": "elm-active-page-post-gc-v3",
+      "seed": 3728,
+      "fixedEpoch": 1791540000000,
+      "coldStartMs": 882,
+      "datasetPreparationMs": 33128,
+      "startupBoundary": "navigation-to-connected",
+      "warmStartMs": 675,
+      "warm": true,
+      "gc": {
+        "available": true,
+        "requested": true,
+        "usedSizeBytes": 5643452,
+        "totalSizeBytes": 7823360
+      },
+      "diskTargetRequested": 250,
+      "rowsPerDiskTargetRequested": 400,
+      "persistedRowsActual": 100000,
+      "persistenceFixture": "direct v5 owned-row seed after authenticated runtime initialization; raw storage cohort, hydration measured only through app UI",
+      "activeConversationLoadedRowsActual": 120,
+      "activeTargetDurableRowsActual": 400,
+      "joinedRoomsRequested": 50,
+      "joinedRoomsActual": 50,
+      "socketOpens": 3,
+      "rosterOffered": 1000,
+      "rosterDomRowsActual": 1000,
+      "initialRenderedRowsTarget": 120,
+      "initialRenderedRowsActual": 120,
+      "liveRowsSupportedCap": 1000,
+      "liveCohortRequested": [
+        500,
+        1000
+      ],
+      "liveCohortCounts": [
+        {
+          "cycle": 0,
+          "offered": 500,
+          "loaded": 620
+        },
+        {
+          "cycle": 0,
+          "offered": 1000,
+          "loaded": 1000
+        },
+        {
+          "cycle": 1,
+          "offered": 500,
+          "loaded": 1000
+        },
+        {
+          "cycle": 1,
+          "offered": 1000,
+          "loaded": 1000
+        },
+        {
+          "cycle": 2,
+          "offered": 500,
+          "loaded": 1000
+        },
+        {
+          "cycle": 2,
+          "offered": 1000,
+          "loaded": 1000
+        },
+        {
+          "cycle": 3,
+          "offered": 500,
+          "loaded": 1000
+        },
+        {
+          "cycle": 3,
+          "offered": 1000,
+          "loaded": 1000
+        },
+        {
+          "cycle": 4,
+          "offered": 500,
+          "loaded": 1000
+        },
+        {
+          "cycle": 4,
+          "offered": 1000,
+          "loaded": 1000
+        }
+      ],
+      "inputKeystrokes": 50,
+      "inputLatencyP50Ms": 21.299999952316284,
+      "inputLatencyP95Ms": 39.89999997615814,
+      "inputLatencyMaxMs": 41.19999998807907,
+      "measurementInputEvents": 50,
+      "laneOperationalTimeoutMs": 600000,
+      "ingestionCohortAssertionTimeoutMs": 10000,
+      "ingestionCycles": [
+        {
+          "persistenceReady": true,
+          "persistenceStatus": "ready",
+          "persistenceGuardExpired": false,
+          "elapsedMs": 8236.5,
+          "domNodes": 6981,
+          "messageRows": 120,
+          "loadedRows": 1000,
+          "retainedRows": 400,
+          "persistenceMessageId": "evt-0-999",
+          "persistenceSettlementMs": 4097.200000047684,
+          "persistenceSettlementGuardMs": 10000,
+          "persistenceOfferRows": 1000,
+          "persistenceAffectedRows": 1000,
+          "persistenceRuntimeSequence": 1,
+          "persistenceOwnerKeyMatches": true,
+          "persistenceTargetMatches": true,
+          "persistenceTargetPendingCalls": 0,
+          "persistenceOwnerCurrent": true,
+          "persistenceLatestCallUnchanged": true,
+          "persistenceDurableMessagePresent": true,
+          "persistenceCompletionCriterion": "latest target snapshot ready, exact owner and target current, no target writes pending, final message present in owned target index, durable rows <= 400",
+          "heapUsedBytes": 43085404,
+          "activePagePostGcHeapUsedBytes": 14901356,
+          "longTasks": [
+            58,
+            60,
+            60,
+            59,
+            59,
+            59,
+            60,
+            53,
+            102,
+            100,
+            101,
+            53,
+            59,
+            59,
+            66,
+            64,
+            64,
+            60,
+            54,
+            103,
+            101,
+            101,
+            102,
+            101,
+            102,
+            64,
+            101,
+            98,
+            100,
+            99,
+            99,
+            100,
+            98,
+            98,
+            83,
+            98,
+            86
+          ]
+        },
+        {
+          "persistenceReady": true,
+          "persistenceStatus": "ready",
+          "persistenceGuardExpired": false,
+          "elapsedMs": 10245.400000035763,
+          "domNodes": 6981,
+          "messageRows": 120,
+          "loadedRows": 1000,
+          "retainedRows": 400,
+          "persistenceMessageId": "evt-1-999",
+          "persistenceSettlementMs": 5608,
+          "persistenceSettlementGuardMs": 10000,
+          "persistenceOfferRows": 1000,
+          "persistenceAffectedRows": 1000,
+          "persistenceRuntimeSequence": 1,
+          "persistenceOwnerKeyMatches": true,
+          "persistenceTargetMatches": true,
+          "persistenceTargetPendingCalls": 0,
+          "persistenceOwnerCurrent": true,
+          "persistenceLatestCallUnchanged": true,
+          "persistenceDurableMessagePresent": true,
+          "persistenceCompletionCriterion": "latest target snapshot ready, exact owner and target current, no target writes pending, final message present in owned target index, durable rows <= 400",
+          "heapUsedBytes": 36947328,
+          "activePagePostGcHeapUsedBytes": 14911168,
+          "longTasks": [
+            85,
+            61,
+            60,
+            64,
+            60,
+            61,
+            61,
+            56,
+            60,
+            59,
+            111,
+            100,
+            100,
+            100,
+            54,
+            59,
+            72,
+            65,
+            64,
+            61,
+            60,
+            56,
+            103,
+            68,
+            101,
+            101,
+            103,
+            101,
+            101,
+            102,
+            103,
+            104,
+            100,
+            100,
+            61,
+            106,
+            99,
+            99,
+            100,
+            98,
+            103,
+            112,
+            94,
+            92,
+            94,
+            82
+          ]
+        },
+        {
+          "persistenceReady": true,
+          "persistenceStatus": "ready",
+          "persistenceGuardExpired": false,
+          "elapsedMs": 9926.800000011921,
+          "domNodes": 6981,
+          "messageRows": 120,
+          "loadedRows": 1000,
+          "retainedRows": 400,
+          "persistenceMessageId": "evt-2-999",
+          "persistenceSettlementMs": 5389.899999976158,
+          "persistenceSettlementGuardMs": 10000,
+          "persistenceOfferRows": 1000,
+          "persistenceAffectedRows": 1000,
+          "persistenceRuntimeSequence": 1,
+          "persistenceOwnerKeyMatches": true,
+          "persistenceTargetMatches": true,
+          "persistenceTargetPendingCalls": 0,
+          "persistenceOwnerCurrent": true,
+          "persistenceLatestCallUnchanged": true,
+          "persistenceDurableMessagePresent": true,
+          "persistenceCompletionCriterion": "latest target snapshot ready, exact owner and target current, no target writes pending, final message present in owned target index, durable rows <= 400",
+          "heapUsedBytes": 51652368,
+          "activePagePostGcHeapUsedBytes": 16067220,
+          "longTasks": [
+            88,
+            60,
+            60,
+            81,
+            63,
+            59,
+            65,
+            57,
+            59,
+            56,
+            102,
+            94,
+            93,
+            94,
+            56,
+            60,
+            61,
+            61,
+            61,
+            59,
+            60,
+            62,
+            97,
+            146,
+            93,
+            98,
+            96,
+            94,
+            93,
+            95,
+            94,
+            96,
+            94,
+            60,
+            100,
+            92,
+            94,
+            92,
+            94,
+            93,
+            93,
+            92,
+            93,
+            94,
+            84
+          ]
+        },
+        {
+          "persistenceReady": true,
+          "persistenceStatus": "ready",
+          "persistenceGuardExpired": false,
+          "elapsedMs": 9886.800000011921,
+          "domNodes": 6981,
+          "messageRows": 120,
+          "loadedRows": 1000,
+          "retainedRows": 400,
+          "persistenceMessageId": "evt-3-999",
+          "persistenceSettlementMs": 5192.5,
+          "persistenceSettlementGuardMs": 10000,
+          "persistenceOfferRows": 1000,
+          "persistenceAffectedRows": 1000,
+          "persistenceRuntimeSequence": 1,
+          "persistenceOwnerKeyMatches": true,
+          "persistenceTargetMatches": true,
+          "persistenceTargetPendingCalls": 0,
+          "persistenceOwnerCurrent": true,
+          "persistenceLatestCallUnchanged": true,
+          "persistenceDurableMessagePresent": true,
+          "persistenceCompletionCriterion": "latest target snapshot ready, exact owner and target current, no target writes pending, final message present in owned target index, durable rows <= 400",
+          "heapUsedBytes": 65061452,
+          "activePagePostGcHeapUsedBytes": 14995516,
+          "longTasks": [
+            82,
+            61,
+            62,
+            62,
+            59,
+            60,
+            61,
+            53,
+            60,
+            109,
+            94,
+            93,
+            93,
+            56,
+            61,
+            61,
+            59,
+            63,
+            63,
+            82,
+            180,
+            142,
+            97,
+            95,
+            96,
+            94,
+            93,
+            94,
+            93,
+            94,
+            94,
+            93,
+            60,
+            94,
+            92,
+            92,
+            92,
+            92,
+            93,
+            94,
+            91,
+            93,
+            93,
+            81
+          ]
+        },
+        {
+          "persistenceReady": true,
+          "persistenceStatus": "ready",
+          "persistenceGuardExpired": false,
+          "elapsedMs": 10477.699999988079,
+          "domNodes": 6981,
+          "messageRows": 120,
+          "loadedRows": 1000,
+          "retainedRows": 400,
+          "persistenceMessageId": "evt-4-999",
+          "persistenceSettlementMs": 5874.900000035763,
+          "persistenceSettlementGuardMs": 10000,
+          "persistenceOfferRows": 1000,
+          "persistenceAffectedRows": 1000,
+          "persistenceRuntimeSequence": 1,
+          "persistenceOwnerKeyMatches": true,
+          "persistenceTargetMatches": true,
+          "persistenceTargetPendingCalls": 0,
+          "persistenceOwnerCurrent": true,
+          "persistenceLatestCallUnchanged": true,
+          "persistenceDurableMessagePresent": true,
+          "persistenceCompletionCriterion": "latest target snapshot ready, exact owner and target current, no target writes pending, final message present in owned target index, durable rows <= 400",
+          "heapUsedBytes": 64765484,
+          "activePagePostGcHeapUsedBytes": 15063968,
+          "longTasks": [
+            83,
+            60,
+            59,
+            75,
+            61,
+            61,
+            60,
+            61,
+            56,
+            61,
+            108,
+            95,
+            94,
+            93,
+            54,
+            60,
+            59,
+            59,
+            63,
+            65,
+            59,
+            55,
+            142,
+            94,
+            94,
+            95,
+            94,
+            93,
+            94,
+            94,
+            95,
+            95,
+            95,
+            60,
+            94,
+            93,
+            93,
+            92,
+            93,
+            93,
+            93,
+            92,
+            94,
+            94,
+            94,
+            93,
+            94,
+            85
+          ]
+        }
+      ],
+      "maxIngestLongTaskMs": 180,
+      "idbBatches": {
+        "writeP95Ms": 38,
+        "readP95Ms": 281,
+        "samples": 100,
+        "batchSize": 100
+      },
+      "last3EqualWorkloadHeapGrowthPercent": 25.38725039672915,
+      "lastThreeCycleActivePostGcHeapGrowthPercent": -6.244092008449501,
+      "cleanupDomNodes": 85,
+      "actualCounts": {
+        "vaultRows": 100000,
+        "joinedRooms": 50,
+        "rosterMembersOffered": 1000,
+        "initialRenderedRows": 120,
+        "activeConversationLoadedRows": 120,
+        "activeTargetDurableRows": 400,
+        "measuredInputEvents": 50,
+        "measuredInputSamples": 50,
+        "ingestionEvents": 5000
+      },
+      "thresholdFailures": [],
+      "longTaskObserverAvailable": true,
+      "blocked": [],
+      "limits": [
+        "Chromium desktop and CPU-throttled viewport emulation only; no OS/mobile device, battery, or media acceptance evidence"
+      ]
+    }
+  ],
+  "baselineLanes": [],
+  "comparisons": {
+    "status": "unavailable",
+    "reason": "No prior baseline stage and receipt supplied"
+  },
+  "playwrightExitCode": 1,
+  "openFailureCount": 0,
+  "unavailableCaseCount": 0
+}

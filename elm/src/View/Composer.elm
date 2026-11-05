@@ -16,11 +16,12 @@ a nested form, so Enter in the composer still sends.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, button, div, form, input, label, p, progress, span, text)
+import Html exposing (Html, button, div, form, input, label, li, p, progress, span, text, ul)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
-import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Html.Events exposing (on, onClick, onInput, onSubmit, preventDefaultOn)
 import Json.Decode as Decode
+import FirstHour
 import Outbox
 import Schedule
 
@@ -44,6 +45,9 @@ composer model =
         editingNow =
             editingFor model
 
+        retainedDraftLocked =
+            model.retiredDraftOwner /= Nothing
+
         -- Edit mode turns Send into a guarded Save (mirroring the
         -- oracle `canSend` edit branch: nonempty draft, no staged
         -- attachments). The normal path keeps the existing
@@ -58,10 +62,20 @@ composer model =
                         && List.isEmpty model.attachments
     in
     form [ class "onyx-composer", onSubmit ComposerSend ]
-        [ span [ class "onyx-composer-target" ]
+        [ if not model.threadFollowing && model.activeChannel /= Nothing then
+            div [ class "onyx-reading-bar" ]
+                [ span [] [ text "Reading earlier messages" ]
+                , button [ type_ "button", onClick ThreadShowLatest ] [ text "Back to latest" ]
+                ]
+          else
+            text ""
+        , span [ class "onyx-composer-target" ]
             [ text (Maybe.withDefault "#" model.activeChannel) ]
+        , retainedDraftBanner model
         , replyBar model
         , editBar model
+        , coach model
+        , suggestions model
         , if App.composerAudienceOffered model then
             button
                 [ type_ "button"
@@ -84,6 +98,9 @@ composer model =
                  else if editingNow /= Nothing then
                     "Edit message"
 
+                 else if retainedDraftLocked then
+                    "Retained draft — edits stay in this tab"
+
                  else if online then
                     "Message"
 
@@ -98,14 +115,16 @@ composer model =
                     "Message"
                 )
             , value model.composer
+            , on "compositionstart" (Decode.succeed ComposerCompositionStarted)
+            , on "compositionend" (Decode.succeed ComposerCompositionEnded)
             , onInput ComposerInput
-            , on "keydown" (escapeDecoder model)
+            , preventDefaultOn "keydown" (composerKey model)
             , disabled (not ready)
             ]
             []
         , button
             [ type_ "submit"
-            , disabled (not ready || not canSaveOrSend)
+            , disabled (not ready || not canSaveOrSend || retainedDraftLocked)
             , attribute "aria-label"
                 (if editingNow /= Nothing then
                     "Save edit"
@@ -129,6 +148,19 @@ composer model =
 
             Nothing ->
                 text ""
+        , case editingNow of
+            Just edit ->
+                if App.editOutcomeUnknown model edit.target edit.msgid then
+                    div [ class "onyx-composer-error", attribute "role" "status" ]
+                        [ span [] [ text "Edit outcome unknown. Review the current message before editing again." ]
+                        , button [ type_ "button", onClick (DismissEditUncertainty edit.target edit.msgid) ] [ text "Dismiss edit uncertainty" ]
+                        ]
+
+                else
+                    text ""
+
+            Nothing ->
+                text ""
         , case chrome of
             Nothing ->
                 text ""
@@ -147,13 +179,12 @@ composer model =
         ]
 
 
-{-| Escape backs out of composer context (mirroring the composer
-`handleKeyDown` Escape order: armed edit, then the active reply).
-IME-claimed events and other keys decode to nothing, and with
-neither context armed nothing fires — the schedule popover keeps
-its own focus while open, so it stays ahead of this handler. -}
-escapeDecoder : Model -> Decode.Decoder Msg
-escapeDecoder model =
+{-| Keys for the composer. Slash and nick menus take arrows, Tab,
+Enter, and Escape before the form can submit. Escape then backs out
+of an armed edit, then the active reply. The schedule popover is its
+own dialog, so this decoder does not claim keys for it. -}
+composerKey : Model -> Decode.Decoder ( Msg, Bool )
+composerKey model =
     Decode.field "isComposing" Decode.bool
         |> Decode.andThen
             (\composing ->
@@ -162,25 +193,158 @@ escapeDecoder model =
 
                 else
                     Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key /= "Escape" then
-                                    Decode.fail "not-escape"
-
-                                else
-                                    case editingFor model of
-                                        Just _ ->
-                                            Decode.succeed App.EditCancel
-
-                                        Nothing ->
-                                            case Maybe.andThen (App.activeReplyParent model.replyingTo) model.activeChannel of
-                                                Just _ ->
-                                                    Decode.succeed App.ReplyCancel
-
-                                                Nothing ->
-                                                    Decode.fail "nothing-armed"
-                            )
+                        |> Decode.andThen (keyAction model)
             )
+
+
+keyAction : Model -> String -> Decode.Decoder ( Msg, Bool )
+keyAction model key =
+    let
+        slash =
+            App.slashSuggestionCommands model
+
+        nicks =
+            App.nickSuggestionMatches model
+    in
+    if not (List.isEmpty slash) then
+        menuKey key (List.map .name slash) model.slashIndex SlashSuggestMove SlashSuggestPick SlashSuggestDismiss
+
+    else if not (List.isEmpty nicks) then
+        menuKey key nicks model.nickIndex NickSuggestMove NickSuggestPick NickSuggestDismiss
+
+    else if key == "Escape" then
+        case editingFor model of
+            Just _ ->
+                Decode.succeed ( App.EditCancel, False )
+
+            Nothing ->
+                case Maybe.andThen (App.activeReplyParent model.replyingTo) model.activeChannel of
+                    Just _ ->
+                        Decode.succeed ( App.ReplyCancel, False )
+
+                    Nothing ->
+                        Decode.fail "nothing-armed"
+
+    else
+        Decode.fail "pass"
+
+
+retainedDraftBanner : Model -> Html Msg
+retainedDraftBanner model =
+    case model.retiredDraftOwner of
+        Nothing ->
+            text ""
+
+        Just origin ->
+            let
+                copy =
+                    case origin.accountId of
+                        Just account ->
+                            "This unsent draft is retained from account " ++ account ++ ". It stays only in this tab until that account reconnects on the same network."
+
+                        Nothing ->
+                            "This unsent draft is from an earlier guest connection. It stays only in this tab until you authorize it for this guest session."
+
+                reauthorize =
+                    case ( origin.accountId, model.runtimeOwnerStamp ) of
+                        ( Nothing, Just stamp ) ->
+                            if stamp.networkId == origin.networkId
+                                && stamp.accountId == Nothing
+                                && stamp.connectionGeneration > origin.connectionGeneration then
+                                [ button [ type_ "button", onClick RetiredDraftReauthorize ] [ text "Use draft in this guest session" ] ]
+
+                            else
+                                []
+
+                        _ ->
+                            []
+            in
+            div [ class "onyx-retained-draft", attribute "role" "status", attribute "aria-live" "polite" ]
+                ([ p [] [ text copy ]
+                 , button [ type_ "button", onClick RetiredDraftDiscard ] [ text "Clear retained draft" ]
+                 ]
+                    ++ reauthorize
+                )
+
+
+menuKey : String -> List String -> Int -> (Int -> Msg) -> (String -> Msg) -> Msg -> Decode.Decoder ( Msg, Bool )
+menuKey key names index move pick dismiss =
+    let
+        current =
+            List.drop index names |> List.head |> Maybe.withDefault ""
+    in
+    if key == "ArrowDown" then
+        Decode.succeed ( move 1, True )
+
+    else if key == "ArrowUp" then
+        Decode.succeed ( move -1, True )
+
+    else if (key == "Tab" || key == "Enter") && not (String.isEmpty current) then
+        Decode.succeed ( pick current, True )
+
+    else if key == "Escape" then
+        Decode.succeed ( dismiss, True )
+
+    else
+        Decode.fail "menu-pass"
+
+
+coach : Model -> Html Msg
+coach model =
+    case FirstHour.composerHint model.firstHourSeen model.firstHourHandoff of
+        Nothing ->
+            text ""
+
+        Just hint ->
+            div [ class "onyx-first-hour", attribute "data-testid" "first-hour-coach" ]
+                [ span [] [ text hint ]
+                , button [ type_ "button", onClick FirstHourDismiss ] [ text "Dismiss" ]
+                ]
+
+
+suggestions : Model -> Html Msg
+suggestions model =
+    let
+        slash =
+            App.slashSuggestionCommands model
+
+        nicks =
+            App.nickSuggestionMatches model
+    in
+    if not (List.isEmpty slash) then
+        ul [ class "onyx-suggest", attribute "role" "listbox", attribute "data-testid" "slash-suggestions", attribute "aria-label" "Commands" ]
+            (List.indexedMap (suggestButton model.slashIndex SlashSuggestPick .name .description) slash)
+
+    else if not (List.isEmpty nicks) then
+        ul [ class "onyx-suggest", attribute "role" "listbox", attribute "data-testid" "nick-suggestions", attribute "aria-label" "Nicks" ]
+            (List.indexedMap (\index nick -> suggestRow (index == model.nickIndex) (NickSuggestPick nick) nick "") nicks)
+
+    else
+        text ""
+
+
+suggestButton : Int -> (String -> Msg) -> (a -> String) -> (a -> String) -> Int -> a -> Html Msg
+suggestButton selected pick nameOf detailOf index item =
+    suggestRow (index == selected) (pick (nameOf item)) (nameOf item) (detailOf item)
+
+
+suggestRow : Bool -> Msg -> String -> String -> Html Msg
+suggestRow active msg name detail =
+    li
+        [ class "onyx-suggest-row"
+        , classList [ ( "is-active", active ) ]
+        , attribute "role" "option"
+        , attribute "aria-selected" (if active then "true" else "false")
+        ]
+        [ button [ type_ "button", onClick msg ]
+            [ text name
+            , if String.isEmpty detail then
+                text ""
+
+              else
+                span [] [ text (" " ++ detail) ]
+            ]
+        ]
 
 
 {-| The armed edit for the active conversation, if any (mirrors the
@@ -291,8 +455,14 @@ attachments model =
         ([ button
             [ type_ "button"
             , class "onyx-attach-open"
-            , disabled protected
-            , title hint
+            , disabled (protected || model.retiredDraftOwner /= Nothing)
+            , title
+                (if model.retiredDraftOwner /= Nothing then
+                    "Clear or reauthorize the retained draft before attaching files."
+
+                 else
+                    hint
+                )
             , attribute "aria-label" "Attach files"
             , onClick AttachPick
             ]
@@ -422,10 +592,14 @@ sendLater model =
             }
 
         able =
-            Schedule.canScheduleComposer gate
+            model.retiredDraftOwner == Nothing && Schedule.canScheduleComposer gate
 
         hint =
-            Maybe.withDefault "Schedule this message" (Schedule.scheduleComposerRefusal gate)
+            if model.retiredDraftOwner /= Nothing then
+                "Clear or reauthorize the retained draft before scheduling a message."
+
+            else
+                Maybe.withDefault "Schedule this message" (Schedule.scheduleComposerRefusal gate)
     in
     div [ class "onyx-schedule" ]
         ([ button
@@ -471,7 +645,7 @@ schedulePopover model =
         [ div [ class "onyx-schedule-head" ]
             [ div [ class "onyx-schedule-headings" ]
                 [ p [ class "onyx-schedule-title" ] [ text "Send later" ]
-                , p [ class "onyx-schedule-sub" ] [ text "This message will stay in your scheduled list until it sends." ]
+                , p [ class "onyx-schedule-sub" ] [ text "A private editor will open for the scheduled message. The encrypted list never shows its text." ]
                 ]
             , button
                 [ type_ "button"

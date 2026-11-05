@@ -10,6 +10,7 @@ import App exposing (..)
 import Attribution
 import Base64Url
 import Cadence
+import Char
 import Dict
 import DmCipher
 import Expect
@@ -18,23 +19,77 @@ import GroupControl
 import GroupDirectory
 import GroupEnvelope
 import GroupPublisher
+import Ids
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Labels
 import SavedSearches exposing (SearchMode(..))
+import Media
 import Schedule
 import Services
 import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
 import RoomMedia exposing (RoomMediaFilter(..))
 import Moderation
+import Multiline
 import Session
+import RuntimeDomain
 import Set
 import Test exposing (Test, describe, test)
 import Time
 import TopicRead
 import Wire exposing (SaslMechanism(..))
+import VaultSeenIds
 
+
+mustCredentialRef : String -> Ids.CredentialRef
+mustCredentialRef raw =
+    case Ids.credentialRefFromRuntime raw of
+        Just reference ->
+            reference
+
+        Nothing ->
+            Debug.todo "fixture credential reference must be valid"
+
+
+mustRequestId : String -> Ids.RequestId
+mustRequestId raw =
+    case Ids.requestIdFromRuntime raw of
+        Just reference ->
+            reference
+
+        Nothing ->
+            Debug.todo "fixture request ID must be valid"
+
+
+mustOwnerRef : String -> Ids.OwnerRef
+mustOwnerRef raw =
+    case Ids.ownerRefFromRuntime raw of
+        Just reference ->
+            reference
+
+        Nothing ->
+            Debug.todo "fixture owner reference must be valid"
+
+
+mustAccountGeneration : Int -> Ids.AccountGeneration
+mustAccountGeneration raw =
+    case Ids.accountGenerationFromInt raw of
+        Just generation ->
+            generation
+
+        Nothing ->
+            Debug.todo "fixture account generation must be valid"
+
+
+mustConnectionGeneration : Int -> Ids.ConnectionGeneration
+mustConnectionGeneration raw =
+    case Ids.connectionGenerationFromInt raw of
+        Just generation ->
+            generation
+
+        Nothing ->
+            Debug.todo "fixture connection generation must be valid"
 
 groupPayload : String
 groupPayload =
@@ -213,6 +268,180 @@ feed model line =
     update (WsLineReceived line) model
 
 
+feedTrustedServerNotice : Model -> String -> ( Model, List Outbound )
+feedTrustedServerNotice model line =
+    let
+        nick =
+            if String.isEmpty model.ourNick then
+                "alice"
+
+            else
+                model.ourNick
+
+        ( registered, _ ) =
+            feed { model | ourNick = nick } (":irc.example 001 " ++ nick ++ " :welcome")
+    in
+    feed registered line
+
+
+knownRetentionScope : { kind : String, policyRevision : Maybe String, lastSyncMs : Maybe Float }
+knownRetentionScope =
+    { kind = "live", policyRevision = Just "test-policy-v1", lastSyncMs = Just 1000.0 }
+
+
+vaultRowsReceived : String -> List VaultRow -> String -> Msg
+vaultRowsReceived target rows status =
+    VaultRowsScopedReceived
+        { target = target
+        , rows = rows
+        , status = status
+        , ownerRef = Nothing
+        , accountGeneration = Nothing
+        , connectionGeneration = Nothing
+        , retentionScope = knownRetentionScope
+        }
+
+
+vaultRowsAroundReceived : String -> Int -> List VaultRow -> String -> Msg
+vaultRowsAroundReceived target at rows status =
+    VaultRowsAroundScopedReceived
+        { target = target
+        , at = at
+        , rows = rows
+        , status = status
+        , ownerRef = Nothing
+        , accountGeneration = Nothing
+        , connectionGeneration = Nothing
+        , retentionScope = knownRetentionScope
+        }
+
+
+openTestSocket : Model -> Model
+openTestSocket model =
+    Tuple.first (update (WsOpened { url = "wss://irc.example" }) { model | connection = Offline })
+
+
+testRuntimeOwner :
+    { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int }
+testRuntimeOwner =
+    { ownerRef = "test_owner_000000000000000000000000"
+    , networkId = "test_network"
+    , accountId = Just "alice"
+    , accountGeneration = 1
+    , connectionGeneration = 1
+    }
+
+
+acceptedServiceIntegrationResult : RuntimeDomain.Command -> RuntimeDomain.ResultView
+acceptedServiceIntegrationResult command =
+    let
+        requestId =
+            Ids.requestIdToRuntime command.requestId
+
+        serviceView : RuntimeDomain.ServiceIntegrationView
+        serviceView =
+            { requestId = requestId
+            , feature = "memo"
+            , operation = Just "send"
+            , phase = "accepted"
+            , registry = "enabled"
+            , effectiveFeature = "enabled"
+            , accountProof = "satisfied"
+            , authorization = "allowed"
+            , reason = Nothing
+            , rows = []
+            , inputRef = Nothing
+            }
+    in
+    { requestId = command.requestId
+    , ownerRef = command.ownerRef
+    , accountGeneration = command.accountGeneration
+    , connectionGeneration = command.connectionGeneration
+    , domain = "service-integration"
+    , action = "memo-send"
+    , status = RuntimeDomain.Accepted
+    , completionScope = "local"
+    , reason = Nothing
+    , items = []
+    , draftTarget = Nothing
+    , draftText = Nothing
+    , draftRevision = Nothing
+    , selectedContinuationRef = Nothing
+    , anchorTarget = Nothing
+    , anchorAcceptedTimestamp = Nothing
+    , anchorViewedCandidate = Nothing
+    , scheduledMode = Nothing
+    , scheduledLegacyHeldCount = 0
+    , scheduledLegacyReviewUnavailable = False
+    , scheduledViewReady = False
+    , scheduledItems = []
+    , sessionRecovery = Nothing
+    , passkeyManagement = Nothing
+    , sessionInventory = Nothing
+    , sessionRevocation = Nothing
+    , accountCommunity = Nothing
+    , serviceIntegration = Just serviceView
+    , draftRecovery = Nothing
+    , mediaQuality = Nothing
+    , mediaControl = Nothing
+    }
+
+
+acceptedPasskeyManagementResult : RuntimeDomain.Command -> RuntimeDomain.ResultView
+acceptedPasskeyManagementResult command =
+    let
+        base =
+            acceptedServiceIntegrationResult command
+    in
+    { base
+        | domain = "account-security"
+        , action = "passkey-rename"
+        , passkeyManagement =
+            Just
+                { requestId = Ids.requestIdToRuntime command.requestId
+                , status = "ready"
+                , operation = Just "rename"
+                , rows = [ { credentialRef = "credential_reference_00000001", label = "phone", signCount = "1", createdUnix = "0" } ]
+                , reason = Nothing
+                }
+        , serviceIntegration = Nothing
+    }
+
+
+runtimeActions : List Outbound -> List RuntimeDomain.Action
+runtimeActions outbound =
+    List.filterMap
+        (\item ->
+            case item of
+                RuntimeDomainCommand command ->
+                    Just command.action
+
+                _ ->
+                    Nothing
+        )
+        outbound
+
+
+isDmKeyFetch : Outbound -> Bool
+isDmKeyFetch outbound =
+    case outbound of
+        SendLine line ->
+            String.startsWith "METADATA mallory GET ocean.dm-key" line
+
+        _ ->
+            False
+
+
+isOpenedNavigationReceipt : Outbound -> Bool
+isOpenedNavigationReceipt outbound =
+    case outbound of
+        RuntimeNotificationNavigationReceipt receipt ->
+            receipt.opened
+
+        _ ->
+            False
+
+
 sendLines : List Outbound -> List String
 sendLines outs =
     List.filterMap
@@ -225,6 +454,16 @@ sendLines outs =
                     Nothing
         )
         outs
+
+
+isPrivateScheduleCapture : Outbound -> Bool
+isPrivateScheduleCapture item =
+    case item of
+        RuntimePrivateScheduledMessageRequest _ ->
+            True
+
+        _ ->
+            False
 
 
 previewFetches : List Outbound -> List Outbound
@@ -292,12 +531,71 @@ joinFirst base nick channel =
     Tuple.first (feed base (":" ++ nick ++ "!u@h JOIN " ++ channel))
 
 
+liveRoom : String -> String -> Model
+liveRoom nick channel =
+    let
+        live =
+            { blank | connection = Live, ourNick = nick }
+
+        joined =
+            joinFirst live nick channel
+    in
+    Tuple.first (update (ChannelSelect channel) joined)
+
+
+historyRoom : List ChatMessage -> Model
+historyRoom rows =
+    let
+        room =
+            liveRoom "me" "#c"
+
+        shell =
+            Maybe.withDefault (shellOf "#c" 0 -1) (Dict.get "#c" room.channels)
+    in
+    { room
+        | caps = [ "chathistory" ]
+        , channels = Dict.insert "#c" { shell | messages = rows } room.channels
+        , historyLoading = Set.empty
+        , pendingHistoryRequests = Dict.empty
+        , historyExhausted = Set.empty
+    }
+
+
+historyMessage : Int -> Int -> ChatMessage
+historyMessage id at =
+    let
+        row =
+            vaultTestRow id ("row-" ++ String.fromInt id) []
+    in
+    { row | at = at, msgid = Just ("history-" ++ String.fromInt id) }
+
+
 {-| Device-memory owner model for the custom-status slice: endpoint +
 nick resolve the oracle's `_scheduledMessageOwner` account-or-nick
 identity without an authed account. -}
 ownerBase : Model
 ownerBase =
-    { blank | endpoint = Just "wss://irc.example", ourNick = "kai" }
+    { blank | endpoint = Just "wss://irc.example", ourNick = "kai", runtimeOwnerStamp = Just guestRuntimeOwner }
+
+
+{-| Runtime owner stamp for a guest (no account): guest device memory
+is keyed by this physical owner plus the nick. -}
+guestRuntimeOwner : RuntimeOwnerStamp
+guestRuntimeOwner =
+    { ownerRef = "guest_owner_test_00000000000000000", networkId = "test_network", accountId = Nothing, accountGeneration = 1, connectionGeneration = 1 }
+
+
+{-| The device-memory identity a guest nick resolves to under
+`guestRuntimeOwner`. -}
+guestIdentity : String -> String
+guestIdentity nick =
+    "guest:" ++ guestRuntimeOwner.ownerRef ++ ":" ++ nick
+
+
+{-| `guestIdentity` as it appears percent-encoded inside owner storage keys. -}
+guestKeyIdentity : String -> String
+guestKeyIdentity nick =
+    "guest%3A" ++ guestRuntimeOwner.ownerRef ++ "%3A" ++ nick
 
 
 ownerLive : Model
@@ -335,7 +633,7 @@ stewardRoom =
 
 stewardLive : Model
 stewardLive =
-    { ownerBase | connection = Live, ourNick = "alice", channels = Dict.fromList [ ( "#harbor", stewardRoom ) ] }
+    { ownerBase | connection = Live, ourNick = "alice", channels = Dict.fromList [ ( "#harbor", stewardRoom ) ], runtimeOwnerStamp = Just testRuntimeOwner }
 
 
 isWhoisTimeoutStart : Outbound -> Bool
@@ -492,7 +790,7 @@ rosterAuthed =
 isSessionTokenStored : Outbound -> Bool
 isSessionTokenStored outbound =
     case outbound of
-        SessionTokenStored _ ->
+        SessionTokenIssueRequested ->
             True
 
         _ ->
@@ -536,7 +834,1572 @@ membersOf model channel =
 suite : Test
 suite =
     describe "App"
-        [ test "overlapping NAMES bursts APPEND instead of replacing" <|
+        [ describe "Audit 2026-11-05 chat and community defects"
+            [ test "REDACT before the original redacts it on live arrival and keeps the secret out of the vault" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "me", runtimeOwnerStamp = Just testRuntimeOwner } "me" "#c"
+
+                        ( early, _ ) =
+                            feed joined ":bob!u@h REDACT #c m1 :oops"
+
+                        ( arrived, arrivedOut ) =
+                            feed early "@msgid=m1 :bob!u@h PRIVMSG #c :secret"
+
+                        ( other, otherOut ) =
+                            feed arrived "@msgid=m2 :bob!u@h PRIVMSG #c :kept"
+
+                        ( _, tickOut ) =
+                            update (Tick (Time.millisToPosix 5000)) other
+
+                        rows m =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))
+
+                        persistedBodies outs =
+                            List.concatMap
+                                (\o ->
+                                    case o of
+                                        VaultPersist p ->
+                                            List.map .body p.rows
+
+                                        _ ->
+                                            []
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "[Message deleted]" ] (List.map .body (rows arrived))
+                        , \_ -> Expect.equal [ True ] (List.map .redacted (rows arrived))
+                        , \_ -> Expect.equal [ "kept", "[Message deleted]" ] (List.map .body (rows other))
+                        , \_ -> Expect.equal [ False, True ] (List.map .redacted (rows other))
+                        , \_ -> Expect.equal True (List.member "[Message deleted]" (persistedBodies tickOut))
+                        , \_ -> Expect.equal False (List.member "secret" (persistedBodies (arrivedOut ++ otherOut ++ tickOut)))
+                        ]
+                        ()
+            , test "REDACT before the original applies when the original arrives in a history batch" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                        ( early, _ ) =
+                            feed joined ":bob!u@h REDACT #c h1 :oops"
+
+                        ( opened, _ ) =
+                            feed early "BATCH +b1 chathistory #c"
+
+                        ( filled, _ ) =
+                            feed opened "@batch=b1;msgid=h1;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :secret"
+
+                        ( filled2, _ ) =
+                            feed filled "@batch=b1;msgid=h2;time=2026-10-04T12:01:00Z :bob!u@h PRIVMSG #c :fine"
+
+                        ( closed, closeOut ) =
+                            feed filled2 "BATCH -b1"
+
+                        rows =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))
+
+                        persisted =
+                            List.concatMap
+                                (\o ->
+                                    case o of
+                                        VaultPersist p ->
+                                            List.map .body p.rows
+
+                                        _ ->
+                                            []
+                                )
+                                closeOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "fine", "[Message deleted]" ] (List.map .body rows)
+                        , \_ -> Expect.equal [ False, True ] (List.map .redacted rows)
+                        , \_ -> Expect.equal False (List.member "secret" persisted)
+                        ]
+                        ()
+            , test "a lower MARKREAD never moves the account read marker backwards" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed (joinFirst { blank | nowMs = 1000 } "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                        ( m2, _ ) =
+                            feed { m1 | nowMs = 3000 } ":bob!u@h PRIVMSG #c :two"
+
+                        ( later, _ ) =
+                            feed m2 ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:04Z"
+
+                        ( earlier, _ ) =
+                            feed later ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+
+                        ( same, _ ) =
+                            feed later ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:04Z"
+
+                        counts m =
+                            Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m.channels)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "1970-01-01T00:00:04Z") (Dict.get "#c" later.readMarkers)
+                        , \_ -> Expect.equal (Just ( 0, 0 )) (counts later)
+                        , \_ -> Expect.equal (Just "1970-01-01T00:00:04Z") (Dict.get "#c" earlier.readMarkers)
+                        , \_ -> Expect.equal (counts later) (counts earlier)
+                        , \_ -> Expect.equal (Just "1970-01-01T00:00:04Z") (Dict.get "#c" same.readMarkers)
+                        ]
+                        ()
+            , test "an owner quarantine clears account and viewed read markers" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed (joinFirst { blank | nowMs = 1000 } "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                        ( alice, _ ) =
+                            feed m1 ":irc.example 900 me me!u@h alice :You are now logged in as alice"
+
+                        ( marked, _ ) =
+                            feed alice ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+
+                        seeded =
+                            { marked | viewedReadMarkers = Dict.singleton "#c" "1970-01-01T00:00:02Z" }
+
+                        ( bob, _ ) =
+                            feed seeded ":irc.example 900 me me!u@h bob :You are now logged in as bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.member "#c" marked.readMarkers)
+                        , \_ -> Expect.equal Dict.empty bob.readMarkers
+                        , \_ -> Expect.equal Dict.empty bob.viewedReadMarkers
+                        , \_ -> Expect.equal [] bob.topicReadLedger
+                        ]
+                        ()
+            , test "guest device memory is keyed by the physical owner, not the reused nick" <|
+                \_ ->
+                    let
+                        stamp ref =
+                            { ownerRef = ref, networkId = "test_network", accountId = Nothing, accountGeneration = 1, connectionGeneration = 1 }
+
+                        guest ref =
+                            { blank | endpoint = Just "wss://irc.example", ourNick = "Guest42", runtimeOwnerStamp = ref }
+
+                        first =
+                            deviceMemoryOwner (guest (Just (stamp "guest_owner_a_000000000000000000")))
+
+                        second =
+                            deviceMemoryOwner (guest (Just (stamp "guest_owner_b_000000000000000000")))
+
+                        again =
+                            deviceMemoryOwner (guest (Just (stamp "guest_owner_a_000000000000000000")))
+
+                        account ref =
+                            deviceMemoryOwner { blank | endpoint = Just "wss://irc.example", ourNick = "kai_", accountName = Just "kai", runtimeOwnerStamp = ref }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.notEqual Nothing first
+                        , \_ -> Expect.notEqual first second
+                        , \_ -> Expect.equal first again
+                        , \_ -> Expect.equal Nothing (deviceMemoryOwner (guest Nothing))
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) (account Nothing)
+                        , \_ -> Expect.equal (account Nothing) (account (Just (stamp "guest_owner_b_000000000000000000")))
+                        ]
+                        ()
+            , test "a replayed row under a reused guest nick is not ours to edit or delete" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                        ( opened, _ ) =
+                            feed joined "BATCH +b1 chathistory #c"
+
+                        ( filled, _ ) =
+                            feed opened "@batch=b1;msgid=old1;time=2026-10-04T12:00:00Z :me!u@h PRIVMSG #c :someone else's words"
+
+                        ( closed, _ ) =
+                            feed filled "BATCH -b1"
+
+                        ( live, _ ) =
+                            feed closed "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (canEditRow live "#c" "old1")
+                        , \_ -> Expect.equal False (canDeleteRow live "#c" "old1")
+                        , \_ -> Expect.equal True (canEditRow live "#c" "m9")
+                        , \_ -> Expect.equal True (canDeleteRow live "#c" "m9")
+                        ]
+                        ()
+            , test "a replayed row is ours only when its account tag matches the signed-in account" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "kai", accountName = Just "kai" } "kai" "#c"
+
+                        ( opened, _ ) =
+                            feed joined "BATCH +b1 chathistory #c"
+
+                        ( own, _ ) =
+                            feed opened "@batch=b1;msgid=a1;account=kai;time=2026-10-04T12:00:00Z :kai!u@h PRIVMSG #c :mine before"
+
+                        ( foreign, _ ) =
+                            feed own "@batch=b1;msgid=a2;account=mallory;time=2026-10-04T12:01:00Z :kai!u@h PRIVMSG #c :not mine"
+
+                        ( untagged, _ ) =
+                            feed foreign "@batch=b1;msgid=a3;time=2026-10-04T12:02:00Z :kai!u@h PRIVMSG #c :unknown author"
+
+                        ( closed, _ ) =
+                            feed untagged "BATCH -b1"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (canEditRow closed "#c" "a1")
+                        , \_ -> Expect.equal False (canEditRow closed "#c" "a2")
+                        , \_ -> Expect.equal False (canEditRow closed "#c" "a3")
+                        ]
+                        ()
+            , test "a duplicate TAGMSG reaction with the same msgid does not toggle it off" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( added, _ ) =
+                            feed m1 "@msgid=r1;+draft/react=👍;+draft/reply=m1 :bob!u@h TAGMSG #c"
+
+                        ( repeated, _ ) =
+                            feed added "@msgid=r1;+draft/react=👍;+draft/reply=m1 :bob!u@h TAGMSG #c"
+
+                        ( removed, _ ) =
+                            feed repeated "@msgid=r2;+draft/react=👍;+draft/reply=m1 :bob!u@h TAGMSG #c"
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] (reactionsOf added)
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] (reactionsOf repeated)
+                        , \_ -> Expect.equal [] (reactionsOf removed)
+                        ]
+                        ()
+            , test "EVENT MEDIA applies only from the trusted server to our nick" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                        ( registered, _ ) =
+                            feed joined ":irc.example 001 me :welcome"
+
+                        ( spoofed, _ ) =
+                            feed registered ":mallory!u@h EVENT me MEDIA JOIN #c dave"
+
+                        ( strangerServer, _ ) =
+                            feed registered ":other.example EVENT me MEDIA JOIN #c dave"
+
+                        ( misaddressed, _ ) =
+                            feed registered ":irc.example EVENT bob MEDIA JOIN #c dave"
+
+                        ( trusted, _ ) =
+                            feed registered ":irc.example EVENT me MEDIA JOIN #c dave"
+
+                        ( unregistered, _ ) =
+                            feed joined ":irc.example EVENT me MEDIA JOIN #c dave"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (Dict.get "#c" spoofed.media.participants)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" strangerServer.media.participants)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" misaddressed.media.participants)
+                        , \_ -> Expect.equal (Just [ "dave" ]) (Dict.get "#c" trusted.media.participants)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" unregistered.media.participants)
+                        ]
+                        ()
+            , test "unknown operator verbs never fall through raw without operator status" <|
+                \_ ->
+                    let
+                        ( refused, refusedOut ) =
+                            runSlashOper { blank | composer = "/gline *@bad.host 1h :spam" } "gline"
+
+                        ( allowed, allowedOut ) =
+                            runSlashOper { blank | isOper = True, composer = "/gline *@bad.host 1h :spam" } "gline"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (sendLines refusedOut)
+                        , \_ -> Expect.equal [ "Operator access required" ] (List.map .title refused.toasts)
+                        , \_ -> Expect.equal "/gline *@bad.host 1h :spam" refused.composer
+                        , \_ -> Expect.equal 1 (List.length (sendLines allowedOut))
+                        , \_ -> Expect.equal "" allowed.composer
+                        ]
+                        ()
+            , test "PINS writes stay pending until the server echo and clear on 913" <|
+                \_ ->
+                    let
+                        base =
+                            Isupport.defaultSupport
+
+                        live =
+                            { blank | ourNick = "me", isupport = { base | ircx = True } }
+
+                        ( joined, _ ) =
+                            feed live ":me!u@h JOIN #c"
+
+                        ( pinned, _ ) =
+                            feed joined ":s 818 me #c PINS :m1"
+
+                        ( asked, askOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m2" }) pinned
+
+                        ( askedAgain, againOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m3" }) asked
+
+                        ( echoed, _ ) =
+                            feed askedAgain ":me!u@h PROP #c PINS :m1,m2,m3"
+
+                        ( denied, _ ) =
+                            feed asked ":s 913 me #c :No access"
+
+                        ( afterDenial, afterDenialOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m3" }) denied
+
+                        ( failed, _ ) =
+                            feed asked ":s FAIL PROP NO_ACCESS #c PINS :Not allowed"
+
+                        ( afterFail, afterFailOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m3" }) failed
+
+                        ( offline, offlineOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m2" }) { pinned | connection = Offline }
+
+                        ( plain, plainOut ) =
+                            update (PinnedMessagePin { channel = "#c", messageId = "m2" }) { pinned | isupport = base }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "m1" ] (channelPins asked "#c")
+                        , \_ -> Expect.equal [ "PROP #c PINS m1,m2\r\n" ] (sendLines askOut)
+                        , \_ -> Expect.equal [ "PROP #c PINS m1,m2,m3\r\n" ] (sendLines againOut)
+                        , \_ -> Expect.equal [ "m1" ] (channelPins askedAgain "#c")
+                        , \_ -> Expect.equal [ "m1", "m2", "m3" ] (channelPins echoed "#c")
+                        , \_ -> Expect.equal [ "m1" ] (channelPins denied "#c")
+                        , \_ -> Expect.equal [ "PROP #c PINS m1,m3\r\n" ] (sendLines afterDenialOut)
+                        , \_ -> Expect.equal [ "m1" ] (channelPins afterDenial "#c")
+                        , \_ -> Expect.equal [ "m1" ] (channelPins failed "#c")
+                        , \_ -> Expect.equal [ "PROP #c PINS m1,m3\r\n" ] (sendLines afterFailOut)
+                        , \_ -> Expect.equal [ "m1" ] (channelPins afterFail "#c")
+                        , \_ -> Expect.equal [ "m1" ] (channelPins offline "#c")
+                        , \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal [ "m1" ] (channelPins plain "#c")
+                        , \_ -> Expect.equal [] plainOut
+                        ]
+                        ()
+            , test "channel event writes apply only on the server echo; FAIL PROP clears the pending value" <|
+                \_ ->
+                    let
+                        base =
+                            Isupport.defaultSupport
+
+                        live =
+                            { blank | ourNick = "me", isupport = { base | ircx = True } }
+
+                        ( joined, _ ) =
+                            feed live ":me!u@h JOIN #c"
+
+                        ( scheduled, scheduleOut ) =
+                            scheduleChannelEvent joined "#c" 1767229200 "Party"
+
+                        ( echoed, _ ) =
+                            feed scheduled ":me!u@h PROP #c ocean.event :1767229200|Party"
+
+                        ( clearing, clearOut ) =
+                            clearChannelEvent echoed "#c"
+
+                        ( failed, _ ) =
+                            feed clearing ":s FAIL PROP NO_ACCESS #c ocean.event :Not allowed"
+
+                        ( plain, plainOut ) =
+                            scheduleChannelEvent { joined | isupport = base } "#c" 1767229200 "Party"
+
+                        eventOf m =
+                            Dict.get "#c" m.props.channelProps |> Maybe.andThen (Dict.get "ocean.event")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (eventOf scheduled)
+                        , \_ -> Expect.equal [ "PROP #c ocean.event 1767229200|Party\r\n" ] (sendLines scheduleOut)
+                        , \_ -> Expect.equal (Just "1767229200|Party") (eventOf echoed)
+                        , \_ -> Expect.equal (Just "1767229200|Party") (eventOf clearing)
+                        , \_ -> Expect.equal [ "PROP #c ocean.event :\r\n" ] (sendLines clearOut)
+                        , \_ -> Expect.equal (Just "1767229200|Party") (eventOf failed)
+                        , \_ -> Expect.equal Nothing (eventOf plain)
+                        , \_ -> Expect.equal [] plainOut
+                        ]
+                        ()
+            , test "channel operator status follows the learned PREFIX order and oper needs the room" <|
+                \_ ->
+                    let
+                        member modes =
+                            { nick = "me", modes = Set.fromList modes, away = False }
+
+                        room modes =
+                            let
+                                shell =
+                                    shellOf "#c" 0 -1
+                            in
+                            Dict.singleton "#c" { shell | members = Dict.singleton "me" (member modes) }
+
+                        ( learnedOv, _ ) =
+                            feed blank ":s 005 me PREFIX=(ov)@+ :are supported"
+
+                        ( learnedQaohv, _ ) =
+                            feed blank ":s 005 me PREFIX=(qaohv)~&@%+ :are supported"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (isChannelOp { learnedOv | channels = room [ 'q' ] } "#c")
+                        , \_ -> Expect.equal True (isChannelOp { learnedOv | channels = room [ 'o' ] } "#c")
+                        , \_ -> Expect.equal True (isChannelOp { learnedQaohv | channels = room [ 'a' ] } "#c")
+                        , \_ -> Expect.equal False (isChannelOp { learnedQaohv | channels = room [ 'h' ] } "#c")
+                        , \_ -> Expect.equal False (isChannelOp { learnedQaohv | channels = room [ 'h', 'v' ] } "#c")
+                        , \_ -> Expect.equal False (isChannelOp { blank | isOper = True } "#nope")
+                        , \_ -> Expect.equal True (isChannelOp { blank | isOper = True, channels = room [] } "#c")
+                        ]
+                        ()
+            ]
+        , describe "Audit 2026-11-05 account packages"
+            [ test "a self NICK under an account keeps the account, SASL proof, and rows" <|
+                \_ ->
+                    let
+                        ( loggedIn, _ ) =
+                            feed (joinFirst { blank | ourNick = "me", saslAuthenticated = True } "me" "#c") ":irc.example 900 me me!u@h kai :You are now logged in as kai"
+
+                        ( withRow, _ ) =
+                            feed loggedIn "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( guested, _ ) =
+                            feed withRow ":me!u@h NICK Guest123"
+
+                        ( renamed, _ ) =
+                            feed guested ":Guest123!u@h NICK kai_"
+
+                        ( anonymous, _ ) =
+                            feed { blank | ourNick = "guest" } ":guest!u@h NICK kai"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") guested.accountName
+                        , \_ -> Expect.equal (Just "kai") renamed.accountName
+                        , \_ -> Expect.equal "kai_" renamed.ourNick
+                        , \_ -> Expect.equal True renamed.saslAuthenticated
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body (List.filter (\m -> m.msgType == "msg") (dmMessages renamed "#c")))
+                        , \_ -> Expect.equal Nothing anonymous.accountName
+                        ]
+                        ()
+            , test "an account switch clears the passkey, session inventory, continuation, and recovery views" <|
+                \_ ->
+                    let
+                        ( alice, _ ) =
+                            feed { blank | ourNick = "me" } ":irc.example 900 me me!u@h alice :You are now logged in as alice"
+
+                        seeded =
+                            { alice
+                                | passkeyManagementView = Just { requestId = "domainRequest000000000001", status = "ready", operation = Just "list", rows = [], reason = Nothing }
+                                , sessionInventoryView =
+                                    Just
+                                        { requestId = "domainRequest000000000002"
+                                        , mode = "local"
+                                        , status = "complete"
+                                        , scanRef = Nothing
+                                        , localRows = [ { rowRef = "row_reference_000000000001", index = 1, signonMs = "0", state = "attached", current = True } ]
+                                        , meshRows = []
+                                        , continuationAvailable = True
+                                        , scanComplete = True
+                                        , pageCount = 1
+                                        , lastObservedAt = Nothing
+                                        , reason = Nothing
+                                        }
+                                , selectedContinuationRef = Just "continuation_reference_0001"
+                                , sessionRecoveryView = Just { requestId = "domainRequest000000000003", credentialRef = "AAAAAAAAAAAAAAAAAAAAAAAA", status = "accepted", outcome = Nothing, reason = Nothing, redirectNode = Nothing, hopCount = 0, transferFrom = Nothing }
+                            }
+
+                        ( bob, _ ) =
+                            feed seeded ":irc.example 900 me me!u@h bob :You are now logged in as bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "bob") bob.accountName
+                        , \_ -> Expect.equal Nothing bob.passkeyManagementView
+                        , \_ -> Expect.equal Nothing bob.sessionInventoryView
+                        , \_ -> Expect.equal Nothing bob.selectedContinuationRef
+                        , \_ -> Expect.equal Nothing bob.sessionRecoveryView
+                        ]
+                        ()
+            , test "session bearer text never reaches the service log, inbox, or rows" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed (joinFirst { blank | ourNick = "alice" } "alice" "#c") ":irc.example 001 alice :welcome"
+
+                        ( token, _ ) =
+                            feed joined ":irc.example NOTICE alice :SESSION TOKEN s3cr3t-bearer-value"
+
+                        ( mtoken, _ ) =
+                            feed token ":irc.example NOTICE alice :SESSION MTOKEN s3cr3t-mesh-value"
+
+                        ( ponged, _ ) =
+                            feed mtoken ":irc.example PONG irc.example :s3cr3t-pong"
+
+                        leaks m =
+                            List.filter (\t -> String.contains "s3cr3t-bearer" t || String.contains "s3cr3t-mesh" t)
+                                (m.serviceLog
+                                    ++ List.map .text m.notifications
+                                    ++ List.concatMap (\ch -> List.map .body ch.messages) (Dict.values m.channels)
+                                )
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (leaks token)
+                        , \_ -> Expect.equal [] (leaks mtoken)
+                        , \_ -> Expect.equal [] (leaks ponged)
+                        ]
+                        ()
+            , test "a selected continuation without SESSION-TOKEN disconnects with no fallback and no CAP END" <|
+                \_ ->
+                    let
+                        opened =
+                            openTestSocket { blank | runtimeOwnerStamp = Just testRuntimeOwner, selectedContinuationRef = Just "continuation_reference_0001" }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :sasl=PLAIN"
+
+                        ( acked, outbound ) =
+                            feed listed ":s CAP me ACK :sasl"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member WsDisconnect outbound)
+                        , \_ -> Expect.equal False (List.member (SendLine "CAP END\r\n") outbound)
+                        , \_ -> Expect.equal False (List.member (SendLine "AUTHENTICATE PLAIN\r\n") outbound)
+                        , \_ -> Expect.equal False acked.saslAuthenticated
+                        , \_ -> Expect.equal SaslIdle acked.sasl
+                        , \_ -> Expect.equal True (List.any (String.contains "no fallback was attempted") acked.serviceLog)
+                        ]
+                        ()
+            , test "a SASL timeout or local failure aborts with AUTHENTICATE * before disconnecting" <|
+                \_ ->
+                    let
+                        pending =
+                            { blank | capNegotiating = True, sasl = SaslPending Plain }
+
+                        ( timedOut, timeoutOut ) =
+                            update SaslTimeout pending
+
+                        ( failed, failedOut ) =
+                            update (SaslFailed { reason = "SCRAM proof mismatch" }) { pending | sasl = SaslPending ScramSha256 }
+
+                        ( idleTimeout, idleOut ) =
+                            update SaslTimeout blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SaslTimerCleared, SendLine "AUTHENTICATE *\r\n", WsDisconnect ] timeoutOut
+                        , \_ -> Expect.equal SaslIdle timedOut.sasl
+                        , \_ -> Expect.equal [ SaslTimerCleared, SendLine "AUTHENTICATE *\r\n", WsDisconnect ] failedOut
+                        , \_ -> Expect.equal False failed.saslAuthenticated
+                        , \_ -> Expect.equal [] idleOut
+                        , \_ -> Expect.equal SaslIdle idleTimeout.sasl
+                        ]
+                        ()
+            , test "906 aborts an in-flight exchange fail-closed and stays a log line when idle" <|
+                \_ ->
+                    let
+                        pending =
+                            { blank | capNegotiating = True, sasl = SaslPending Plain }
+
+                        ( aborted, abortedOut ) =
+                            feed pending ":s 906 me :SASL authentication aborted"
+
+                        ( tokenAborted, tokenOut ) =
+                            feed { pending | sasl = SaslPending SessionToken, sessionTokenSaslRequestId = Just "continuationUse0000000001" } ":s 906 me :SASL authentication aborted"
+
+                        ( idle, idleOut ) =
+                            feed blank ":s 906 me :SASL authentication aborted"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal SaslIdle aborted.sasl
+                        , \_ -> Expect.equal True (List.member WsDisconnect abortedOut)
+                        , \_ -> Expect.equal False (List.member (SendLine "CAP END\r\n") abortedOut)
+                        , \_ -> Expect.equal False aborted.saslAuthenticated
+                        , \_ -> Expect.equal SaslIdle tokenAborted.sasl
+                        , \_ -> Expect.equal Nothing tokenAborted.sessionTokenSaslRequestId
+                        , \_ -> Expect.equal True (List.member WsDisconnect tokenOut)
+                        , \_ -> Expect.equal [] idleOut
+                        , \_ -> Expect.equal False (List.isEmpty idle.serviceLog)
+                        ]
+                        ()
+            , test "SASL failures in flight disconnect without CAP END, SESSION-TOKEN included" <|
+                \_ ->
+                    let
+                        pending =
+                            { blank | capNegotiating = True, sasl = SaslPending Plain }
+
+                        ( failed, failedOut ) =
+                            update (SaslFailed { reason = "" }) pending
+
+                        ( tooLong, tooLongOut ) =
+                            feed pending ":s 905 me :SASL message too long"
+
+                        opened =
+                            openTestSocket { blank | runtimeOwnerStamp = Just testRuntimeOwner, selectedContinuationRef = Just "continuation_reference_0001" }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :sasl=SESSION-TOKEN"
+
+                        ( begun, begunOut ) =
+                            feed listed ":s CAP me ACK :sasl"
+
+                        requestId =
+                            Maybe.withDefault "" begun.sessionTokenSaslRequestId
+
+                        ( rejected904, out904 ) =
+                            feed begun ":s 904 me :SASL authentication failed"
+
+                        ( rejected, rejectedOut ) =
+                            update (RuntimeSessionTokenSaslStatus { requestId = requestId, status = "rejected", ownerRef = testRuntimeOwner.ownerRef, accountGeneration = testRuntimeOwner.accountGeneration, connectionGeneration = testRuntimeOwner.connectionGeneration }) rejected904
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member WsDisconnect failedOut)
+                        , \_ -> Expect.equal False (List.member (SendLine "CAP END\r\n") failedOut)
+                        , \_ -> Expect.equal False failed.saslAuthenticated
+                        , \_ -> Expect.equal True (List.member WsDisconnect tooLongOut)
+                        , \_ -> Expect.equal False (List.member (SendLine "CAP END\r\n") tooLongOut)
+                        , \_ -> Expect.equal SaslIdle tooLong.sasl
+                        , \_ -> Expect.equal (SaslPending SessionToken) begun.sasl
+                        , \_ -> Expect.equal True (List.member SaslTimerStarted begunOut)
+                        , \_ -> Expect.equal False (String.isEmpty requestId)
+                        , \_ -> Expect.equal [] out904
+                        , \_ -> Expect.equal (SaslPending SessionToken) rejected904.sasl
+                        , \_ -> Expect.equal True (List.member WsDisconnect rejectedOut)
+                        , \_ -> Expect.equal False (List.member (SendLine "CAP END\r\n") rejectedOut)
+                        , \_ -> Expect.equal False rejected.saslAuthenticated
+                        , \_ -> Expect.equal SaslIdle rejected.sasl
+                        ]
+                        ()
+            , test "a rejected missing-session observation issues no token and replays no resume" <|
+                \_ ->
+                    let
+                        current =
+                            { requestId = "domainRequest000000000007", credentialRef = "AAAAAAAAAAAAAAAAAAAAAAAA", status = "awaiting-authentication", outcome = Nothing, reason = Nothing, redirectNode = Nothing, hopCount = 0, transferFrom = Nothing }
+
+                        base =
+                            { blank | accountName = Just "alice", runtimeOwnerStamp = Just testRuntimeOwner, sessionRecoveryView = Just current, sessionRecoveryViewOwner = Just testRuntimeOwner }
+
+                        observation =
+                            { ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            , domain = "session"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Nothing
+                            , sessionRecovery = Just { current | status = "rejected", outcome = Just "missing", reason = Just "no-session" }
+                            , passkeyManagement = Nothing
+                            , webAuthn = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            }
+
+                        ( observed, outs ) =
+                            update (RuntimeDomainObservationReceived observation) base
+
+                        isResume action =
+                            case action of
+                                RuntimeDomain.ResumeSession _ _ ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "rejected") (Maybe.map .status observed.sessionRecoveryView)
+                        , \_ -> Expect.equal False (List.any isSessionTokenStored outs)
+                        , \_ -> Expect.equal False (List.any isResume (runtimeActions outs))
+                        , \_ -> Expect.equal False observed.sessionTokenIssuanceRequested
+                        ]
+                        ()
+            , test "a failed password-reset observation leaves the account untouched" <|
+                \_ ->
+                    let
+                        observation status =
+                            { ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            , domain = "account-security"
+                            , sequence = 1
+                            , securityStatus = Just status
+                            , scheduledView = Nothing
+                            , sessionRecovery = Nothing
+                            , passkeyManagement = Nothing
+                            , webAuthn = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            }
+
+                        failure =
+                            { action = "reset-password", phase = "failed", outcome = "", reason = Just "INVALID_CODE", targetAccount = Just "alice", requiresLogin = False }
+
+                        signedIn =
+                            { blank | accountName = Just "alice", saslAuthenticated = True, runtimeOwnerStamp = Just testRuntimeOwner }
+
+                        ( afterSigned, signedOut ) =
+                            update (RuntimeDomainObservationReceived (observation failure)) signedIn
+
+                        ( afterGuest, _ ) =
+                            update (RuntimeDomainObservationReceived (observation failure)) { signedIn | accountName = Nothing, saslAuthenticated = False }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "alice") afterSigned.accountName
+                        , \_ -> Expect.equal True afterSigned.saslAuthenticated
+                        , \_ -> Expect.equal (Just "failed") (Maybe.map .phase afterSigned.privateAccountStatus)
+                        , \_ -> Expect.equal [] (sendLines signedOut)
+                        , \_ -> Expect.equal Nothing afterGuest.accountName
+                        ]
+                        ()
+            , test "dropping the current local session row is refused with no outbound" <|
+                \_ ->
+                    let
+                        inventory =
+                            { requestId = "domainRequest000000000002"
+                            , mode = "local"
+                            , status = "complete"
+                            , scanRef = Nothing
+                            , localRows =
+                                [ { rowRef = "row_reference_000000000001", index = 1, signonMs = "0", state = "attached", current = True }
+                                , { rowRef = "row_reference_000000000002", index = 2, signonMs = "0", state = "attached", current = False }
+                                ]
+                            , meshRows = []
+                            , continuationAvailable = True
+                            , scanComplete = True
+                            , pageCount = 1
+                            , lastObservedAt = Nothing
+                            , reason = Nothing
+                            }
+
+                        base =
+                            { blank | accountName = Just "alice", runtimeOwnerStamp = Just testRuntimeOwner, sessionInventoryView = Just inventory }
+
+                        ( refused, refusedOut ) =
+                            update (SessionDropRequested { index = 1 }) base
+
+                        ( other, otherOut ) =
+                            update (SessionDropRequested { index = 2 }) base
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] refusedOut
+                        , \_ -> Expect.equal (Just "Cannot drop this connection — sign out instead.") refused.accountSessionsError
+                        , \_ -> Expect.equal False refused.accountSessionsPending
+                        , \_ -> Expect.equal [ RuntimeDomain.LocalSessionDrop "row_reference_000000000002" ] (runtimeActions otherOut)
+                        , \_ -> Expect.equal True other.accountSessionsPending
+                        ]
+                        ()
+            ]
+        , describe "Audit 2026-11-05 pinned gaps"
+            [ test "a peer rename keeps each row's original sender" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                        ( arrived, _ ) =
+                            feed joined ":alice!u@h JOIN #c"
+
+                        ( before, _ ) =
+                            feed arrived "@msgid=m1 :alice!u@h PRIVMSG #c :before"
+
+                        ( renamed, _ ) =
+                            feed before ":alice!u@h NICK alicia"
+
+                        ( after, _ ) =
+                            feed renamed "@msgid=m2 :alicia!u@h PRIVMSG #c :after"
+
+                        senders =
+                            List.map .from (List.filter (\m -> m.msgType == "msg") (dmMessages after "#c"))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "alicia", "alice" ] senders
+                        , \_ -> Expect.equal [ "alicia", "me" ] (List.sort (membersOf after "#c"))
+                        ]
+                        ()
+            , test "an account self-NICK keeps the account, rows, and read markers" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "kai", accountName = Just "kai", endpoint = Just "wss://irc.example" }
+
+                        ( withRow, _ ) =
+                            feed (joinFirst base "kai" "#c") "@msgid=m1;time=1970-01-01T00:00:01Z :bob!u@h PRIVMSG #c :hello"
+
+                        ( marked, _ ) =
+                            feed withRow ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+
+                        ( renamed, outs ) =
+                            feed marked ":kai!u@h NICK kai_"
+
+                        chatRows m =
+                            List.filter (\r -> r.msgType == "msg") (dmMessages m "#c")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") renamed.accountName
+                        , \_ -> Expect.equal "kai_" renamed.ourNick
+                        , \_ -> Expect.equal (List.map .body (chatRows marked)) (List.map .body (chatRows renamed))
+                        , \_ -> Expect.equal marked.readMarkers renamed.readMarkers
+                        , \_ -> Expect.equal [] (List.filter sendLineIsNick outs)
+                        ]
+                        ()
+            , test "CHGHOST keeps the account, rows, alias flag, and roster with no outbound" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "kai_", accountName = Just "kai", currentNickIsAlias = True }
+
+                        joined =
+                            joinFirst base "kai_" "#c"
+
+                        ( withPeer, _ ) =
+                            feed joined ":bob!u@h JOIN #c"
+
+                        ( withRow, _ ) =
+                            feed withPeer "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( selfCloak, selfOut ) =
+                            feed withRow ":kai_!u@old.host CHGHOST kai cloak.onyx"
+
+                        ( peerCloak, peerOut ) =
+                            feed selfCloak ":bob!u@h CHGHOST bob bob.cloak.onyx"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] selfOut
+                        , \_ -> Expect.equal [] peerOut
+                        , \_ -> Expect.equal (Just "kai") peerCloak.accountName
+                        , \_ -> Expect.equal True peerCloak.currentNickIsAlias
+                        , \_ -> Expect.equal (dmMessages withRow "#c") (dmMessages peerCloak "#c")
+                        , \_ -> Expect.equal (List.sort (membersOf withRow "#c")) (List.sort (membersOf peerCloak "#c"))
+                        ]
+                        ()
+            , test "an accepted send whose echo was lost is not resent after reconnect" <|
+                \_ ->
+                    let
+                        label =
+                            Labels.nextClientLabel 0 1
+
+                        ( sent, _ ) =
+                            labeledSend [ "labeled-response" ] "hi"
+
+                        ( acked, _ ) =
+                            feed sent ("@label=" ++ label ++ " ACK")
+
+                        ( closed, closedOut ) =
+                            update (WsClosed { clean = False, reason = "lost" }) acked
+
+                        ( reopened, reopenedOut ) =
+                            update (WsOpened { url = "wss://irc.example" }) { closed | connection = Offline }
+
+                        ( welcomed, welcomedOut ) =
+                            feed reopened ":irc.example 001 alice :welcome"
+
+                        privmsgs outs =
+                            List.filter (String.startsWith "PRIVMSG") (sendLines outs)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (privmsgs (closedOut ++ reopenedOut ++ welcomedOut))
+                        , \_ -> Expect.equal [ "hi" ] (channelBodies welcomed)
+                        , \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown welcomed) (dmMessages welcomed "#c"))
+                        ]
+                        ()
+            , test "a replayed mention in a background room raises no alert, inbox row, or read marker" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | ourNick = "me", caps = [ "chathistory", "draft/read-marker" ] }
+
+                        joinedA =
+                            joinFirst live "me" "#a"
+
+                        joinedC =
+                            joinFirst joinedA "me" "#c"
+
+                        selected =
+                            Tuple.first (update (ChannelSelect "#a") joinedC)
+
+                        settled =
+                            { selected | historyLoading = Set.empty, pendingHistoryRequests = Dict.empty }
+
+                        ( opened, _ ) =
+                            feed settled "BATCH +b1 chathistory #c"
+
+                        ( filled, _ ) =
+                            feed opened "@batch=b1;msgid=x1;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hey me, look"
+
+                        ( closed, closeOut ) =
+                            feed filled "BATCH -b1"
+
+                        isAlert o =
+                            case o of
+                                NotifyAlert _ ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "hey me, look" ] (List.map .body (dmMessages closed "#c"))
+                        , \_ -> Expect.equal False (List.any isAlert closeOut)
+                        , \_ -> Expect.equal settled.notifications closed.notifications
+                        , \_ -> Expect.equal settled.readMarkers closed.readMarkers
+                        , \_ -> Expect.equal [] (List.filter (String.startsWith "MARKREAD") (sendLines closeOut))
+                        ]
+                        ()
+            , test "an EDIT that outruns its original is dropped and the original shows unedited" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :first"
+
+                        ( early, _ ) =
+                            feed m1 ":bob!u@h EDIT #c m9 :edited text"
+
+                        ( arrived, _ ) =
+                            feed early "@msgid=m9 :bob!u@h PRIVMSG #c :original"
+
+                        rows =
+                            dmMessages arrived "#c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "original", "first" ] (List.map .body rows)
+                        , \_ -> Expect.equal [ False, False ] (List.map .edited rows)
+                        , \_ -> Expect.equal (dmMessages m1 "#c") (List.drop 1 rows)
+                        ]
+                        ()
+            , test "an AROUND batch without the pinned target leaves pins, rows, and exhaustion intact" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                        ( joined, _ ) =
+                            feed base ":me!u@h JOIN #c"
+
+                        ( pinned, _ ) =
+                            feed { joined | historyLoading = Set.empty } ":s 818 me #c PINS :gone"
+
+                        ( withMsg, _ ) =
+                            feed pinned "@msgid=p1;time=2026-10-04T12:00:00Z :alice!u@h PRIVMSG #c :hello"
+
+                        ( requested, requestOut ) =
+                            update (PinnedMessageJump { channel = "#c", messageId = "gone" }) withMsg
+
+                        ( opened, _ ) =
+                            feed requested "BATCH +a1 chathistory #c"
+
+                        ( filled, _ ) =
+                            feed opened "@batch=a1;msgid=n1;time=2026-10-04T11:00:00Z :bob!u@h PRIVMSG #c :neighbor"
+
+                        ( closed, _ ) =
+                            feed filled "BATCH -a1"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "CHATHISTORY AROUND #c msgid=gone 50\r\n" ] (List.filter (String.startsWith "CHATHISTORY") (sendLines requestOut))
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" closed.pendingPins)
+                        , \_ -> Expect.equal [ "gone" ] (channelPins closed "#c")
+                        , \_ -> Expect.equal [ "hello", "neighbor" ] (List.map .body (List.filter (\m -> m.msgType == "msg") (dmMessages closed "#c")))
+                        , \_ -> Expect.equal False (isHistoryExhausted closed "#c")
+                        , \_ -> Expect.equal Nothing closed.historyLanding
+                        , \_ -> Expect.equal "Pinned message could not be loaded from history. Try again." closed.pinsLoadFeedback
+                        ]
+                        ()
+            , test "an AROUND batch carrying the pinned target lands on it and frees later jumps" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                        ( joined, _ ) =
+                            feed base ":me!u@h JOIN #c"
+
+                        ( pinned, _ ) =
+                            feed { joined | historyLoading = Set.empty } ":s 818 me #c PINS :old1,old2"
+
+                        ( withMsg, _ ) =
+                            feed pinned "@msgid=p1;time=2026-10-04T12:00:00Z :alice!u@h PRIVMSG #c :hello"
+
+                        ( requested, _ ) =
+                            update (PinnedMessageJump { channel = "#c", messageId = "old1" }) withMsg
+
+                        ( blocked, blockedOut ) =
+                            update (PinnedMessageJump { channel = "#c", messageId = "old2" }) requested
+
+                        ( opened, _ ) =
+                            feed requested "BATCH +a1 chathistory #c"
+
+                        ( filled, _ ) =
+                            feed opened "@batch=a1;msgid=old1;time=2026-10-04T10:00:00Z :bob!u@h PRIVMSG #c :the pinned one"
+
+                        ( closed, _ ) =
+                            feed filled "BATCH -a1"
+
+                        ( next, nextOut ) =
+                            update (PinnedMessageJump { channel = "#c", messageId = "old2" }) closed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (List.filter (String.startsWith "CHATHISTORY") (sendLines blockedOut))
+                        , \_ -> Expect.equal (Just "old1") closed.historyLanding
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" closed.pendingPins)
+                        , \_ -> Expect.equal [ "CHATHISTORY AROUND #c msgid=old2 50\r\n" ] (List.filter (String.startsWith "CHATHISTORY") (sendLines nextOut))
+                        , \_ -> Expect.equal (Just "old2") (Dict.get "#c" next.pendingPins)
+                        , \_ -> Expect.equal blocked.pendingPins requested.pendingPins
+                        ]
+                        ()
+            , test "multiline fragments of astral text stay within the byte bound and round-trip" <|
+                \_ ->
+                    let
+                        text =
+                            "😀😀😀😀\nx"
+
+                        batches =
+                            Multiline.planMultilineBatches text { maxBytes = 6, maxLines = 24 }
+                                |> Maybe.withDefault []
+
+                        parts =
+                            List.concat batches
+
+                        utf8Bytes s =
+                            List.sum
+                                (List.map
+                                    (\c ->
+                                        let
+                                            code =
+                                                Char.toCode c
+                                        in
+                                        if code < 0x80 then
+                                            1
+
+                                        else if code < 0x0800 then
+                                            2
+
+                                        else if code < 0x00010000 then
+                                            3
+
+                                        else
+                                            4
+                                    )
+                                    (String.toList s)
+                                )
+
+                        loneSurrogate s =
+                            List.any (\c -> Char.toCode c >= 0xD800 && Char.toCode c <= 0xDFFF) (String.toList s)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 5 (List.length parts)
+                        , \_ -> Expect.equal True (List.all (\p -> utf8Bytes p.text <= 6) parts)
+                        , \_ -> Expect.equal False (List.any (\p -> loneSurrogate p.text) parts)
+                        , \_ -> Expect.equal True (List.all (\batch -> List.sum (List.map (.text >> utf8Bytes) batch) <= 6) batches)
+                        -- Split points that open a new batch degrade to a
+                        -- newline (documented in Multiline.groupGo); the
+                        -- code points themselves round-trip in order.
+                        , \_ -> Expect.equal (String.replace "\n" "" text) (String.replace "\n" "" (Multiline.assembleMultilineText parts))
+                        ]
+                        ()
+            , test "a mode toggle waits for the echo and a 482 denial leaves modes unchanged" <|
+                \_ ->
+                    let
+                        room modes =
+                            let
+                                shell =
+                                    shellOf "#c" 0 -1
+                            in
+                            Dict.singleton "#c" { shell | modes = "+nt", members = Dict.singleton "me" { nick = "me", modes = Set.fromList modes, away = False } }
+
+                        opped =
+                            { blank | ourNick = "me", channels = room [ 'o' ] }
+
+                        ( toggled, toggleOut ) =
+                            update (ModerationDeskToggleMode "#c" "m") opped
+
+                        ( denied, _ ) =
+                            feed toggled ":s 482 me #c :You're not channel operator"
+
+                        ( echoed, _ ) =
+                            feed toggled ":me!u@h MODE #c +m"
+
+                        ( halfop, halfopOut ) =
+                            update (ModerationDeskToggleMode "#c" "m") { opped | channels = room [ 'h' ] }
+
+                        modesOf m =
+                            Maybe.map .modes (Dict.get "#c" m.channels)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "MODE #c +m\r\n" ] (sendLines toggleOut)
+                        , \_ -> Expect.equal (Just "+nt") (modesOf toggled)
+                        , \_ -> Expect.equal (Just "+nt") (modesOf denied)
+                        , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text (List.take 1 denied.notifications))
+                        , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map (String.contains "m") (modesOf echoed)))
+                        , \_ -> Expect.equal [] halfopOut
+                        , \_ -> Expect.equal (Just "+nt") (modesOf halfop)
+                        ]
+                        ()
+            , test "a 491 operator-factor loss refuses the next operator verb" <|
+                \_ ->
+                    let
+                        oper =
+                            { blank | isOper = True }
+
+                        ( before, beforeOut ) =
+                            runSlashOper { oper | composer = "/rehash" } "rehash"
+
+                        ( lost, _ ) =
+                            feed oper ":s 491 me :No O-lines for your host"
+
+                        ( after, afterOut ) =
+                            runSlashOper { lost | composer = "/rehash" } "rehash"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length (sendLines beforeOut))
+                        , \_ -> Expect.equal "" before.composer
+                        , \_ -> Expect.equal False lost.isOper
+                        , \_ -> Expect.equal [] (sendLines afterOut)
+                        , \_ -> Expect.equal [ "Operator access required" ] (List.map .title after.toasts)
+                        ]
+                        ()
+            , test "operator diagnostics drop secrets and setup readiness stays unknown" <|
+                \_ ->
+                    let
+                        decode raw =
+                            Decode.decodeString Decode.value raw
+                                |> Result.map RuntimeDomain.decodeOperatorItems
+                                |> Result.withDefault []
+
+                        doctor =
+                            decode """{"previewRef":"preview_ref_0001","operPassword":"hunter2-secret","plan":{"exporterBuild":"1.2.3","secrets":{"meshKey":"hunter2-secret"},"diagnostics":{"passed":3,"failed":1,"total":4,"skipped":0,"truncated":false},"service":{"manager":"openrc","argumentsBounded":true,"arguments":["--oper-pass=hunter2-secret"]},"checks":[{"id":"mesh_security","status":"pass","detail":"key=hunter2-secret"},{"id":"hunter2-secret","status":"pass"}],"capabilities":[{"name":"tls_configured","configured":true,"path":"/etc/hunter2-secret.pem"}]}}"""
+
+                        setup readiness =
+                            decode ("""{"previewRef":"preview_ref_0002","plan":{"mode":"preview","profile":"community","readiness":\"""" ++ readiness ++ """","network":{"validation":"static-passed","tlsPort":6697,"ircPort":6667,"tlsEnabled":true,"hostnameSyntax":"valid","addressSyntax":"ipv4"},"media":{"enabled":"yes","readiness":"unknown","relay":"unknown","configured":null},"effectiveProfile":{"maxClients":500},"service":{"manager":"systemd","argumentsBounded":false}}}""")
+
+                        texts items =
+                            List.concatMap (\item -> item.ref :: item.label :: item.state :: item.extra) items
+
+                        readinessOf items =
+                            List.head items |> Maybe.map .extra |> Maybe.andThen (List.reverse >> List.head)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "operator-doctor" ] (List.map .state doctor)
+                        , \_ -> Expect.equal False (List.any (String.contains "hunter2") (texts doctor))
+                        , \_ -> Expect.equal [ "operator-setup" ] (List.map .state (setup "ready"))
+                        , \_ -> Expect.equal (Just "unknown") (readinessOf (setup "ready"))
+                        , \_ -> Expect.equal (Just "unknown") (readinessOf (setup "unknown"))
+                        ]
+                        ()
+            ]
+        , describe "E50 notification and authoring safety state"
+            [ test "only worker activate and cancel are excluded from pending authoring safety" <|
+                \_ ->
+                    Expect.equal
+                        ( False, False, True )
+                        ( runtimeDomainActionIsAuthoring (RuntimeDomain.WorkerActivate "activation_reference_0001")
+                        , runtimeDomainActionIsAuthoring (RuntimeDomain.WorkerCancel "activation_reference_0001")
+                        , runtimeDomainActionIsAuthoring (RuntimeDomain.QueueMessage "#c" "chat" "body" Nothing "message" Nothing)
+                        )
+            , test "integration authoring is unsafe for worker activation until explicitly cleared" <|
+                \_ ->
+                    let
+                        edited =
+                            update (ServiceIntegrationFieldChanged "text" "draft schedule body") blank |> Tuple.first
+
+                        cleared =
+                            update ServiceIntegrationFormReset edited |> Tuple.first
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (serviceIntegrationFormIsDirty blank)
+                        , \_ -> Expect.equal True (serviceIntegrationFormIsDirty edited)
+                        , \_ -> Expect.equal False (serviceIntegrationFormIsDirty cleared)
+                        , \_ -> Expect.equal "" cleared.serviceIntegrationForm.text
+                        ]
+                        ()
+            , test "an accepted integration request cleans only the exact submitted form revision" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                        authored =
+                            update (ServiceIntegrationFieldChanged "text" "submitted memo") base |> Tuple.first
+
+                        ( pending, pendingOut ) =
+                            update (RuntimeDomainActionRequested (RuntimeDomain.ServiceMemoSend "alice" "submitted memo")) authored
+
+                        command =
+                            pendingOut
+                                |> List.filterMap
+                                    (\outbound ->
+                                        case outbound of
+                                            RuntimeDomainCommand value -> Just value
+                                            _ -> Nothing
+                                    )
+                                |> List.head
+
+                        editedWhilePending =
+                            update (ServiceIntegrationFieldChanged "text" "later unsent edit") pending |> Tuple.first
+
+                        settledAfterEdit =
+                            command
+                                |> Maybe.map (acceptedServiceIntegrationResult >> RuntimeDomainResultReceived >> (\message -> update message editedWhilePending |> Tuple.first))
+                                |> Maybe.withDefault editedWhilePending
+
+                        settledWithoutEdit =
+                            command
+                                |> Maybe.map (acceptedServiceIntegrationResult >> RuntimeDomainResultReceived >> (\message -> update message pending |> Tuple.first))
+                                |> Maybe.withDefault pending
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (serviceIntegrationFormIsDirty settledAfterEdit)
+                        , \_ -> Expect.equal "later unsent edit" settledAfterEdit.serviceIntegrationForm.text
+                        , \_ -> Expect.equal False (serviceIntegrationFormIsDirty settledWithoutEdit)
+                        ]
+                        ()
+            , test "stamped notification navigation opens only an existing conversation" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , channels = Dict.singleton "#c" (shellOf "#c" 0 0)
+                                , activeChannel = Just "#other"
+                            }
+
+                        ( opened, openOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0001"
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "mention"
+                                    , conversationId = Just "#c"
+                                    }
+                                )
+                                base
+
+                        ( stale, staleOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0002"
+                                    , ownerRef = "owner_stale_000000000000000000000000"
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "dm"
+                                    , conversationId = Just "alice"
+                                    }
+                                )
+                                base
+
+                        ( missing, missingOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0003"
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "mention"
+                                    , conversationId = Just "#missing"
+                                    }
+                                )
+                                base
+
+                        ( missingMention, missingMentionOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0004"
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "mention"
+                                    , conversationId = Just "mallory"
+                                    }
+                                )
+                                base
+
+                        ( coldDm, coldDmOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0006"
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "dm"
+                                    , conversationId = Just "mallory"
+                                    }
+                                )
+                                base
+
+                        ( call, callOut ) =
+                            update
+                                (RuntimeNotificationNavigationReceived
+                                    { requestId = "notification_fixture_0005"
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , kind = "call"
+                                    , conversationId = Just "mallory"
+                                    }
+                                )
+                                base
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "#c") opened.activeChannel
+                        , \_ -> Expect.equal [ RuntimeDomain.AnchorViewed "#c" (Just "1") (Just "1970-01-01T00:00:00.000Z"), RuntimeDomain.LoadDraft "#c", RuntimeDomain.AnchorLoad "#c" ] (runtimeActions openOut)
+                        , \_ -> Expect.equal True (List.any isOpenedNavigationReceipt openOut)
+                        , \_ -> Expect.equal base.activeChannel stale.activeChannel
+                        , \_ -> Expect.equal [ RuntimeNotificationNavigationReceipt { requestId = "notification_fixture_0002", ownerRef = "owner_stale_000000000000000000000000", accountGeneration = 1, connectionGeneration = 1, opened = False } ] staleOut
+                        , \_ -> Expect.equal base.activeChannel missing.activeChannel
+                        , \_ -> Expect.equal [ RuntimeNotificationNavigationReceipt { requestId = "notification_fixture_0003", ownerRef = testRuntimeOwner.ownerRef, accountGeneration = 1, connectionGeneration = 1, opened = False } ] missingOut
+                        , \_ -> Expect.equal base.activeChannel missingMention.activeChannel
+                        , \_ -> Expect.equal False (Dict.member "mallory" missingMention.channels)
+                        , \_ -> Expect.equal [ RuntimeNotificationNavigationReceipt { requestId = "notification_fixture_0004", ownerRef = testRuntimeOwner.ownerRef, accountGeneration = 1, connectionGeneration = 1, opened = False } ] missingMentionOut
+                        , \_ -> Expect.equal base.activeChannel call.activeChannel
+                        , \_ -> Expect.equal False (List.any isOpenedNavigationReceipt callOut)
+                        , \_ -> Expect.equal (Just "mallory") coldDm.activeChannel
+                        , \_ -> Expect.equal True (Dict.member "mallory" coldDm.channels)
+                        , \_ -> Expect.equal True (List.any isDmKeyFetch coldDmOut)
+                        , \_ -> Expect.equal True (List.any isOpenedNavigationReceipt coldDmOut)
+                        ]
+                        ()
+            , test "composition state is explicit and composition end releases it" <|
+                \_ ->
+                    let
+                        ( composing, startOut ) =
+                            update ComposerCompositionStarted blank
+
+                        ( ended, endOut ) =
+                            update ComposerCompositionEnded composing
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True composing.composerComposing
+                        , \_ -> Expect.equal False ended.composerComposing
+                        , \_ -> Expect.equal [] startOut
+                        , \_ -> Expect.equal [] endOut
+                        ]
+                        ()
+            ]
+        , describe "E73 mounted media snapshot and gestures"
+            [ test "soundcheck uses its literal local scope without requiring an active room" <|
+                \_ ->
+                    let
+                        ( updated, effects ) =
+                            update
+                                (RuntimeCapturePrepared
+                                    { ownerRef = testRuntimeOwner.ownerRef
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , conversationId = "soundcheck"
+                                    , captureRef = "capture_reference_0000001"
+                                    , kind = "soundcheck"
+                                    , available = True
+                                    , reason = Nothing
+                                    , deviceRef = Nothing
+                                    , callRef = Nothing
+                                    }
+                                )
+                                { blank | runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Nothing }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ RuntimeDomain.MediaSoundcheck "capture_reference_0000001" 1500 ] (runtimeActions effects)
+                        , \_ -> Expect.equal Nothing updated.activeChannel
+                        ]
+                        ()
+            , test "transport-unavailable capture reports its bounded reason without dispatching media" <|
+                \_ ->
+                    let
+                        ( updated, effects ) =
+                            update
+                                (RuntimeCapturePrepared
+                                    { ownerRef = testRuntimeOwner.ownerRef
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , conversationId = "#room"
+                                    , captureRef = "capture_reference_0000001"
+                                    , kind = "voice"
+                                    , available = False
+                                    , reason = Just "transport-unavailable"
+                                    , deviceRef = Nothing
+                                    , callRef = Nothing
+                                    }
+                                )
+                                { blank | runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#room" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "transport-unavailable") updated.composerError
+                        , \_ -> Expect.equal [] (runtimeActions effects)
+                        ]
+                        ()
+            , test "input switch is fenced to the call ref captured before browser permission" <|
+                \_ ->
+                    let
+                        originalCallRef =
+                            "call_reference_000000001"
+
+                        mediaView =
+                            { sequence = 1
+                            , state = "in-call"
+                            , previewRef = Nothing
+                            , screenRef = Nothing
+                            , experimentRef = Nothing
+                            , experiment = Nothing
+                            , call = Just { conversationId = "#room", callRef = originalCallRef }
+                            , reason = Nothing
+                            , muted = False
+                            , deafened = False
+                            , devices = { inputs = [], outputs = [], selectedInputRef = Nothing, requestedInputRef = Nothing, appliedInputRef = Nothing, inputState = "idle", inputReason = Nothing, selectedOutputRef = Nothing, requestedOutputRef = Nothing, appliedOutputRef = Nothing, outputState = "idle", outputReason = Nothing, requestedVolumePercent = 50, appliedVolumePercent = Nothing }
+                            , soundcheck = Nothing
+                            , recording = { ownConsent = "unknown", consentRequest = "idle", desiredAction = Nothing, requestState = "idle", actual = "inactive", rosterState = "unknown", allConsented = Nothing, policyRevision = Nothing, reason = Nothing }
+                            , telemetry = { sampledAtMonotonicMs = 0, counters = [], availability = "unavailable", reason = Nothing }
+                            , caption = Nothing
+                            , webRtc = Nothing
+                            }
+
+                        base =
+                            { blank
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , mediaControlView = Just mediaView
+                                , mediaControlViewOwner = Just testRuntimeOwner
+                                , activeChannel = Just "#room"
+                            }
+
+                        prepared callRef =
+                            RuntimeCapturePrepared
+                                { ownerRef = testRuntimeOwner.ownerRef
+                                , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                , accountGeneration = testRuntimeOwner.accountGeneration
+                                , conversationId = "#room"
+                                , captureRef = "capture_reference_0000001"
+                                , kind = "input-switch"
+                                , available = True
+                                , reason = Nothing
+                                , deviceRef = Just "device_reference_000000001"
+                                , callRef = Just callRef
+                                }
+
+                        ( staleModel, staleEffects ) =
+                            update (prepared "call_reference_000000002") base
+
+                        ( currentModel, currentEffects ) =
+                            update (prepared originalCallRef) base
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (runtimeActions staleEffects)
+                        , \_ -> Expect.equal Nothing staleModel.runtimeDomainPendingAction
+                        , \_ -> Expect.equal [ RuntimeDomain.MediaInput { deviceRef = Just "device_reference_000000001", conversationId = Just "#room", callRef = Just originalCallRef, captureRef = Just "capture_reference_0000001" } ] (runtimeActions currentEffects)
+                        , \_ ->
+                            Expect.equal (Just originalCallRef)
+                                (currentModel.runtimeDomainPendingAction
+                                    |> Maybe.andThen
+                                        (\action ->
+                                            case action of
+                                                RuntimeDomain.MediaInput input ->
+                                                    input.callRef
+
+                                                _ ->
+                                                    Nothing
+                                        )
+                                )
+                        ]
+                        ()
+            , test "media snapshots reject stale sequences and foreign owner envelopes" <|
+                \_ ->
+                    let
+                        devices =
+                            { inputs = [], outputs = [], selectedInputRef = Nothing, requestedInputRef = Nothing, appliedInputRef = Nothing
+                            , inputState = "idle", inputReason = Nothing, selectedOutputRef = Nothing, requestedOutputRef = Nothing
+                            , appliedOutputRef = Nothing, outputState = "idle", outputReason = Nothing, requestedVolumePercent = 50, appliedVolumePercent = Nothing
+                            }
+
+                        recording =
+                            { ownConsent = "unknown", consentRequest = "idle", desiredAction = Nothing, requestState = "idle", actual = "unknown"
+                            , rosterState = "unknown", allConsented = Nothing, policyRevision = Nothing, reason = Nothing
+                            }
+
+                        telemetry = { sampledAtMonotonicMs = 0, counters = [], availability = "unavailable", reason = Nothing }
+
+                        caption =
+                            Just
+                                { conversationId = "#room", callRef = "call_reference_000000001", state = "listening", reason = Nothing
+                                , mode = Just "local", language = Just "en-US", source = Just "local-participant-microphone", accuracy = Just "unknown"
+                                , interimText = Nothing, serverVisible = True
+                                }
+
+                        media sequence nestedCaption =
+                            { sequence = sequence, state = "idle", previewRef = Nothing, screenRef = Nothing, experimentRef = Nothing, experiment = Nothing
+                            , call = Nothing, reason = Nothing, muted = False, deafened = False, devices = devices, soundcheck = Nothing
+                            , recording = recording, telemetry = telemetry, caption = nestedCaption, webRtc = Nothing
+                            }
+
+                        observation sequence mediaView =
+                            { ownerRef = testRuntimeOwner.ownerRef, accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration, domain = "media", sequence = sequence
+                            , securityStatus = Nothing, scheduledView = Nothing, sessionRecovery = Nothing, passkeyManagement = Nothing, webAuthn = Nothing
+                            , sessionInventory = Nothing, sessionRevocation = Nothing, accountCommunity = Nothing, serviceIntegration = Nothing
+                            , draftRecovery = Nothing, mediaQuality = Nothing, mediaControl = Just mediaView
+                            }
+
+                        base = { blank | runtimeOwnerStamp = Just testRuntimeOwner }
+                        accepted = update (RuntimeDomainObservationReceived (observation 5 (media 5 caption))) base |> Tuple.first
+                        stale = update (RuntimeDomainObservationReceived (observation 4 (media 4 Nothing))) accepted |> Tuple.first
+                        foreignEnvelope = update (RuntimeDomainObservationReceived { ownerRef = "owner_other_000000000000000000000001", accountGeneration = testRuntimeOwner.accountGeneration, connectionGeneration = testRuntimeOwner.connectionGeneration, domain = "media", sequence = 6, securityStatus = Nothing, scheduledView = Nothing, sessionRecovery = Nothing, passkeyManagement = Nothing, webAuthn = Nothing, sessionInventory = Nothing, sessionRevocation = Nothing, accountCommunity = Nothing, serviceIntegration = Nothing, draftRecovery = Nothing, mediaQuality = Nothing, mediaControl = Just (media 6 caption) }) accepted |> Tuple.first
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 5) (Maybe.map .sequence accepted.mediaControlView)
+                        , \_ -> Expect.equal (Just 5) (Maybe.map .sequence stale.mediaControlView)
+                        , \_ -> Expect.equal (Just 5) (Maybe.map .sequence foreignEnvelope.mediaControlView)
+                        ]
+                        ()
+            ]
+        , describe "E82 call quality"
+            [ test "quality policy requires the current owner, active call and conversation" <|
+                \_ ->
+                    let
+                        quality =
+                            { requestId = "quality_fixture_0001"
+                            , conversationId = "#c"
+                            , callRef = "call_fixture_00000000000000000000"
+                            , desiredPolicy = "balanced"
+                            , observedNetworkTier = Just 2
+                            , observedAudioQuality = Just 1
+                            , videoState = "encoding"
+                            }
+
+                        callBase =
+                            blank.calls
+
+                        activeCall =
+                            { blank
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , mediaQualityView = Just quality
+                                , mediaQualityViewOwner = Just testRuntimeOwner
+                                , activeChannel = Just "#c"
+                                , calls = { callBase | lifecycle = Media.InCall, channel = Just "#c" }
+                            }
+
+                        ( changed, changedOut ) =
+                            update (MediaQualityPolicySet "audio-priority") activeCall
+
+                        ( stale, staleOut ) =
+                            update (MediaQualityPolicySet "auto") { activeCall | mediaQualityViewOwner = Nothing }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ RuntimeDomain.MediaQuality "#c" quality.callRef "audio-priority" ] (runtimeActions changedOut)
+                        , \_ -> Expect.equal activeCall.mediaQualityView changed.mediaQualityView
+                        , \_ -> Expect.equal [] staleOut
+                        , \_ -> Expect.equal activeCall.mediaQualityView stale.mediaQualityView
+                        ]
+                        ()
+            ]
+        , test "overlapping NAMES bursts APPEND instead of replacing" <|
             \_ ->
                 let
                     ( joined, _ ) =
@@ -576,6 +2439,27 @@ suite =
 
                     Nothing ->
                         Expect.fail "expected #c"
+        , test "RFC1459 target and nick identity uses ASCII-only server folding" <|
+            \_ ->
+                let
+                    ( rfc, _ ) =
+                        feed blank ":s 005 me CASEMAPPING=rfc1459 :supported"
+
+                    ( joined, _ ) =
+                        feed rfc ":me!u@h JOIN #[room]"
+
+                    ( names, _ ) =
+                        feed joined ":s 353 me = #{room} :Σ"
+
+                    ( distinctNick, _ ) =
+                        feed names ":σ!u@h JOIN #{room}"
+                in
+                case Dict.get "#{room}" distinctNick.channels of
+                    Just channel ->
+                        Expect.equal [ "Σ", "σ" ] (List.sort (List.map .nick (Dict.values channel.members)))
+
+                    Nothing ->
+                        Expect.fail "RFC1459-equivalent channel spelling did not resolve"
         , test "JOIN validates channel and nick tokens" <|
             \_ ->
                 let
@@ -777,9 +2661,8 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine "PRIVMSG #c hello\r\n"
-                            , VaultPersist
-                                { target = "#c"
-                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
+                                , rows = [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                                 }
                             ]
                             out
@@ -790,6 +2673,20 @@ suite =
                             (List.map (\m -> ( m.id, m.from, m.body ))
                                 (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels)))
                             )
+                    ]
+                    ()
+        , test "raw slash preflight preserves the draft on invalid command fields" <|
+            \_ ->
+                let
+                    text = "/PING\r\nJOIN #hidden"
+
+                    ( next, out ) =
+                        sendRawSlashCommand { blank | composer = text } "#c" text
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal text next.composer
+                    , \_ -> Expect.equal (Just "The command could not be sent because it exceeds the client wire limits.") next.composerError
                     ]
                     ()
         , test "composer plans a multiline batch when the cap is negotiated" <|
@@ -806,34 +2703,65 @@ suite =
                     , SendLine "@batch=ml0 PRIVMSG #c :one\r\n"
                     , SendLine "@batch=ml0 PRIVMSG #c :two\r\n"
                     , SendLine "BATCH -ml0\r\n"
-                    , VaultPersist
-                        { target = "#c"
+                    , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                            [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "me", body = "one", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                            , { id = "#c:1", wireMessageId = Nothing, target = "#c", from = "me", body = "two", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                             ]
                         }
                     ]
                     out
-        , test "composer falls back to one line without the cap" <|
+        , test "composer keeps multiline draft when the cap is unavailable" <|
             \_ ->
                 let
-                    ( _, out ) =
+                    ( next, out ) =
                         update (ComposerInput "one\ntwo")
                             { blank | activeChannel = Just "#c" }
                             |> Tuple.first
                             |> (\m2 -> update ComposerSend m2)
                 in
-                -- No cap: single PRIVMSG with wire controls stripped,
-                -- plus the optimistic render and vault persist.
-                Expect.equal
-                    [ SendLine "PRIVMSG #c onetwo\r\n"
-                    , VaultPersist
-                        { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
-                        }
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal "one\ntwo" next.composer
+                    , \_ -> Expect.equal (Just "This server does not support multiline messages; your draft was kept.") next.composerError
+                    , \_ -> Expect.equal 0 next.messageSeq
                     ]
-                    out
+                    ()
+        , test "composer rejects a field-shaped multiline target before planning" <|
+            \_ ->
+                let
+                    ( entered, _ ) =
+                        update (ComposerInput "one\ntwo")
+                            { blank | activeChannel = Just "#c extra", caps = [ "draft/multiline" ] }
+
+                    ( next, out ) =
+                        update ComposerSend entered
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal "one\ntwo" next.composer
+                    , \_ -> Expect.equal 0 next.messageSeq
+                    , \_ -> Expect.equal (Just "The message could not be sent because it exceeds the client wire limits.") next.composerError
+                    ]
+                    ()
+        , test "composer rejects CR/NUL controls before sending and keeps the draft" <|
+            \_ ->
+                let
+                    text = "unsafe\r\nJOIN #hidden"
+
+                    ( edited, _ ) =
+                        update (ComposerInput text) { blank | activeChannel = Just "#c" }
+
+                    ( next, out ) =
+                        update ComposerSend edited
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal text next.composer
+                    , \_ -> Expect.equal 0 next.messageSeq
+                    , \_ -> Expect.equal [] (channelBodies next)
+                    ]
+                    ()
         , test "own untagged echo drops without echo-message" <|
             \_ ->
                 let
@@ -1013,8 +2941,11 @@ suite =
         , test "short plain close proves history exhausted" <|
             \_ ->
                 let
+                    ( requested, _ ) =
+                        requestJoinHistory { blank | caps = [ "chathistory" ] } "#c"
+
                     ( opened, _ ) =
-                        feed blank "BATCH +h1 draft/chathistory #c"
+                        feed requested "BATCH +h1 draft/chathistory #c"
 
                     ( held, _ ) =
                         feed opened "@batch=h1 :bob!u@h PRIVMSG #c :old"
@@ -1032,11 +2963,181 @@ suite =
                     , \_ -> Expect.equal 50 historyPageSize
                     ]
                     ()
+        , test "catch-up AFTER anchors at the newest buffered row beyond one page" <|
+            \_ ->
+                let
+                    rows =
+                        List.range 1 51
+                            |> List.reverse
+                            |> List.map (\id -> historyMessage id (id * 1000))
+
+                    base =
+                        historyRoom rows
+
+                    ( requested, out ) =
+                        update ThreadCatchUp base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CHATHISTORY AFTER #c msgid=history-51 50\r\n" ] out
+                    , \_ -> Expect.equal True (Set.member "#c" requested.historyLoading)
+                    ]
+                    ()
+        , test "short or empty AFTER and BETWEEN batches do not exhaust older history" <|
+            \_ ->
+                let
+                    base =
+                        historyRoom [ historyMessage 2 2000, historyMessage 1 1000 ]
+
+                    ( afterRequested, afterOut ) =
+                        update ThreadCatchUp base
+
+                    ( afterOpened, _ ) =
+                        feed afterRequested "BATCH +after draft/chathistory #c"
+
+                    ( afterClosed, _ ) =
+                        feed afterOpened "BATCH -after"
+
+                    ( afterEarlier, afterBeforeOut ) =
+                        update ThreadShowEarlier { afterClosed | threadWindowSize = 320 }
+
+                    ( betweenRequested, betweenOut ) =
+                        update ThreadFillGaps base
+
+                    ( betweenOpened, _ ) =
+                        feed betweenRequested "BATCH +between draft/chathistory #c"
+
+                    ( betweenClosed, _ ) =
+                        feed betweenOpened "BATCH -between"
+
+                    ( betweenEarlier, betweenBeforeOut ) =
+                        update ThreadShowEarlier { betweenClosed | threadWindowSize = 320 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CHATHISTORY AFTER #c msgid=history-2 50\r\n" ] afterOut
+                    , \_ -> Expect.equal [ SendLine "CHATHISTORY BETWEEN #c msgid=history-2 msgid=history-1 50\r\n" ] betweenOut
+                    , \_ -> Expect.equal False (isHistoryExhausted afterClosed "#c")
+                    , \_ -> Expect.equal False (isHistoryExhausted betweenClosed "#c")
+                    , \_ -> Expect.equal True (Dict.isEmpty afterClosed.pendingHistoryRequests)
+                    , \_ -> Expect.equal True (Dict.isEmpty betweenClosed.pendingHistoryRequests)
+                    , \_ -> Expect.equal True (List.any (String.startsWith "CHATHISTORY BEFORE #c msgid=history-1" << sendLineText) afterBeforeOut)
+                    , \_ -> Expect.equal True (List.any (String.startsWith "CHATHISTORY BEFORE #c msgid=history-1" << sendLineText) betweenBeforeOut)
+                    , \_ -> Expect.equal True (Set.member "#c" afterEarlier.historyLoading)
+                    , \_ -> Expect.equal True (Set.member "#c" betweenEarlier.historyLoading)
+                    ]
+                    ()
+        , test "short BEFORE batch still proves older history exhausted" <|
+            \_ ->
+                let
+                    base =
+                        historyRoom [ historyMessage 2 2000, historyMessage 1 1000 ]
+
+                    ( requested, out ) =
+                        update ThreadShowEarlier base
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +before draft/chathistory #c"
+
+                    ( held, _ ) =
+                        feed opened "@batch=before;msgid=history-0 :alice!u@h PRIVMSG #c :older"
+
+                    ( closed, _ ) =
+                        feed held "BATCH -before"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CHATHISTORY BEFORE #c msgid=history-1 50\r\n" ] out
+                    , \_ -> Expect.equal True (List.any (\row -> row.body == "older" && row.msgid == Just "history-0") (dmMessages closed "#c"))
+                    , \_ -> Expect.equal True (isHistoryExhausted closed "#c")
+                    , \_ -> Expect.equal False (Set.member "#c" closed.historyLoading)
+                    ]
+                    ()
+        , test "mismatched and stale history batches cannot borrow request direction" <|
+            \_ ->
+                let
+                    base =
+                        historyRoom [ historyMessage 2 2000, historyMessage 1 1000 ]
+
+                    ( afterRequested, _ ) =
+                        update ThreadCatchUp base
+
+                    ( otherOpened, _ ) =
+                        feed afterRequested "BATCH +other draft/chathistory #other"
+
+                    ( otherClosed, _ ) =
+                        feed otherOpened "BATCH -other"
+
+                    staleRequest =
+                        { otherClosed
+                            | pendingHistoryRequests =
+                                Dict.map
+                                    (\_ pending -> { pending | connectionGeneration = pending.connectionGeneration - 1 })
+                                    otherClosed.pendingHistoryRequests
+                        }
+
+                    ( staleOpened, _ ) =
+                        feed staleRequest "BATCH +stale draft/chathistory #c"
+
+                    ( staleClosed, _ ) =
+                        feed staleOpened "BATCH -stale"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (isHistoryExhausted otherClosed "#c")
+                    , \_ -> Expect.equal False (isHistoryExhausted otherClosed "#other")
+                    , \_ -> Expect.equal True (Dict.member "#c" otherClosed.pendingHistoryRequests)
+                    , \_ -> Expect.equal False (isHistoryExhausted staleClosed "#c")
+                    , \_ -> Expect.equal False (Set.member "#c" staleClosed.historyLoading)
+                    , \_ -> Expect.equal True (Dict.isEmpty staleClosed.pendingHistoryRequests)
+                    ]
+                    ()
+        , test "same-physical account and network changes retire pending history direction" <|
+            \_ ->
+                let
+                    oldOwner =
+                        testRuntimeOwner
+
+                    room =
+                        historyRoom [ historyMessage 2 2000, historyMessage 1 1000 ]
+
+                    base =
+                        { room | runtimeOwnerStamp = Just oldOwner, accountName = oldOwner.accountId }
+
+                    ( requested, _ ) =
+                        update ThreadCatchUp base
+
+                    changedAccount =
+                        { oldOwner
+                            | ownerRef = "owner_bob_000000000000000000000000"
+                            , accountId = Just "bob"
+                            , accountGeneration = oldOwner.accountGeneration + 1
+                        }
+
+                    changedNetwork =
+                        { oldOwner
+                            | ownerRef = "owner_other_network_00000000000000000000"
+                            , networkId = "other_network"
+                        }
+
+                    ( accountChanged, _ ) =
+                        update (RuntimeOwnerStateReceived changedAccount) requested
+
+                    ( networkChanged, _ ) =
+                        update (RuntimeOwnerStateReceived changedNetwork) requested
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (Dict.isEmpty requested.pendingHistoryRequests)
+                    , \_ -> Expect.equal True (Dict.isEmpty accountChanged.pendingHistoryRequests)
+                    , \_ -> Expect.equal True (Set.isEmpty accountChanged.historyLoading)
+                    , \_ -> Expect.equal True (Dict.isEmpty networkChanged.pendingHistoryRequests)
+                    , \_ -> Expect.equal True (Set.isEmpty networkChanged.historyLoading)
+                    ]
+                    ()
         , test "full-page plain close keeps history open" <|
             \_ ->
                 let
+                    ( requested, _ ) =
+                        requestJoinHistory { blank | caps = [ "chathistory" ] } "#c"
+
                     ( opened, _ ) =
-                        feed blank "BATCH +h1 draft/chathistory #c"
+                        feed requested "BATCH +h1 draft/chathistory #c"
 
                     flooded =
                         List.foldl
@@ -1363,8 +3464,11 @@ suite =
         , test "short replay-only batch proves history exhausted" <|
             \_ ->
                 let
+                    ( requested, _ ) =
+                        requestJoinHistory { blank | caps = [ "chathistory" ] } "#c"
+
                     ( opened, _ ) =
-                        feed blank "BATCH +h1 draft/chathistory #c"
+                        feed requested "BATCH +h1 draft/chathistory #c"
 
                     ( e1, _ ) =
                         feed opened "@batch=h1 :bob!u@h JOIN #c"
@@ -1598,7 +3702,7 @@ suite =
                 in
                 Expect.equal [ "same" ]
                     (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
-        , test "unknown batch closes and foreign children fold live" <|
+        , test "unknown batch closes and foreign children stay quarantined" <|
             \_ ->
                 let
                     ( m1, out1 ) =
@@ -1612,9 +3716,7 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [] out1
-                    , \_ ->
-                        Expect.equal [ "live" ]
-                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    , \_ -> Expect.equal [] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
                     , \_ -> Expect.equal [] out3
                     ]
                     ()
@@ -1643,7 +3745,7 @@ suite =
                         in
                         List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels)))
                 in
-                Expect.equal (List.repeat (List.length opens) [ "live" ]) (List.map tryOpen opens)
+                Expect.equal (List.repeat (List.length opens) []) (List.map tryOpen opens)
         , test "open batch refs dedupe and cap at 64" <|
             \_ ->
                 let
@@ -1664,7 +3766,7 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        Expect.equal [ "live" ]
+                        Expect.equal []
                             (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels))))
                     , \_ -> Expect.equal Nothing (Dict.get "#other" diverted.channels)
                     ]
@@ -2211,9 +4313,90 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ UploadSend { key = "att-0", endpoint = "/upload", fieldName = "file", index = 0 } ] sendOut
-                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :hi[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c hi\r\n") doneOut)
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
                     , \_ -> Expect.equal [] m4.attachments
                     , \_ -> Expect.equal "" m4.composer
+                    ]
+                    ()
+        , test "attachment send rejects raw caption controls before trim or upload" <|
+            \_ ->
+                let
+                    joined =
+                        liveRoom "me" "#c"
+
+                    uploaded =
+                        { id = 0
+                        , key = "att-0"
+                        , position = 0
+                        , name = "a.png"
+                        , size = 10
+                        , mime = "image/png"
+                        , status = StagedUploaded "/uploads/a.png"
+                        , progress = Just 100
+                        }
+
+                    invalidCaptions =
+                        [ "caption\r"
+                        , "caption" ++ String.fromChar (Char.fromCode 0)
+                        , "caption" ++ String.fromChar (Char.fromCode 0xD800)
+                        ]
+
+                    attempt caption =
+                        update ComposerSend { joined | composer = caption, attachments = [ uploaded ] }
+
+                    outcomes =
+                        List.map attempt invalidCaptions
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (List.repeat 3 []) (List.map Tuple.second outcomes)
+                    , \_ -> Expect.equal invalidCaptions (List.map (.composer << Tuple.first) outcomes)
+                    , \_ -> Expect.equal (List.repeat 3 [ uploaded ]) (List.map (.attachments << Tuple.first) outcomes)
+                    , \_ -> Expect.equal (List.repeat 3 (Just "The attachment caption contains a character the client cannot send; your caption and attachments were kept.") ) (List.map (.composerError << Tuple.first) outcomes)
+                    ]
+                    ()
+        , test "a later invalid tagged attachment receipt aborts the whole send group" <|
+            \_ ->
+                let
+                    joined =
+                        liveRoom "me" "#c"
+
+                    validReceipt =
+                        { id = 0
+                        , key = "att-0"
+                        , position = 0
+                        , name = "first.png"
+                        , size = 10
+                        , mime = "image/png"
+                        , status = StagedUploaded "/uploads/first.png"
+                        , progress = Just 100
+                        }
+
+                    invalidReceipt =
+                        { id = 1
+                        , key = "att-1"
+                        , position = 1
+                        , name = "second.png"
+                        , size = 10
+                        , mime = "image/png"
+                        , status = StagedUploaded "https://example.test/bad\nurl"
+                        , progress = Just 100
+                        }
+
+                    tagged =
+                        { joined | caps = [ "labeled-response" ], composer = "caption", attachments = [ validReceipt, invalidReceipt ] }
+
+                    ( refused, out ) =
+                        update ComposerSend tagged
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal "caption" refused.composer
+                    , \_ -> Expect.equal [ validReceipt, invalidReceipt ] refused.attachments
+                    , \_ -> Expect.equal Nothing refused.pendingAttachmentSend
+                    , \_ -> Expect.equal tagged.messageSeq refused.messageSeq
+                    , \_ -> Expect.equal True (Dict.isEmpty refused.pendingLabels)
+                    , \_ -> Expect.equal (Just "The attachment message could not be sent; your caption and attachments were kept.") refused.composerError
                     ]
                     ()
         , test "a second send while uploading neither aborts nor duplicates" <|
@@ -2240,7 +4423,8 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [ UploadSend { key = "att-0", endpoint = "/upload", fieldName = "file", index = 0 } ] sendOut
                     , \_ -> Expect.equal [] sendOut2
-                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :two[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c two\r\n") doneOut)
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
                     , \_ -> Expect.equal [] m5.attachments
                     ]
                     ()
@@ -2809,13 +4993,13 @@ suite =
             \_ ->
                 let
                     window =
-                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                        [ { id = "#c:9", wireMessageId = Nothing, target = "#c", from = "bob", body = "old", at = 1791115200000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
 
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
 
                     ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                        update (vaultRowsAroundReceived "#c" 150 window "ok") m1
                 in
                 Expect.equal [ 1791115200000 ]
                     (case Dict.get "#c" m2.channels of
@@ -2829,16 +5013,16 @@ suite =
             \_ ->
                 let
                     window =
-                        [ { id = "#c:9", target = "#c", from = "bob", body = "[Message deleted]", at = 1791115200000, rowType = "msg", deleted = False, redacted = True , replyTo = Nothing } ]
+                        [ { id = "#c:9", wireMessageId = Nothing, target = "#c", from = "bob", body = "[Message deleted]", at = 1791115200000, rowType = "msg", deleted = False, redacted = True , replyTo = Nothing } ]
 
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
 
                     ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                        update (vaultRowsAroundReceived "#c" 150 window "ok") m1
 
                     ( f2, _ ) =
-                        update (VaultRowsReceived { target = "#c", rows = window, status = "ok" }) m1
+                        update (vaultRowsReceived "#c" window "ok") m1
 
                     flags model =
                         case Dict.get "#c" model.channels of
@@ -3090,11 +5274,11 @@ suite =
                             back.replyingTo
                     ]
                     ()
-        , test "edit send saves, clears, and refuses empty or refused edits" <|
+        , test "edit send remains pending until server acceptance and refuses empty or refused edits" <|
             \_ ->
                 let
                     live =
-                        { blank | connection = Live, ourNick = "me", caps = [ "draft/message-editing" ] }
+                        { blank | connection = Live, ourNick = "me", caps = [ "draft/message-editing" ], runtimeOwnerStamp = Just testRuntimeOwner }
 
                     ( m1, _ ) =
                         feed (joinFirst live "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
@@ -3124,10 +5308,11 @@ suite =
                         Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ SendLine "EDIT #c m9 mine!\r\n" ] savedOut
-                    , \_ -> Expect.equal Nothing saved.editingMessage
-                    , \_ -> Expect.equal "" saved.composer
-                    , \_ -> Expect.equal [ "mine!" ] (List.map .body (bodies saved))
+                    [ \_ -> Expect.equal [ "EDIT #c m9 :mine!\r\n" ] (sendLines savedOut)
+                    , \_ -> Expect.equal armed.editingMessage saved.editingMessage
+                    , \_ -> Expect.equal "mine!" saved.composer
+                    , \_ -> Expect.equal [ "mine" ] (List.map .body (bodies saved))
+                    , \_ -> Expect.equal True (editOutcomeUnknown saved "#c" "m9")
                     , \_ -> Expect.equal [] emptyOut
                     , \_ -> Expect.equal armed.editingMessage emptied.editingMessage
                     , \_ -> Expect.equal [] offlineOut
@@ -3325,7 +5510,7 @@ suite =
                     , \_ -> Expect.equal Nothing quoted.messageMenu
                     , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = True }) deleteAsked.messageMenu
                     , \_ -> Expect.equal Nothing deleted.messageMenu
-                    , \_ -> Expect.equal [ SendLine "REDACT #c m9 Deleted\r\n" ] deleteOut
+                    , \_ -> Expect.equal [ SendLine "REDACT #c m9 :Deleted\r\n" ] deleteOut
                     , \_ -> Expect.equal [ ClipboardCopy { text = "theirs", tag = "message-copy" } ] copyOut
                     , \_ -> Expect.equal Nothing copied.messageMenu
                     , \_ -> Expect.equal [] copyGoneOut
@@ -3404,6 +5589,7 @@ suite =
                     oppedBase =
                         { blank
                             | ourNick = "me"
+                            , isupport = { defaultIsupport | ircx = True }
                             , channels =
                                 Dict.singleton "#c"
                                     (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
@@ -3412,11 +5598,20 @@ suite =
                     ( m1, _ ) =
                         feed oppedBase "@msgid=m1 :alice!u@h PRIVMSG #c :hello"
 
-                    ( pinned, _ ) =
+                    ( pinned, pinnedOut ) =
                         update (MessagePinToggle { target = "#c", msgid = "m1" }) m1
 
-                    ( unpinned, _ ) =
-                        update (MessagePinToggle { target = "#c", msgid = "m1" }) pinned
+                    ( echoed, _ ) =
+                        feed pinned ":me!u@h PROP #c PINS m1"
+
+                    ( unpinned, unpinnedOut ) =
+                        update (MessagePinToggle { target = "#c", msgid = "m1" }) echoed
+
+                    ( unechoed, _ ) =
+                        feed unpinned ":me!u@h PROP #c PINS :"
+
+                    defaultIsupport =
+                        Isupport.defaultSupport
 
                     ( refused, _ ) =
                         update (MessagePinToggle { target = "bob", msgid = "m1" }) m1
@@ -3437,9 +5632,15 @@ suite =
                         update (MessageCollapseToggle { nick = "   " }) m1
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "m1" ] (channelPins pinned "#c")
+                    -- Pin writes wait for the server echo (audit
+                    -- 2026-11-05): the committed list moves only on PROP.
+                    [ \_ -> Expect.equal [] (channelPins pinned "#c")
+                    , \_ -> Expect.equal [ "PROP #c PINS m1\r\n" ] (sendLines pinnedOut)
+                    , \_ -> Expect.equal [ "m1" ] (channelPins echoed "#c")
                     , \_ -> Expect.equal Nothing pinned.messageMenu
-                    , \_ -> Expect.equal [] (channelPins unpinned "#c")
+                    , \_ -> Expect.equal [ "PROP #c PINS :\r\n" ] (sendLines unpinnedOut)
+                    , \_ -> Expect.equal [ "m1" ] (channelPins unpinned "#c")
+                    , \_ -> Expect.equal [] (channelPins unechoed "#c")
                     , \_ -> Expect.equal [] (channelPins refused "#c")
                     , \_ -> Expect.equal Nothing refused.messageMenu
                     , \_ -> Expect.equal True (Set.member "alice" ignored.ignoredUsers)
@@ -3722,7 +5923,7 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [] earlyOut
-                    , \_ -> Expect.equal [ VaultSearch { query = "hello", limit = 80, seq = 1, mode = "hybrid", activeTarget = Nothing, selfNick = "me", nowMs = 1300 } ] firedOut
+                    , \_ -> Expect.equal [ VaultSearch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  query = "hello", limit = 80, seq = 1, mode = "hybrid", activeTarget = Nothing, selfNick = "me", nowMs = 1300 } ] firedOut
                     , \_ -> Expect.equal 0 fired.vaultSearchDueAt
                     , \_ -> Expect.equal [] againOut
                     ]
@@ -3731,8 +5932,8 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        [ { id = "#b:7", wireMessageId = Nothing, target = "#b", from = "bob", body = "hello there", at = 2000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        , { id = "#a:3", wireMessageId = Nothing, target = "#a", from = "alice", body = "hello again", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
                     ( scheduled, _ ) =
@@ -3751,9 +5952,9 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        [ { id = "dave:1", wireMessageId = Nothing, target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        , { id = "erin:1", wireMessageId = Nothing, target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        , { id = "#c:1", wireMessageId = Nothing, target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
                     ( scheduled, _ ) =
@@ -3848,7 +6049,7 @@ suite =
                 Expect.all
                     [ \_ ->
                         Expect.equal
-                            [ VaultSearch { query = "hello", limit = 80, seq = 1, mode = "exact", activeTarget = Just "#c", selfNick = "me", nowMs = 1300 } ]
+                            [ VaultSearch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  query = "hello", limit = 80, seq = 1, mode = "exact", activeTarget = Just "#c", selfNick = "me", nowMs = 1300 } ]
                             firedOut
                     , \_ -> Expect.equal ExactVaultSearch collected.vaultSearchModeShown
                     , \_ -> Expect.equal SemanticVaultSearch retoggled.vaultSearchMode
@@ -3884,7 +6085,7 @@ suite =
                     [ \_ -> Expect.equal (Just "#b") m.activeChannel
                     , \_ -> Expect.equal False m.searchOpen
                     , \_ -> Expect.equal VaultSearchIdle m.vaultStatus
-                    , \_ -> Expect.equal [ VaultFetchAround { target = "#b", at = 2000, limit = 400 } ] out
+                    , \_ -> Expect.equal [ VaultFetchAround { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#b", at = 2000, limit = 400 } ] out
                     ]
                     ()
         , test "recall pivots include vault hit text" <|
@@ -3954,7 +6155,7 @@ suite =
                     , \_ -> Expect.equal 1 (List.length (List.filter isVaultPersist out2))
                     ]
                     ()
-        , test "bare ACK confirms the pending row in place" <|
+        , test "bare ACK completes response only and leaves delivery unknown" <|
             \_ ->
                 let
                     label =
@@ -3968,8 +6169,10 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ "hi" ] (channelBodies m2)
-                    , \_ -> Expect.equal [ False ] (channelPendings m2)
+                    , \_ -> Expect.equal [ True ] (channelPendings m2)
                     , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown m2) (dmMessages m2 "#c"))
+                    , \_ -> Expect.equal 1 (Dict.size m2.uncertainLabels)
                     , \_ -> Expect.equal [] out2
                     ]
                     ()
@@ -4051,7 +6254,7 @@ suite =
                     , \_ -> Expect.equal [] out
                     ]
                     ()
-        , test "registry eviction promotes the oldest row past 128 in flight" <|
+        , test "registry eviction preserves delivery-unknown rows past 128 in flight" <|
             \_ ->
                 let
                     texts =
@@ -4071,14 +6274,15 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal Labels.maxPendingLabeledSends (Dict.size sequenced.pendingLabels)
                     , \_ ->
-                        Expect.equal Labels.maxPendingLabeledSends
+                        Expect.equal (Labels.maxPendingLabeledSends + 2)
                             (List.length (List.filter identity (channelPendings sequenced)))
+                    , \_ -> Expect.equal 2 (Set.size sequenced.deliveryUnknownIds)
                     , \_ ->
                         Expect.equal (Labels.maxPendingLabeledSends + 2)
                             (List.length (channelBodies sequenced))
                     ]
                     ()
-        , test "disconnect confirms every pending row and clears the registry" <|
+        , test "disconnect leaves in-flight rows delivery unknown and clears old correlations" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -4088,8 +6292,10 @@ suite =
                         update (WsClosed { clean = True, reason = "test" }) m1
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ False ] (channelPendings m2)
+                    [ \_ -> Expect.equal [ True ] (channelPendings m2)
                     , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal 1 (Set.size m2.deliveryUnknownIds)
+                    , \_ -> Expect.equal Dict.empty m2.uncertainLabels
                     , \_ -> Expect.equal [] out2
                     ]
                     ()
@@ -4129,7 +6335,7 @@ suite =
                         feed m1 ("@label=" ++ label ++ " BATCH +ml0 draft/multiline #c")
 
                     ( m3, _ ) =
-                        feed m2 "@batch=ml0 :alice!u@h PRIVMSG #c :one"
+                        feed m2 "@batch=ml0;msgid=multiline-echo-1 :alice!u@h PRIVMSG #c :one"
 
                     ( m4, _ ) =
                         feed m3 "@batch=ml0 :alice!u@h PRIVMSG #c :two"
@@ -4155,7 +6361,7 @@ suite =
                     , \_ -> Expect.equal True (List.any isVaultPersist closedOut)
                     ]
                     ()
-        , test "labeled-response wrapper batch resolves a single send" <|
+        , test "labeled-response wrapper settles only an exact msgid self echo" <|
             \_ ->
                 let
                     label =
@@ -4168,7 +6374,7 @@ suite =
                         feed m1 ("@label=" ++ label ++ " BATCH +w1 labeled-response")
 
                     ( m3, _ ) =
-                        feed m2 "@batch=w1 :alice!u@h PRIVMSG #c :hi"
+                        feed m2 "@batch=w1;msgid=wrapper-echo-1 :alice!u@h PRIVMSG #c :hi"
 
                     ( m4, _ ) =
                         feed m3 "BATCH -w1"
@@ -4176,8 +6382,63 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [ "hi" ] (channelBodies m4)
                     , \_ -> Expect.equal [ False ] (channelPendings m4)
+                    , \_ -> Expect.equal [ False ] (List.map (isDeliveryUnknown m4) (dmMessages m4 "#c"))
                     , \_ -> Expect.equal Dict.empty m4.pendingLabels
+                    , \_ -> Expect.equal (Just [ "wrapper-echo-1" ]) (Dict.get "#c" m4.seenMsgids)
                     , \_ -> Expect.equal Set.empty m4.ownEchoBatches
+                    ]
+                    ()
+        , test "an empty completed labeled-response wrapper marks delivery unknown" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                    ( m2, _ ) =
+                        feed m1 ("@label=" ++ label ++ " BATCH +w-empty labeled-response")
+
+                    ( m3, _ ) =
+                        feed m2 "BATCH -w-empty"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ True ] (channelPendings m3)
+                    , \_ -> Expect.equal Dict.empty m3.pendingLabels
+                    , \_ -> Expect.equal 1 (Dict.size m3.uncertainLabels)
+                    , \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown m3) (dmMessages m3 "#c"))
+                    ]
+                    ()
+        , test "nested labeled response settles only its exact self echo under a generic wrapper" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                    ( m2, _ ) =
+                        feed m1 "BATCH +outer wrapper"
+
+                    ( m3, _ ) =
+                        feed m2 ("@batch=outer;label=" ++ label ++ " BATCH +inner labeled-response")
+
+                    ( m4, _ ) =
+                        feed m3 "@batch=inner;msgid=nested-echo-1 :alice!u@h PRIVMSG #c :hi"
+
+                    ( m5, _ ) =
+                        feed m4 "@batch=outer BATCH -inner"
+
+                    ( m6, _ ) =
+                        feed m5 "BATCH -outer"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ False ] (channelPendings m6)
+                    , \_ -> Expect.equal Dict.empty m6.pendingLabels
+                    , \_ -> Expect.equal (Just [ "nested-echo-1" ]) (Dict.get "#c" m6.seenMsgids)
+                    , \_ -> Expect.equal Dict.empty m6.historyBatches
                     ]
                     ()
         , test "foreign multiline batches reassemble without touching echo state" <|
@@ -4204,7 +6465,7 @@ suite =
                     , \_ -> Expect.equal [] (channelBodies m2)
                     , \_ -> Expect.equal [] (channelBodies m3)
                     , \_ -> Expect.equal [ "hi\nthere" ] (channelBodies m4)
-                    , \_ -> Expect.equal [ "hi" ] (channelBodies m5)
+                    , \_ -> Expect.equal [] (channelBodies m5)
                     ]
                     ()
         , test "multiline concat joins without a newline and keeps first-line provenance" <|
@@ -4326,8 +6587,10 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ "two", "one" ] (channelBodies closed)
-                    , \_ -> Expect.equal [ False, False ] (channelPendings closed)
+                    , \_ -> Expect.equal [ True, True ] (channelPendings closed)
                     , \_ -> Expect.equal Dict.empty closed.pendingLabels
+                    , \_ -> Expect.equal 1 (Dict.size closed.uncertainLabels)
+                    , \_ -> Expect.equal [ True, True ] (List.map (isDeliveryUnknown closed) (dmMessages closed "#c"))
                     , \_ -> Expect.equal Dict.empty closed.historyBatches
                     ]
                     ()
@@ -4356,7 +6619,7 @@ suite =
                         in
                         List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels)))
                 in
-                Expect.equal (List.repeat (List.length opens) [ "live" ]) (List.map tryOpen opens)
+                Expect.equal (List.repeat (List.length opens) []) (List.map tryOpen opens)
         , test "001 with chathistory cap requests a TARGETS sweep" <|
             \_ ->
                 let
@@ -4396,11 +6659,24 @@ suite =
                     seeded =
                         { blank | ourNick = "kai", props = { prior | synced = Set.singleton "#c" } }
 
+                    owner =
+                        { ownerRef = "test_owner_000000000000000000000000"
+                        , networkId = "test_network"
+                        , accountId = Just "alice"
+                        , accountGeneration = 1
+                        , connectionGeneration = 1
+                        }
+
+                    ready =
+                        update (RuntimeFeatureReadinessReceived { roundRef = "test_round_000000000000000000000000", ownerRef = owner.ownerRef, accountGeneration = owner.accountGeneration, connectionGeneration = owner.connectionGeneration, e2ee = False, media = True, newCapabilities = [] })
+                            { seeded | runtimeOwnerStamp = Just owner, caps = [ "onyx/media" ] }
+                            |> Tuple.first
+
                     ( m, _ ) =
-                        feed seeded ":irc.example 001 Guest7 :welcome home"
+                        feed ready ":irc.example 001 Guest7 :welcome home"
 
                     ( bare, _ ) =
-                        feed seeded ":irc.example 001"
+                        feed ready ":irc.example 001"
                 in
                 Expect.all
                     [ \_ -> Expect.equal "Guest7" m.ourNick
@@ -6219,13 +8495,169 @@ suite =
                         feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :hi"
                 in
                 Expect.equal
-                    [ VaultPersist
-                        { target = "#c"
+                    [ VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                            [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "alice", body = "hi", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                         }
                     ]
                     outbound
+        , test "live owned PRIVMSG bursts coalesce to one latest full-buffer vault snapshot" <|
+            \_ ->
+                let
+                    live =
+                        liveRoom "me" "#c"
+
+                    base =
+                        { live | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                    messages =
+                        [ ":alice!u@h PRIVMSG #c :first"
+                        , ":bob!u@h PRIVMSG #c :middle"
+                        , ":carol!u@h PRIVMSG #c :latest"
+                        ]
+
+                    ( queued, ingressOut ) =
+                        List.foldl
+                            (\line ( current, out ) ->
+                                let
+                                    ( next, emitted ) =
+                                        feed current line
+                                in
+                                ( next, out ++ emitted )
+                            )
+                            ( base, [] )
+                            messages
+
+                    vaultRequests outbound =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    VaultPersist request ->
+                                        Just request
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outbound
+
+                    ( flushed, tickOut ) =
+                        update (Tick (Time.millisToPosix 1000)) queued
+
+                    ( quiet, quietOut ) =
+                        update (Tick (Time.millisToPosix 2000)) flushed
+
+                    flushedRequests =
+                        vaultRequests tickOut
+
+                    bodies =
+                        flushedRequests
+                            |> List.concatMap (.rows >> List.map .body)
+                            |> List.sort
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (vaultRequests ingressOut)
+                    , \_ -> Expect.equal 1 (List.length flushedRequests)
+                    , \_ -> Expect.equal [ "first", "latest", "middle" ] bodies
+                    , \_ -> Expect.equal [ "#c" ] (List.map .target flushedRequests)
+                    , \_ -> Expect.equal [] (vaultRequests quietOut)
+                    , \_ -> Expect.equal 0 (Dict.size quiet.vaultDirtyTargets)
+                    ]
+                    ()
+        , test "dirty vault targets drain at most four per tick and survive in fair order" <|
+            \_ ->
+                let
+                    joined =
+                        List.foldl
+                            (\channel model -> Tuple.first (feed model (":me!u@h JOIN " ++ channel)))
+                            (liveRoom "me" "#a")
+                            [ "#b", "#c", "#d", "#e" ]
+
+                    owned =
+                        { joined | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                    ( queued, ingressOut ) =
+                        List.foldl
+                            (\channel ( current, out ) ->
+                                let
+                                    ( next, emitted ) =
+                                        feed current (":alice!u@h PRIVMSG " ++ channel ++ " :body " ++ channel)
+                                in
+                                ( next, out ++ emitted )
+                            )
+                            ( owned, [] )
+                            [ "#a", "#b", "#c", "#d", "#e" ]
+
+                    targets outbound =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    VaultPersist request ->
+                                        Just request.target
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outbound
+
+                    ( first, firstOut ) =
+                        update (Tick (Time.millisToPosix 1000)) queued
+
+                    ( second, secondOut ) =
+                        update (Tick (Time.millisToPosix 2000)) first
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (targets ingressOut)
+                    , \_ -> Expect.equal [ "#a", "#b", "#c", "#d" ] (targets firstOut)
+                    , \_ -> Expect.equal [ "#e" ] (targets secondOut)
+                    , \_ -> Expect.equal 0 (Dict.size second.vaultDirtyTargets)
+                    ]
+                    ()
+        , test "owner and workspace changes discard pending vault flushes" <|
+            \_ ->
+                let
+                    live =
+                        liveRoom "me" "#c"
+
+                    base =
+                        { live | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                    ( queued, _ ) =
+                        feed base ":alice!u@h PRIVMSG #c :must not cross owners"
+
+                    changedOwner =
+                        { testRuntimeOwner | ownerRef = "new_owner_000000000000000000000000", accountId = Just "bob", accountGeneration = 2 }
+
+                    ( retired, retirementOut ) =
+                        update (RuntimeOwnerStateReceived changedOwner) queued
+
+                    ( retiredTick, retiredTickOut ) =
+                        update (Tick (Time.millisToPosix 1000)) retired
+
+                    ( workspacePending, workspaceOut ) =
+                        update (RuntimeDomainActionRequested (RuntimeDomain.SelectWorkspace "workspace-b")) queued
+
+                    ( workspaceTicked, workspaceTickOut ) =
+                        update (Tick (Time.millisToPosix 1000)) workspacePending
+
+                    vaultTargets outbound =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    VaultPersist request ->
+                                        Just request.target
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outbound
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (vaultTargets retirementOut ++ vaultTargets retiredTickOut)
+                    , \_ -> Expect.equal Dict.empty retiredTick.vaultDirtyTargets
+                    , \_ -> Expect.equal [] (vaultTargets workspaceOut ++ vaultTargets workspaceTickOut)
+                    , \_ -> Expect.equal Dict.empty workspaceTicked.vaultDirtyTargets
+                    ]
+                    ()
         , test "PING fold emits no VaultPersist" <|
             \_ ->
                 let
@@ -6253,7 +8685,7 @@ suite =
                     ( _, outbound ) =
                         update (ChannelSelect "#c") joined
                 in
-                Expect.equal [ VaultFetch { target = "#c", limit = 400 } ] outbound
+                Expect.equal [ VaultFetch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  target = "#c", limit = 400 } ] outbound
         , test "ChannelSelect on a live channel emits no fetch" <|
             \_ ->
                 let
@@ -6272,12 +8704,9 @@ suite =
 
                     ( loaded, _ ) =
                         update
-                            (VaultRowsReceived
-                                { target = "#c"
-                                , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
-                                , status = "ok"
-                                }
+                            (vaultRowsReceived "#c"
+                                [ { id = "#c:7", wireMessageId = Nothing, target = "#c", from = "alice", body = "old", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                                "ok"
                             )
                             joined
                 in
@@ -6302,7 +8731,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                                    [ { id = "#c:7", wireMessageId = Nothing, target = "#c", from = "alice", body = "stale", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                                 , status = "ok"
                                 }
                             )
@@ -6329,7 +8758,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#a"
                                 , rows =
-                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                                    [ { id = "#ab:5", wireMessageId = Nothing, target = "#ab", from = "x", body = "nope", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                                 , status = "ok"
                                 }
                             )
@@ -6452,7 +8881,7 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [ 0 ] (List.map .id (persistableVaultRows rows))
                     , \_ ->
-                        Expect.equal [ { target = "#c", rows = [] } ]
+                        Expect.equal [ { target = "#c", rows = [], ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing } ]
                             (persists flushOut)
                     , \_ -> Expect.equal [] (persists quietOut)
                     , \_ -> Expect.equal True (Dict.member "#c" quiet.vaultPersistSig)
@@ -6476,7 +8905,7 @@ suite =
                 Expect.all
                     [ \_ ->
                         Expect.equal
-                            "Local history is unavailable on this device."
+                            "Local history is unavailable or incomplete because its retention policy is unknown."
                             (Maybe.withDefault "" (List.head empty.serviceLog))
                     , \_ -> Expect.equal m1.serviceLog m2.serviceLog
                     ]
@@ -6488,12 +8917,12 @@ suite =
                         feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
 
                     window =
-                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "alice", body = "live", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        , { id = "#c:5", wireMessageId = Nothing, target = "#c", from = "alice", body = "old", at = 100, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
                     ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                        update (vaultRowsAroundReceived "#c" 150 window "ok") m1
                 in
                 case Dict.get "#c" m2.channels of
                     Just c ->
@@ -6501,7 +8930,7 @@ suite =
                             [ \_ -> Expect.equal [ "live", "old" ] (List.map .body c.messages)
                             , \_ -> Expect.equal (Just "#c:5") m2.historyLanding
                             , \_ -> Expect.equal 6 m2.messageSeq
-                            , \_ -> Expect.equal True (List.member "#c:5" m2.vaultSeenIds)
+                            , \_ -> Expect.equal True (VaultSeenIds.member "#c:5" m2.vaultSeenIds)
                             ]
                             ()
 
@@ -6514,12 +8943,12 @@ suite =
                         feed blank ":me!u@h JOIN #c"
 
                     window =
-                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        [ { id = "#c:3", wireMessageId = Nothing, target = "#c", from = "alice", body = "m3", at = 300, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                        , { id = "#c:4", wireMessageId = Nothing, target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
                     ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 350, rows = window, status = "ok" }) joined
+                        update (vaultRowsAroundReceived "#c" 350 window "ok") joined
                 in
                 case Dict.get "#c" m2.channels of
                     Just c ->
@@ -6538,7 +8967,7 @@ suite =
                         feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
 
                     ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = [], status = "ok" }) m1
+                        update (vaultRowsAroundReceived "#c" 150 [] "ok") m1
 
                     ( m3, _ ) =
                         update (VaultRowsAroundReceived { target = "#c", at = 150, rows = [], status = "unavailable" }) m1
@@ -6548,7 +8977,7 @@ suite =
                     , \_ -> Expect.equal (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels)))) [ "live" ]
                     , \_ ->
                         Expect.equal
-                            "Local history is unavailable on this device."
+                            "Local history is unavailable or incomplete because its retention policy is unknown."
                             (Maybe.withDefault "" (List.head m3.serviceLog))
                     ]
                     ()
@@ -6573,11 +9002,10 @@ suite =
                 Expect.all
                     [ \_ ->
                         Expect.equal
-                            [ VaultPersist
-                                { target = "#c"
+                            [ VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
                                 , rows =
-                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
-                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000, rowType = "notice", deleted = False, redacted = False , replyTo = Nothing }
+                                    [ { id = "m1", wireMessageId = Nothing, target = "#c", from = "a", body = "hi", at = 1000, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
+                                    , { id = "m2", wireMessageId = Nothing, target = "#c", from = "b", body = "yo", at = 2000, rowType = "notice", deleted = False, redacted = False , replyTo = Nothing }
                                     ]
                                 }
                             ]
@@ -6640,6 +9068,104 @@ suite =
                             (Maybe.withDefault [] (Maybe.map (List.map .body << .messages) (Dict.get "#c" m1.channels)))
                     ]
                     ()
+        , test "WsFramesReceived folds only for the matching runtime owner" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | runtimeOwnerStamp = Just testRuntimeOwner
+                            , nowMs = 10
+                        }
+
+                    frame =
+                        { at = 50, lines = [ ":s PING :current" ] }
+
+                    ( matched, matchedOut ) =
+                        update (WsFramesReceived { owner = testRuntimeOwner, frames = [ frame ] }) base
+
+                    staleOwner =
+                        { testRuntimeOwner | connectionGeneration = testRuntimeOwner.connectionGeneration + 1 }
+
+                    ( stale, staleOut ) =
+                        update (WsFramesReceived { owner = staleOwner, frames = [ frame ] }) base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 50 matched.nowMs
+                    , \_ -> Expect.equal [ SendLine "PONG current\r\n" ] matchedOut
+                    , \_ -> Expect.equal base stale
+                    , \_ -> Expect.equal [] staleOut
+                    ]
+                    ()
+        , test "WsFramesReceived uses each PONG receipt time and never rewinds the clock" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | connection = Live
+                            , runtimeOwnerStamp = Just testRuntimeOwner
+                            , nowMs = 100000
+                            , pingPending = Just { cookie = "lat-100000", sentAt = 100000 }
+                        }
+
+                    ( sampled, sampledOut ) =
+                        update
+                            (WsFramesReceived
+                                { owner = testRuntimeOwner
+                                , frames =
+                                    [ { at = 100042, lines = [ ":irc.example PONG :lat-100000" ] }
+                                    , { at = 99900, lines = [ ":irc.example PONG :late" ] }
+                                    ]
+                                }
+                            )
+                            base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 100042 sampled.nowMs
+                    , \_ -> Expect.equal (Just 42) sampled.latencyMs
+                    , \_ -> Expect.equal [ 42 ] sampled.latencyHistory
+                    , \_ -> Expect.equal Nothing sampled.pingPending
+                    , \_ -> Expect.equal [ PingObserved, PingObserved ] sampledOut
+                    ]
+                    ()
+        , test "WsFramesReceived preserves multiple PING replies and legacy fold order" <|
+            \_ ->
+                let
+                    base =
+                        { blank | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                    frames =
+                        [ { at = 100, lines = [ ":s PING :first", ":s PING :second" ] }
+                        , { at = 101, lines = [ ":s PING :third" ] }
+                        ]
+
+                    ( batched, batchedOut ) =
+                        update (WsFramesReceived { owner = testRuntimeOwner, frames = frames }) base
+
+                    ( sequential, sequentialOut ) =
+                        List.foldl
+                            (\frame ( current, accumulated ) ->
+                                let
+                                    ( next, frameOut ) =
+                                        update (WsBatchReceived frame) current
+                                in
+                                ( next, accumulated ++ frameOut )
+                            )
+                            ( base, [] )
+                            frames
+
+                    expectedOut =
+                        [ SendLine "PONG first\r\n"
+                        , SendLine "PONG second\r\n"
+                        , SendLine "PONG third\r\n"
+                        ]
+                in
+                Expect.all
+                    [ \_ -> Expect.equal expectedOut batchedOut
+                    , \_ -> Expect.equal sequentialOut batchedOut
+                    , \_ -> Expect.equal 101 batched.nowMs
+                    , \_ -> Expect.equal sequential.nowMs batched.nowMs
+                    ]
+                    ()
         , test "WsClosed marks Offline and WsOpened recovers to Registering" <|
             \_ ->
                 let
@@ -6652,6 +9178,29 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal Offline m1.connection
                     , \_ -> Expect.equal Registering m2.connection
+                    ]
+                    ()
+        , test "client-line rejection updates only the matching physical connection" <|
+            \_ ->
+                let
+                    context =
+                        { endpoint = Nothing
+                        , physicalConnectionGeneration = blank.physicalConnectionGeneration
+                        , runtimeOwnerStamp = Nothing
+                        }
+
+                    ( current, _ ) =
+                        update (ClientLineRejected context) blank
+
+                    stale =
+                        { context | physicalConnectionGeneration = context.physicalConnectionGeneration - 1 }
+
+                    ( ignored, _ ) =
+                        update (ClientLineRejected stale) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "The command could not be sent because it exceeds the client wire limits.") current.composerError
+                    , \_ -> Expect.equal Nothing ignored.composerError
                     ]
                     ()
         , test "auto-reconnect schedules, counts down, and redials" <|
@@ -7185,6 +9734,34 @@ suite =
                     , SendLine "USER webchat 0 * :me (webchat)\r\n"
                     ]
                     outbound
+        , test "WsOpened resets ISUPPORT before learning a new socket inventory" <|
+            \_ ->
+                let
+                    ( openedA, _ ) =
+                        update (WsOpened { url = "wss://a" }) { blank | connection = Offline }
+
+                    ( supportA, _ ) =
+                        feed openedA ":a 005 me NETWORK=alpha CASEMAPPING=rfc1459 NICKLEN=32 :supported"
+
+                    ( closed, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) supportA
+
+                    ( openedB, _ ) =
+                        update (WsOpened { url = "wss://b" }) closed
+
+                    ( supportB, _ ) =
+                        feed openedB ":b 005 me NETWORK=beta CASEMAPPING=ascii NICKLEN=24 :supported"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "alpha" supportA.isupport.network
+                    , \_ -> Expect.equal "beta" supportB.isupport.network
+                    , \_ -> Expect.equal "ascii" openedB.isupport.casemapping
+                    , \_ -> Expect.equal 64 openedB.isupport.nicklen
+                    , \_ -> Expect.equal [] openedB.isupport.tokenOrder
+                    , \_ -> Expect.equal False (Dict.member "NETWORK" openedB.isupport.tokens)
+                    , \_ -> Expect.equal 24 supportB.isupport.nicklen
+                    ]
+                    ()
         , test "CAP LS requests wanted caps and skips sasl" <|
             \_ ->
                 let
@@ -7200,6 +9777,18 @@ suite =
                     , \_ -> Expect.equal True m2.capNegotiating
                     ]
                     ()
+        , test "CAP LS requests server canonical names and excludes unready caps" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( _, outbound ) =
+                        feed opened ":s CAP me LS :sasl multiline chathistory read-marker channel-rename no-implicit-names draft/no-implicit-names typing react reply message-editing message-redaction msgid onyx/e2ee file-upload future-cap"
+                in
+                Expect.equal
+                    [ SendLine "CAP REQ :multiline chathistory read-marker channel-rename draft/no-implicit-names typing react reply message-editing message-redaction msgid\r\n" ]
+                    outbound
         , test "CAP ACK marks negotiated and ends negotiation" <|
             \_ ->
                 let
@@ -7216,6 +9805,473 @@ suite =
                     [ \_ -> Expect.equal [ "draft/multiline" ] m3.caps
                     , \_ -> Expect.equal [ SendLine "CAP END\r\n" ] outbound
                     , \_ -> Expect.equal False m3.capNegotiating
+                    ]
+                    ()
+        , test "CAP ACK ignores unsolicited names and duplicate replies" <|
+            \_ ->
+                let
+                    ( pending, _ ) =
+                        feed { blank | capNegotiating = True } ":s CAP me LS :message-tags"
+
+                    ( unsolicited, out1 ) =
+                        feed pending ":s CAP me ACK :onyx/e2ee future-cap"
+
+                    ( accepted, out2 ) =
+                        feed unsolicited ":s CAP me ACK :message-tags"
+
+                    ( duplicate, out3 ) =
+                        feed accepted ":s CAP me ACK :message-tags"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] unsolicited.caps
+                    , \_ -> Expect.equal 1 unsolicited.capReqPending
+                    , \_ -> Expect.equal [] out1
+                    , \_ -> Expect.equal [ "message-tags" ] accepted.caps
+                    , \_ -> Expect.equal 0 accepted.capReqPending
+                    , \_ -> Expect.equal [ SendLine "CAP END\r\n" ] out2
+                    , \_ -> Expect.equal accepted.caps duplicate.caps
+                    , \_ -> Expect.equal accepted.capReqPending duplicate.capReqPending
+                    , \_ -> Expect.equal [] out3
+                    ]
+                    ()
+        , test "negative CAP ACK tokens cannot disable unrelated negotiated capabilities" <|
+            \_ ->
+                let
+                    ( pending, _ ) =
+                        feed { blank | capNegotiating = True, caps = [ "draft/typing" ] } ":s CAP me LS :message-tags"
+
+                    ( accepted, _ ) =
+                        feed pending ":s CAP me ACK :message-tags -draft/typing"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "draft/typing", "message-tags" ] accepted.caps
+                    , \_ -> Expect.equal 0 accepted.capReqPending
+                    ]
+                    ()
+        , test "runtime capability ACK is owner-correlated and ends its separate round once" <|
+            \_ ->
+                let
+                    owner = { ownerRef = "owner_fixture_000000000000000000000000", networkId = "net_fixture", accountId = Just "alice", accountGeneration = 2, connectionGeneration = 4 }
+
+                    ( ready, requestOut ) =
+                        update (RuntimeFeatureReadinessReceived { roundRef = "round_fixture_000000000000000000000000", ownerRef = owner.ownerRef, accountGeneration = owner.accountGeneration, connectionGeneration = owner.connectionGeneration, e2ee = False, media = True, newCapabilities = [] })
+                            { blank | connection = Live, capNegotiating = False, runtimeOwnerStamp = Just owner, capAvailable = [ "onyx/media" ] }
+
+                    ( admitted, admissionOut ) =
+                        update (RuntimeCapabilityAdmissionReceived { roundRef = "round_fixture_000000000000000000000000", names = [ "onyx/media" ], status = "transport-admitted" }) ready
+
+                    ( accepted, endOut ) =
+                        feed admitted ":s CAP me ACK :onyx/media"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ RuntimeCapabilityRequest { roundRef = "round_fixture_000000000000000000000000", names = [ "onyx/media" ] } ] requestOut
+                    , \_ -> Expect.equal [] admissionOut
+                    , \_ -> Expect.equal [ "onyx/media" ] accepted.caps
+                    , \_ -> Expect.equal [ RuntimeCapabilityEnd { roundRef = "round_fixture_000000000000000000000000" } ] endOut
+                    , \_ -> Expect.equal True accepted.mediaAvailable
+                    ]
+                    ()
+        , test "runtime capability readiness ignores a retired owner stamp" <|
+            \_ ->
+                let
+                    ( model, outbound ) =
+                        update (RuntimeFeatureReadinessReceived { roundRef = "round_fixture_000000000000000000000000", ownerRef = "other_owner_000000000000000000000000", accountGeneration = 2, connectionGeneration = 4, e2ee = True, media = True, newCapabilities = [] })
+                            { blank | connection = Live, capAvailable = [ "onyx/e2ee", "onyx/media" ], runtimeOwnerStamp = Just { ownerRef = "owner_fixture_000000000000000000000000", networkId = "net_fixture", accountId = Just "alice", accountGeneration = 2, connectionGeneration = 4 } }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing model.runtimeFeatureRound
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "same-socket account changes do not strand an in-flight CAP reply" <|
+            \_ ->
+                let
+                    roundRef = "round_fixture_000000000000000000000000"
+                    originalOwner = { ownerRef = "owner_fixture_000000000000000000000000", networkId = "network_fixture", accountId = Just "alice", accountGeneration = 2, connectionGeneration = 4 }
+                    ( ready, _ ) =
+                        update (RuntimeFeatureReadinessReceived { roundRef = roundRef, ownerRef = originalOwner.ownerRef, accountGeneration = 2, connectionGeneration = 4, e2ee = False, media = True, newCapabilities = [] })
+                            { blank | connection = Live, capNegotiating = False, runtimeOwnerStamp = Just originalOwner, capAvailable = [ "onyx/media" ] }
+                    ( admitted, _ ) =
+                        update (RuntimeCapabilityAdmissionReceived { roundRef = roundRef, names = [ "onyx/media" ], status = "transport-admitted" }) ready
+                    ( changedAccount, _ ) =
+                        update (RuntimeOwnerStateReceived { ownerRef = "new_owner_fixture_000000000000000000000000", networkId = "network_fixture", accountId = Just "bob", accountGeneration = 3, connectionGeneration = 4 }) admitted
+                    ( negotiated, outbound ) =
+                        feed changedAccount ":s CAP me ACK :onyx/media"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "onyx/media" ] negotiated.caps
+                    , \_ -> Expect.equal [ RuntimeCapabilityEnd { roundRef = roundRef } ] outbound
+                    , \_ -> Expect.equal False negotiated.mediaAvailable
+                    ]
+                    ()
+        , test "offline ownerRef rotation quarantines painted state and rejects old history replies" <|
+            \_ ->
+                let
+                    before =
+                        { blank
+                            | runtimeOwnerStamp = Just { ownerRef = "workspace_a", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 8 }
+                            , composer = "private draft from A"
+                            , activeChannel = Just "#a"
+                            , retentionReadScopes = Dict.singleton "#a" { kind = "cached", policyRevision = Just "rev-a", lastSyncMs = Just 1000 }
+                        }
+
+                    ( selectedB, _ ) =
+                        update (RuntimeOwnerStateReceived { ownerRef = "workspace_b", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 8 }) before
+
+                    ( staleRows, _ ) =
+                        update (VaultRowsScopedReceived { target = "#a", rows = [], status = "ok", ownerRef = Just "workspace_a", accountGeneration = Just 5, connectionGeneration = Just 8, retentionScope = { kind = "cached", policyRevision = Just "rev-a", lastSyncMs = Just 1000 } }) selectedB
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" selectedB.composer
+                    , \_ -> Expect.equal Nothing selectedB.activeChannel
+                    , \_ -> Expect.equal Dict.empty selectedB.retentionReadScopes
+                    , \_ -> Expect.equal selectedB.retentionReadScopes staleRows.retentionReadScopes
+                    , \_ -> Expect.equal "" staleRows.composer
+                    ]
+                    ()
+        , test "physical close preserves a 29 character authenticated draft in a locked RAM-only state" <|
+            \_ ->
+                let
+                    body =
+                        String.repeat 29 "x"
+
+                    room =
+                        liveRoom "me" "#room"
+
+                    before =
+                        { room
+                            | runtimeOwnerStamp = Just { ownerRef = "owner_alice_old_000000000000000000000000", networkId = "network_fixture", accountId = Just "alice", accountGeneration = 4, connectionGeneration = 10 }
+                            , accountName = Just "alice"
+                            , activeChannel = Just "#room"
+                            , composer = body
+                            , composerDrafts = Dict.singleton "#room" body
+                            , composerDraftVersions = Dict.singleton "#room" 7
+                        }
+
+                    ( closed, closeOut ) =
+                        update (RuntimeOwnerStateReceived { ownerRef = "guest_after_close_0000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }) before
+
+                    ( sent, sendOut ) =
+                        update ComposerSend closed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 29 (String.length closed.composer)
+                    , \_ -> Expect.equal body closed.composer
+                    , \_ -> Expect.equal (Just { networkId = "network_fixture", accountId = Just "alice", ownerRef = "owner_alice_old_000000000000000000000000", connectionGeneration = 10 }) closed.retiredDraftOwner
+                    , \_ -> Expect.equal [] closeOut
+                    , \_ -> Expect.equal [] sendOut
+                    , \_ -> Expect.equal (Just "This retained draft is locked to its previous owner. Reauthorize it or clear it before sending.") sent.composerError
+                    ]
+                    ()
+        , test "guest reconnect keeps a physical-scope draft locked until explicit reauthorization" <|
+            \_ ->
+                let
+                    owner = { ownerRef = "guest_new_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 6, connectionGeneration = 12 }
+                    body = "guest private text"
+
+                    room =
+                        liveRoom "me" "#room"
+
+                    before =
+                        { room
+                            | runtimeOwnerStamp = Just { ownerRef = "guest_old_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }
+                            , activeChannel = Just "#room"
+                            , composer = body
+                            , composerDrafts = Dict.singleton "#room" body
+                            , composerDraftVersions = Dict.singleton "#room" 3
+                        }
+
+                    ( reconnected, _ ) =
+                        update (RuntimeOwnerStateReceived owner) before
+
+                    ( edited, inputOut ) =
+                        update (ComposerInput "edited guest text") reconnected
+
+                    ( autosave, autosaveOut ) =
+                        update (DraftAutosaveTimerFired { target = "#room", revision = 4, ownerRef = owner.ownerRef, accountGeneration = owner.accountGeneration, connectionGeneration = owner.connectionGeneration }) edited
+
+                    ( loading, loadOut ) =
+                        update (DraftLoadRequested "#room") autosave
+
+                    ( sent, sendOut ) =
+                        update ComposerSend loading
+
+                    ( scheduled, scheduleOut ) =
+                        update (ScheduleMessage { channel = "#room", text = "edited guest text", sendAt = 999999 }) sent
+
+                    ( directSave, directSaveOut ) =
+                        update (RuntimeDomainActionRequested (RuntimeDomain.SaveDraft "#room" "bypass" 99)) scheduled
+
+                    ( authorized, authorizeOut ) =
+                        update RetiredDraftReauthorize directSave
+
+                    ( authorizedSent, authorizedSendOut ) =
+                        update ComposerSend authorized
+
+                    queueCommands =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    RuntimeDomainCommand command ->
+                                        Just command
+
+                                    _ ->
+                                        Nothing
+                            )
+                            authorizedSendOut
+
+                    queueAction =
+                        RuntimeDomain.QueueMessage "#room" "chat" "edited guest text" Nothing "message" Nothing
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just { networkId = "network_fixture", accountId = Nothing, ownerRef = "guest_old_000000000000000000000000", connectionGeneration = 11 }) reconnected.retiredDraftOwner
+                    , \_ -> Expect.equal "edited guest text" autosave.composer
+                    , \_ -> Expect.equal [] inputOut
+                    , \_ -> Expect.equal [] autosaveOut
+                    , \_ -> Expect.equal [] loadOut
+                    , \_ -> Expect.equal [] sendOut
+                    , \_ -> Expect.equal [] scheduleOut
+                    , \_ -> Expect.equal [] directSaveOut
+                    , \_ -> Expect.equal Nothing authorized.retiredDraftOwner
+                    , \_ -> Expect.equal [ RuntimeDraftAutosaveTimerStarted { target = "#room", revision = 4, delayMs = 100, ownerRef = owner.ownerRef, accountGeneration = owner.accountGeneration, connectionGeneration = owner.connectionGeneration } ] authorizeOut
+                    , \_ -> Expect.equal [ queueAction ] (List.map .action queueCommands)
+                    , \_ -> Expect.equal [ owner.ownerRef ] (List.map (.ownerRef >> Ids.ownerRefToRuntime) queueCommands)
+                    , \_ -> Expect.equal [ owner.accountGeneration ] (List.map (.accountGeneration >> Ids.accountGenerationToInt) queueCommands)
+                    , \_ -> Expect.equal [ owner.connectionGeneration ] (List.map (.connectionGeneration >> Ids.connectionGenerationToInt) queueCommands)
+                    , \_ -> Expect.equal [ authorizedSent.runtimeDomainPending ] (List.map (Just << .requestId) queueCommands)
+                    , \_ -> Expect.equal (Just queueAction) authorizedSent.runtimeDomainPendingAction
+                    , \_ -> Expect.equal "edited guest text" authorizedSent.composer
+                    , \_ -> Expect.equal (Just 4) (Dict.get "#room" authorizedSent.composerDraftVersions)
+                    , \_ -> Expect.equal False (List.any (String.startsWith "PRIVMSG #room" << sendLineText) authorizedSendOut)
+                    ]
+                    ()
+        , test "same proven account restores its retained draft under the new owner and schedules a new save" <|
+            \_ ->
+                let
+                    oldOwner = { ownerRef = "owner_alice_old_000000000000000000000000", networkId = "network_fixture", accountId = Just "Alice", accountGeneration = 4, connectionGeneration = 10 }
+                    guestOwner = { ownerRef = "guest_after_close_0000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }
+                    newOwner = { ownerRef = "owner_alice_new_0000000000000000000000", networkId = "network_fixture", accountId = Just "alice", accountGeneration = 6, connectionGeneration = 12 }
+                    body = "latest alice draft"
+
+                    room =
+                        liveRoom "me" "#room"
+
+                    before =
+                        { room
+                            | runtimeOwnerStamp = Just oldOwner
+                            , accountName = Just "Alice"
+                            , activeChannel = Just "#room"
+                            , composer = body
+                            , composerDrafts = Dict.singleton "#room" body
+                            , composerDraftVersions = Dict.singleton "#room" 9
+                        }
+
+                    ( retired, _ ) =
+                        update (RuntimeOwnerStateReceived guestOwner) before
+
+                    ( restored, restoreOut ) =
+                        update (RuntimeOwnerStateReceived newOwner) retired
+
+                    ( saved, saveOut ) =
+                        update (DraftAutosaveTimerFired { target = "#room", revision = 9, ownerRef = newOwner.ownerRef, accountGeneration = newOwner.accountGeneration, connectionGeneration = newOwner.connectionGeneration }) restored
+
+                    ( controlSent, controlSendOut ) =
+                        update ComposerSend restored
+
+                    controlCommands =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    RuntimeDomainCommand command ->
+                                        Just command
+
+                                    _ ->
+                                        Nothing
+                            )
+                            controlSendOut
+
+                    controlQueueAction =
+                        RuntimeDomain.QueueMessage "#room" "chat" body Nothing "message" Nothing
+
+                    saveCommands =
+                        List.filterMap
+                            (\item ->
+                                case item of
+                                    RuntimeDomainCommand command ->
+                                        Just command
+
+                                    _ ->
+                                        Nothing
+                            )
+                            saveOut
+                in
+                Expect.all
+                    [ \_ -> Expect.equal body restored.composer
+                    , \_ -> Expect.equal [ controlQueueAction ] (List.map .action controlCommands)
+                    , \_ -> Expect.equal [ newOwner.ownerRef ] (List.map (.ownerRef >> Ids.ownerRefToRuntime) controlCommands)
+                    , \_ -> Expect.equal [ newOwner.accountGeneration ] (List.map (.accountGeneration >> Ids.accountGenerationToInt) controlCommands)
+                    , \_ -> Expect.equal [ newOwner.connectionGeneration ] (List.map (.connectionGeneration >> Ids.connectionGenerationToInt) controlCommands)
+                    , \_ -> Expect.equal [ controlSent.runtimeDomainPending ] (List.map (Just << .requestId) controlCommands)
+                    , \_ -> Expect.equal (Just controlQueueAction) controlSent.runtimeDomainPendingAction
+                    , \_ -> Expect.equal body controlSent.composer
+                    , \_ -> Expect.equal (Just 9) (Dict.get "#room" controlSent.composerDraftVersions)
+                    , \_ -> Expect.equal False (List.any (String.startsWith "PRIVMSG #room" << sendLineText) controlSendOut)
+                    , \_ -> Expect.equal Nothing restored.retiredDraftOwner
+                    , \_ -> Expect.equal [ RuntimeDraftAutosaveTimerStarted { target = "#room", revision = 9, delayMs = 100, ownerRef = newOwner.ownerRef, accountGeneration = newOwner.accountGeneration, connectionGeneration = newOwner.connectionGeneration } ] restoreOut
+                    , \_ -> Expect.equal [ RuntimeDomain.SaveDraft "#room" body 9 ] (List.map .action saveCommands)
+                    , \_ -> Expect.equal [ newOwner.ownerRef ] (List.map (.ownerRef >> Ids.ownerRefToRuntime) saveCommands)
+                    , \_ -> Expect.equal [ 6 ] (List.map (.accountGeneration >> Ids.accountGenerationToInt) saveCommands)
+                    , \_ -> Expect.equal [ 12 ] (List.map (.connectionGeneration >> Ids.connectionGenerationToInt) saveCommands)
+                    , \_ -> Expect.equal 1 saved.eventClock
+                    ]
+                    ()
+        , test "different account or network clears the retired draft before it can be shown" <|
+            \_ ->
+                let
+                    oldOwner = { ownerRef = "owner_alice_old_000000000000000000000000", networkId = "network_fixture", accountId = Just "alice", accountGeneration = 4, connectionGeneration = 10 }
+                    guestOwner = { ownerRef = "guest_after_close_0000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }
+                    body = "alice text"
+                    base = { blank | runtimeOwnerStamp = Just oldOwner, activeChannel = Just "#room", composer = body, composerDrafts = Dict.singleton "#room" body, composerDraftVersions = Dict.singleton "#room" 2 }
+                    ( retired, _ ) = update (RuntimeOwnerStateReceived guestOwner) base
+                    ( underBob, bobOut ) = update (RuntimeOwnerStateReceived { ownerRef = "owner_bob_000000000000000000000000", networkId = "network_fixture", accountId = Just "bob", accountGeneration = 6, connectionGeneration = 11 }) retired
+                    ( retiredAgain, _ ) = update (RuntimeOwnerStateReceived guestOwner) base
+                    ( otherNetwork, networkOut ) = update (RuntimeOwnerStateReceived { ownerRef = "owner_other_network_00000000000000000000", networkId = "other_network", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }) retiredAgain
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" underBob.composer
+                    , \_ -> Expect.equal Dict.empty underBob.composerDrafts
+                    , \_ -> Expect.equal Nothing underBob.retiredDraftOwner
+                    , \_ -> Expect.equal [] bobOut
+                    , \_ -> Expect.equal "" otherNetwork.composer
+                    , \_ -> Expect.equal Dict.empty otherNetwork.composerDrafts
+                    , \_ -> Expect.equal Nothing otherNetwork.retiredDraftOwner
+                    , \_ -> Expect.equal [] networkOut
+                    ]
+                    ()
+        , test "same-connection LOGOUT fully clears drafts without retaining them" <|
+            \_ ->
+                let
+                    before =
+                        { blank
+                            | runtimeOwnerStamp = Just { ownerRef = "owner_alice_old_000000000000000000000000", networkId = "network_fixture", accountId = Just "alice", accountGeneration = 4, connectionGeneration = 10 }
+                            , activeChannel = Just "#room"
+                            , composer = "alice secret"
+                            , composerDrafts = Dict.singleton "#room" "alice secret"
+                        }
+
+                    ( loggedOut, outbound ) =
+                        update (RuntimeOwnerStateReceived { ownerRef = "guest_logout_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 10 }) before
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" loggedOut.composer
+                    , \_ -> Expect.equal Dict.empty loggedOut.composerDrafts
+                    , \_ -> Expect.equal Nothing loggedOut.retiredDraftOwner
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "physical owner retirement with no unsent text does not lock a fresh guest composer" <|
+            \_ ->
+                let
+                    before =
+                        { blank
+                            | runtimeOwnerStamp = Just { ownerRef = "guest_old_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 5, connectionGeneration = 11 }
+                            , composerDrafts = Dict.singleton "#room" ""
+                            , composerDraftVersions = Dict.singleton "#room" 2
+                        }
+
+                    ( reconnected, outbound ) =
+                        update (RuntimeOwnerStateReceived { ownerRef = "guest_new_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 6, connectionGeneration = 12 }) before
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" reconnected.composer
+                    , \_ -> Expect.equal Nothing reconnected.retiredDraftOwner
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "discard clears every retained body and unlocks fresh composing" <|
+            \_ ->
+                let
+                    owner = { ownerRef = "guest_new_000000000000000000000000", networkId = "network_fixture", accountId = Nothing, accountGeneration = 6, connectionGeneration = 12 }
+                    before =
+                        { blank
+                            | runtimeOwnerStamp = Just owner
+                            , retiredDraftOwner = Just { networkId = "network_fixture", accountId = Nothing, ownerRef = "guest_old_000000000000000000000000", connectionGeneration = 11 }
+                            , activeChannel = Just "#room"
+                            , composer = "current retained text"
+                            , composerDrafts = Dict.fromList [ ( "#room", "current retained text" ), ( "#other", "other retained text" ) ]
+                            , composerDraftVersions = Dict.fromList [ ( "#room", 4 ), ( "#other", 8 ) ]
+                        }
+
+                    ( discarded, outbound ) =
+                        update RetiredDraftDiscard before
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" discarded.composer
+                    , \_ -> Expect.equal Dict.empty discarded.composerDrafts
+                    , \_ -> Expect.equal Dict.empty discarded.composerDraftVersions
+                    , \_ -> Expect.equal Nothing discarded.retiredDraftOwner
+                    , \_ -> Expect.equal (Set.fromList [ "#room", "#other" ]) discarded.hydratedDraftTargets
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "partial ACK keeps its request group pending until every requested cap settles" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( pending, _ ) =
+                        feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                    ( partial, firstOut ) =
+                        feed pending ":s CAP me ACK :message-tags"
+
+                    ( duplicate, duplicateOut ) =
+                        feed partial ":s CAP me ACK :message-tags"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "message-tags" ] partial.caps
+                    , \_ -> Expect.equal 1 partial.capReqPending
+                    , \_ -> Expect.equal [] firstOut
+                    , \_ -> Expect.equal 1 duplicate.capReqPending
+                    , \_ -> Expect.equal [] duplicateOut
+                    ]
+                    ()
+        , test "partial and unsolicited CAP NAKs leave the exact request group pending" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( pending, _ ) =
+                        feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                    ( partial, partialOut ) =
+                        feed pending ":s CAP me NAK :message-tags"
+
+                    ( unsolicited, unsolicitedOut ) =
+                        feed partial ":s CAP me NAK :onyx/e2ee future-cap"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 partial.capReqPending
+                    , \_ -> Expect.equal [] partialOut
+                    , \_ -> Expect.equal 1 unsolicited.capReqPending
+                    , \_ -> Expect.equal [] unsolicitedOut
+                    ]
+                    ()
+        , test "CAP NAK with an extra negative token cannot settle a request group" <|
+            \_ ->
+                let
+                    ( pending, _ ) =
+                        feed { blank | capNegotiating = True, caps = [ "draft/typing" ] } ":s CAP me LS :message-tags"
+
+                    ( malformed, outbound ) =
+                        feed pending ":s CAP me NAK :message-tags -draft/typing"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 malformed.capReqPending
+                    , \_ -> Expect.equal [ "draft/typing" ] malformed.caps
+                    , \_ -> Expect.equal [] outbound
                     ]
                     ()
         , test "CAP NAK ends negotiation without caps" <|
@@ -7251,6 +10307,158 @@ suite =
                     [ \_ -> Expect.equal [] out1
                     , \_ -> Expect.equal [ "draft/multiline", "message-tags", "sasl" ] m3.capAvailable
                     , \_ -> Expect.equal [ SendLine "CAP REQ :draft/multiline message-tags\r\n" ] out2
+                    ]
+                    ()
+        , test "CAP advertised values update across LS chunks and are removed on DEL" <|
+            \_ ->
+                let
+                    ( connected, _ ) =
+                        update (WsOpened { url = "wss://before-values" }) { blank | connection = Offline }
+
+                    ( first, _ ) =
+                        feed connected ":s CAP me LS * :draft/multiline=max-bytes=40000,max-lines=64"
+
+                    ( second, _ ) =
+                        feed first ":s CAP me LS :multiline=max-bytes=30000,max-lines=48"
+
+                    ( updated, _ ) =
+                        feed second ":s CAP me NEW :draft/multiline=max-bytes=12,max-lines=2"
+
+                    ( rejected, _ ) =
+                        feed updated ":s CAP me NAK :draft/multiline"
+
+                    ( deleted, _ ) =
+                        feed rejected ":s CAP me DEL :draft/multiline"
+
+                    ( disconnected, _ ) =
+                        update (WsClosed { clean = True, reason = "reconnect" }) deleted
+
+                    ( reopened, _ ) =
+                        update (WsOpened { url = "wss://new-node" }) disconnected
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "max-bytes=40000,max-lines=64") (Dict.get "draft/multiline" first.capAvailableValues)
+                    , \_ -> Expect.equal (Just "max-bytes=30000,max-lines=48") (Dict.get "multiline" second.capAvailableValues)
+                    , \_ -> Expect.equal (Just "max-bytes=12,max-lines=2") (Dict.get "draft/multiline" updated.capAvailableValues)
+                    , \_ -> Expect.equal [] rejected.caps
+                    , \_ -> Expect.equal (Just "max-bytes=12,max-lines=2") (Dict.get "draft/multiline" rejected.capAvailableValues)
+                    , \_ -> Expect.equal Nothing (Dict.get "draft/multiline" deleted.capAvailableValues)
+                    , \_ -> Expect.equal (Just "max-bytes=30000,max-lines=48") (Dict.get "multiline" deleted.capAvailableValues)
+                    , \_ -> Expect.equal [] reopened.capAvailable
+                    , \_ -> Expect.equal Dict.empty reopened.capAvailableValues
+                    ]
+                    ()
+        , test "acknowledged multiline aliases use the smaller advertised limits" <|
+            \_ ->
+                let
+                    live =
+                        liveRoom "me" "#c"
+
+                    negotiated =
+                        { live
+                            | caps = [ "draft/multiline", "multiline" ]
+                            , capAvailable = [ "draft/multiline", "multiline" ]
+                            , capAvailableValues =
+                                Dict.fromList
+                                    [ ( "draft/multiline", "max-bytes=12,max-lines=3" )
+                                    , ( "multiline", "max-bytes=8,max-lines=2" )
+                                    ]
+                        }
+
+                    ( entered, _ ) =
+                        update (ComposerInput "123456789\nz") negotiated
+
+                    ( _, outbound ) =
+                        update ComposerSend entered
+
+                    lines =
+                        List.filter (not << String.isEmpty) (List.map sendLineText outbound)
+                in
+                Expect.equal
+                    [ "BATCH +ml0 draft/multiline #c\r\n"
+                    , "@batch=ml0 PRIVMSG #c :12345678\r\n"
+                    , "BATCH -ml0\r\n"
+                    , "BATCH +ml1 draft/multiline #c\r\n"
+                    , "@batch=ml1 PRIVMSG #c :9\r\n"
+                    , "@batch=ml1 PRIVMSG #c :z\r\n"
+                    , "BATCH -ml1\r\n"
+                    ]
+                    lines
+        , test "unacknowledged multiline alias limits do not affect sending" <|
+            \_ ->
+                let
+                    live =
+                        liveRoom "me" "#c"
+
+                    advertisedOnly =
+                        { live
+                            | caps = [ "draft/multiline" ]
+                            , capAvailable = [ "draft/multiline", "multiline" ]
+                            , capAvailableValues =
+                                Dict.fromList
+                                    [ ( "draft/multiline", "max-bytes=12,max-lines=3" )
+                                    , ( "multiline", "max-bytes=8,max-lines=1" )
+                                    ]
+                        }
+
+                    ( entered, _ ) =
+                        update (ComposerInput "123456789\nz") advertisedOnly
+
+                    ( _, outbound ) =
+                        update ComposerSend entered
+
+                    lines =
+                        List.filter (not << String.isEmpty) (List.map sendLineText outbound)
+                in
+                Expect.equal
+                    [ "BATCH +ml0 draft/multiline #c\r\n"
+                    , "@batch=ml0 PRIVMSG #c :123456789\r\n"
+                    , "@batch=ml0 PRIVMSG #c :z\r\n"
+                    , "BATCH -ml0\r\n"
+                    ]
+                    lines
+        , test "multiline client batch refs stay unique across immediate sends and occupied refs" <|
+            \_ ->
+                let
+                    live =
+                        liveRoom "me" "#c"
+
+                    negotiated =
+                        { live
+                            | caps = [ "draft/multiline" ]
+                            , capAvailableValues = Dict.singleton "draft/multiline" "max-bytes=8,max-lines=3"
+                        }
+
+                    ( occupied, _ ) =
+                        feed negotiated "BATCH +ml0 unknown-wrapper"
+
+                    ( firstInput, _ ) =
+                        update (ComposerInput "123456789\nz") occupied
+
+                    ( firstSent, firstOut ) =
+                        update ComposerSend firstInput
+
+                    ( secondInput, _ ) =
+                        update (ComposerInput "abcdefghi\ny") firstSent
+
+                    ( _, secondOut ) =
+                        update ComposerSend secondInput
+
+                    refs out =
+                        List.filterMap
+                            (\line ->
+                                if String.startsWith "BATCH +" line then
+                                    line |> String.dropLeft 7 |> String.words |> List.head
+
+                                else
+                                    Nothing
+                            )
+                            (List.filter (not << String.isEmpty) (List.map sendLineText out))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "ml1", "ml2" ] (refs firstOut)
+                    , \_ -> Expect.equal [ "ml3", "ml4" ] (refs secondOut)
+                    , \_ -> Expect.equal False (List.any (\ref -> List.member ref (refs firstOut)) (refs secondOut))
                     ]
                     ()
         , test "CAP NEW requests newly advertised caps" <|
@@ -7332,6 +10540,27 @@ suite =
                     , \_ -> Expect.equal "kai" rotated.ourNick
                     , \_ -> Expect.equal [] bareOut
                     , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    ]
+                    ()
+        , test "unknown command numeric leaves an unrelated labeled send pending" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( sending, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( afterUnknownCommand, outbound ) =
+                        feed sending ":srv 421 me FROB :Unknown command"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (Dict.size sending.pendingLabels)
+                    , \_ -> Expect.equal sending.pendingLabels afterUnknownCommand.pendingLabels
+                    , \_ -> Expect.equal (Just "#c") (Dict.get label afterUnknownCommand.pendingLabels |> Maybe.map .target)
+                    , \_ -> Expect.equal Dict.empty afterUnknownCommand.uncertainLabels
+                    , \_ -> Expect.equal [ "Unknown command: FROB" ] (List.map .text afterUnknownCommand.notifications)
+                    , \_ -> Expect.equal [] outbound
                     ]
                     ()
         , test "error numerics record verbatim inbox rows" <|
@@ -7528,7 +10757,7 @@ suite =
             \_ ->
                 let
                     ( m, out ) =
-                        feed { blank | nickAliasTryIdx = 3, endpoint = Just "wss://irc.example" } ":irc.example 001 me :welcome"
+                        feed { blank | nickAliasTryIdx = 3, endpoint = Just "wss://irc.example", runtimeOwnerStamp = Just guestRuntimeOwner } ":irc.example 001 me :welcome"
                 in
                 Expect.all
                     [ \_ -> Expect.equal 0 m.nickAliasTryIdx
@@ -7551,7 +10780,7 @@ suite =
             \_ ->
                 let
                     owned =
-                        { blank | endpoint = Just "wss://irc.example", ourNick = "kai" }
+                        { blank | endpoint = Just "wss://irc.example", ourNick = "kai", runtimeOwnerStamp = Just guestRuntimeOwner }
 
                     ( loaded, _ ) =
                         update (NickAliasesLoaded (Encode.list Encode.string [ "kai", "zed", "bad nick", "zed" ])) owned
@@ -7607,7 +10836,7 @@ suite =
             \_ ->
                 let
                     ( m1, outbound ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = False }) blank
                 in
                 Expect.all
                     [ \_ -> Expect.equal (Just "alice") m1.saslAccount
@@ -7615,7 +10844,7 @@ suite =
                     , \_ -> Expect.equal False m1.saslClientCert
                     , \_ ->
                         Expect.equal
-                            [ SaslCredentialsStored { account = "alice", password = "s3cret", hasClientCert = False } ]
+                            [ SaslCredentialsStored { account = "alice", hasClientCert = False } ]
                             outbound
                     , \_ -> Expect.equal SaslIdle m1.sasl
                     ]
@@ -7623,14 +10852,17 @@ suite =
         , test "sasl joins CAP REQ only with credentials held" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     ( held, _ ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = False }) opened
 
                     ( mHeld, outboundHeld ) =
                         feed held ":s CAP me LS :sasl=PLAIN multi-prefix"
 
                     ( _, outboundGuest ) =
-                        feed blank ":s CAP me LS :sasl=PLAIN multi-prefix"
+                        feed (openTestSocket blank) ":s CAP me LS :sasl=PLAIN multi-prefix"
 
                     hasSaslReq outbound =
                         List.any
@@ -7653,8 +10885,11 @@ suite =
         , test "ACK sasl begins the PLAIN exchange" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     ( held, _ ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = False }) opened
 
                     ( m1, _ ) =
                         feed held ":s CAP me LS :sasl=PLAIN"
@@ -7670,11 +10905,14 @@ suite =
                     , \_ -> Expect.equal True (List.member SaslTimerStarted outbound)
                     ]
                     ()
-        , test "ACK sasl without credentials just releases" <|
+        , test "unsolicited ACK sasl without credentials is ignored" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     negotiating =
-                        { blank | capNegotiating = True }
+                        { opened | capAvailable = [ "sasl" ] }
 
                     ( m1, _ ) =
                         feed negotiating ":s CAP me LS :sasl=PLAIN multi-prefix"
@@ -7684,17 +10922,19 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal SaslIdle m2.sasl
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "CAP END\r\n") outbound)
+                    , \_ -> Expect.equal False (List.member "sasl" m2.caps)
+                    , \_ -> Expect.equal False (List.member (SendLine "AUTHENTICATE PLAIN\r\n") outbound)
                     , \_ -> Expect.equal False (List.member SaslTimerStarted outbound)
                     ]
                     ()
         , test "unsupported mechanism fails closed, never guest" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     ( held, _ ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = False }) opened
 
                     ( m1, _ ) =
                         feed held ":s CAP me LS :sasl=UNKNOWN-MECH"
@@ -7715,8 +10955,11 @@ suite =
         , test "PLAIN challenge relays to the ports side" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     ( held, _ ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = False }) opened
 
                     ( m1, _ ) =
                         feed held ":s CAP me LS :sasl=PLAIN"
@@ -7738,8 +10981,11 @@ suite =
         , test "EXTERNAL answers the empty challenge directly" <|
             \_ ->
                 let
+                    opened =
+                        openTestSocket blank
+
                     ( held, _ ) =
-                        update (SaslCredentialsProvided { account = "alice", password = "", hasClientCert = True }) blank
+                        update (SaslCredentialsProvided { account = "alice", hasClientCert = True }) opened
 
                     ( m1, _ ) =
                         feed held ":s CAP me LS :sasl=EXTERNAL"
@@ -7759,31 +11005,6 @@ suite =
                             [ SendLine "AUTHENTICATE +\r\n" ]
                             outbound3
                     , \_ -> Expect.equal (SaslPending External) m3.sasl
-                    ]
-                    ()
-        , test "payload answers chunk into AUTHENTICATE lines" <|
-            \_ ->
-                let
-                    pending =
-                        { blank | sasl = SaslPending Plain }
-
-                    big =
-                        String.repeat 401 "p"
-
-                    ( _, outbound ) =
-                        update (SaslPayload { payload = big }) pending
-
-                    ( _, idleOutbound ) =
-                        update (SaslPayload { payload = big }) blank
-                in
-                Expect.all
-                    [ \_ ->
-                        Expect.equal
-                            [ SendLine ("AUTHENTICATE " ++ String.repeat 400 "p" ++ "\r\n")
-                            , SendLine "AUTHENTICATE p\r\n"
-                            ]
-                            outbound
-                    , \_ -> Expect.equal [] idleOutbound
                     ]
                     ()
         , test "903 in flight completes the login" <|
@@ -7876,549 +11097,134 @@ suite =
                     , \_ -> Expect.equal [] outbound3
                     ]
                     ()
-        , test "probe winner connects and adopts empty holdings" <|
+        , test "session credentials in Elm are opaque metadata, never server bearer lines" <|
             \_ ->
                 let
-                    ( m1, out ) =
-                        update
-                            (NodesProbed
-                                { wss = "wss://eshmaki.me:8080"
-                                , sessionToken = Just "tok"
-                                , meshToken = Just "mesh"
-                                , meshExpiresAtMs = Just 99
-                                }
-                            )
-                            blank
+                    ref = mustCredentialRef "AAAAAAAAAAAAAAAAAAAAAAAA"
+                    metadata = { credentialRef = ref, kind = Session.LocalLogical, expiresAtMs = Nothing, restorable = True }
+                    ( received, _ ) = update (SessionCredentialsReceived [ metadata ]) blank
+                    ( captured, outbound ) = feedTrustedServerNotice received ":irc.example NOTICE me :SESSION TOKEN fixture-token-never-issued"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ WsConnect { url = "wss://eshmaki.me:8080" } ] out
-                    , \_ -> Expect.equal (Just "tok") m1.sessionTokens.sessionToken
-                    , \_ -> Expect.equal (Just "mesh") m1.sessionTokens.meshToken
-                    , \_ -> Expect.equal (Just 99) m1.sessionTokens.meshTokenExpiresAt
-                    ]
-                    ()
-        , test "probe winner never overwrites live holdings" <|
-            \_ ->
-                let
-                    live =
-                        { blank
-                            | sessionTokens =
-                                { sessionToken = Just "live"
-                                , meshToken = Nothing
-                                , meshTokenExpiresAt = Nothing
-                                }
-                        }
-
-                    ( m1, out ) =
-                        update
-                            (NodesProbed
-                                { wss = "wss://ircx.us:8080"
-                                , sessionToken = Just "stale"
-                                , meshToken = Just "stale-mesh"
-                                , meshExpiresAtMs = Just 7
-                                }
-                            )
-                            live
-                in
-                Expect.all
-                    [ \_ -> Expect.equal [ WsConnect { url = "wss://ircx.us:8080" } ] out
-                    , \_ -> Expect.equal (Just "live") m1.sessionTokens.sessionToken
-                    , \_ -> Expect.equal Nothing m1.sessionTokens.meshToken
-                    ]
-                    ()
-        , test "sasl proof admits session commands before 900" <|
-            \_ ->
-                let
-                    authed =
-                        { blank
-                            | saslAuthenticated = True
-                            , sessionTokens =
-                                { sessionToken = Just "tok123"
-                                , meshToken = Nothing
-                                , meshTokenExpiresAt = Nothing
-                                }
-                        }
-
-                    ( m1, outbound ) =
-                        feed authed ":irc.example 001 me :welcome"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal True m1.sessionCommandsSent
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
-                    ]
-                    ()
-        , test "server NOTICE SESSION TOKEN is captured and persisted" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, outbound ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal (Just "tok123") m2.sessionTokens.sessionToken
-                    , \_ ->
-                        Expect.equal
-                            [ SessionTokenStored { kind = "token", token = "tok123", expiresAt = Nothing, server = "", nick = "alice" } ]
-                            outbound
-                    ]
-                    ()
-        , test "server NOTICE SESSION MTOKEN merges with ms deadline" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, _ ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-
-                    ( m3, outbound ) =
-                        feed m2 ":irc.example NOTICE me :SESSION MTOKEN hex9 expires=99"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal (Just "tok123") m3.sessionTokens.sessionToken
-                    , \_ -> Expect.equal (Just "hex9") m3.sessionTokens.meshToken
-                    , \_ -> Expect.equal (Just 99000) m3.sessionTokens.meshTokenExpiresAt
-                    , \_ ->
-                        Expect.equal
-                            [ SessionTokenStored { kind = "mtoken", token = "hex9", expiresAt = Just 99, server = "", nick = "alice" } ]
-                            outbound
-                    ]
-                    ()
-        , test "guest token notices stay silent and unpersisted" <|
-            \_ ->
-                let
-                    ( m1, outbound ) =
-                        feed blank ":irc.example NOTICE me :SESSION TOKEN tok123"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal Nothing m1.sessionTokens.sessionToken
+                    [ \_ -> Expect.equal [ metadata ] captured.sessionTokens.credentials
                     , \_ -> Expect.equal [] outbound
-                    , \_ -> Expect.equal [] m1.serviceLog
                     ]
                     ()
-        , test "peer SESSION mentions never plant Bearer [REDACTED]" <|
+        , test "Elm cannot replay an attachment from credential metadata alone" <|
             \_ ->
                 let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, outbound ) =
-                        feed m1 ":dave!u@h NOTICE me :SESSION TOKEN tok123"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal Nothing m2.sessionTokens.sessionToken
-                    , \_ -> Expect.equal [] (List.filter isSessionTokenStored outbound)
-                    ]
-                    ()
-        , test "legacy NOTE SESSION TOKEN is captured" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, outbound ) =
-                        feed m1 ":s NOTE SESSION TOKEN :tok123"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal (Just "tok123") m2.sessionTokens.sessionToken
-                    , \_ ->
-                        Expect.equal
-                            [ SessionTokenStored { kind = "token", token = "tok123", expiresAt = Nothing, server = "", nick = "alice" } ]
+                    metadata = { credentialRef = mustCredentialRef "BBBBBBBBBBBBBBBBBBBBBBBB", kind = Session.LocalLogical, expiresAtMs = Nothing, restorable = True }
+                    seeded = { blank | sessionTokens = { credentials = [ metadata ] } }
+                    ( loggedIn, _ ) = feed seeded ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
+                    ( live, outbound ) = feed loggedIn ":irc.example 001 me :welcome"
+                    sessionOut =
+                        List.filter
+                            (\item ->
+                                case item of
+                                    ReclaimTimerStarted _ -> True
+                                    _ -> False
+                            )
                             outbound
-                    ]
-                    ()
-        , test "900 with seeded holdings sends RESUME plus rotation once" <|
-            \_ ->
-                let
-                    seeded =
-                        { blank
-                            | sessionTokens =
-                                { sessionToken = Just "tok123"
-                                , meshToken = Nothing
-                                , meshTokenExpiresAt = Nothing
-                                }
-                        }
-
-                    ( m1, outbound ) =
-                        feed seeded ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, outbound2 ) =
-                        feed m1 ":irc.example 001 me :welcome"
-
-                    ( m3, outbound3 ) =
-                        feed m2 ":s 900 me nick!u@h alice :You are now logged in as alice"
                 in
-                Expect.all
-                    [ \_ -> Expect.equal True m1.sessionCommandsSent
+                    Expect.all
+                    [ \_ -> Expect.equal [] sessionOut
                     , \_ ->
                         Expect.equal
-                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
-                            m1.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (ReclaimTimerStarted { stage = "confirm" }) outbound)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.startsWith "SESSION" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound2
-                            )
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.startsWith "SESSION" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound3
-                            )
-                    , \_ -> Expect.equal True m2.sessionCommandsSent
+                            (Just { phase = Restoring, kind = Just Session.LocalBearer, credentialKind = Just Session.LocalLogical, credentialRef = Just (mustCredentialRef "BBBBBBBBBBBBBBBBBBBBBBBB"), outcome = Session.ResumePending })
+                            live.sessionReclaim
+                    , \_ -> Expect.equal [ metadata ] live.sessionTokens.credentials
                     ]
                     ()
-        , test "001 sends RESUME for an already-authed socket" <|
+        , test "typed private domain views reject malformed passkey metadata" <|
             \_ ->
                 let
-                    authed =
-                        { blank
-                            | accountName = Just "alice"
-                            , sessionTokens =
-                                { sessionToken = Just "tok123"
-                                , meshToken = Nothing
-                                , meshTokenExpiresAt = Nothing
-                                }
-                        }
+                    makeResult label signCount createdUnix =
+                        Encode.object
+                            [ ( "schemaVersion", Encode.int 1 )
+                            , ( "requestId", Encode.string "domainRequest000000000001" )
+                            , ( "ownerRef", Encode.string "owner_test_valid_00000001" )
+                            , ( "accountGeneration", Encode.int 1 )
+                            , ( "connectionGeneration", Encode.int 1 )
+                            , ( "domain", Encode.string "account-security" )
+                            , ( "action", Encode.string "passkey-list" )
+                            , ( "status", Encode.string "accepted" )
+                            , ( "completionScope", Encode.string "server" )
+                            , ( "reason", Encode.null )
+                            , ( "view"
+                              , Encode.object
+                                    [ ( "kind", Encode.string "passkey-management" )
+                                    , ( "requestId", Encode.string "domainRequest000000000001" )
+                                    , ( "status", Encode.string "ready" )
+                                    , ( "operation", Encode.string "list" )
+                                    , ( "reason", Encode.null )
+                                    , ( "rows"
+                                      , Encode.list identity
+                                            [ Encode.object
+                                                [ ( "credentialRef", Encode.string "AAAAAAAAAAAAAAAAAAAAAAAA" )
+                                                , ( "label", Encode.string label )
+                                                , ( "signCount", Encode.string signCount )
+                                                , ( "createdUnix", Encode.string createdUnix )
+                                                ]
+                                            ]
+                                      )
+                                    ]
+                              )
+                            ]
 
-                    ( m1, outbound ) =
-                        feed authed ":irc.example 001 me :welcome"
-
-                    ( m2, outbound2 ) =
-                        feed m1 ":irc.example 001 me :welcome again"
+                    valid = makeResult "Trusted laptop" "4294967295" "-9223372036854775808"
+                    tooLong = makeResult (String.repeat 65 "x") "1" "0"
+                    badCount = makeResult "Laptop" "" "0"
+                    badTime = makeResult "Laptop" "1" "9223372036854775808"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal True m1.sessionCommandsSent
-                    , \_ ->
-                        Expect.equal
-                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
-                            m1.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.startsWith "SESSION" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound2
-                            )
+                    [ \_ -> Expect.equal True (Result.toMaybe (Decode.decodeValue RuntimeDomain.decodeResult valid) /= Nothing)
+                    , \_ -> Expect.equal Nothing (Result.toMaybe (Decode.decodeValue RuntimeDomain.decodeResult tooLong))
+                    , \_ -> Expect.equal Nothing (Result.toMaybe (Decode.decodeValue RuntimeDomain.decodeResult badCount))
+                    , \_ -> Expect.equal Nothing (Result.toMaybe (Decode.decodeValue RuntimeDomain.decodeResult badTime))
                     ]
                     ()
-        , test "001 without holdings sends rotation only" <|
+        , test "untyped resume NOTICE cannot settle private recovery" <|
             \_ ->
                 let
-                    authed =
-                        { blank | accountName = Just "alice" }
-
-                    ( m1, outbound ) =
-                        feed authed ":irc.example 001 me :welcome"
+                    notice = { phase = Restoring, kind = Just Session.LocalBearer, credentialKind = Just Session.LocalLogical, credentialRef = Just (mustCredentialRef "CCCCCCCCCCCCCCCCCCCCCCCC"), outcome = Session.ResumePending }
+                    pending = { blank | sessionReclaim = Just notice }
+                    ( timed, timerOut ) = update (ReclaimTimerFired { stage = "confirm" }) pending
+                    trusted = Tuple.first (feed { timed | ourNick = "me" } ":irc.example 001 me :welcome")
+                    ( unrelated, _ ) = feed trusted ":irc.example NOTICE me :SESSION RESUME: unrelated message"
+                    ( success, successOut ) = feed trusted ":irc.example NOTICE me :SESSION RESUME: exact session restored"
+                    ( peerNotice, _ ) = feed trusted ":bob!u@h NOTICE me :SESSION RESUME: ordinary user text"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal True m1.sessionCommandsSent
-                    , \_ -> Expect.equal Nothing m1.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.contains "RESUME" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound
-                            )
+                    [ \_ -> Expect.equal (Just notice) timed.sessionReclaim
+                    , \_ -> Expect.equal [] timerOut
+                    , \_ -> Expect.equal timed.sessionReclaim unrelated.sessionReclaim
+                    , \_ -> Expect.equal timed.sessionReclaim success.sessionReclaim
+                    , \_ -> Expect.equal [] successOut
+                    , \_ -> Expect.equal True (List.any (\row -> row.body == "SESSION RESUME: ordinary user text") (dmMessages peerNotice "bob"))
                     ]
                     ()
-        , test "900 after 001 runs the session commands for passwordless login" <|
+        , test "untyped attachment busy FAIL cannot settle private recovery" <|
             \_ ->
                 let
-                    ( m1, outbound1 ) =
-                        feed blank ":irc.example 001 me :welcome"
-
-                    ( m2, outbound2 ) =
-                        feed m1 ":s 900 me nick!u@h alice :You are now logged in as alice"
+                    ref = mustCredentialRef "DDDDDDDDDDDDDDDDDDDDDDDD"
+                    notice = { phase = Restoring, kind = Just Session.LocalBearer, credentialKind = Just Session.LocalExact, credentialRef = Just ref, outcome = Session.ResumePending }
+                    ( busy, outbound ) = feed { blank | sessionReclaim = Just notice } ":irc.example FAIL SESSION ATTACHMENT_IN_USE :Exact session attachment is already active"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal False m1.sessionCommandsSent
-                    , \_ -> Expect.equal True m2.sessionCommandsSent
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.startsWith "SESSION" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound1
-                            )
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound2)
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal (Just notice) busy.sessionReclaim
                     ]
                     ()
-        , test "lapsed mesh Bearer [REDACTED] through to the local one" <|
+        , test "untyped revoked FAIL cannot forget a private recovery credential" <|
             \_ ->
                 let
-                    authed =
-                        { blank
-                            | nowMs = 1000000
-                            , accountName = Just "alice"
-                            , sessionTokens =
-                                { sessionToken = Just "tok123"
-                                , meshToken = Just "hex9"
-                                , meshTokenExpiresAt = Just 99000
-                                }
-                        }
-
-                    ( m1, outbound ) =
-                        feed authed ":irc.example 001 me :welcome"
+                    ref = mustCredentialRef "EEEEEEEEEEEEEEEEEEEEEEEE"
+                    notice = { phase = Restoring, kind = Just Session.MeshBearer, credentialKind = Just Session.MeshExact, credentialRef = Just ref, outcome = Session.ResumePending }
+                    ( revoked, outbound ) = feed { blank | sessionReclaim = Just notice } ":irc.example FAIL SESSION SESSION_REVOKED :Logical session is revoked"
                 in
                 Expect.all
-                    [ \_ ->
-                        Expect.equal
-                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
-                            m1.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
-                    ]
-                    ()
-        , test "lapsed mesh Bearer [REDACTED] sign-in-again banner" <|
-            \_ ->
-                let
-                    authed =
-                        { blank
-                            | nowMs = 1000000
-                            , accountName = Just "alice"
-                            , sessionTokens =
-                                { sessionToken = Nothing
-                                , meshToken = Just "hex9"
-                                , meshTokenExpiresAt = Just 99000
-                                }
-                        }
-
-                    ( m1, outbound ) =
-                        feed authed ":irc.example 001 me :welcome"
-                in
-                Expect.all
-                    [ \_ ->
-                        Expect.equal
-                            (Just { phase = SignInAgain, kind = Nothing })
-                            m1.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.contains "RESUME" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound
-                            )
-                    ]
-                    ()
-        , test "FAIL SESSION INVALID_TOKEN revokes the Bearer [REDACTED]" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, _ ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-
-                    ( m3, outbound ) =
-                        feed m2 ":s FAIL SESSION INVALID_TOKEN :stale bearer"
-
-                    ( m4, outbound2 ) =
-                        update (ReclaimTimerFired { stage = "confirm" }) m3
-                in
-                Expect.all
-                    [ \_ -> Expect.equal Nothing m3.sessionTokens.sessionToken
-                    , \_ ->
-                        Expect.equal
-                            (Just { phase = ReclaimFailed, kind = Nothing })
-                            m3.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SessionTokensCleared { server = "", nick = "me" }) outbound)
-                    , \_ ->
-                        Expect.equal True
-                            (List.member ReclaimTimersCleared outbound)
-                    , \_ -> Expect.equal True m3.sessionTokenWritesAllowed
-                    , \_ -> Expect.equal True m3.credentialCanonicalOnly
-                    , \_ -> Expect.equal False (List.isEmpty m3.serviceLog)
-                    , \_ -> Expect.equal m3.sessionReclaim m4.sessionReclaim
-                    , \_ -> Expect.equal [] outbound2
-                    ]
-                    ()
-        , test "FAIL SESSION LIST never erases the Bearer [REDACTED]" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, _ ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-
-                    ( m3, outbound ) =
-                        feed m2 ":s FAIL SESSION LIST :no such session list"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal (Just "tok123") m3.sessionTokens.sessionToken
-                    , \_ -> Expect.equal Nothing m3.sessionReclaim
-                    , \_ -> Expect.equal False (List.isEmpty m3.serviceLog)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SessionTokensCleared _ ->
-                                            True
-
-                                        _ ->
-                                            False
-                                )
-                                outbound
-                            )
-                    ]
-                    ()
-        , test "account switch drops the old account's holdings" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, _ ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-
-                    ( m3, outbound ) =
-                        feed m2 ":s 900 me nick!u@h bob :You are now logged in as bob"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal Nothing m3.sessionTokens.sessionToken
-                    , \_ -> Expect.equal (Just "bob") m3.accountName
-                    , \_ -> Expect.equal True m3.sessionCommandsSent
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
-                    , \_ ->
-                        Expect.equal False
-                            (List.any
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            String.contains "RESUME" line
-
-                                        _ ->
-                                            False
-                                )
-                                outbound
-                            )
-                    ]
-                    ()
-        , test "901 clears live resume tokens and re-arms the commands" <|
-            \_ ->
-                let
-                    ( m1, _ ) =
-                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m2, _ ) =
-                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
-
-                    ( m3, _ ) =
-                        feed m2 ":irc.example 001 me :welcome"
-
-                    ( m4, _ ) =
-                        feed m3 ":s 901 me :You are now logged out"
-                in
-                Expect.all
-                    [ \_ -> Expect.equal Nothing m4.sessionTokens.sessionToken
-                    , \_ -> Expect.equal False m4.sessionCommandsSent
-                    , \_ -> Expect.equal Nothing m4.accountName
-                    ]
-                    ()
-        , test "reclaim confirm and dismiss timers walk the banner" <|
-            \_ ->
-                let
-                    seeded =
-                        { blank
-                            | sessionTokens =
-                                { sessionToken = Just "tok123"
-                                , meshToken = Nothing
-                                , meshTokenExpiresAt = Nothing
-                                }
-                        }
-
-                    ( m1, _ ) =
-                        feed seeded ":s 900 me nick!u@h alice :You are now logged in as alice"
-
-                    ( m4, outbound4 ) =
-                        update (ReclaimTimerFired { stage = "confirm" }) m1
-
-                    ( m5, _ ) =
-                        update (ReclaimTimerFired { stage = "dismiss" }) m4
-                in
-                Expect.all
-                    [ \_ ->
-                        Expect.equal
-                            (Just { phase = Reclaimed, kind = Just Session.LocalBearer })
-                            m4.sessionReclaim
-                    , \_ ->
-                        Expect.equal True
-                            (List.member (ReclaimTimerStarted { stage = "dismiss" }) outbound4)
-                    , \_ -> Expect.equal Nothing m5.sessionReclaim
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal (Just notice) revoked.sessionReclaim
                     ]
                     ()
         , test "901 clears the logged-in account" <|
@@ -8558,7 +11364,7 @@ suite =
             \_ ->
                 let
                     base =
-                        { blank | endpoint = Just "wss://irc.example", ourNick = "guest1" }
+                        { blank | endpoint = Just "wss://irc.example", ourNick = "guest1", runtimeOwnerStamp = Just guestRuntimeOwner }
 
                     joined =
                         joinFirst base "guest1" "#c"
@@ -8742,8 +11548,11 @@ suite =
                     ( m3, outUnpin ) =
                         update (PinnedMessageUnpin { channel = "#c", messageId = "m2" }) m2
 
+                    ( m3echo, _ ) =
+                        feed m3 ":me!u@h PROP #c PINS m1,m3,m4"
+
                     ( m4, _ ) =
-                        feed m3 ":alice!u@h PRIVMSG #c :hello"
+                        feed m3echo ":alice!u@h PRIVMSG #c :hello"
 
                     ( jumped, jumpOut ) =
                         update PinnedMessagesOpen m4
@@ -8753,9 +11562,12 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ "m1", "m2", "m3" ] (channelPins pinned "#c")
-                    , \_ -> Expect.equal [ "m1", "m2", "m3", "m4" ] (channelPins m1 "#c")
+                    -- Writes stay pending until the server echo (audit
+                    -- 2026-11-05); follow-up writes build on the pending list.
+                    , \_ -> Expect.equal [ "m1", "m2", "m3" ] (channelPins m1 "#c")
                     , \_ -> Expect.equal [] outDup
-                    , \_ -> Expect.equal [ "m1", "m3", "m4" ] (channelPins m3 "#c")
+                    , \_ -> Expect.equal [ "m1", "m2", "m3" ] (channelPins m3 "#c")
+                    , \_ -> Expect.equal [ "m1", "m3", "m4" ] (channelPins m3echo "#c")
                     , \_ -> Expect.equal [ SendLine "PROP #c PINS m1,m2,m3,m4\r\n" ] outPin
                     , \_ -> Expect.equal [ SendLine "PROP #c PINS m1,m3,m4\r\n" ] outUnpin
                     , \_ -> Expect.equal True jumped.showPinnedMessages
@@ -8966,18 +11778,18 @@ suite =
                         update (PasskeyFailed { message = "cancelled" }) blank
                 in
                 Expect.equal (Just "cancelled") m1.passkey.error
-        , test "NOTE MEDIA JOIN lands in a joined channel" <|
+        , test "unsupported wire commands never enter the media fold" <|
             \_ ->
                 let
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
 
                     ( m2, _ ) =
-                        feed m1 ":s NOTE MEDIA #c JOIN dave"
+                        feed m1 ":s BOGUS MEDIA #c JOIN dave"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
-                    , \_ -> Expect.equal True m2.mediaAvailable
+                    [ \_ -> Expect.equal Dict.empty m2.media.participants
+                    , \_ -> Expect.equal False m2.mediaAvailable
                     ]
                     ()
         , test "EVENT MEDIA redispatches into the media fold" <|
@@ -8986,11 +11798,16 @@ suite =
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
 
+                    -- EVENT MEDIA needs the 001-learned server prefix
+                    -- and our nick as recipient (audit 2026-11-05).
+                    ( registered, _ ) =
+                        feed m1 ":irc.example 001 me :welcome"
+
                     ( m2, _ ) =
-                        feed m1 ":s EVENT me MEDIA JOIN #c dave"
+                        feed registered ":irc.example EVENT me MEDIA JOIN #c dave"
                 in
                 Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
-        , test "FAIL MEDIA folds and marks the plane available" <|
+        , test "private FAIL MEDIA replies never enter the Elm fold" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -9000,19 +11817,19 @@ suite =
                         feed m1 ":s FAIL MEDIA #c JOIN dave"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
-                    , \_ -> Expect.equal True m2.mediaAvailable
+                    [ \_ -> Expect.equal Dict.empty m2.media.participants
+                    , \_ -> Expect.equal False m2.mediaAvailable
                     ]
                     ()
         , test "MEDIA for an unknown channel allocates nothing" <|
             \_ ->
                 let
                     ( m1, _ ) =
-                        feed blank ":s NOTE MEDIA #other JOIN dave"
+                        feed blank ":s BOGUS MEDIA #other JOIN dave"
                 in
                 Expect.all
                     [ \_ -> Expect.equal True (Dict.isEmpty m1.media.participants)
-                    , \_ -> Expect.equal True m1.mediaAvailable
+                    , \_ -> Expect.equal False m1.mediaAvailable
                     ]
                     ()
         , test "761 ocean.dm-key lands in the device directory" <|
@@ -9080,10 +11897,9 @@ suite =
                     , \_ -> Expect.equal (Just envelopeBody) (Maybe.map .body (List.head stored))
                     , \_ ->
                         Expect.equal
-                            [ DmOpenRequested { peer = "dave", presentedKey = peerKey, messageId = 0, envelope = envelopeBody, owner = Nothing }
-                            , VaultPersist
-                                { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                            [ DmOpenRequested { peer = "dave", presentedKey = peerKey, messageId = 0, envelope = envelopeBody, owner = Nothing, runtimeOwnerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing }
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "dave"
+                                , rows = [ { id = "dave:0", wireMessageId = Nothing, target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                                 }
                             ]
                             outbound
@@ -9099,9 +11915,8 @@ suite =
                     [ \_ -> Expect.equal (Just DmCipher.lockedPlaceholder) (Maybe.map displayBody (List.head (dmMessages m1 "dave")))
                     , \_ ->
                         Expect.equal
-                            [ VaultPersist
-                                { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                            [ VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "dave"
+                                , rows = [ { id = "dave:0", wireMessageId = Nothing, target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                                 }
                             ]
                             outbound
@@ -9191,9 +12006,8 @@ suite =
                 in
                 Expect.equal
                     [ SendLine "PRIVMSG bob hello\r\n"
-                    , VaultPersist
-                        { target = "bob"
-                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                    , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "bob"
+                        , rows = [ { id = "bob:0", wireMessageId = Nothing, target = "bob", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                         }
                     ]
                     outbound
@@ -9219,10 +12033,10 @@ suite =
             \_ ->
                 let
                     ( m1, outbound ) =
-                        update ComposerSend { blank | connection = Offline, activeChannel = Just "#c", composer = "hello" }
+                        update ComposerSend { blank | runtimeOwnerStamp = Just testRuntimeOwner, connection = Offline, activeChannel = Just "#c", composer = "hello" }
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ OutboxQueue { target = "#c", text = "hello" } ] outbound
+                    [ \_ -> Expect.equal [ RuntimeDomain.QueueMessage "#c" "chat" "hello" Nothing "message" Nothing ] (runtimeActions outbound)
                     , \_ -> Expect.equal "hello" m1.composer
                     , \_ -> Expect.equal [] m1.outbox
                     ]
@@ -9231,16 +12045,51 @@ suite =
             \_ ->
                 let
                     ( m1, _ ) =
-                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) { blank | activeChannel = Just "#c", composer = "hello" }
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000, revision = Just 0 }) { blank | activeChannel = Just "#c", composer = "hello", composerDraftVersions = Dict.singleton "#c" 0, threadFollowing = False, threadWindowSize = 500 }
 
                     rows =
                         Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m1.channels))
                 in
                 Expect.all
                     [ \_ -> Expect.equal "" m1.composer
+                    , \_ -> Expect.equal True m1.threadFollowing
+                    , \_ -> Expect.equal Nothing m1.threadPageStart
                     , \_ -> Expect.equal [ { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 } ] m1.outbox
                     , \_ -> Expect.equal [ Just "ob-1" ] (List.map .outboxId rows)
                     , \_ -> Expect.equal [ "hello" ] (List.map .body rows)
+                    ]
+                    ()
+        , test "delayed admission for room A does not clear same-text typing in room B" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | activeChannel = Just "#room-b"
+                            , composer = "same text"
+                            , composerDrafts = Dict.fromList [ ( "#room-a", "same text" ), ( "#room-b", "same text" ) ]
+                            , composerDraftVersions = Dict.fromList [ ( "#room-a", 4 ), ( "#room-b", 7 ) ]
+                            , threadFollowing = False
+                        }
+
+                    ( admitted, _ ) =
+                        update
+                            (OutboxQueued { id = "client_intent_00000001", target = "#room-a", text = "same text", queuedAt = 1000, revision = Just 4 })
+                            base
+
+                    targetA =
+                        "#room-a"
+
+                    targetB =
+                        "#room-b"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "same text" admitted.composer
+                    , \_ -> Expect.equal False admitted.threadFollowing
+                    , \_ -> Expect.equal (Just "same text") (Dict.get targetB admitted.composerDrafts)
+                    , \_ -> Expect.equal Nothing (Dict.get targetA admitted.composerDrafts)
+                    , \_ -> Expect.equal (Just 7) (Dict.get targetB admitted.composerDraftVersions)
+                    , \_ -> Expect.equal Nothing (Dict.get targetA admitted.composerDraftVersions)
+                    , \_ -> Expect.equal [ "same text" ] (Maybe.withDefault [] (Maybe.map (List.map .body << .messages) (Dict.get targetA admitted.channels)))
                     ]
                     ()
         , test "failed queue keeps the draft and warns" <|
@@ -9936,8 +12785,14 @@ suite =
                     ( set, setOut ) =
                         update ComposerSend { live | composer = "/event 2026-01-01T01:00:00Z Party time!" }
 
+                    ( setEchoed, _ ) =
+                        feed set ":me!u@h PROP #c ocean.event :1767229200|Party time!"
+
                     ( cleared, clearedOut ) =
-                        update ComposerSend { set | composer = "/event OFF" }
+                        update ComposerSend { setEchoed | composer = "/event OFF" }
+
+                    ( clearEchoed, _ ) =
+                        feed cleared ":me!u@h PROP #c ocean.event :"
 
                     ( bare, bareOut ) =
                         update ComposerSend { set | composer = "/event" }
@@ -9964,13 +12819,19 @@ suite =
                         update ComposerSend { plainLink | composer = "/event 1767229200 Shh" }
                 in
                 Expect.all
-                    [ \_ ->
+                    -- The event lands only on the server echo (audit
+                    -- 2026-11-05), never as an optimistic local write.
+                    [ \_ -> Expect.equal Nothing (Dict.get "#c" set.props.channelProps)
+                    , \_ ->
                         Expect.equal (Just (Dict.singleton "ocean.event" "1767229200|Party time!"))
-                            (Dict.get "#c" set.props.channelProps)
+                            (Dict.get "#c" setEchoed.props.channelProps)
                     , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :1767229200|Party time!\r\n" ] setOut
                     , \_ -> Expect.equal [] set.toasts
                     , \_ -> Expect.equal "" set.composer
-                    , \_ -> Expect.equal Nothing (Dict.get "#c" cleared.props.channelProps)
+                    , \_ ->
+                        Expect.equal (Just (Dict.singleton "ocean.event" "1767229200|Party time!"))
+                            (Dict.get "#c" cleared.props.channelProps)
+                    , \_ -> Expect.equal "" (Dict.get "#c" clearEchoed.props.channelProps |> Maybe.andThen (Dict.get "ocean.event") |> Maybe.withDefault "")
                     , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :\r\n" ] clearedOut
                     , \_ -> Expect.equal [] cleared.toasts
                     , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :\r\n" ] bareOut
@@ -9987,9 +12848,9 @@ suite =
                     , \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") down.composerError
                     , \_ -> Expect.equal [ SendLine "EVENT clear\r\n" ] dmOut
                     , \_ -> Expect.equal [ SendLine "EVENT\r\n" ] bareDmOut
-                    , \_ ->
-                        Expect.equal (Just (Dict.singleton "ocean.event" "1767229200|Shh"))
-                            (Dict.get "#c" quiet.props.channelProps)
+                    -- A non-IRCX link cannot store the event: nothing is
+                    -- sent and nothing is written locally.
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" quiet.props.channelProps)
                     , \_ -> Expect.equal [] quietOut
                     ]
                     ()
@@ -10175,10 +13036,10 @@ suite =
             \_ ->
                 let
                     ( m1, _ ) =
-                        update (OutboxQueued { id = "ob-1", target = "#c", text = "one", queuedAt = 1000 }) blank
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "one", queuedAt = 1000, revision = Nothing }) blank
 
                     ( m2, _ ) =
-                        update (OutboxQueued { id = "ob-2", target = "#c", text = "two", queuedAt = 2000 }) m1
+                        update (OutboxQueued { id = "ob-2", target = "#c", text = "two", queuedAt = 2000, revision = Nothing }) m1
 
                     ( m3, outbound ) =
                         update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [ "ob-2" ], dropped = [], rows = [ { id = "ob-2", target = "#c", text = "two", queuedAt = 2000 } ], waiting = 1, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 }) m2
@@ -10225,7 +13086,7 @@ suite =
             \_ ->
                 let
                     ( m1, _ ) =
-                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000, revision = Nothing }) blank
 
                     ( m2, _ ) =
                         update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "q9" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
@@ -10244,13 +13105,13 @@ suite =
             \_ ->
                 let
                     ( m1, _ ) =
-                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000, revision = Nothing }) blank
 
                     ( m2, _ ) =
                         update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "q9" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
 
                     ( m3, _ ) =
-                        feed { m2 | ourNick = "me" } "@label=q9 :me!u@h PRIVMSG #c :hello"
+                        feed { m2 | ourNick = "me" } "@label=q9;msgid=outbox-echo-1 :me!u@h PRIVMSG #c :hello"
 
                     rows =
                         Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m3.channels))
@@ -10266,7 +13127,7 @@ suite =
             \_ ->
                 let
                     ( m1, _ ) =
-                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000, revision = Nothing }) blank
 
                     ( m2, _ ) =
                         update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "not a label" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
@@ -10447,10 +13308,10 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine ("PRIVMSG dave :" ++ envelopeBody ++ "\r\n")
-                            , VaultPersist
-                                { target = "dave"
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "dave"
                                 , rows =
                                     [ { id = "dave:1"
+                                      , wireMessageId = Nothing
                                       , target = "dave"
                                       , from = m3.ourNick
                                       , body = envelopeBody
@@ -10833,9 +13694,8 @@ suite =
                 in
                 Expect.equal
                     [ SendLine "PRIVMSG #c :hi room\r\n"
-                    , VaultPersist
-                        { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
+                    , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
+                        , rows = [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "me", body = "hi room", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ]
                         }
                     ]
                     outbound
@@ -10856,7 +13716,7 @@ suite =
                     , \_ -> Expect.equal (Just roomEnvelopeBody) (Maybe.map .body (List.head stored))
                     , \_ ->
                         Expect.equal [ RoomOpenRequested { room = "#c", messageId = 0, envelope = roomEnvelopeBody } ]
-                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ] }) outbound)
+                            (List.filter (\o -> o /= VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  target = "#c", rows = [ { id = "#c:0", wireMessageId = Nothing, target = "#c", from = "dave", body = roomEnvelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing } ] }) outbound)
                     ]
                     ()
         , test "RoomSealed sends tagged ciphertext and keeps plaintext local" <|
@@ -10878,10 +13738,10 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine ("@+onyx/e2ee=mls PRIVMSG #c :" ++ roomEnvelopeBody ++ "\r\n")
-                            , VaultPersist
-                                { target = "#c"
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
                                 , rows =
                                     [ { id = "#c:1"
+                                      , wireMessageId = Nothing
                                       , target = "#c"
                                       , from = m4.ourNick
                                       , body = roomEnvelopeBody
@@ -10924,10 +13784,10 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine ("@label=" ++ label ++ " PRIVMSG dave :" ++ envelopeBody ++ "\r\n")
-                            , VaultPersist
-                                { target = "dave"
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "dave"
                                 , rows =
                                     [ { id = "dave:1"
+                                      , wireMessageId = Nothing
                                       , target = "dave"
                                       , from = m3.ourNick
                                       , body = envelopeBody
@@ -10981,6 +13841,318 @@ suite =
                     , \_ -> Expect.equal [] (List.filter (not << String.isEmpty) (List.map sendLineText out4))
                     ]
                     ()
+        , test "labeled-response ACK leaves delivery unknown until exact msgid echo" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "alice" "#c"
+
+                    ( sent, _ ) =
+                        update ComposerSend
+                            { base
+                                | caps = [ "labeled-response" ]
+                                , composer = "hello"
+                            }
+
+                    label =
+                        Maybe.withDefault "" (List.head (Dict.keys sent.pendingLabels))
+
+                    ( wrapped, _ ) =
+                        feed sent ("@label=" ++ label ++ " BATCH +w1 labeled-response")
+
+                    ( acked, _ ) =
+                        feed wrapped ("@label=" ++ label ++ " ACK")
+
+                    ( accepted, _ ) =
+                        feed acked ("@label=" ++ label ++ ";msgid=accepted-1 :alice!u@h PRIVMSG #c :hello")
+
+                    ( duplicate, _ ) =
+                        feed accepted ("@label=" ++ label ++ ";msgid=accepted-1 :alice!u@h PRIVMSG #c :hello")
+
+                    row =
+                        List.head (dmMessages accepted "#c")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ True ] (List.map .pending (dmMessages wrapped "#c"))
+                    , \_ -> Expect.equal [] (Set.toList wrapped.deliveryUnknownIds)
+                    , \_ -> Expect.equal Dict.empty acked.pendingLabels
+                    , \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown acked) (dmMessages acked "#c"))
+                    , \_ -> Expect.equal [ False ] (List.map .pending (dmMessages accepted "#c"))
+                    , \_ -> Expect.equal [] (Set.toList accepted.deliveryUnknownIds)
+                    , \_ -> Expect.equal (Just "hello") (Maybe.map .body row)
+                    , \_ -> Expect.equal 1 (List.length (dmMessages duplicate "#c"))
+                    ]
+                    ()
+        , test "unresolved batch JOIN and MARKREAD never fall through to live folds" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "me" "#c"
+
+                    ( joined, _ ) =
+                        feed base "@batch=retired :eve!u@h JOIN #c"
+
+                    ( marked, _ ) =
+                        feed joined "@batch=retired :s MARKREAD #c 2026-01-01T00:00:00.000Z"
+
+                    members =
+                        Dict.get "#c" marked.channels |> Maybe.map (.members >> Dict.values) |> Maybe.withDefault []
+
+                    baselineMarkers =
+                        base.readMarkers
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (List.filter (\member -> member.nick == "eve") members)
+                    , \_ -> Expect.equal baselineMarkers marked.readMarkers
+                    , \_ -> Expect.equal Dict.empty marked.historyBatches
+                    ]
+                    ()
+        , test "labeled timeout becomes delivery unknown and never retries" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "alice" "#c"
+
+                    ( sent, _ ) =
+                        update ComposerSend
+                            { base
+                                | caps = [ "labeled-response" ]
+                                , composer = "timeout body"
+                            }
+
+                    label =
+                        Maybe.withDefault "" (List.head (Dict.keys sent.pendingLabels))
+
+                    ( timedOut, timeoutOut ) =
+                        update (Tick (Time.millisToPosix (floor sent.nowMs + 31000))) sent
+
+                    ( accepted, _ ) =
+                        feed timedOut ("@label=" ++ label ++ ";msgid=late-accepted :alice!u@h PRIVMSG #c :timeout body")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown timedOut) (dmMessages timedOut "#c"))
+                    , \_ -> Expect.equal False (List.any (\out -> String.contains "PRIVMSG #c" (sendLineText out)) timeoutOut)
+                    , \_ -> Expect.equal [ False ] (List.map .pending (dmMessages accepted "#c"))
+                    , \_ -> Expect.equal [] (Set.toList accepted.deliveryUnknownIds)
+                    ]
+                    ()
+        , test "nested labeled wrapper inherits open plain history and commits only at parent close" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "me" "#c"
+
+                    ( parent, _ ) =
+                        feed base "BATCH +h1 draft/chathistory #c"
+
+                    ( wrapper, _ ) =
+                        feed parent "@batch=h1 BATCH +w1 labeled-response"
+
+                    ( held, _ ) =
+                        feed wrapper "@batch=w1;msgid=historic-1 :bob!u@h PRIVMSG #c :historic"
+
+                    ( childClosed, _ ) =
+                        feed held "@batch=h1 BATCH -w1"
+
+                    ( parentClosed, _ ) =
+                        feed childClosed "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (channelBodies held)
+                    , \_ -> Expect.equal [] (channelBodies childClosed)
+                    , \_ -> Expect.equal [ "historic" ] (channelBodies parentClosed)
+                    , \_ -> Expect.equal Dict.empty parentClosed.historyBatches
+                    ]
+                    ()
+        , test "incomplete nested multiline is discarded while complete history siblings survive" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "me" "#c"
+
+                    ( parent, _ ) =
+                        feed base "BATCH +h-multi draft/chathistory #c"
+
+                    ( withSibling, _ ) =
+                        feed parent "@batch=h-multi;msgid=history-sibling :bob!u@h PRIVMSG #c :kept"
+
+                    ( withMultiline, _ ) =
+                        feed withSibling "@batch=h-multi BATCH +ml-part draft/multiline #c"
+
+                    ( withPart, _ ) =
+                        feed withMultiline "@batch=ml-part :alice!u@h PRIVMSG #c :partial"
+
+                    ( withDescendant, _ ) =
+                        feed withPart "@batch=ml-part BATCH +desc wrapper"
+
+                    ( childClosed, _ ) =
+                        feed withDescendant "@batch=h-multi BATCH -ml-part"
+
+                    ( historyClosed, _ ) =
+                        feed childClosed "BATCH -h-multi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "kept" ] (channelBodies historyClosed)
+                    , \_ -> Expect.equal Dict.empty historyClosed.historyBatches
+                    , \_ -> Expect.equal [ "History response incomplete" ] (List.filterMap (\toast -> if toast.title == "History response incomplete" then Just toast.title else Nothing) historyClosed.toasts)
+                    ]
+                    ()
+        , test "interleaved plain history batches remain isolated through reverse close order" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "me" "#a"
+
+                    ( withB, _ ) =
+                        feed base ":me!u@h JOIN #b"
+
+                    ( aOpen, _ ) =
+                        feed withB "BATCH +ha draft/chathistory #a"
+
+                    ( bothOpen, _ ) =
+                        feed aOpen "BATCH +hb draft/chathistory #b"
+
+                    ( buffered, _ ) =
+                        feed bothOpen "@batch=ha :alice!u@h PRIVMSG #a :alpha"
+                            |> Tuple.first
+                            |> (\m -> feed m "@batch=hb :bob!u@h PRIVMSG #b :beta")
+
+                    ( bClosed, _ ) =
+                        feed buffered "BATCH -hb"
+
+                    ( aClosed, _ ) =
+                        feed bClosed "BATCH -ha"
+
+                    bodies target =
+                        Dict.get target aClosed.channels |> Maybe.map (List.map .body << .messages) |> Maybe.withDefault []
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "alpha" ] (bodies "#a")
+                    , \_ -> Expect.equal [ "beta" ] (bodies "#b")
+                    , \_ -> Expect.equal Dict.empty aClosed.historyBatches
+                    ]
+                    ()
+        , test "missing history close expires as incomplete and late batch traffic stays quarantined" <|
+            \_ ->
+                let
+                    ( requested, _ ) =
+                        requestJoinHistory (historyRoom []) "#c"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +h1 draft/chathistory #c"
+
+                    ( buffered, _ ) =
+                        feed opened "@batch=h1;msgid=historic-2 :bob!u@h PRIVMSG #c :kept"
+
+                    ( expired, expiredOut ) =
+                        update (Tick (Time.millisToPosix (floor buffered.nowMs + 31000))) buffered
+
+                    ( late, _ ) =
+                        feed expired "@batch=h1 :eve!u@h JOIN #c"
+
+                    members =
+                        Dict.get "#c" late.channels |> Maybe.map (.members >> Dict.values) |> Maybe.withDefault []
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "kept" ] (channelBodies expired)
+                    , \_ -> Expect.equal True (List.any isVaultPersist expiredOut)
+                    , \_ -> Expect.equal False (isHistoryExhausted expired "#c")
+                    , \_ -> Expect.equal [] (List.filter (\member -> member.nick == "eve") members)
+                    , \_ -> Expect.equal [] (Dict.keys late.historyBatches)
+                    , \_ -> Expect.equal [ "History response incomplete" ] (List.filterMap (\toast -> if toast.title == "History response incomplete" then Just toast.title else Nothing) expired.toasts)
+                    ]
+                    ()
+        , test "duplicate history OPEN cannot reset its deadline or create a parent cycle" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed (liveRoom "me" "#c") "BATCH +h-dup draft/chathistory #c"
+
+                    beforeDuplicate =
+                        { opened | nowMs = opened.nowMs + 29000 }
+
+                    ( duplicate, _ ) =
+                        feed beforeDuplicate "@batch=h-dup BATCH +h-dup draft/chathistory #c"
+
+                    ( expired, _ ) =
+                        update (Tick (Time.millisToPosix (floor opened.nowMs + 30000))) duplicate
+                in
+                Expect.all
+                    [ \_ -> Expect.equal opened.historyBatches duplicate.historyBatches
+                    , \_ -> Expect.equal Dict.empty expired.historyBatches
+                    , \_ -> Expect.equal [ "History response incomplete" ] (List.filterMap (\toast -> if toast.title == "History response incomplete" then Just toast.title else Nothing) expired.toasts)
+                    ]
+                    ()
+        , test "closing replay with an active topic reapplies its marker without advancing or saving it" <|
+            \_ ->
+                let
+                    base =
+                        liveRoom "me" "#c"
+
+                    withTopic =
+                        { base
+                            | activeChannelTopics = Dict.singleton "#c" "Alpha"
+                            , readMarkers = Dict.singleton "#c" "2026-10-04T12:00:00Z"
+                            , topicReadLedger = []
+                            , endpoint = Just "wss://irc.example"
+                        }
+
+                    ( opened, _ ) =
+                        feed withTopic "BATCH +h-read draft/chathistory #c"
+
+                    ( buffered, _ ) =
+                        feed opened "@batch=h-read;msgid=historic-topic;time=2026-10-04T12:00:01Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :historic"
+
+                    ( closed, closeOut ) =
+                        feed buffered "BATCH -h-read"
+
+                    saves =
+                        List.filterMap
+                            (\outbound ->
+                                case outbound of
+                                    TopicReadSave _ ->
+                                        Just outbound
+
+                                    _ ->
+                                        Nothing
+                            )
+                            closeOut
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "historic" ] (channelBodies closed)
+                    , \_ -> Expect.equal [] closed.topicReadLedger
+                    , \_ -> Expect.equal [] saves
+                    ]
+                    ()
+        , test "batch registry enforces the depth and open-count ceilings" <|
+            \_ ->
+                let
+                    deep =
+                        List.range 0 8
+                            |> List.foldl
+                                (\index model ->
+                                    let
+                                        parentTag =
+                                            if index == 0 then
+                                                ""
+
+                                            else
+                                                "@batch=b" ++ String.fromInt (index - 1) ++ " "
+                                    in
+                                    Tuple.first (feed model (parentTag ++ "BATCH +b" ++ String.fromInt index ++ " wrapper"))
+                                )
+                                blank
+
+                    capped =
+                        List.range 0 64
+                            |> List.foldl (\index model -> Tuple.first (feed model ("BATCH +c" ++ String.fromInt index ++ " wrapper"))) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 64 (Dict.size capped.historyBatches)
+                    , \_ -> Expect.equal 8 (Dict.size deep.historyBatches)
+                    , \_ -> Expect.equal False (Dict.member "b8" deep.historyBatches)
+                    ]
+                    ()
         , test "RoomSealed combines the e2ee tag with @label" <|
             \_ ->
                 let
@@ -11006,10 +14178,10 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine ("@+onyx/e2ee=mls;label=" ++ label ++ " PRIVMSG #c :" ++ roomEnvelopeBody ++ "\r\n")
-                            , VaultPersist
-                                { target = "#c"
+                            , VaultPersist { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, target = "#c"
                                 , rows =
                                     [ { id = "#c:1"
+                                      , wireMessageId = Nothing
                                       , target = "#c"
                                       , from = m4.ourNick
                                       , body = roomEnvelopeBody
@@ -11215,11 +14387,11 @@ suite =
                         (List.member "op set mode " (channelBodies m))
             ]
         , describe "offline MEMO parity"
-            [ test "NOTE MEMO buffers the DM row and folds the aggregate" <|
+            [ test "NOTICE MEMO buffers the DM row and folds the aggregate" <|
                 \_ ->
                     let
                         ( m, outs ) =
-                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :hello there"
+                            feedTrustedServerNotice { blank | ourNick = "alice" } ":irc.example NOTICE alice :MEMO from bob :hello there"
                     in
                     Expect.all
                         [ \_ ->
@@ -11251,10 +14423,10 @@ suite =
                             { blank | ourNick = "alice" }
 
                         ( m1, _ ) =
-                            feed base ":s NOTE MEMO :from bob :one"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from bob :one"
 
                         ( m2, outs ) =
-                            feed m1 ":s NOTE MEMO :from bob :two"
+                            feedTrustedServerNotice m1 ":irc.example NOTICE alice :MEMO from bob :two"
                     in
                     Expect.all
                         [ \_ ->
@@ -11277,20 +14449,69 @@ suite =
                             { blank | ourNick = "alice" }
 
                         ( m1, o1 ) =
-                            feed base ":s NOTE MEMO :bogus"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO bogus"
 
                         ( m2, o2 ) =
-                            feed m1 ":s NOTE MEMO :from bob"
+                            feedTrustedServerNotice m1 ":irc.example NOTICE alice :MEMO from bob"
 
                         ( m3, o3 ) =
-                            feed m2 ":s NOTE MEMO :from ,bad :x"
+                            feedTrustedServerNotice m2 ":irc.example NOTICE alice :MEMO from ,bad :x"
+
+                        ( retiredNote, noteOut ) =
+                            feedTrustedServerNotice base ":irc.example BOGUS MEMO :from bob :old"
+
+                        ( userNotice, _ ) =
+                            feed m3 ":bob!u@h NOTICE alice :MEMO from bob :ordinary user text"
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] o1
                         , \_ -> Expect.equal [] o2
                         , \_ -> Expect.equal [] o3
+                        , \_ -> Expect.equal [] noteOut
+                        , \_ -> Expect.equal Nothing (offlineMemoFor retiredNote "bob")
+                        , \_ -> Expect.equal [] (dmMessages retiredNote "bob")
                         , \_ -> Expect.equal True (Dict.isEmpty m3.channels)
                         , \_ -> Expect.equal Nothing (offlineMemoFor m3 "bob")
+                        , \_ -> Expect.equal Nothing (offlineMemoFor userNotice "bob")
+                        , \_ -> Expect.equal [ "MEMO from bob :ordinary user text" ] (List.map .body (dmMessages userNotice "bob"))
+                        ]
+                        ()
+            , test "trusted MEMO NOTICE wrappers never persist into a self-target shell" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "alice"
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                                , channels = Dict.singleton "alice" (shellOf "alice" 0 -1)
+                            }
+
+                        ( delivered, deliveredOut ) =
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from bob :hello"
+
+                        ( malformed, malformedOut ) =
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO malformed"
+
+                        hasVaultPersist outbounds =
+                            List.any
+                                (\outbound ->
+                                    case outbound of
+                                        VaultPersist _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outbounds
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "hello" ] (List.map .body (dmMessages delivered "bob"))
+                        , \_ -> Expect.equal [] (dmMessages delivered "alice")
+                        , \_ -> Expect.equal False (Dict.member "alice" delivered.vaultDirtyTargets)
+                        , \_ -> Expect.equal False (hasVaultPersist deliveredOut)
+                        , \_ -> Expect.equal [] (dmMessages malformed "alice")
+                        , \_ -> Expect.equal False (Dict.member "alice" malformed.vaultDirtyTargets)
+                        , \_ -> Expect.equal False (hasVaultPersist malformedOut)
                         ]
                         ()
             , test "a saturated DM set refuses the shell and the aggregate" <|
@@ -11301,7 +14522,7 @@ suite =
                                 { blank | ourNick = "alice" }
 
                         ( m, outs ) =
-                            feed base ":s NOTE MEMO :from newguy :hello"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from newguy :hello"
                     in
                     Expect.all
                         [ \_ -> Expect.equal False (Dict.member "newguy" m.channels)
@@ -11316,7 +14537,7 @@ suite =
                             { blank | ourNick = "alice", mutedDMs = Set.fromList [ "bob" ] }
 
                         ( m, _ ) =
-                            feed base ":s NOTE MEMO :from bob :quiet hello"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from bob :quiet hello"
                     in
                     Expect.all
                         [ \_ ->
@@ -11337,7 +14558,7 @@ suite =
                 \_ ->
                     let
                         ( m1, _ ) =
-                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :hello"
+                            feedTrustedServerNotice { blank | ourNick = "alice" } ":irc.example NOTICE alice :MEMO from bob :hello"
 
                         ( m2, _ ) =
                             update (ChannelSelect "bob") m1
@@ -11365,7 +14586,7 @@ suite =
                             }
 
                         ( m, _ ) =
-                            feed base ":s NOTE MEMO :from bob :late"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from bob :late"
                     in
                     Expect.equal (Just { count = 9999, firstMsgId = 7 })
                         (offlineMemoFor m "bob")
@@ -11399,7 +14620,7 @@ suite =
                             { blank | ourNick = "alice", ignoredUsers = Set.fromList [ "bob" ] }
 
                         ( m, _ ) =
-                            feed base ":s NOTE MEMO :from bob :loud hello"
+                            feedTrustedServerNotice base ":irc.example NOTICE alice :MEMO from bob :loud hello"
                     in
                     Expect.all
                         [ \_ ->
@@ -11417,13 +14638,13 @@ suite =
                 \_ ->
                     let
                         ( m1, _ ) =
-                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :one"
+                            feedTrustedServerNotice { blank | ourNick = "alice" } ":irc.example NOTICE alice :MEMO from bob :one"
 
                         ( opened, _ ) =
                             update (ChannelSelect "bob") m1
 
                         ( m2, _ ) =
-                            feed { opened | activeChannel = Just "bob" } ":s NOTE MEMO :from bob :two"
+                            feedTrustedServerNotice { opened | activeChannel = Just "bob" } ":irc.example NOTICE alice :MEMO from bob :two"
                     in
                     Expect.all
                         [ \_ ->
@@ -12305,7 +15526,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal "playing chess" m.customStatus
                         , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "kai" m.userActivities)
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP * STATUS :playing chess\r\n" ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP * STATUS :playing chess\r\n" ] outs
                         ]
                         ()
             , test "offline set lands and persists without wire" <|
@@ -12317,7 +15538,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal "coding onyx" m.customStatus
                         , \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "onyx" }) (Dict.get "kai" m.userActivities)
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing } ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "coding onyx", expiryIso = Nothing } ] outs
                         ]
                         ()
             , test "invalid text and missing owners are silent no-ops" <|
@@ -12353,9 +15574,9 @@ suite =
                             update (CustomStatusSet "") idle
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP * STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
+                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP * STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
                         , \_ -> Expect.equal "coding onyx" m.customStatus
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP * STATUS :\r\n" ] clearedOuts
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "", expiryIso = Nothing }, SendLine "PROP * STATUS :\r\n" ] clearedOuts
                         , \_ -> Expect.equal "" cleared.customStatus
                         , \_ -> Expect.equal True (Dict.isEmpty cleared.userActivities)
                         ]
@@ -12368,7 +15589,7 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal "playing chess" m.customStatus
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing } ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "playing chess", expiryIso = Nothing } ] outs
                         ]
                         ()
             , test "expiry set validates, clears, and persists ISO" <|
@@ -12388,11 +15609,11 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal (Just 1700000000000) m.customStatusExpiry
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Just (millisToIso 1700000000000) } ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "", expiryIso = Just (millisToIso 1700000000000) } ] outs
                         , \_ -> Expect.equal Nothing neg.customStatusExpiry
                         , \_ -> Expect.equal [] negOuts
                         , \_ -> Expect.equal Nothing cleared.customStatusExpiry
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing } ] clearedOuts
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = guestIdentity "kai", status = "", expiryIso = Nothing } ] clearedOuts
                         , \_ -> Expect.equal [] ownerlessOuts
                         ]
                         ()
@@ -12440,27 +15661,28 @@ suite =
                         , \_ -> Expect.equal Nothing (Dict.get "newkai" m.userActivities)
                         , \_ ->
                             Expect.equal
-                                [ IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , TopicHistoryRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , NickAliasesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , GuestClaimDismissRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , FriendsRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , WatchListRequest { serverUrl = "wss://irc.example", identity = "newkai" }
-                                , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                [ IdentityProfileRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , TopicHistoryRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , NickAliasesRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , GuestClaimDismissRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , FriendsRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , WatchListRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
                                 , IdentityOverridesRequest
-                                    { softIgnoreKey = Just "onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
-                                    , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
-                                    , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
+                                    { softIgnoreKey = Just ("onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22" ++ guestKeyIdentity "newkai" ++ "%22%5D")
+                                    , nickColorsKey = Just ("onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22" ++ guestKeyIdentity "newkai" ++ "%22%5D")
+                                    , displayNamesKey = Just ("onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22" ++ guestKeyIdentity "newkai" ++ "%22%5D")
                                     }
-                                , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , TopicReadRequest { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }
+                                , NavigationLoad { key = ("onyx:channel-navigation:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22" ++ guestKeyIdentity "newkai" ++ "%22%5D") }
                                 ]
                                 outs
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.nickAliasesOwner
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.contactsOwner
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.ctcpOwner
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityOverridesOwner
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.topicReadOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.identityProfileOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.nickAliasesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.contactsOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.ctcpOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.identityOverridesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "newkai" }) m.topicReadOwner
                         , \_ -> Expect.equal seeded.userActivities foreign.userActivities
                         , \_ -> Expect.equal [] foreignOuts
                         ]
@@ -12554,9 +15776,9 @@ suite =
                             feed r1 ":s 001 kai :welcome"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal True (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "kai" }) outs1)
-                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) r1.identityProfileOwner
-                        , \_ -> Expect.equal False (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "kai" }) outs2)
+                        [ \_ -> Expect.equal True (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = guestIdentity "kai" }) outs1)
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = guestIdentity "kai" }) r1.identityProfileOwner
+                        , \_ -> Expect.equal False (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = guestIdentity "kai" }) outs2)
                         ]
                         ()
             , test "900 login reloads the account-owned profile" <|
@@ -12953,11 +16175,145 @@ suite =
                         , \_ -> Expect.equal "hi" nocap.composer
                         ]
                         ()
+            , test "low event clocks still emit valid owner-scoped draft runtime commands" <|
+                \_ ->
+                    let
+                        lowClockOwnerBase =
+                            { blank | runtimeOwnerStamp = Just testRuntimeOwner, eventClock = 0 }
+
+                        ( selected, loadOut ) =
+                            update (ChannelSelect "#draft-low-clock") lowClockOwnerBase
+
+                        ( saved, saveOut ) =
+                            update
+                                (DraftAutosaveTimerFired
+                                    { target = "#draft-low-clock"
+                                    , revision = 1
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    }
+                                )
+                                { selected
+                                    | eventClock = 0
+                                    , composerDrafts = Dict.singleton "#draft-low-clock" "draft"
+                                    , composerDraftVersions = Dict.singleton "#draft-low-clock" 1
+                                }
+
+                        commands =
+                            List.filterMap
+                                (\item ->
+                                    case item of
+                                        RuntimeDomainCommand command ->
+                                            Just command
+
+                                        _ ->
+                                            Nothing
+                                )
+                                (loadOut ++ saveOut)
+
+                        commandIds =
+                            List.map (.requestId >> Ids.requestIdToRuntime) commands
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ RuntimeDomain.LoadDraft "#draft-low-clock", RuntimeDomain.AnchorLoad "#draft-low-clock", RuntimeDomain.SaveDraft "#draft-low-clock" "draft" 1 ] (List.map .action commands)
+                        , \_ -> Expect.equal 3 (List.length commandIds)
+                        , \_ -> Expect.equal True (List.all (\raw -> String.length raw >= 22 && Ids.requestIdFromRuntime raw /= Nothing) commandIds)
+                        , \_ -> Expect.equal 1 saved.eventClock
+                        ]
+                        ()
+            , test "volatile guest transport admission clears only the submitted draft without claiming server acceptance" <|
+                \_ ->
+                    let
+                        requestId =
+                            mustRequestId "domainRequest000000000001"
+
+                        requestText =
+                            Ids.requestIdToRuntime requestId
+
+                        result =
+                            { requestId = requestId
+                            , ownerRef = mustOwnerRef testRuntimeOwner.ownerRef
+                            , accountGeneration = mustAccountGeneration testRuntimeOwner.accountGeneration
+                            , connectionGeneration = mustConnectionGeneration testRuntimeOwner.connectionGeneration
+                            , domain = "journal"
+                            , action = "queue"
+                            , status = RuntimeDomain.TransportAdmitted
+                            , completionScope = "transport"
+                            , reason = Nothing
+                            , items = [ { ref = "entry_ref_00000001", label = "chat", state = "transport-admitted", extra = [ "volatile" ] } ]
+                            , draftTarget = Nothing
+                            , draftText = Nothing
+                            , draftRevision = Nothing
+                            , selectedContinuationRef = Nothing
+                            , anchorTarget = Nothing
+                            , anchorAcceptedTimestamp = Nothing
+                            , anchorViewedCandidate = Nothing
+                            , scheduledMode = Nothing
+                            , scheduledLegacyHeldCount = 0
+                            , scheduledLegacyReviewUnavailable = False
+                            , scheduledViewReady = False
+                            , scheduledItems = []
+                            , sessionRecovery = Nothing
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            }
+
+                        base =
+                            { blank
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , runtimeDomainPending = Just requestId
+                                , runtimeDomainPendingAction = Just (RuntimeDomain.QueueMessage "#c" "chat" "hello" Nothing "message" Nothing)
+                                , activeChannel = Just "#c"
+                                , composer = "hello"
+                                , composerDrafts = Dict.singleton "#c" "hello"
+                                , composerDraftVersions = Dict.singleton "#c" 2
+                                , queuedDraftRevisions = Dict.singleton requestText { target = "#c", revision = 2, text = "hello" }
+                                }
+
+                        ( admitted, outs ) =
+                            update (RuntimeDomainResultReceived result) base
+
+                        rows =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" admitted.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" admitted.composer
+                        , \_ -> Expect.equal Nothing admitted.runtimeDomainPending
+                        , \_ -> Expect.equal Nothing admitted.runtimeDomainPendingAction
+                        , \_ -> Expect.equal [ Just True ] (List.map (Just << .pending) rows)
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body rows)
+                        , \_ -> Expect.equal True (List.all (\row -> row.outboxId /= Nothing) rows)
+                        , \_ -> Expect.equal (Just "Message handed to this connection. Server confirmation is pending; it will not be resent automatically.") admitted.composerError
+                        , \_ -> Expect.equal Nothing (Maybe.map (\entry -> entry.id) (List.head admitted.outbox))
+                        , \_ ->
+                            Expect.equal False
+                                (List.any
+                                    (\out ->
+                                        case out of
+                                            RuntimeJournalFlush _ ->
+                                                True
+
+                                            _ ->
+                                                False
+                                    )
+                                    outs
+                                )
+                        , \_ -> Expect.equal RuntimeDomain.TransportAdmitted (Maybe.withDefault RuntimeDomain.Blocked (Maybe.map .status admitted.runtimeDomainResult))
+                        , \_ -> Expect.equal "transport" (Maybe.withDefault "" (Maybe.map .completionScope admitted.runtimeDomainResult))
+                        ]
+                        ()
             , test "cancel and dispatch stop typing" <|
                 \_ ->
                     let
                         base =
-                            { blank | ourNick = "me", caps = [ "draft/typing" ] }
+                            { blank | ourNick = "me", caps = [ "draft/typing" ], runtimeOwnerStamp = Just testRuntimeOwner }
 
                         ( m1, _ ) =
                             feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
@@ -12995,13 +16351,10 @@ suite =
                         , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] editOut
                         , \_ -> Expect.equal Nothing editCancelled.editingMessage
                         , \_ -> Expect.equal (SendLine "@+typing=done TAGMSG #c\r\n") (Maybe.withDefault (SendLine "") (List.head (List.reverse sentOut)))
-                        , \_ -> Expect.equal "" sent.composer
-                        , \_ ->
-                            Expect.equal
-                                [ OutboxQueue { target = "#c", text = "hi" }
-                                , SendLine "@+typing=done TAGMSG #c\r\n"
-                                ]
-                                queuedOut
+                        , \_ -> Expect.equal "hi" sent.composer
+                        , \_ -> Expect.equal [ RuntimeDomain.QueueMessage "#c" "chat" "hi" Nothing "message" Nothing ] (runtimeActions sentOut)
+                        , \_ -> Expect.equal [ RuntimeDomain.QueueMessage "#c" "chat" "hi" Nothing "message" Nothing ] (runtimeActions queuedOut)
+                        , \_ -> Expect.equal (Just (SendLine "@+typing=done TAGMSG #c\r\n")) (List.head (List.reverse queuedOut))
                         ]
                         ()
             , test "composer drafts are per-target across switches" <|
@@ -13091,13 +16444,14 @@ suite =
                 \_ ->
                     let
                         queued =
-                            { id = "q1", target = "#c", text = "hi", queuedAt = 0 }
+                            { id = "q1", target = "#c", text = "hi", queuedAt = 0, revision = Just 0 }
 
                         base =
                             { blank
                                 | activeChannel = Just "#c"
                                 , composer = "hi"
                                 , composerDrafts = Dict.fromList [ ( "#c", "hi" ) ]
+                                , composerDraftVersions = Dict.fromList [ ( "#c", 0 ) ]
                             }
 
                         ( committed, _ ) =
@@ -13440,11 +16794,17 @@ suite =
                         ( optimistic, optimisticOut ) =
                             update (ReactionSend "#c" "m1" "👍") capped
 
+                        ( cappedAccepted, _ ) =
+                            feed optimistic "@+draft/react=👍;+draft/reply=m1 :me!u@h TAGMSG #c"
+
                         echoed =
                             { m1 | caps = [ "draft/react", "echo-message" ] }
 
                         ( held, heldOut ) =
                             update (ReactionSend "#c" "m1" "👍") echoed
+
+                        ( echoedAccepted, _ ) =
+                            feed held "@+draft/react=👍;+draft/reply=m1 :me!u@h TAGMSG #c"
 
                         reactionsOf model =
                             Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
@@ -13455,10 +16815,12 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf localOnly)
                         , \_ -> Expect.equal [] localOut
-                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf optimistic)
+                        , \_ -> Expect.equal [] (reactionsOf optimistic)
                         , \_ -> Expect.equal [ wire ] optimisticOut
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf cappedAccepted)
                         , \_ -> Expect.equal [] (reactionsOf held)
                         , \_ -> Expect.equal [ wire ] heldOut
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf echoedAccepted)
                         ]
                         ()
             ]
@@ -14408,7 +17770,7 @@ suite =
                 \_ ->
                     let
                         base =
-                            { blank | ourNick = "me", caps = [ "draft/message-editing" ], nowMs = 1000 }
+                            { blank | ourNick = "me", caps = [ "draft/message-editing" ], nowMs = 1000, runtimeOwnerStamp = Just testRuntimeOwner }
 
                         ( m1, _ ) =
                             feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
@@ -14440,9 +17802,10 @@ suite =
                                 |> Maybe.map .body
                     in
                     Expect.all
-                        [ \_ -> Expect.equal (Just "mine!") (ownBody edited)
-                        , \_ -> Expect.equal [ SendLine "EDIT #c m9 mine!\r\n" ] editOut
-                        , \_ -> Expect.equal [ { body = "mine", editedAt = 1000 } ] (revisionsFor edited.editHistory "m9")
+                        [ \_ -> Expect.equal (Just "mine") (ownBody edited)
+                        , \_ -> Expect.equal [ "EDIT #c m9 :mine!\r\n" ] (sendLines editOut)
+                        , \_ -> Expect.equal [] (revisionsFor edited.editHistory "m9")
+                        , \_ -> Expect.equal True (editOutcomeUnknown edited "#c" "m9")
                         , \_ -> Expect.equal (Just "theirs") (Maybe.map .body (List.head (List.filter (\m -> m.msgid == Just "m1") (bodies foreign))))
                         , \_ -> Expect.equal [] foreignOut
                         , \_ -> Expect.equal (Just "mine") (ownBody unknown)
@@ -14451,6 +17814,327 @@ suite =
                         , \_ -> Expect.equal [] uncapOut
                         , \_ -> Expect.equal (Just "mine") (ownBody offline)
                         , \_ -> Expect.equal [] offlineOut
+                        ]
+                        ()
+            , test "EDIT request settles only on its exact labeled self echo" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "me"
+                                , caps = [ "draft/message-editing", "labeled-response" ]
+                                , nowMs = 1000
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                            }
+
+                        ( joined, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :before"
+
+                        ( selected, _ ) =
+                            update (ChannelSelect "#c") joined
+
+                        ( armed, _ ) =
+                            update (EditArm { target = "#c", msgid = "m9" }) selected
+
+                        ( authored, _ ) =
+                            update (ComposerInput "replacement") armed
+
+                        ( requested, requestOut ) =
+                            requestEdit authored "#c" "m9" "replacement"
+
+                        ( disconnected, _ ) =
+                            update (WsClosed { clean = False, reason = "lost" }) requested
+
+                        pending =
+                            Dict.get ("#c" ++ "\u{001F}" ++ "m9") requested.pendingMessageEdits
+
+                        label =
+                            pending |> Maybe.andThen .label |> Maybe.withDefault "missing"
+
+                        ( acked, _ ) =
+                            feed requested ("@label=" ++ label ++ " ACK")
+
+                        ( wrongLabel, _ ) =
+                            feed acked "@label=other;msgid=m9;+draft/edit=m9;+draft/revision=1 :me!u@h PRIVMSG #c :replacement"
+
+                        ( accepted, _ ) =
+                            feed wrongLabel ("@label=" ++ label ++ ";msgid=m9;+draft/edit=m9;+draft/revision=1 :me!u@h PRIVMSG #c :replacement")
+
+                        ownBody model =
+                            Dict.get "#c" model.channels
+                                |> Maybe.andThen (\channel -> List.filter (\row -> row.msgid == Just "m9") channel.messages |> List.head)
+                                |> Maybe.map .body
+
+                        taggedRequest =
+                            List.any
+                                (\out ->
+                                    case out of
+                                        SendLine line ->
+                                            String.startsWith "@label=" line
+
+                                        _ ->
+                                            False
+                                )
+                                requestOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True taggedRequest
+                        , \_ -> Expect.equal True (editOutcomeUnknown disconnected "#c" "m9")
+                        , \_ -> Expect.equal 1 (Dict.size acked.pendingMessageEdits)
+                        , \_ -> Expect.equal True (editOutcomeUnknown acked "#c" "m9")
+                        , \_ -> Expect.equal 1 (Dict.size wrongLabel.pendingMessageEdits)
+                        , \_ -> Expect.equal (Just "replacement") (ownBody wrongLabel)
+                        , \_ -> Expect.equal 0 (Dict.size accepted.pendingMessageEdits)
+                        , \_ -> Expect.equal (Just "replacement") (ownBody accepted)
+                        , \_ -> Expect.equal Nothing accepted.editingMessage
+                        , \_ -> Expect.equal "" accepted.composer
+                        ]
+                        ()
+            , test "unlabeled authoritative EDIT updates history without settling local intent" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "me"
+                                , caps = [ "draft/message-editing", "labeled-response" ]
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                            }
+
+                        ( joined, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :before"
+
+                        ( requested, _ ) =
+                            requestEdit joined "#c" "m9" "local desired"
+
+                        ( updated, _ ) =
+                            feed requested "@msgid=m9;+draft/edit=m9;+draft/revision=1 :me!u@h PRIVMSG #c :sibling edit"
+
+                        currentBody =
+                            Dict.get "#c" updated.channels
+                                |> Maybe.andThen (\channel -> List.filter (\row -> row.msgid == Just "m9") channel.messages |> List.head)
+                                |> Maybe.map .body
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "sibling edit") currentBody
+                        , \_ -> Expect.equal 1 (Dict.size updated.pendingMessageEdits)
+                        , \_ -> Expect.equal False (editOutcomeUnknown updated "#c" "m9")
+                        ]
+                        ()
+            , test "authoritative DM EDIT persists under the peer conversation target" <|
+                \_ ->
+                    let
+                        live =
+                            liveRoom "me" "#unused"
+
+                        base =
+                            { live | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                        ( original, _ ) =
+                            feed base "@msgid=dm-edit-1 :alice!u@h PRIVMSG me :before"
+
+                        ( edited, editOut ) =
+                            feed original "@msgid=dm-edit-1;+draft/edit=dm-edit-1;+draft/revision=1 :alice!u@h PRIVMSG me :after"
+
+                        peerBody =
+                            Dict.get "alice" edited.channels
+                                |> Maybe.andThen (\channel -> List.filter (\row -> row.msgid == Just "dm-edit-1") channel.messages |> List.head)
+                                |> Maybe.map .body
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "after") peerBody
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (\out ->
+                                        case out of
+                                            VaultPersist row ->
+                                                row.target == "alice"
+                                                    && List.any (\saved -> saved.wireMessageId == Just "dm-edit-1" && saved.body == "after") row.rows
+
+                                            _ ->
+                                                False
+                                    )
+                                    editOut
+                                )
+                        , \_ ->
+                            Expect.equal False
+                                (List.any
+                                    (\out ->
+                                        case out of
+                                            VaultPersist row ->
+                                                row.target == "me"
+
+                                            _ ->
+                                                False
+                                    )
+                                    editOut
+                                )
+                        ]
+                        ()
+            , test "labeled response wrapper settles exact EDIT and preserves its vault flush" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "me"
+                                , caps = [ "draft/message-editing", "labeled-response" ]
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                            }
+
+                        ( joined, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :before"
+
+                        ( requested, _ ) =
+                            requestEdit joined "#c" "m9" "wrapped edit"
+
+                        label =
+                            Dict.get ("#c" ++ "\u{001F}" ++ "m9") requested.pendingMessageEdits
+                                |> Maybe.andThen .label
+                                |> Maybe.withDefault "missing"
+
+                        ( opened, _ ) =
+                            feed requested ("@label=" ++ label ++ " BATCH +edit-wrapper labeled-response")
+
+                        ( buffered, _ ) =
+                            feed opened "@batch=edit-wrapper;msgid=m9;+draft/edit=m9;+draft/revision=1 :me!u@h PRIVMSG #c :wrapped edit"
+
+                        ( closed, closeOut ) =
+                            feed buffered "BATCH -edit-wrapper"
+
+                        currentBody =
+                            Dict.get "#c" closed.channels
+                                |> Maybe.andThen (\channel -> List.filter (\row -> row.msgid == Just "m9") channel.messages |> List.head)
+                                |> Maybe.map .body
+
+                        persisted =
+                            List.any
+                                (\out ->
+                                    case out of
+                                        VaultPersist _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                closeOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "wrapped edit") currentBody
+                        , \_ -> Expect.equal 0 (Dict.size closed.pendingMessageEdits)
+                        , \_ -> Expect.equal True persisted
+                        ]
+                        ()
+            , test "labeled response wrapper FAIL rejects the matching edit and keeps the editor" <|
+                \_ ->
+                    let
+                        live =
+                            liveRoom "me" "#c"
+
+                        base =
+                            { live
+                                | caps = [ "draft/message-editing", "labeled-response" ]
+                                , nowMs = 1000
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                                , composer = "keep replacement"
+                            }
+
+                        ( joined, _ ) =
+                            feed base "@msgid=m9 :me!u@h PRIVMSG #c :before"
+
+                        ( requested, _ ) =
+                            requestEdit joined "#c" "m9" "replacement"
+
+                        label =
+                            Dict.get ("#c" ++ "\u{001F}" ++ "m9") requested.pendingMessageEdits
+                                |> Maybe.andThen .label
+                                |> Maybe.withDefault "missing"
+
+                        ( opened, _ ) =
+                            feed requested ("@label=" ++ label ++ " BATCH +edit-fail labeled-response")
+
+                        ( buffered, _ ) =
+                            feed opened "@batch=edit-fail FAIL EDIT PERMISSION_DENIED :Only the original sender may edit a message"
+
+                        ( rejected, _ ) =
+                            feed buffered "BATCH -edit-fail"
+
+                        body =
+                            Dict.get "#c" rejected.channels
+                                |> Maybe.andThen (\channel -> List.filter (\row -> row.msgid == Just "m9") channel.messages |> List.head)
+                                |> Maybe.map .body
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 0 (Dict.size rejected.pendingMessageEdits)
+                        , \_ -> Expect.equal "keep replacement" rejected.composer
+                        , \_ -> Expect.equal (Just "The server rejected this edit. Your replacement text and original message were kept.") rejected.composerError
+                        , \_ -> Expect.equal (Just "before") body
+                        ]
+                        ()
+            , test "wrapped edit failures require the captured label and current physical generation" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "me"
+                                , caps = [ "draft/message-editing", "labeled-response" ]
+                                , nowMs = 1000
+                                , runtimeOwnerStamp = Just testRuntimeOwner
+                                , composer = "keep replacement"
+                            }
+
+                        ( joined, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :before"
+
+                        ( requested, _ ) =
+                            requestEdit joined "#c" "m9" "replacement"
+
+                        label =
+                            Dict.get ("#c" ++ "\u{001F}" ++ "m9") requested.pendingMessageEdits
+                                |> Maybe.andThen .label
+                                |> Maybe.withDefault "missing"
+
+                        ( mismatchOpen, _ ) =
+                            feed requested "@label=other_label BATCH +edit-mismatch labeled-response"
+
+                        ( mismatchBuffered, _ ) =
+                            feed mismatchOpen "@batch=edit-mismatch FAIL EDIT PERMISSION_DENIED :Only the original sender may edit a message"
+
+                        ( mismatchClosed, _ ) =
+                            feed mismatchBuffered "BATCH -edit-mismatch"
+
+                        ( nonEditOpen, _ ) =
+                            feed requested ("@label=" ++ label ++ " BATCH +edit-other-fail labeled-response")
+
+                        ( nonEditBuffered, _ ) =
+                            feed nonEditOpen "@batch=edit-other-fail FAIL PRIVMSG #c ERR_GENERIC :not an edit failure"
+
+                        ( nonEditClosed, _ ) =
+                            feed nonEditBuffered "BATCH -edit-other-fail"
+
+                        ( retiredOpen, _ ) =
+                            feed requested ("@label=" ++ label ++ " BATCH +edit-retired labeled-response")
+
+                        ( retiredGeneration, _ ) =
+                            update (WsClosed { clean = False, reason = "lost" }) retiredOpen
+
+                        ( retiredChild, _ ) =
+                            feed retiredGeneration "@batch=edit-retired FAIL EDIT PERMISSION_DENIED :Only the original sender may edit a message"
+
+                        ( retiredClosed, _ ) =
+                            feed retiredChild "BATCH -edit-retired"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (Dict.size mismatchClosed.pendingMessageEdits)
+                        , \_ -> Expect.equal Nothing mismatchClosed.composerError
+                        , \_ -> Expect.equal "keep replacement" mismatchClosed.composer
+                        , \_ -> Expect.equal False (editOutcomeUnknown mismatchClosed "#c" "m9")
+                        , \_ -> Expect.equal 1 (Dict.size nonEditClosed.pendingMessageEdits)
+                        , \_ -> Expect.equal Nothing nonEditClosed.composerError
+                        , \_ -> Expect.equal True (editOutcomeUnknown nonEditClosed "#c" "m9")
+                        , \_ -> Expect.equal 1 (Dict.size retiredClosed.pendingMessageEdits)
+                        , \_ -> Expect.equal True (editOutcomeUnknown retiredClosed "#c" "m9")
+                        , \_ -> Expect.equal Nothing retiredClosed.composerError
+                        , \_ -> Expect.equal "keep replacement" retiredClosed.composer
                         ]
                         ()
             , test "requestDelete needs the cap and refuses pending rows" <|
@@ -14464,6 +18148,9 @@ suite =
 
                         ( deleted, deleteOut ) =
                             update (MessageDeleteRequested "#c" "m9") m1
+
+                        ( accepted, _ ) =
+                            feed deleted ":me!u@h REDACT #c m9"
 
                         ( uncap, uncapOut ) =
                             update (MessageDeleteRequested "#c" "m9") { m1 | caps = [] }
@@ -14486,9 +18173,11 @@ suite =
                             List.filter (\m -> m.msgid == Just "m9") (bodies model) |> List.head
                     in
                     Expect.all
-                        [ \_ -> Expect.equal (Just True) (Maybe.map .redacted (redactedOf deleted))
-                        , \_ -> Expect.equal (Just "[Message deleted]") (Maybe.map .body (redactedOf deleted))
-                        , \_ -> Expect.equal [ SendLine "REDACT #c m9 Deleted\r\n" ] deleteOut
+                        [ \_ -> Expect.equal (Just False) (Maybe.map .redacted (redactedOf deleted))
+                        , \_ -> Expect.equal (Just "mine") (Maybe.map .body (redactedOf deleted))
+                        , \_ -> Expect.equal [ SendLine "REDACT #c m9 :Deleted\r\n" ] deleteOut
+                        , \_ -> Expect.equal (Just True) (Maybe.map .redacted (redactedOf accepted))
+                        , \_ -> Expect.equal (Just "[Message deleted]") (Maybe.map .body (redactedOf accepted))
                         , \_ -> Expect.equal (Just False) (Maybe.map .redacted (redactedOf uncap))
                         , \_ -> Expect.equal [] uncapOut
                         , \_ -> Expect.equal False (canDeleteRow pended "#c" "m9")
@@ -15856,7 +19545,9 @@ suite =
                             withModes Set.empty
                     in
                     Expect.all
-                        [ \_ -> Expect.equal True (isChannelOp { opped | isOper = True } "#nope")
+                        -- Operator status needs the room (audit 2026-11-05).
+                        [ \_ -> Expect.equal False (isChannelOp { opped | isOper = True } "#nope")
+                        , \_ -> Expect.equal True (isChannelOp { plain | isOper = True } "#c")
                         , \_ -> Expect.equal True (isChannelOp opped "#c")
                         , \_ -> Expect.equal True (isChannelOp opped "#C")
                         , \_ -> Expect.equal False (isChannelOp voiced "#c")
@@ -16123,7 +19814,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal 1 (List.length saves)
                         , \_ -> Expect.equal (Just "wss://irc.example") (List.head saves |> Maybe.map .serverUrl)
-                        , \_ -> Expect.equal (Just "kai") (List.head saves |> Maybe.map .identity)
+                        , \_ -> Expect.equal (Just (guestIdentity "kai")) (List.head saves |> Maybe.map .identity)
                         , \_ -> Expect.equal selected.topicReadLedger (List.head saves |> Maybe.map savedLedger |> Maybe.withDefault [])
                         , \_ -> Expect.equal [ "alpha" ] (List.map .topic selected.topicReadLedger)
                         , \_ -> Expect.equal (Just "m3") (List.head selected.topicReadLedger |> Maybe.map .lastReadMessageId)
@@ -16484,7 +20175,7 @@ suite =
                         isTopicSave out =
                             case out of
                                 TopicHistorySave req ->
-                                    req.serverUrl == "wss://irc.example" && req.identity == "kai"
+                                    req.serverUrl == "wss://irc.example" && req.identity == guestIdentity "kai"
 
                                 _ ->
                                     False
@@ -16545,216 +20236,92 @@ suite =
                         ]
                         ()
             ]
-        , describe "session roster"
-            [ test "SessionListRequested sends SESSION LIST and resets the accumulator" <|
+        , describe "session roster through the private runtime lease"
+            [ test "local list uses a stamped typed command rather than a wire line" <|
                 \_ ->
                     let
-                        seeded =
-                            { rosterAuthed
-                                | accountSessionsPending = False
-                                , accountSessionsError = Just "stale"
+                        seeded = { rosterAuthed | runtimeOwnerStamp = Just testRuntimeOwner, accountSessionsPending = False, accountSessionsError = Just "stale" }
+                        ( listed, outs ) = update SessionListRequested seeded
+                        command =
+                            case outs of
+                                [ RuntimeDomainCommand value ] -> Just value
+                                _ -> Nothing
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just RuntimeDomain.LocalSessionList) (Maybe.map .action command)
+                        , \_ -> Expect.equal (Just (mustOwnerRef testRuntimeOwner.ownerRef)) (Maybe.map .ownerRef command)
+                        , \_ -> Expect.equal (Just (mustAccountGeneration testRuntimeOwner.accountGeneration)) (Maybe.map .accountGeneration command)
+                        , \_ -> Expect.equal (Just (mustConnectionGeneration testRuntimeOwner.connectionGeneration)) (Maybe.map .connectionGeneration command)
+                        , \_ -> Expect.equal True listed.accountSessionsPending
+                        , \_ -> Expect.equal Nothing listed.accountSessionsError
+                        ]
+                        ()
+            , test "session notices no longer alter the private inventory" <|
+                \_ ->
+                    let
+                        waiting = { rosterAuthed | ourNick = "me", accountSessionsPending = True }
+                        ( afterRow, rowOut ) = feedTrustedServerNotice waiting ":irc.example NOTICE me :SESSION LIST * #2 signon=1710000000 detached"
+                        ( afterDrop, dropOut ) = feedTrustedServerNotice waiting ":irc.example NOTICE me :SESSION DROP #2 ok"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] afterRow.accountSessions
+                        , \_ -> Expect.equal True afterRow.accountSessionsPending
+                        , \_ -> Expect.equal [] rowOut
+                        , \_ -> Expect.equal [] afterDrop.accountSessions
+                        , \_ -> Expect.equal True afterDrop.accountSessionsPending
+                        , \_ -> Expect.equal [] dropOut
+                        ]
+                        ()
+            , test "local drop uses the opaque row reference and never falls back to an ordinal" <|
+                \_ ->
+                    let
+                        inventory =
+                            { requestId = "sessionList_request_00000001"
+                            , mode = "local"
+                            , status = "ready"
+                            , scanRef = Nothing
+                            , localRows =
+                                [ { rowRef = "local_row_reference_000001", index = 2, signonMs = "1710000000", state = "detached", current = False } ]
+                            , meshRows = []
+                            , continuationAvailable = False
+                            , scanComplete = True
+                            , pageCount = 0
+                            , lastObservedAt = Nothing
+                            , reason = Nothing
                             }
-
-                        ( m, out ) =
-                            update SessionListRequested seeded
+                        seeded = { rosterAuthed | runtimeOwnerStamp = Just testRuntimeOwner, sessionInventoryView = Just inventory }
+                        ( dropped, outs ) = update (SessionDropRequested { index = 2 }) seeded
+                        action =
+                            case outs of
+                                [ RuntimeDomainCommand command ] -> Just command.action
+                                _ -> Nothing
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
-                        , \_ -> Expect.equal True m.accountSessionsPending
-                        , \_ -> Expect.equal Nothing m.accountSessionsError
+                        [ \_ -> Expect.equal (Just (RuntimeDomain.LocalSessionDrop "local_row_reference_000001")) action
+                        , \_ -> Expect.equal True dropped.accountSessionsPending
                         ]
                         ()
-            , test "SessionListRequested without an authed socket surfaces the sign-in error" <|
+            , test "mesh and local references are not interchangeable" <|
                 \_ ->
                     let
-                        ( guest, guestOut ) =
-                            update SessionListRequested blank
-
-                        ( offline, offlineOut ) =
-                            update SessionListRequested { blank | connection = Offline, accountName = Just "alice" }
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] guestOut
-                        , \_ -> Expect.equal (Just "Sign in to list sessions.") guest.accountSessionsError
-                        , \_ -> Expect.equal False guest.accountSessionsPending
-                        , \_ -> Expect.equal [] offlineOut
-                        , \_ -> Expect.equal (Just "Sign in to list sessions.") offline.accountSessionsError
-                        ]
-                        ()
-            , test "LIST rows accumulate sorted by index and clear the error" <|
-                \_ ->
-                    let
-                        ( m1, _ ) =
-                            feed rosterAuthed ":irc.example NOTICE me :SESSION LIST - #2 signon=1710000100 detached"
-
-                        ( m2, _ ) =
-                            feed m1 ":irc.example NOTICE me :SESSION LIST * #1 signon=1710000000 attached"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [ 1, 2 ] (List.map .index m2.accountSessions)
-                        , \_ -> Expect.equal [ True, False ] (List.map .current m2.accountSessions)
-                        , \_ -> Expect.equal Nothing m2.accountSessionsError
-                        ]
-                        ()
-            , test "end of session list clears pending without an error" <|
-                \_ ->
-                    let
-                        waiting =
-                            { rosterAuthed | accountSessionsPending = True }
-
-                        ( m, out ) =
-                            feed waiting ":irc.example NOTICE me :SESSION: end of session list"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal False m.accountSessionsPending
-                        , \_ -> Expect.equal Nothing m.accountSessionsError
-                        , \_ -> Expect.equal [] out
-                        ]
-                        ()
-            , test "DROP ok removes the row and refreshes the list" <|
-                \_ ->
-                    let
-                        seeded =
-                            { rosterAuthed
-                                | accountSessions =
-                                    [ { index = 1, current = True, signonMs = 1, state = Session.Attached, sid = Nothing }
-                                    , { index = 2, current = False, signonMs = 2, state = Session.Detached, sid = Nothing }
-                                    ]
-                                , accountSessionsPending = True
+                        inventory =
+                            { requestId = "meshList_request_00000001"
+                            , mode = "mesh"
+                            , status = "ready"
+                            , scanRef = Nothing
+                            , localRows = []
+                            , meshRows = []
+                            , continuationAvailable = False
+                            , scanComplete = True
+                            , pageCount = 1
+                            , lastObservedAt = Just "1710000000000"
+                            , reason = Nothing
                             }
-
-                        ( m, out ) =
-                            feed seeded ":irc.example NOTICE me :SESSION DROP #2 ok"
+                        ( unchanged, outs ) = update (SessionDropRequested { index = 1 }) { rosterAuthed | runtimeOwnerStamp = Just testRuntimeOwner, sessionInventoryView = Just inventory }
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ 1 ] (List.map .index m.accountSessions)
-                        , \_ -> Expect.equal False m.accountSessionsPending
-                        , \_ -> Expect.equal Nothing m.accountSessionsError
-                        , \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
-                        ]
-                        ()
-            , test "sid-form DROP success keeps rows and still refreshes" <|
-                \_ ->
-                    let
-                        seeded =
-                            { rosterAuthed | accountSessionsPending = True }
-
-                        ( m, out ) =
-                            feed seeded ":irc.example NOTICE me :SESSION DROP sid=0123456789abcdef0123456789abcdef ok"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] m.accountSessions
-                        , \_ -> Expect.equal False m.accountSessionsPending
-                        , \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
-                        ]
-                        ()
-            , test "free-form SESSION errors surface with a 200-unit bound" <|
-                \_ ->
-                    let
-                        waiting =
-                            { rosterAuthed | accountSessionsPending = True }
-
-                        ( m1, _ ) =
-                            feed waiting ":irc.example NOTICE me :SESSION: no such session"
-
-                        longBody =
-                            "SESSION: " ++ String.repeat 300 "x"
-
-                        ( m2, _ ) =
-                            feed waiting (":irc.example NOTICE me :" ++ longBody)
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal (Just "SESSION: no such session") m1.accountSessionsError
-                        , \_ -> Expect.equal False m1.accountSessionsPending
-                        , \_ -> Expect.equal (Just (String.slice 0 200 longBody)) m2.accountSessionsError
-                        ]
-                        ()
-            , test "FAIL SESSION text surfaces as a roster error" <|
-                \_ ->
-                    let
-                        ( m, _ ) =
-                            feed { rosterAuthed | accountSessionsPending = True }
-                                ":irc.example NOTICE me :FAIL SESSION NO_SESSION"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal (Just "FAIL SESSION NO_SESSION") m.accountSessionsError
-                        , \_ -> Expect.equal False m.accountSessionsPending
-                        ]
-                        ()
-            , test "peer and channel NOTICEs can never rewrite the roster" <|
-                \_ ->
-                    let
-                        waiting =
-                            { rosterAuthed | accountSessionsPending = True }
-
-                        ( m1, _ ) =
-                            feed waiting ":alice!u@h NOTICE me :SESSION LIST * #9 signon=1710000000 attached"
-
-                        ( m2, _ ) =
-                            feed waiting ":irc.example NOTICE #c :SESSION: end of session list"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] m1.accountSessions
-                        , \_ -> Expect.equal True m1.accountSessionsPending
-                        , \_ -> Expect.equal True m2.accountSessionsPending
-                        ]
-                        ()
-            , test "SessionDropRequested refuses the current connection" <|
-                \_ ->
-                    let
-                        seeded =
-                            { rosterAuthed
-                                | accountSessions =
-                                    [ { index = 1, current = True, signonMs = 1, state = Session.Attached, sid = Nothing } ]
-                            }
-
-                        ( m, out ) =
-                            update (SessionDropRequested { index = 1 }) seeded
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] out
-                        , \_ -> Expect.equal (Just "Cannot drop this connection — sign out instead.") m.accountSessionsError
-                        ]
-                        ()
-            , test "SessionDropRequested prefers the physical sid and falls back to the ordinal" <|
-                \_ ->
-                    let
-                        seeded =
-                            { rosterAuthed
-                                | accountSessions =
-                                    [ { index = 2, current = False, signonMs = 2, state = Session.Detached, sid = Just "abcdef0123456789abcdef0123456789" } ]
-                            }
-
-                        ( withSid, sidOut ) =
-                            update (SessionDropRequested { index = 2 }) seeded
-
-                        ( _, missingOut ) =
-                            update (SessionDropRequested { index = 7 }) rosterAuthed
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [ SendLine "SESSION DROP sid=abcdef0123456789abcdef0123456789\r\n" ] sidOut
-                        , \_ -> Expect.equal True withSid.accountSessionsPending
-                        , \_ -> Expect.equal [ SendLine "SESSION DROP #7\r\n" ] missingOut
-                        ]
-                        ()
-            , test "SessionDropRequested stays silent offline, guest, or with a bad index" <|
-                \_ ->
-                    let
-                        ( guest, guestOut ) =
-                            update (SessionDropRequested { index = 2 }) blank
-
-                        ( offline, offlineOut ) =
-                            update (SessionDropRequested { index = 2 }) { blank | connection = Offline, accountName = Just "alice" }
-
-                        ( bad, badOut ) =
-                            update (SessionDropRequested { index = 0 }) rosterAuthed
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] guestOut
-                        , \_ -> Expect.equal Nothing guest.accountSessionsError
-                        , \_ -> Expect.equal [] offlineOut
-                        , \_ -> Expect.equal [] badOut
-                        , \_ -> Expect.equal False bad.accountSessionsPending
+                        [ \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal (Just "Refresh the session list before selecting a session to sign out.") unchanged.accountSessionsError
                         ]
                         ()
             ]
@@ -17985,7 +21552,7 @@ suite =
                         , \_ -> Expect.equal MediaVaultLoading opened.mediaIndexVaultState
                         , \_ ->
                             Expect.equal
-                                [ VaultFetch { target = "#c", limit = keepMessages } ]
+                                [ VaultFetch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  target = "#c", limit = keepMessages } ]
                                 outs
                         ]
                         ()
@@ -18024,7 +21591,7 @@ suite =
                         , \_ -> Expect.equal MediaVaultLoading retried.mediaIndexVaultState
                         , \_ ->
                             Expect.equal
-                                [ VaultFetch { target = "#c", limit = keepMessages } ]
+                                [ VaultFetch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  target = "#c", limit = keepMessages } ]
                                 retryOuts
                         , \_ -> Expect.equal False closed.mediaIndexOpen
                         , \_ -> Expect.equal "" closed.mediaIndexTarget
@@ -18083,6 +21650,7 @@ suite =
 
                         vaultRow =
                             { id = "#c:7"
+                            , wireMessageId = Nothing
                             , target = "#c"
                             , from = "bob"
                             , body = "https://vault.example/old"
@@ -18094,7 +21662,7 @@ suite =
                             }
 
                         ( claimed, _ ) =
-                            update (VaultRowsReceived { target = "#c", rows = [ vaultRow ], status = "ok" }) opened
+                            update (vaultRowsReceived "#c" [ vaultRow ] "ok") opened
 
                         index =
                             mediaIndexFor claimed
@@ -18153,6 +21721,7 @@ suite =
 
                         vaultRow =
                             { id = "#c:7"
+                            , wireMessageId = Nothing
                             , target = "#c"
                             , from = "bob"
                             , body = "https://vault.example/old"
@@ -18164,7 +21733,7 @@ suite =
                             }
 
                         ( claimed, _ ) =
-                            update (VaultRowsReceived { target = "#c", rows = [ vaultRow ], status = "ok" }) stale
+                            update (vaultRowsReceived "#c" [ vaultRow ] "ok") stale
                     in
                     Expect.all
                         [ \_ -> Expect.equal MediaVaultFailed claimed.mediaIndexVaultState
@@ -18190,7 +21759,7 @@ suite =
                         [ \_ -> Expect.equal True switched.mediaIndexOpen
                         , \_ -> Expect.equal "#d" switched.mediaIndexTarget
                         , \_ -> Expect.equal [] switched.mediaIndexVault
-                        , \_ -> Expect.equal True (List.member (VaultFetch { target = "#d", limit = keepMessages }) outs)
+                        , \_ -> Expect.equal True (List.member (VaultFetch { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing,  target = "#d", limit = keepMessages }) outs)
                         ]
                         ()
             , test "the live index lists conversation links" <|
@@ -18249,7 +21818,7 @@ suite =
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
                         , \_ -> Expect.equal [ SendLine "MSG bob hi\r\n" ] (send "/msg bob hi")
                         , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
-                        , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
+                        , \_ -> Expect.equal [] (send "/")
                         ]
                         ()
             , test "unhandled verbs clear the draft" <|
@@ -18286,9 +21855,9 @@ suite =
                 \_ ->
                     let
                         ( _, out ) =
-                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", connection = Offline, composer = "/shrug hi" }
+                            update ComposerSend { blank | ourNick = "alice", runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#c", connection = Offline, composer = "/shrug hi" }
                     in
-                    Expect.equal [ OutboxQueue { target = "#c", text = "¯\\_(ツ)_/¯ hi" } ] out
+                    Expect.equal [ RuntimeDomain.QueueMessage "#c" "chat" "¯\\_(ツ)_/¯ hi" Nothing "message" Nothing ] (runtimeActions out)
             , test "offline guard precedes local verbs" <|
                 \_ ->
                     let
@@ -18521,861 +22090,136 @@ suite =
                         ]
                         ()
             ]
-        , describe "scheduled queue actions"
-            [ test "schedule admits through fence then add" <|
+        , describe "private scheduled custody bridge"
+            [ test "schedule requests a private body capture then emits a typed body-free create action" <|
                 \_ ->
                     let
                         base =
-                            { ownerBase | nowMs = 1000 }
-
-                        tag =
-                            "sched-1000-1"
-
-                        owner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
+                            { ownerBase | nowMs = 1000, runtimeOwnerStamp = Just testRuntimeOwner }
 
                         ( requested, out1 ) =
-                            update (ScheduleMessage { channel = "  #c  ", text = "later", sendAt = 5000 }) base
+                            update (ScheduleMessage { channel = "#c", text = "later", sendAt = 5000 }) base
 
-                        fenceReqs =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledFenceRequest r ->
-                                            Just r
+                        captureRequest =
+                            out1
+                                |> List.filterMap
+                                    (\item ->
+                                        case item of
+                                            RuntimePrivateScheduledMessageRequest request ->
+                                                Just request
 
-                                        _ ->
-                                            Nothing
-                                )
-                                out1
+                                            _ ->
+                                                Nothing
+                                    )
+                                |> List.head
 
-                        ( fenced, out2 ) =
-                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) requested
-
-                        addReqs =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledAddRequest r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                out2
-
-                        ( added, out3 ) =
-                            update (ScheduledAddResult { id = tag, ok = True }) fenced
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [ { tag = tag, owner = owner } ] fenceReqs
-                        , \_ -> Expect.equal 1 (List.length addReqs)
-                        , \_ -> Expect.equal [ Just 0 ] (List.map .expectedEpoch addReqs)
-                        , \_ -> Expect.equal [ Just 0 ] (List.map .expectedGeneration addReqs)
-                        , \_ -> Expect.equal 1 (List.length added.scheduledMessages)
-                        , \_ -> Expect.equal (Just "#c") (Maybe.map .channel (List.head added.scheduledMessages))
-                        , \_ -> Expect.equal (Just owner) (Maybe.andThen .owner (List.head added.scheduledMessages))
-                        , \_ -> Expect.equal True (List.any isScheduledSave out3)
-                        , \_ -> Expect.equal [] added.toasts
-                        , \_ -> Expect.equal [] added.scheduledInflight
-                        , \_ -> Expect.equal 1 (List.length (ownedScheduledMessages added))
-                        ]
-                        ()
-            , test "scheduled admission stops typing when it clears the draft" <|
-                \_ ->
-                    let
-                        row =
-                            { id = "s1"
-                            , channel = "#c"
-                            , text = "later"
-                            , sendAt = 5000
-                            , owner = Nothing
-                            , claim = Nothing
-                            , generation = Nothing
-                            , clearEpoch = Nothing
+                        capture =
+                            { requestId = Maybe.map .requestId captureRequest |> Maybe.withDefault ""
+                            , operationId = Maybe.map .operationId captureRequest |> Maybe.withDefault ""
+                            , kind = "create"
+                            , inputRef = "private_input_ref_00000001"
+                            , dueAtMs = 1900000
+                            , prefilledComposer = True
+                            , ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
                             }
 
-                        base =
-                            { blank
-                                | caps = [ "draft/typing" ]
-                                , activeChannel = Just "#c"
-                                , composer = "later"
-                                , schedulePending = [ { channel = "#c", text = "later", sendAt = 5000 } ]
-                            }
+                        ( staged, stagedOut ) =
+                            update (RuntimePrivateScheduledMessageReady capture) requested
 
-                        ( admitted, out ) =
-                            admitSchedulePending base row
+                        actions =
+                            runtimeActions stagedOut
 
-                        ( moved, movedOut ) =
-                            admitSchedulePending { base | activeChannel = Just "#d" } row
+                        isSafeCreate action =
+                            case action of
+                                RuntimeDomain.ScheduledCreate inputRef _ _ target _ _ _ _ ->
+                                    inputRef == capture.inputRef && target == "#c"
+
+                                _ ->
+                                    False
                     in
                     Expect.all
-                        [ \_ -> Expect.equal "" admitted.composer
-                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] out
-                        , \_ -> Expect.equal "later" moved.composer
-                        , \_ -> Expect.equal [] movedOut
+                        [ \_ -> Expect.equal (Just "create") (Maybe.map .kind captureRequest)
+                        , \_ -> Expect.equal [] (List.filter isScheduledSave out1)
+                        , \_ -> Expect.equal [ True ] (List.map isSafeCreate actions)
+                        , \_ -> Expect.equal [] (sendLines stagedOut)
+                        , \_ -> Expect.equal [] staged.scheduledMessages
                         ]
                         ()
-            , test "fence and add refusals drop silently" <|
+            , test "current encryption and recipient policy is resolved in private custody, not by plaintext client scheduling" <|
                 \_ ->
                     let
                         base =
-                            { ownerBase | nowMs = 1000 }
+                            { ownerBase | runtimeOwnerStamp = Just testRuntimeOwner, nowMs = 1000 }
 
-                        tag =
-                            "sched-1000-1"
-
-                        ( requested, _ ) =
-                            update (ScheduleMessage { channel = "#c", text = "x", sendAt = 5000 }) base
-
-                        ( refused, refusedOut ) =
-                            update (ScheduledFenceResult { tag = tag, ok = False, epoch = 0, generation = 0 }) requested
-
-                        ( moved, movedOut ) =
-                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 })
-                                { requested | accountName = Just "alice" }
-
-                        ( fenced, _ ) =
-                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) requested
-
-                        ( addRefused, addRefusedOut ) =
-                            update (ScheduledAddResult { id = tag, ok = False }) fenced
-
-                        ( addMoved, addMovedOut ) =
-                            update (ScheduledAddResult { id = tag, ok = True })
-                                { fenced | accountName = Just "alice" }
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] refused.scheduledMessages
-                        , \_ -> Expect.equal [] refusedOut
-                        , \_ -> Expect.equal [] refused.toasts
-                        , \_ -> Expect.equal [] moved.scheduledMessages
-                        , \_ -> Expect.equal [] movedOut
-                        , \_ -> Expect.equal [] addRefused.scheduledMessages
-                        , \_ -> Expect.equal [] addRefusedOut
-                        , \_ -> Expect.equal [] addMoved.scheduledMessages
-                        , \_ -> Expect.equal [] addMovedOut
-                        ]
-                        ()
-            , test "required rooms and designated DMs refuse before storing" <|
-                \_ ->
-                    let
                         baseProps =
-                            blank.props
+                            base.props
 
                         requiredProps =
                             { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] }
 
-                        ( refusedRoom, refusedRoomOut ) =
-                            update
-                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 5 })
-                                { ownerBase | props = requiredProps }
+                        ( room, roomOut ) =
+                            update (ScheduleMessage { channel = "#c", text = "secret draft", sendAt = 5000 }) { base | props = requiredProps }
 
-                        designatedBase =
-                            { ownerBase | peerKeyChanges = Set.singleton "bob" }
-
-                        ( refusedDm, refusedDmOut ) =
-                            update
-                                (ScheduleMessage { channel = "bob", text = "x", sendAt = 5 })
-                                designatedBase
-
-                        ( plainDm, plainDmOut ) =
-                            update
-                                (ScheduleMessage { channel = "bob", text = "x", sendAt = 5 })
-                                ownerBase
+                        ( dm, dmOut ) =
+                            update (ScheduleMessage { channel = "bob", text = "private draft", sendAt = 5000 }) { base | peerKeyChanges = Set.singleton "bob" }
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [] refusedRoom.scheduledMessages
-                        , \_ -> Expect.equal [] refusedRoomOut
-                        , \_ -> Expect.equal [ "Encrypted room messages can't be scheduled" ] (List.map .title refusedRoom.toasts)
-                        , \_ -> Expect.equal [] refusedDm.scheduledMessages
-                        , \_ -> Expect.equal [] refusedDmOut
-                        , \_ -> Expect.equal [ "Encrypted DMs can't be scheduled" ] (List.map .title refusedDm.toasts)
-                        , \_ -> Expect.equal [] plainDm.scheduledMessages
-                        , \_ -> Expect.equal 1 (List.length plainDm.scheduledInflight)
-                        , \_ -> Expect.equal True (List.any isScheduledFenceRequest plainDmOut)
+                        [ \_ -> Expect.equal 1 (List.length (List.filter isPrivateScheduleCapture roomOut))
+                        , \_ -> Expect.equal 1 (List.length (List.filter isPrivateScheduleCapture dmOut))
+                        , \_ -> Expect.equal [] (List.filter isScheduledSave roomOut ++ List.filter isScheduledSave dmOut)
+                        , \_ -> Expect.equal [] (sendLines roomOut ++ sendLines dmOut)
+                        , \_ -> Expect.equal [] room.scheduledMessages
+                        , \_ -> Expect.equal [] dm.scheduledMessages
                         ]
                         ()
-            , test "missing owner and malformed rows refuse silently" <|
+            , test "legacy schedule results cannot produce automatic scheduled sends" <|
                 \_ ->
                     let
-                        ( noOwner, noOwnerOut ) =
-                            update
-                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 5 })
-                                blank
-
-                        ( blankText, _ ) =
-                            update
-                                (ScheduleMessage { channel = "#c", text = "   ", sendAt = 5 })
-                                ownerBase
-
-                        ( badTime, _ ) =
-                            update
-                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 0 })
-                                ownerBase
-
-                        ( badTarget, _ ) =
-                            update
-                                (ScheduleMessage { channel = "has space", text = "x", sendAt = 5 })
-                                ownerBase
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] noOwner.scheduledMessages
-                        , \_ -> Expect.equal [] noOwnerOut
-                        , \_ -> Expect.equal [] noOwner.toasts
-                        , \_ -> Expect.equal [] blankText.scheduledMessages
-                        , \_ -> Expect.equal [] badTime.scheduledMessages
-                        , \_ -> Expect.equal [] badTarget.scheduledMessages
-                        ]
-                        ()
-            , test "cancel tombstones through the durable close" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000 }
-
-                        tag =
-                            "sched-1000-1"
-
-                        ( canceling, cancelOut ) =
-                            update (CancelScheduledMessage { id = tag }) queued
-
-                        cancelReqs =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledCancelRequest r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                cancelOut
-
-                        ( canceled, canceledOut ) =
-                            update (ScheduledCancelResult { id = tag, ok = True }) canceling
-
-                        ( refused, refusedOut ) =
-                            update (ScheduledCancelResult { id = tag, ok = False }) canceling
-
-                        ( foreign, foreignOut ) =
-                            update (CancelScheduledMessage { id = tag }) { queued | accountName = Just "alice" }
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal 1 (List.length canceling.scheduledMessages)
-                        , \_ -> Expect.equal 1 (List.length cancelReqs)
-                        , \_ -> Expect.equal [] canceled.scheduledMessages
-                        , \_ -> Expect.equal True (List.any isScheduledSave canceledOut)
-                        , \_ -> Expect.equal 1 (List.length refused.scheduledMessages)
-                        , \_ -> Expect.equal [ "Could not cancel scheduled message" ] (List.map .title refused.toasts)
-                        , \_ -> Expect.equal 1 (List.length foreign.scheduledMessages)
-                        , \_ -> Expect.equal [] foreignOut
-                        ]
-                        ()
-            , test "projection write result folds the degraded flag" <|
-                \_ ->
-                    let
-                        ( failed, _ ) =
-                            update (ScheduledPersisted { ok = False }) ownerBase
-
-                        ( recovered, _ ) =
-                            update (ScheduledPersisted { ok = True }) { ownerBase | scheduledProjectionDegraded = True }
-
-                        ( shown, _ ) =
-                            update (SetShowScheduledMessages True) ownerBase
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal True failed.scheduledProjectionDegraded
-                        , \_ -> Expect.equal False recovered.scheduledProjectionDegraded
-                        , \_ -> Expect.equal True shown.showScheduledMessages
-                        ]
-                        ()
-            , test "account switch purges only the outgoing identity" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000 }
-
-                        ( loggedIn, loginOut ) =
-                            feed queued ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
-
-                        ( notified, notifyOut ) =
-                            feed queued ":kai!u@h ACCOUNT alice"
-
-                        authed =
-                            { ownerBase | accountName = Just "alice" }
-
-                        ( queuedAuthed, _ ) =
-                            scheduleQueued { authed | nowMs = 1000 }
-
-                        ( renamed, renameOut ) =
-                            feed queuedAuthed ":kai!u@h NICK kai2"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] loggedIn.scheduledMessages
-                        , \_ -> Expect.equal True (List.any isScheduledSave loginOut)
-                        , \_ -> Expect.equal [] notified.scheduledMessages
-                        , \_ -> Expect.equal True (List.any isScheduledSave notifyOut)
-                        , \_ -> Expect.equal 1 (List.length renamed.scheduledMessages)
-                        , \_ -> Expect.equal False (List.any isScheduledSave renameOut)
-                        ]
-                        ()
-            , test "guest self-rename retires the nick-owned rows" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000 }
-
-                        ( renamed, renameOut ) =
-                            feed queued ":kai!u@h NICK kai2"
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal "kai2" renamed.ourNick
-                        , \_ -> Expect.equal [] renamed.scheduledMessages
-                        , \_ -> Expect.equal True (List.any isScheduledSave renameOut)
-                        ]
-                        ()
-            , test "dispatch round claims then sends unlabeled" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
-
-                        tag =
-                            "sched-1000-1"
+                        legacy =
+                            { ownerBase
+                                | scheduledMessages =
+                                    [ { id = "legacy-row"
+                                      , channel = "#c"
+                                      , text = "held legacy text"
+                                      , sendAt = 1
+                                      , owner = Nothing
+                                      , claim = Nothing
+                                      , generation = Nothing
+                                      , clearEpoch = Nothing
+                                      }
+                                    ]
+                                , nowMs = 100000
+                            }
 
                         ( ticked, tickOut ) =
-                            update (Tick (Time.millisToPosix 9000)) queued
+                            update (Tick (Time.millisToPosix 100000)) legacy
 
-                        dispatchReqs =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledDispatchRequest r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                tickOut
-
-                        ( resulted, resOut ) =
-                            update
-                                (ScheduledDispatchResult
-                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
-                                    , granted = [ tag ]
-                                    }
-                                )
-                                ticked
-
-                        settles =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledSettle r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                resOut
+                        ( staleResult, staleOut ) =
+                            update (ScheduledDispatchResult { queue = Nothing, granted = [ "legacy-row" ] }) ticked
                     in
                     Expect.all
-                        [ \_ -> Expect.equal True ticked.scheduledDispatchBusy
-                        , \_ -> Expect.equal 1 (List.length dispatchReqs)
-                        , \_ -> Expect.equal [ { id = tag, token = "claim-9000-1", claimedAt = 9000 } ] (List.concatMap .candidates dispatchReqs)
-                        , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c x\r\n") resOut)
-                        , \_ -> Expect.equal [ { id = tag, owner = { serverUrl = "wss://irc.example", identity = "kai" }, token = "claim-9000-1", admitted = True } ] settles
-                        , \_ -> Expect.equal [] resulted.scheduledMessages
-                        , \_ -> Expect.equal False resulted.scheduledDispatchBusy
-                        , \_ -> Expect.equal True (List.member "Scheduled message sent" (List.map .title resulted.toasts))
+                        [ \_ -> Expect.equal [] (sendLines tickOut ++ sendLines staleOut)
+                        , \_ -> Expect.equal False (List.any isScheduledSave tickOut)
+                        , \_ -> Expect.equal False (List.any isScheduledSave staleOut)
+                        , \_ -> Expect.equal [ "legacy-row" ] (List.map .id staleResult.scheduledMessages)
                         ]
                         ()
-            , test "labeled dispatch admits on ACK and restores on FAIL" <|
+            , test "explicit scheduled dispatch carries only a revision-fenced reference" <|
                 \_ ->
                     let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000, caps = [ "labeled-response" ] }
+                        ( requested, outbound ) =
+                            update (RuntimeDomainActionRequested (RuntimeDomain.ScheduledDispatch "schedule_ref_00000001" 3))
+                                { blank | runtimeOwnerStamp = Just testRuntimeOwner }
 
-                        tag =
-                            "sched-1000-1"
-
-                        ( ticked, _ ) =
-                            update (Tick (Time.millisToPosix 9000)) queued
-
-                        ( labeled, resOut ) =
-                            update
-                                (ScheduledDispatchResult
-                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
-                                    , granted = [ tag ]
-                                    }
-                                )
-                                ticked
-
-                        sentLines =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        SendLine line ->
-                                            if String.startsWith "@label=" line then
-                                                Just line
-
-                                            else
-                                                Nothing
-
-                                        _ ->
-                                            Nothing
-                                )
-                                resOut
-
-                        label =
-                            case sentLines of
-                                line :: _ ->
-                                    Maybe.withDefault "" (List.head (String.split " " (String.dropLeft 7 line)))
-
-                                [] ->
-                                    ""
-
-                        ( acked, ackOut ) =
-                            feed labeled ("@label=" ++ label ++ " ACK")
-
-                        ackSettles =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledSettle r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                ackOut
-
-                        ( failed, failOut ) =
-                            feed labeled ("@label=" ++ label ++ " :srv FAIL PRIVMSG CANNOT_SEND :rejected")
-
-                        failSettles =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledSettle r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                failOut
+                        actions =
+                            runtimeActions outbound
                     in
                     Expect.all
-                        [ \_ -> Expect.equal 1 (List.length sentLines)
-                        , \_ -> Expect.equal 1 (Dict.size labeled.scheduledLabels)
-                        , \_ -> Expect.equal 1 (List.length labeled.scheduledMessages)
-                        , \_ -> Expect.equal [] acked.scheduledMessages
-                        , \_ -> Expect.equal True (List.all .admitted ackSettles)
-                        , \_ -> Expect.equal True (List.member "Scheduled message sent" (List.map .title acked.toasts))
-                        , \_ -> Expect.equal 1 (List.length failed.scheduledMessages)
-                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head failed.scheduledMessages))
-                        , \_ -> Expect.equal [ False ] (List.map .admitted failSettles)
-                        , \_ -> Expect.equal False (List.member "Scheduled message sent" (List.map .title failed.toasts))
-                        ]
-                        ()
-            , test "dead durable pauses and releases claims" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
-
-                        ( ticked, _ ) =
-                            update (Tick (Time.millisToPosix 9000)) queued
-
-                        ( paused, pausedOut ) =
-                            update (ScheduledDispatchResult { queue = Nothing, granted = [] }) ticked
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [ "Scheduled send paused" ] (List.map .title paused.toasts)
-                        , \_ -> Expect.equal 1 (List.length paused.scheduledMessages)
-                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head paused.scheduledMessages))
-                        , \_ -> Expect.equal False paused.scheduledDispatchBusy
-                        , \_ -> Expect.equal True (List.any isScheduledSave pausedOut)
-                        ]
-                        ()
-            , test "moved owner settles unadmitted without sending" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
-
-                        tag =
-                            "sched-1000-1"
-
-                        ( ticked, _ ) =
-                            update (Tick (Time.millisToPosix 9000)) queued
-
-                        ( moved, movedOut ) =
-                            update
-                                (ScheduledDispatchResult
-                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
-                                    , granted = [ tag ]
-                                    }
-                                )
-                                { ticked | accountName = Just "alice" }
-
-                        sends =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        SendLine _ ->
-                                            Just ()
-
-                                        _ ->
-                                            Nothing
-                                )
-                                movedOut
-
-                        settles =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledSettle r ->
-                                            Just r
-
-                                        _ ->
-                                            Nothing
-                                )
-                                movedOut
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] sends
-                        , \_ -> Expect.equal [ False ] (List.map .admitted settles)
-                        , \_ -> Expect.equal 1 (List.length moved.scheduledMessages)
-                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head moved.scheduledMessages))
-                        ]
-                        ()
-            , test "disconnect marks in-flight sends uncertain" <|
-                \_ ->
-                    let
-                        ( queued, _ ) =
-                            scheduleQueued { ownerBase | nowMs = 1000, caps = [ "labeled-response" ] }
-
-                        tag =
-                            "sched-1000-1"
-
-                        ( ticked, _ ) =
-                            update (Tick (Time.millisToPosix 9000)) queued
-
-                        ( labeled, _ ) =
-                            update
-                                (ScheduledDispatchResult
-                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
-                                    , granted = [ tag ]
-                                    }
-                                )
-                                ticked
-
-                        ( down, _ ) =
-                            update (WsClosed { clean = True, reason = "boom" }) labeled
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal Dict.empty down.scheduledLabels
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title down.toasts)
-                        , \_ -> Expect.equal 1 (List.length down.scheduledMessages)
-                        , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map (\row -> row.claim /= Nothing) (List.head down.scheduledMessages)))
-                        ]
-                        ()
-            , test "ircx rows wait for prop sync" <|
-                \_ ->
-                    let
-                        sup =
-                            ownerBase.isupport
-
-                        ircxBase =
-                            { ownerBase | isupport = { sup | ircx = True } }
-
-                        mkRow channel =
-                            { id = "s"
-                            , channel = channel
-                            , text = "x"
-                            , sendAt = 1
-                            , owner = Just { serverUrl = "wss://irc.example", identity = "kai" }
-                            , claim = Nothing
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        ircxProps =
-                            ircxBase.props
-
-                        syncedBase =
-                            { ircxBase | props = { ircxProps | synced = Set.singleton "#c" } }
-
-                        baseProps =
-                            blank.props
-
-                        requiredBase =
-                            { ircxBase | props = { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] } }
-
-                        designatedBase =
-                            { ircxBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ircxBase.dmDirectory }
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal False (dispatchableScheduledRow ircxBase (mkRow "#c"))
-                        , \_ -> Expect.equal True (dispatchableScheduledRow syncedBase (mkRow "#c"))
-                        , \_ -> Expect.equal True (dispatchableScheduledRow ircxBase (mkRow "bob"))
-                        , \_ -> Expect.equal True (dispatchableScheduledRow ownerBase (mkRow "#c"))
-                        , \_ -> Expect.equal False (dispatchableScheduledRow requiredBase (mkRow "#c"))
-                        , \_ -> Expect.equal True (dispatchableScheduledRow designatedBase (mkRow "bob"))
-                        ]
-                        ()
-            , test "designated dispatch seals instead of sending plaintext" <|
-                \_ ->
-                    let
-                        schedOwner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
-
-                        keyed =
-                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
-
-                        row =
-                            { id = "s"
-                            , channel = "bob"
-                            , text = "later hi"
-                            , sendAt = 1
-                            , owner = Just schedOwner
-                            , claim = Just { token = "tok", claimedAt = 1 }
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        ( m1, outbound ) =
-                            sendValidClaims { keyed | scheduledMessages = [ row ] } schedOwner [ ( "s", "tok" ) ] False []
-                    in
-                    Expect.all
-                        [ \_ ->
-                            Expect.equal
-                                [ DmSealRequested { target = "bob", keys = [ peerKey ], plaintext = "later hi", owner = Just ownedOwner, schedId = Just "s" } ]
-                                (List.filter
-                                    (\o ->
-                                        case o of
-                                            ScheduledSave _ ->
-                                                False
-
-                                            _ ->
-                                                True
-                                    )
-                                    outbound
-                                )
-                        , \_ -> Expect.equal True (List.any isScheduledSave outbound)
-                        , \_ -> Expect.equal (Just "tok") (Maybe.map .token (Dict.get "s" m1.scheduledSeals))
-                        , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
-                        ]
-                        ()
-            , test "scheduled seal-send settles admitted with ciphertext" <|
-                \_ ->
-                    let
-                        schedOwner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
-
-                        keyed =
-                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
-
-                        row =
-                            { id = "s"
-                            , channel = "bob"
-                            , text = "later hi"
-                            , sendAt = 1
-                            , owner = Just schedOwner
-                            , claim = Just { token = "tok", claimedAt = 1 }
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        sealing =
-                            { keyed
-                                | scheduledMessages = [ row ]
-                                , scheduledSeals =
-                                    Dict.singleton "s"
-                                        { target = "bob"
-                                        , text = "later hi"
-                                        , keys = [ peerKey ]
-                                        , owner = schedOwner
-                                        , token = "tok"
-                                        }
-                            }
-
-                        ( m1, outbound ) =
-                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
-                    in
-                    Expect.all
-                        [ \_ ->
-                            Expect.equal
-                                [ SendLine ("PRIVMSG bob :" ++ envelopeBody ++ "\r\n")
-                                , ScheduledSettle { id = "s", owner = schedOwner, token = "tok", admitted = True }
-                                ]
-                                (List.filter
-                                    (\o ->
-                                        case o of
-                                            ScheduledSave _ ->
-                                                False
-
-                                            _ ->
-                                                True
-                                    )
-                                    outbound
-                                )
-                        , \_ -> Expect.equal [] m1.scheduledMessages
-                        , \_ -> Expect.equal Dict.empty m1.scheduledSeals
-                        , \_ -> Expect.equal [ "Scheduled message sent" ] (List.map .title m1.toasts)
-                        ]
-                        ()
-            , test "scheduled seal-send stamps the e2ee tag and @label" <|
-                \_ ->
-                    let
-                        schedOwner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
-
-                        keyed =
-                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
-
-                        row =
-                            { id = "s"
-                            , channel = "bob"
-                            , text = "later hi"
-                            , sendAt = 1
-                            , owner = Just schedOwner
-                            , claim = Just { token = "tok", claimedAt = 1 }
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        sealing =
-                            { keyed
-                                | scheduledMessages = [ row ]
-                                , scheduledSeals =
-                                    Dict.singleton "s"
-                                        { target = "bob"
-                                        , text = "later hi"
-                                        , keys = [ peerKey ]
-                                        , owner = schedOwner
-                                        , token = "tok"
-                                        }
-                                , caps = [ "labeled-response", "onyx/e2ee" ]
-                            }
-
-                        label =
-                            Labels.nextClientLabel (floor sealing.nowMs) (sealing.labelCounter + 1)
-
-                        ( m1, outbound ) =
-                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
-                    in
-                    Expect.all
-                        [ \_ ->
-                            Expect.equal
-                                [ SendLine ("@+onyx/e2ee=mls;label=" ++ label ++ " PRIVMSG bob :" ++ envelopeBody ++ "\r\n")
-                                , ScheduledSettle { id = "s", owner = schedOwner, token = "tok", admitted = True }
-                                ]
-                                (List.filter
-                                    (\o ->
-                                        case o of
-                                            ScheduledSave _ ->
-                                                False
-
-                                            _ ->
-                                                True
-                                    )
-                                    outbound
-                                )
-                        , \_ -> Expect.equal (Just { id = "s", token = "tok" }) (Dict.get label m1.scheduledLabels)
-                        , \_ -> Expect.equal (sealing.labelCounter + 1) m1.labelCounter
-                        ]
-                        ()
-            , test "scheduled seal-send drops on rotation and holds" <|
-                \_ ->
-                    let
-                        schedOwner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
-
-                        otherKey =
-                            Base64Url.encode (0x04 :: List.repeat 64 8)
-
-                        rotated =
-                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" otherKey ownedBase.dmDirectory }
-
-                        row =
-                            { id = "s"
-                            , channel = "bob"
-                            , text = "later hi"
-                            , sendAt = 1
-                            , owner = Just schedOwner
-                            , claim = Just { token = "tok", claimedAt = 1 }
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        sealing =
-                            { rotated
-                                | scheduledMessages = [ row ]
-                                , scheduledSeals =
-                                    Dict.singleton "s"
-                                        { target = "bob"
-                                        , text = "later hi"
-                                        , keys = [ peerKey ]
-                                        , owner = schedOwner
-                                        , token = "tok"
-                                        }
-                            }
-
-                        ( m1, outbound ) =
-                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] outbound
-                        , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
-                        , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
-                        ]
-                        ()
-            , test "scheduled seal failure holds the claim uncertain" <|
-                \_ ->
-                    let
-                        schedOwner =
-                            { serverUrl = "wss://irc.example", identity = "kai" }
-
-                        keyed =
-                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
-
-                        row =
-                            { id = "s"
-                            , channel = "bob"
-                            , text = "later hi"
-                            , sendAt = 1
-                            , owner = Just schedOwner
-                            , claim = Just { token = "tok", claimedAt = 1 }
-                            , generation = Nothing
-                            , clearEpoch = Nothing
-                            }
-
-                        sealing =
-                            { keyed
-                                | scheduledMessages = [ row ]
-                                , scheduledSeals =
-                                    Dict.singleton "s"
-                                        { target = "bob"
-                                        , text = "later hi"
-                                        , keys = [ peerKey ]
-                                        , owner = schedOwner
-                                        , token = "tok"
-                                        }
-                            }
-
-                        ( m1, outbound ) =
-                            update (DmSealFailed { target = "bob", keyChanged = True, schedId = Just "s" }) sealing
-                    in
-                    Expect.all
-                        [ \_ -> Expect.equal [] outbound
-                        , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
-                        , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
-                        , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        [ \_ -> Expect.equal [ RuntimeDomain.ScheduledDispatch "schedule_ref_00000001" 3 ] actions
+                        , \_ -> Expect.equal Nothing requested.pendingScheduledCapture
+                        , \_ -> Expect.equal [] (sendLines outbound)
                         ]
                         ()
             ]
@@ -19424,29 +22268,21 @@ suite =
                         , \_ -> Expect.equal "2025-06-15T07:12" clocked.scheduleMinLocal
                         ]
                         ()
-            , test "preset click inside the window queues the draft" <|
+            , test "preset click opens a private scheduled-message editor" <|
                 \_ ->
                     let
                         ( opened, _ ) =
-                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#c", composer = "later" }
 
                         ( clicked, outs ) =
                             update (SchedulePresetClicked { id = "in-15m" }) opened
 
-                        fenceTags =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledFenceRequest r ->
-                                            Just r.tag
-
-                                        _ ->
-                                            Nothing
-                                )
-                                outs
+                        privateRequests = List.filter isPrivateScheduleCapture outs
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "sched-1000000-1" ] fenceTags
+                        [ \_ -> Expect.equal 1 (List.length privateRequests)
+                        , \_ -> Expect.equal (Just "#c") (Maybe.map .channel clicked.pendingScheduledCapture)
+                        , \_ -> Expect.equal (Just 1900000) (Maybe.map .dueAtMs clicked.pendingScheduledCapture)
                         , \_ -> Expect.equal [ { channel = "#c", text = "later", sendAt = 1900000 } ] clicked.schedulePending
                         , \_ -> Expect.equal Nothing clicked.scheduleError
                         ]
@@ -19492,7 +22328,7 @@ suite =
                 \_ ->
                     let
                         base =
-                            { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later", scheduleWhen = "2030-01-01T10:00" }
+                            { ownerBase | nowMs = 1000000, runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#c", composer = "later", scheduleWhen = "2030-01-01T10:00" }
 
                         ( stale, staleOut ) =
                             update (ScheduleParseReceived { value = "other", epoch = Just 4600000 }) base
@@ -19506,17 +22342,7 @@ suite =
                         ( far, farOut ) =
                             update (ScheduleParseReceived { value = "2030-01-01T10:00", epoch = Just 4600000 }) base
 
-                        farFences =
-                            List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledFenceRequest r ->
-                                            Just r.tag
-
-                                        _ ->
-                                            Nothing
-                                )
-                                farOut
+                        farPrivateRequests = List.filter isPrivateScheduleCapture farOut
                     in
                     Expect.all
                         [ \_ -> Expect.equal Nothing stale.scheduleError
@@ -19524,82 +22350,598 @@ suite =
                         , \_ -> Expect.equal (Just "Enter a valid time at least a minute from now.") bad.scheduleError
                         , \_ -> Expect.equal (Just "Enter a valid time at least a minute from now.") near.scheduleError
                         , \_ -> Expect.equal [] nearOut
-                        , \_ -> Expect.equal [ "sched-1000000-1" ] farFences
-                        , \_ -> Expect.equal [ { channel = "#c", text = "later", sendAt = 4600000 } ] far.schedulePending
+                        , \_ -> Expect.equal 1 (List.length farPrivateRequests)
+                        , \_ -> Expect.equal (Just "#c") (Maybe.map .channel far.pendingScheduledCapture)
+                        , \_ -> Expect.equal (Just 4600000) (Maybe.map .dueAtMs far.pendingScheduledCapture)
                         ]
                         ()
-            , test "admitted composer send toasts, closes, and clears the draft" <|
+            , test "private scheduled custody stays pending until a local acceptance result" <|
                 \_ ->
                     let
                         ( opened, _ ) =
-                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#c", composer = "later" }
 
                         ( clicked, out1 ) =
                             update (SchedulePresetClicked { id = "in-15m" }) opened
 
-                        tag =
-                            "sched-1000000-1"
-
-                        ( fenced, _ ) =
-                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) clicked
-
-                        ( added, _ ) =
-                            update (ScheduledAddResult { id = tag, ok = True }) fenced
-
-                        fenceTags =
+                        captureRequest =
                             List.filterMap
-                                (\o ->
-                                    case o of
-                                        ScheduledFenceRequest r ->
-                                            Just r.tag
+                                (\item ->
+                                    case item of
+                                        RuntimePrivateScheduledMessageRequest request ->
+                                            Just request
 
                                         _ ->
                                             Nothing
                                 )
                                 out1
+                                |> List.head
+
+                        capture =
+                            { requestId = Maybe.map .requestId captureRequest |> Maybe.withDefault ""
+                            , operationId = Maybe.map .operationId captureRequest |> Maybe.withDefault ""
+                            , kind = "create", inputRef = "private_input_ref_00000002", dueAtMs = 1900000, prefilledComposer = True
+                            , ownerRef = testRuntimeOwner.ownerRef, accountGeneration = 1, connectionGeneration = 1
+                            }
+
+                        ( staged, stagedOut ) = update (RuntimePrivateScheduledMessageReady capture) clicked
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "sched-1000000-1" ] fenceTags
-                        , \_ -> Expect.equal [ "Message scheduled" ] (List.map .title added.toasts)
-                        , \_ -> Expect.equal (Just "Will send to #c at the time you picked.") (Maybe.andThen .description (List.head added.toasts))
-                        , \_ -> Expect.equal False added.scheduleOpen
-                        , \_ -> Expect.equal "" added.composer
-                        , \_ -> Expect.equal "" added.scheduleWhen
-                        , \_ -> Expect.equal Nothing added.scheduleError
-                        , \_ -> Expect.equal [] added.schedulePending
-                        , \_ -> Expect.equal 1 (List.length added.scheduledMessages)
+                        [ \_ -> Expect.equal "later" staged.composer
+                        , \_ -> Expect.equal [] staged.toasts
+                        , \_ -> Expect.equal [ { channel = "#c", text = "later", sendAt = 1900000 } ] staged.schedulePending
+                        , \_ ->
+                            Expect.equal [ "#c" ]
+                                (List.filterMap
+                                    (\action ->
+                                        case action of
+                                            RuntimeDomain.ScheduledCreate ref _ _ target _ _ _ _ ->
+                                                if ref == capture.inputRef then Just target else Nothing
+
+                                            _ ->
+                                                Nothing
+                                    )
+                                    (runtimeActions stagedOut)
+                                )
+                        , \_ -> Expect.equal [] (sendLines stagedOut)
                         ]
                         ()
-            , test "admitted send keeps the draft after a mid-flight navigation" <|
+            , test "a navigation during private capture keeps the captured target and composer draft" <|
                 \_ ->
                     let
                         ( opened, _ ) =
-                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, runtimeOwnerStamp = Just testRuntimeOwner, activeChannel = Just "#c", composer = "later" }
 
-                        ( clicked, _ ) =
-                            update (SchedulePresetClicked { id = "in-15m" }) opened
+                        ( clicked, out1 ) = update (SchedulePresetClicked { id = "in-15m" }) opened
+                        captureRequest =
+                            List.filterMap
+                                (\item ->
+                                    case item of
+                                        RuntimePrivateScheduledMessageRequest request ->
+                                            Just request
 
-                        tag =
-                            "sched-1000000-1"
+                                        _ ->
+                                            Nothing
+                                )
+                                out1
+                                |> List.head
+                        capture =
+                            { requestId = Maybe.map .requestId captureRequest |> Maybe.withDefault ""
+                            , operationId = Maybe.map .operationId captureRequest |> Maybe.withDefault ""
+                            , kind = "create", inputRef = "private_input_ref_00000003", dueAtMs = 1900000, prefilledComposer = True
+                            , ownerRef = testRuntimeOwner.ownerRef, accountGeneration = 1, connectionGeneration = 1
+                            }
+                        navigated = { clicked | activeChannel = Just "#other" }
+                        ( staged, stagedOut ) = update (RuntimePrivateScheduledMessageReady capture) navigated
+                        targets =
+                            List.filterMap
+                                (\action ->
+                                    case action of
+                                        RuntimeDomain.ScheduledCreate ref _ _ target _ _ _ _ ->
+                                            if ref == capture.inputRef then Just target else Nothing
 
-                        ( fenced, _ ) =
-                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) { clicked | activeChannel = Just "#other" }
-
-                        ( added, _ ) =
-                            update (ScheduledAddResult { id = tag, ok = True }) fenced
+                                        _ ->
+                                            Nothing
+                                )
+                                (runtimeActions stagedOut)
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "Message scheduled" ] (List.map .title added.toasts)
-                        , \_ -> Expect.equal False added.scheduleOpen
-                        , \_ -> Expect.equal "later" added.composer
-                        , \_ -> Expect.equal [] added.schedulePending
+                        [ \_ -> Expect.equal "later" staged.composer
+                        , \_ -> Expect.equal [ "#c" ] targets
+                        , \_ -> Expect.equal [] staged.toasts
+                        , \_ -> Expect.equal [] (sendLines stagedOut)
+                        ]
+                        ()
+            , test "scheduled edit keeps selected row semantics and reconciles without resending" <|
+                \_ ->
+                    let
+                        base = { ownerBase | nowMs = 1000000, runtimeOwnerStamp = Just testRuntimeOwner }
+                        edit =
+                            { scheduleRef = "schedule_ref_00000001"
+                            , revision = 7
+                            , target = "#source-room"
+                            , dueAtMs = 1900000
+                            , messageKind = "action"
+                            , replyTo = Just "msgid_000000000001"
+                            , audiencePrefix = Just '!'
+                            }
+                        ( requesting, requestedOut ) = update (EditRuntimeScheduledMessage edit) base
+                        request =
+                            List.filterMap
+                                (\outbound ->
+                                    case outbound of
+                                        RuntimePrivateScheduledMessageRequest value ->
+                                            Just value
+
+                                        _ ->
+                                            Nothing
+                                )
+                                requestedOut
+                                |> List.head
+                        ready =
+                            { requestId = Maybe.map .requestId request |> Maybe.withDefault ""
+                            , operationId = Maybe.map .operationId request |> Maybe.withDefault ""
+                            , kind = "edit"
+                            , inputRef = "private_schedule_edit_0001"
+                            , dueAtMs = 2000000
+                            , prefilledComposer = False
+                            , ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            }
+                        ( staged, stagedOut ) = update (RuntimePrivateScheduledMessageReady ready) requesting
+                        edited =
+                            runtimeActions stagedOut
+                                |> List.filterMap
+                                    (\action ->
+                                        case action of
+                                            RuntimeDomain.ScheduledEdit inputRef scheduleRef revision due kind reply audience ->
+                                                Just { inputRef = inputRef, scheduleRef = scheduleRef, revision = revision, due = due, kind = kind, reply = reply, audience = audience }
+                                            _ -> Nothing
+                                    )
+                                |> List.head
+                        ( _, checkOut ) = update (CheckRuntimeScheduledMessageStatus { scheduleRef = edit.scheduleRef, revision = edit.revision }) base
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { inputRef = "private_schedule_edit_0001", scheduleRef = edit.scheduleRef, revision = edit.revision, due = 2000000, kind = "action", reply = edit.replyTo, audience = edit.audiencePrefix }) edited
+                        , \_ -> Expect.equal [] (sendLines stagedOut)
+                        , \_ -> Expect.equal Nothing staged.pendingScheduledCapture
+                        , \_ -> Expect.equal (Just "#source-room") (Maybe.map .channel requesting.pendingScheduledCapture)
+                        , \_ -> Expect.equal [ RuntimeDomain.ScheduledReconcile edit.scheduleRef edit.revision ] (runtimeActions checkOut)
+                        , \_ -> Expect.equal [] (sendLines checkOut)
+                        ]
+                        ()
+            , test "scheduled due-pump observation refreshes rows without settling a command" <|
+                \_ ->
+                    let
+                        pendingRequest =
+                            Ids.requestIdFromRuntime "domainRequest0000000001"
+
+                        item =
+                            { scheduleRef = "schedule_ref_00000001"
+                            , operationId = Just "operation_1"
+                            , conversationId = Just "#room"
+                            , dueAtMs = Just 1900000
+                            , messageKind = Just "message"
+                            , replyTo = Nothing
+                            , audiencePrefix = Nothing
+                            , revision = Just 3
+                            , mode = "durable"
+                            , state = "delivery-unknown"
+                            }
+
+                        observation =
+                            { ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            , domain = "scheduled"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Just { mode = "durable", legacyHeldCount = 0, legacyReviewUnavailable = False, items = [ item ] }
+                            , sessionRecovery = Nothing
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            , webAuthn = Nothing
+                            }
+
+                        base =
+                            { ownerBase
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , runtimeDomainPending = pendingRequest
+                                , runtimeDomainPendingAction = Just RuntimeDomain.ScheduledList
+                                , runtimeDomainObservation = Dict.singleton "account-security" 9
+                            }
+
+                        ( updated, effects ) =
+                            update (RuntimeDomainObservationReceived observation) base
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal pendingRequest updated.runtimeDomainPending
+                        , \_ -> Expect.equal (Just RuntimeDomain.ScheduledList) updated.runtimeDomainPendingAction
+                        , \_ -> Expect.equal (Just [ item ]) (Maybe.map .items updated.scheduledObservationView)
+                        , \_ -> Expect.equal (Just 1) (Dict.get "scheduled" updated.runtimeDomainObservation)
+                        , \_ -> Expect.equal Nothing updated.runtimeDomainResult
+                        , \_ -> Expect.equal [] effects
+                        ]
+                        ()
+            , test "same recovery ref cannot bypass the controlled owner-transfer proof" <|
+                \_ ->
+                    let
+                        oldOwner =
+                            { testRuntimeOwner | ownerRef = "owner_test_previous_000000000001" }
+
+                        redirecting =
+                            { requestId = "domainRequest0000000001"
+                            , credentialRef = "AAAAAAAAAAAAAAAAAAAAAAAA"
+                            , status = "redirecting"
+                            , outcome = Just "redirect"
+                            , reason = Nothing
+                            , redirectNode = Just "node2"
+                            , hopCount = 1
+                            , transferFrom = Nothing
+                            }
+
+                        unprovenNext =
+                            { redirecting | status = "awaiting-authentication", outcome = Nothing, transferFrom = Nothing }
+
+                        observation =
+                            { ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            , domain = "session"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Nothing
+                            , sessionRecovery = Just unprovenNext
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            , webAuthn = Nothing
+                            }
+
+                        previous =
+                            { ownerBase
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , sessionRecoveryView = Just redirecting
+                                , sessionRecoveryViewOwner = Just oldOwner
+                            }
+
+                        ( after, _ ) =
+                            update (RuntimeDomainObservationReceived observation) previous
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just redirecting) after.sessionRecoveryView
+                        , \_ -> Expect.equal (Just oldOwner) after.sessionRecoveryViewOwner
+                        , \_ -> Expect.equal Nothing (Dict.get "session" after.runtimeDomainObservation)
+                        ]
+                        ()
+            , test "controlled recovery transfer and typed acceptance settle the reclaim state" <|
+                \_ ->
+                    let
+                        credentialRef =
+                            "AAAAAAAAAAAAAAAAAAAAAAAA"
+
+                        guestOwner =
+                            { testRuntimeOwner
+                                | ownerRef = "guest_owner_000000000000000000000001"
+                                , accountId = Nothing
+                                , accountGeneration = 2
+                            }
+
+                        provenOwner =
+                            { guestOwner
+                                | ownerRef = "proven_owner_000000000000000000000001"
+                                , accountId = Just "alice"
+                                , accountGeneration = 3
+                            }
+
+                        awaiting =
+                            { requestId = "domainRequest0000000001"
+                            , credentialRef = credentialRef
+                            , status = "awaiting-authentication"
+                            , outcome = Nothing
+                            , reason = Just "account-proof-required"
+                            , redirectNode = Just "node2"
+                            , hopCount = 1
+                            , transferFrom = Nothing
+                            }
+
+                        redirecting =
+                            { awaiting
+                                | status = "redirecting"
+                                , outcome = Just "redirect"
+                                , reason = Nothing
+                                , redirectNode = Just "node2"
+                            }
+
+                        notice =
+                            { phase = Restoring
+                            , kind = Just Session.LocalBearer
+                            , credentialKind = Just Session.LocalLogical
+                            , credentialRef = Just (mustCredentialRef credentialRef)
+                            , outcome = Session.ResumePending
+                            }
+
+                        sourceModel =
+                            { ownerBase
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , sessionRecoveryView = Just redirecting
+                                , sessionRecoveryViewOwner = Just testRuntimeOwner
+                                , sessionRecoveryExpectedAccount = Just { networkId = testRuntimeOwner.networkId, accountId = "alice", requestId = awaiting.requestId, credentialRef = credentialRef }
+                                , sessionReclaim = Just notice
+                            }
+
+                        ( guestBase, _ ) =
+                            update (RuntimeOwnerStateReceived guestOwner) sourceModel
+
+                        awaitingTransfer =
+                            { awaiting
+                                | transferFrom = Just { ownerRef = testRuntimeOwner.ownerRef, accountGeneration = testRuntimeOwner.accountGeneration, connectionGeneration = testRuntimeOwner.connectionGeneration }
+                            }
+
+                        redirectObservation =
+                            { ownerRef = guestOwner.ownerRef
+                            , accountGeneration = guestOwner.accountGeneration
+                            , connectionGeneration = guestOwner.connectionGeneration
+                            , domain = "session"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Nothing
+                            , sessionRecovery = Just awaitingTransfer
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            , webAuthn = Nothing
+                            }
+
+                        ( guestModel, _ ) =
+                            update (RuntimeDomainObservationReceived redirectObservation) guestBase
+
+                        ( socketOpened, _ ) =
+                            update (WsOpened { url = "wss://irc.example" }) { guestModel | connection = Offline }
+
+                        ( registered, registrationOut ) =
+                            feed socketOpened ":irc.example 001 me :welcome"
+
+                        ( authenticated, authenticationOut ) =
+                            feed registered ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
+
+                        ( provenModel, _ ) =
+                            update (RuntimeOwnerStateReceived provenOwner) authenticated
+
+                        pendingTransfer =
+                            { awaiting
+                                | status = "pending"
+                                , reason = Nothing
+                                , transferFrom = Just { ownerRef = guestOwner.ownerRef, accountGeneration = guestOwner.accountGeneration, connectionGeneration = guestOwner.connectionGeneration }
+                            }
+
+                        transferObservation =
+                            { ownerRef = provenOwner.ownerRef
+                            , accountGeneration = provenOwner.accountGeneration
+                            , connectionGeneration = provenOwner.connectionGeneration
+                            , domain = "session"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Nothing
+                            , sessionRecovery = Just pendingTransfer
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            , webAuthn = Nothing
+                            }
+
+                        ( transferred, _ ) =
+                            update (RuntimeDomainObservationReceived transferObservation) provenModel
+
+                        requestId =
+                            Ids.requestIdFromRuntime "domainRequest0000000001"
+
+                        acceptedView =
+                            { pendingTransfer | status = "accepted", outcome = Just "exact-restored" }
+
+                        acceptedObservation =
+                            { transferObservation
+                                | sequence = 2
+                                , sessionRecovery = Just acceptedView
+                            }
+
+                        action =
+                            RuntimeDomain.ResumeSession credentialRef False
+
+                        pendingAccepted =
+                            { transferred
+                                | runtimeDomainPending = requestId
+                                , runtimeDomainPendingAction = Just action
+                            }
+
+                        ( accepted, acceptedOut ) =
+                            update (RuntimeDomainObservationReceived acceptedObservation) pendingAccepted
+
+                        recoveryWork outbound =
+                            List.any
+                                (\effect ->
+                                    case effect of
+                                        RuntimeDomainCommand command ->
+                                            case command.action of
+                                                RuntimeDomain.ResumeSession _ _ -> True
+                                                RuntimeDomain.RetrySession _ _ -> True
+                                                _ -> False
+
+                                        SessionTokenIssueRequested ->
+                                            True
+
+                                        SendLine line ->
+                                            List.any (\prefix -> String.startsWith prefix line) [ "SESSION RESUME ", "SESSION TOKEN " ]
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just awaitingTransfer) guestModel.sessionRecoveryView
+                        , \_ -> Expect.equal True registered.sessionCommandsSent
+                        , \_ -> Expect.equal False (recoveryWork (registrationOut ++ authenticationOut))
+                        , \_ -> Expect.equal (Just awaitingTransfer) provenModel.sessionRecoveryView
+                        , \_ -> Expect.equal (Just pendingTransfer) transferred.sessionRecoveryView
+                        , \_ -> Expect.equal (Just provenOwner) transferred.sessionRecoveryViewOwner
+                        , \_ -> Expect.equal (Just { notice | phase = Reclaimed, outcome = Session.ExactRestored }) accepted.sessionReclaim
+                        , \_ -> Expect.equal Nothing accepted.runtimeDomainPending
+                        , \_ -> Expect.equal Nothing accepted.runtimeDomainPendingAction
+                        , \_ -> Expect.equal [ ReclaimTimersCleared ] acceptedOut
+                        ]
+                        ()
+            , test "a different proven account cancels recovery and can run its normal socket planner" <|
+                \_ ->
+                    let
+                        credentialRef =
+                            "AAAAAAAAAAAAAAAAAAAAAAAA"
+
+                        redirecting =
+                            { requestId = "domainRequest0000000001"
+                            , credentialRef = credentialRef
+                            , status = "redirecting"
+                            , outcome = Just "redirect"
+                            , reason = Nothing
+                            , redirectNode = Just "node2"
+                            , hopCount = 1
+                            , transferFrom = Nothing
+                            }
+
+                        sourceModel =
+                            { ownerBase
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , sessionRecoveryView = Just redirecting
+                                , sessionRecoveryViewOwner = Just testRuntimeOwner
+                                , sessionRecoveryExpectedAccount = Just { networkId = testRuntimeOwner.networkId, accountId = "alice", requestId = redirecting.requestId, credentialRef = credentialRef }
+                                , sessionReclaim = Just { phase = Restoring, kind = Just Session.LocalBearer, credentialKind = Just Session.LocalLogical, credentialRef = Just (mustCredentialRef credentialRef), outcome = Session.ResumePending }
+                            }
+
+                        otherOwner =
+                            { testRuntimeOwner
+                                | ownerRef = "other_owner_000000000000000000000001"
+                                , accountId = Just "bob"
+                                , accountGeneration = 2
+                            }
+
+                        ( cancelled, cancelEffects ) =
+                            update (RuntimeOwnerStateReceived otherOwner) sourceModel
+
+                        ( socket, _ ) =
+                            update (WsOpened { url = "wss://irc.example" }) { cancelled | connection = Offline }
+
+                        ( registered, registrationOut ) =
+                            feed socket ":irc.example 001 me :welcome"
+
+                        ( authenticated, authenticationOut ) =
+                            feed registered ":irc.example 900 me nick!u@h bob :You are now logged in as bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing cancelled.sessionRecoveryView
+                        , \_ -> Expect.equal Nothing cancelled.sessionRecoveryExpectedAccount
+                        , \_ -> Expect.equal Nothing cancelled.sessionReclaim
+                        , \_ -> Expect.equal [ ReclaimTimersCleared ] cancelEffects
+                        , \_ -> Expect.equal True registered.sessionCommandsSent
+                        , \_ -> Expect.equal True authenticated.sessionCommandsSent
+                        , \_ -> Expect.equal True (List.member RuntimeDomain.PushReconcile (runtimeActions authenticationOut))
+                        , \_ ->
+                            Expect.equal False
+                                (List.any
+                                    (\action ->
+                                        case action of
+                                            RuntimeDomain.ResumeSession _ _ ->
+                                                True
+
+                                            RuntimeDomain.RetrySession _ _ ->
+                                                True
+
+                                            _ ->
+                                                False
+                                    )
+                                    (runtimeActions (registrationOut ++ authenticationOut))
+                                )
+                        , \_ -> Expect.equal False (List.member SessionTokenIssueRequested (registrationOut ++ authenticationOut))
+                        , \_ -> Expect.equal Nothing authenticated.sessionRecoveryView
+                        ]
+                        ()
+            , test "WebAuthn transport admission settles only its matching pending ceremony" <|
+                \_ ->
+                    let
+                        requestId = Ids.requestIdFromRuntime "domainRequest0000000001"
+
+                        ceremony =
+                            { requestId = "domainRequest0000000001"
+                            , ceremonyRef = Just "ceremony_reference_00000001"
+                            , ceremony = "register"
+                            , phase = "transport-admitted"
+                            , reason = Nothing
+                            }
+
+                        observation =
+                            { ownerRef = testRuntimeOwner.ownerRef
+                            , accountGeneration = testRuntimeOwner.accountGeneration
+                            , connectionGeneration = testRuntimeOwner.connectionGeneration
+                            , domain = "webauthn"
+                            , sequence = 1
+                            , securityStatus = Nothing
+                            , scheduledView = Nothing
+                            , sessionRecovery = Nothing
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            , webAuthn = Just ceremony
+                            }
+
+                        pending =
+                            { ownerBase
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , runtimeDomainPending = requestId
+                                , runtimeDomainPendingAction = Just (RuntimeDomain.WebAuthnBegin "register" Nothing)
+                            }
+
+                        ( updated, effects ) =
+                            update (RuntimeDomainObservationReceived observation) pending
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing updated.runtimeDomainPending
+                        , \_ -> Expect.equal Nothing updated.runtimeDomainPendingAction
+                        , \_ -> Expect.equal (Just ceremony) updated.webAuthnObservationView
+                        , \_ -> Expect.equal 1 (Maybe.withDefault 0 (Dict.get "webauthn" updated.runtimeDomainObservation))
+                        , \_ -> Expect.equal [] effects
                         ]
                         ()
             , test "refused admission raises the durable copy and keeps the draft" <|
                 \_ ->
                     let
                         ( opened, _ ) =
-                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+                            update ScheduleOpen { ownerBase | runtimeOwnerStamp = Nothing, nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
 
                         ( clicked, _ ) =
                             update (SchedulePresetClicked { id = "in-15m" }) opened
@@ -19904,7 +23246,87 @@ suite =
                                 , SendLine "MODE #harbor -q alice\r\n"
                                 ]
                                 grantOut
-                        , \_ -> Expect.equal Nothing (stewardOfferFor granted "#harbor")
+                        , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map .accepted (stewardOfferFor granted "#harbor")))
+                        , \_ -> Expect.equal "pending" (Maybe.withDefault "" (Maybe.map .status (Dict.get "#harbor" granted.stewardTransferAttempts)))
+                        ]
+                        ()
+            , test "transfer offer remains until both exact owner MODE echoes arrive" <|
+                \_ ->
+                    let
+                        ( offered, _ ) =
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+
+                        ( accepted, _ ) =
+                            update (StewardAcceptTransfer "#harbor") { offered | ourNick = "drew" }
+
+                        ( sent, _ ) =
+                            update (StewardGrantTransfer "#harbor") { accepted | ourNick = "alice" }
+
+                        ( partial, _ ) =
+                            feed sent ":alice!u@h MODE #harbor +q drew"
+
+                        ( complete, _ ) =
+                            feed partial ":alice!u@h MODE #harbor -q alice"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map .accepted (stewardOfferFor partial "#harbor")))
+                        , \_ -> Expect.equal "partial" (Maybe.withDefault "" (Maybe.map .status (Dict.get "#harbor" partial.stewardTransferAttempts)))
+                        , \_ -> Expect.equal Nothing (stewardOfferFor complete "#harbor")
+                        , \_ -> Expect.equal Nothing (Dict.get "#harbor" complete.stewardTransferAttempts)
+                        , \_ -> Expect.equal "The server confirmed both ownership rank changes." complete.stewardStatus
+                        ]
+                        ()
+            , test "roster refresh keeps the command outcome unknown and never resends" <|
+                \_ ->
+                    let
+                        ( offered, _ ) =
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+
+                        ( accepted, _ ) =
+                            update (StewardAcceptTransfer "#harbor") { offered | ourNick = "drew" }
+
+                        ( sent, _ ) =
+                            update (StewardGrantTransfer "#harbor") { accepted | ourNick = "alice" }
+
+                        ( partial, _ ) =
+                            feed sent ":alice!u@h MODE #harbor +q drew"
+
+                        room =
+                            Maybe.withDefault stewardRoom (Dict.get "#harbor" partial.channels)
+
+                        alice =
+                            Maybe.withDefault { nick = "alice", modes = Set.empty, away = False } (Dict.get "alice" room.members)
+
+                        withoutOwner =
+                            { partial
+                                | channels =
+                                    Dict.insert "#harbor"
+                                        { room | members = Dict.insert "alice" { alice | modes = Set.remove 'q' alice.modes } room.members }
+                                        partial.channels
+                            }
+
+                        ( refreshing, refreshOut ) =
+                            update (StewardReconcileTransfer "#harbor") withoutOwner
+
+                        ( timedOut, _ ) =
+                            update (Tick (Time.millisToPosix 31000)) refreshing
+
+                        ( names, _ ) =
+                            feed refreshing ":server 353 alice = #harbor :~drew alice bob cara erin"
+
+                        ( observed, _ ) =
+                            feed names ":server 366 alice #harbor :End of NAMES list"
+
+                        ( attempted, attemptedOut ) =
+                            update (StewardGrantTransfer "#harbor") observed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NAMES #harbor\r\n" ] refreshOut
+                        , \_ -> Expect.equal "unknown" (Maybe.withDefault "" (Maybe.map .status (Dict.get "#harbor" timedOut.stewardTransferAttempts)))
+                        , \_ -> Expect.equal "observed" (Maybe.withDefault "" (Maybe.map .status (Dict.get "#harbor" observed.stewardTransferAttempts)))
+                        , \_ -> Expect.equal True (String.contains "earlier command outcome remains unknown" observed.stewardStatus)
+                        , \_ -> Expect.equal [] attemptedOut
+                        , \_ -> Expect.equal "observed" (Maybe.withDefault "" (Maybe.map .status (Dict.get "#harbor" attempted.stewardTransferAttempts)))
                         ]
                         ()
             , test "bystander cannot accept and either side can decline" <|
@@ -21720,13 +25142,16 @@ suite =
                             { fields | account = Just "zoe" }
 
                         ( settled, _ ) =
-                            feed pending ":irc.example NOTE ACCOUNTINFO :account=kai flags=3 secure=on"
+                            feed pending ":irc.example NOTICE me :account=kai flags=3 secure=on"
 
                         ( stray, _ ) =
-                            feed totpLive ":irc.example NOTE ACCOUNTINFO :account=kai flags=3"
+                            feed totpLive ":irc.example NOTICE me :account=kai flags=3"
 
                         ( mismatch, _ ) =
-                            feed pending ":irc.example NOTE ACCOUNTINFO :account=zoe flags=3"
+                            feed pending ":irc.example NOTICE me :account=zoe flags=3"
+
+                        ( retired, _ ) =
+                            feed pending ":irc.example BOGUS ACCOUNTINFO :account=kai flags=3"
                     in
                     Expect.all
                         [ \_ -> Expect.equal (Just "kai") (Maybe.map .account settled.accountInfo)
@@ -21735,22 +25160,27 @@ suite =
                         , \_ -> Expect.equal Nothing settled.accountInfoReplyAccount
                         , \_ -> Expect.equal Nothing stray.accountInfo
                         , \_ -> Expect.equal Nothing mismatch.accountInfo
+                        , \_ -> Expect.equal Nothing retired.accountInfo
+                        , \_ -> Expect.equal True retired.accountInfoPending
                         , \_ -> Expect.equal Nothing (applyAccountInfo { pending | accountInfoReplyAccount = Nothing } fields)
                         , \_ -> Expect.equal Nothing (applyAccountInfo pending other)
                         ]
                         ()
-            , test "accountset notes refetch while authed" <|
+            , test "unsupported wire commands cannot trigger an account refetch" <|
                 \_ ->
                     let
                         ( refetched, outs ) =
-                            feed totpLive ":irc.example NOTE ACCOUNTSET :ok"
+                            feed totpLive ":irc.example BOGUS ACCOUNTSET :ok"
 
                         ( guest, outGuest ) =
-                            feed blank ":irc.example NOTE ACCOUNTSET :ok"
+                            feed blank ":irc.example BOGUS ACCOUNTSET :ok"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal True (List.member (SendLine "ACCOUNTINFO\r\n") outs)
+                        [ \_ -> Expect.equal [] outs
                         , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal totpLive.accountInfo refetched.accountInfo
+                        , \_ -> Expect.equal totpLive.accountInfoPending refetched.accountInfoPending
+                        , \_ -> Expect.equal Nothing guest.accountInfo
                         ]
                         ()
             , test "failed account info clears the attempt" <|
@@ -21774,8 +25204,11 @@ suite =
             , test "opening the panel refreshes info and sessions" <|
                 \_ ->
                     let
+                        owned =
+                            { totpLive | runtimeOwnerStamp = Just testRuntimeOwner }
+
                         ( opened, outs ) =
-                            update (SetAccountOpen True) totpLive
+                            update (SetAccountOpen True) owned
 
                         sends =
                             List.filterMap
@@ -21798,7 +25231,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal True opened.accountOpen
                         , \_ -> Expect.equal True (List.member "ACCOUNTINFO\r\n" sends)
-                        , \_ -> Expect.equal True (List.member "SESSION LIST\r\n" sends)
+                        , \_ -> Expect.equal True (List.member RuntimeDomain.LocalSessionList (runtimeActions outs))
                         , \_ -> Expect.equal True opened.accountInfoPending
                         , \_ -> Expect.equal True opened.accountSessionsPending
                         , \_ -> Expect.equal [] outAgain
@@ -22141,46 +25574,92 @@ suite =
             , test "passkey list register remove rename wire legs" <|
                 \_ ->
                     let
+                        owned =
+                            { totpLive | runtimeOwnerStamp = Just testRuntimeOwner }
+
+                        opaqueRef =
+                            "credential_reference_00000001"
+
                         ( _, outGuest ) =
                             update PasskeyListRequested blank
 
                         ( listing, outList ) =
-                            update PasskeyListRequested totpLive
+                            update PasskeyListRequested owned
 
                         ( registering, outRegister ) =
-                            update PasskeyRegisterSubmitted { totpLive | passkeyLabel = "laptop" }
+                            update PasskeyRegisterSubmitted { owned | passkeyLabel = "laptop" }
 
                         ( refused, outRefused ) =
-                            update PasskeyRegisterSubmitted { totpLive | connection = Offline, passkeyLabel = "laptop" }
+                            update PasskeyRegisterSubmitted { owned | connection = Offline, passkeyLabel = "laptop" }
 
                         ( _, outRemove ) =
-                            update PasskeyRemoveConfirmed { totpLive | passkeyRemoveArmed = Just "cred-1" }
+                            update PasskeyRemoveConfirmed { owned | passkeyRemoveArmed = Just opaqueRef }
 
                         ( _, outRemoveBare ) =
-                            update PasskeyRemoveConfirmed totpLive
+                            update PasskeyRemoveConfirmed owned
 
                         ( renamed, outRename ) =
-                            update PasskeyRenameSubmitted { totpLive | passkeyRenamingId = Just "cred-1", passkeyRenameValue = "phone" }
+                            update PasskeyRenameSubmitted { owned | passkeyRenamingId = Just opaqueRef, passkeyRenameValue = "phone" }
+
+                        renameCommand =
+                            outRename
+                                |> List.filterMap
+                                    (\outbound ->
+                                        case outbound of
+                                            RuntimeDomainCommand command ->
+                                                Just command
+
+                                            _ ->
+                                                Nothing
+                                    )
+                                |> List.head
+
+                        wrongRequestResult =
+                            renameCommand
+                                |> Maybe.map
+                                    (\command ->
+                                        let
+                                            result =
+                                                acceptedPasskeyManagementResult command
+                                        in
+                                        { result | requestId = Maybe.withDefault result.requestId (Ids.requestIdFromRuntime "request_wrong_000000000000000000000000") }
+                                    )
+
+                        afterWrongRequest =
+                            wrongRequestResult
+                                |> Maybe.map (RuntimeDomainResultReceived >> (\message -> update message renamed |> Tuple.first))
+                                |> Maybe.withDefault renamed
+
+                        acceptedRename =
+                            renameCommand
+                                |> Maybe.map (acceptedPasskeyManagementResult >> RuntimeDomainResultReceived >> (\message -> update message afterWrongRequest |> Tuple.first))
+                                |> Maybe.withDefault afterWrongRequest
 
                         ( _, outRenameBlank ) =
-                            update PasskeyRenameSubmitted { totpLive | passkeyRenamingId = Just "cred-1", passkeyRenameValue = "  " }
+                            update PasskeyRenameSubmitted { owned | passkeyRenamingId = Just opaqueRef, passkeyRenameValue = "  " }
 
                         supported =
-                            Tuple.first (update (PasskeySupportReceived { supported = True }) totpLive)
+                            Tuple.first (update (PasskeySupportReceived { supported = True }) owned)
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] outGuest
-                        , \_ -> Expect.equal [ SendLine "WEBAUTHN LIST\r\n" ] outList
-                        , \_ -> Expect.equal (Just []) listing.passkey.pendingList
+                        , \_ -> Expect.equal [ RuntimeDomain.PasskeyList ] (runtimeActions outList)
+                        , \_ -> Expect.equal (Just "pending") (Maybe.map .status listing.passkeyManagementView)
                         , \_ -> Expect.equal [ SendLine "WEBAUTHN REGISTER laptop\r\n" ] outRegister
                         , \_ -> Expect.equal True registering.passkey.busy
                         , \_ -> Expect.equal "" registering.passkeyLabel
                         , \_ -> Expect.equal [] outRefused
                         , \_ -> Expect.equal "laptop" refused.passkeyLabel
-                        , \_ -> Expect.equal [ SendLine "WEBAUTHN REMOVE cred-1\r\n" ] outRemove
+                        , \_ -> Expect.equal [ RuntimeDomain.PasskeyRemove opaqueRef ] (runtimeActions outRemove)
                         , \_ -> Expect.equal [] outRemoveBare
-                        , \_ -> Expect.equal [ SendLine "WEBAUTHN RENAME cred-1 phone\r\n" ] outRename
-                        , \_ -> Expect.equal Nothing renamed.passkeyRenamingId
+                        , \_ -> Expect.equal [ RuntimeDomain.PasskeyRename opaqueRef "phone" ] (runtimeActions outRename)
+                        , \_ -> Expect.equal (Just opaqueRef) renamed.passkeyRenamingId
+                        , \_ -> Expect.equal "phone" renamed.passkeyRenameValue
+                        , \_ -> Expect.equal (Just "pending") (Maybe.map .status renamed.passkeyManagementView)
+                        , \_ -> Expect.equal (Just opaqueRef) afterWrongRequest.passkeyRenamingId
+                        , \_ -> Expect.equal "phone" afterWrongRequest.passkeyRenameValue
+                        , \_ -> Expect.equal Nothing acceptedRename.passkeyRenamingId
+                        , \_ -> Expect.equal "" acceptedRename.passkeyRenameValue
                         , \_ -> Expect.equal [] outRenameBlank
                         , \_ -> Expect.equal (Just True) supported.passkeyBrowserSupported
                         ]
@@ -22217,12 +25696,13 @@ suite =
                         , \_ -> Expect.equal False dropped.dropArmed
                         ]
                         ()
-            , test "open-refresh includes recovery and passkey legs plus email seed" <|
+            , test "open-refresh includes recovery without bypassing private passkey inventory" <|
                 \_ ->
                     let
                         seeded =
                             { totpLive
-                                | accountInfo =
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , accountInfo =
                                     Just
                                         { account = "kai"
                                         , flags = Nothing
@@ -22250,7 +25730,8 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal True (List.member "RECOVERYCODES STATUS\r\n" sends)
-                        , \_ -> Expect.equal True (List.member "WEBAUTHN LIST\r\n" sends)
+                        , \_ -> Expect.equal False (List.member "WEBAUTHN LIST\r\n" sends)
+                        , \_ -> Expect.equal False (List.member RuntimeDomain.PasskeyList (runtimeActions outs))
                         , \_ -> Expect.equal "kai@x.test" opened.accountEmail
                         ]
                         ()
@@ -23551,30 +27032,26 @@ suite =
                         , \_ -> Expect.equal "Only the owner can do that." stranger.stewardStatus
                         ]
                         ()
-            , test "WEBHOOK: notice lands in the service log, not chat" <|
+            , test "WEBHOOK notice text never exposes a one-time URL to Elm history or logs" <|
                 \_ ->
                     let
                         ( logged, _ ) =
                             feed blank ":server NOTICE me :WEBHOOK: created for #general - POST Discord webhook JSON to https://chat.example/api/webhooks/id/token"
                     in
                     Expect.all
-                        [ \_ ->
-                            Expect.equal True
-                                (List.any (String.startsWith "Webhook: WEBHOOK: created for #general") logged.serviceLog)
-                        , \_ -> Expect.equal Dict.empty logged.channels
+                        [ \_ -> Expect.equal False (List.any (String.contains "https://chat.example/api/webhooks/id/token") logged.serviceLog)
+                        , \_ -> Expect.equal False (List.any (String.contains "https://chat.example/api/webhooks/id/token") (channelBodies logged))
                         ]
                         ()
-            , test "peer DM naming webhook diverts to the service log" <|
+            , test "peer webhook text is not treated as a private server secret reply" <|
                 \_ ->
                     let
                         ( logged, _ ) =
                             feed blank ":alice!u@h NOTICE me :check the webhook"
                     in
                     Expect.all
-                        [ \_ ->
-                            Expect.equal True
-                                (List.any (String.startsWith "Webhook: ") logged.serviceLog)
-                        ]
+                        [ \_ -> Expect.equal False (List.any (String.startsWith "Webhook:") logged.serviceLog)
+                        , \_ -> Expect.equal False (List.any (String.contains "check the webhook") (channelBodies logged)) ]
                         ()
             , test "channel webhook JSON notice flattens, plain notices pass through" <|
                 \_ ->
@@ -23835,12 +27312,9 @@ suite =
 
                         ( loaded, _ ) =
                             update
-                                (VaultRowsReceived
-                                    { target = "#c"
-                                    , rows =
-                                        [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "notice", deleted = False, redacted = False , replyTo = Nothing } ]
-                                    , status = "ok"
-                                    }
+                                (vaultRowsReceived "#c"
+                                    [ { id = "#c:7", wireMessageId = Nothing, target = "#c", from = "alice", body = "old", at = 0, rowType = "notice", deleted = False, redacted = False , replyTo = Nothing } ]
+                                    "ok"
                                 )
                                 joined
                     in
@@ -23960,7 +27434,16 @@ suite =
                     in
                     Expect.equal [ VaultImportPick ] out
         , describe "retention policy"
-            [ test "keep selection saves and parks the applying status" <|
+            [ test "active memory horizon is 1000 while inactive and durable limits stay 400" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal 1000 activeConversationKeep
+                        , \_ -> Expect.equal 400 keepMessages
+                        , \_ -> Expect.equal 1000 (messageRetentionFor { blank | activeChannel = Just "#Current" } "#current")
+                        , \_ -> Expect.equal 400 (messageRetentionFor { blank | activeChannel = Just "#current" } "#other")
+                        ]
+                        ()
+            , test "keep selection saves and parks the applying status" <|
                 \_ ->
                     let
                         ( saved, out ) =
@@ -24089,6 +27572,551 @@ suite =
                                 out
                     in
                     Expect.equal True (List.member "msg" types)
+            ]
+        , describe "E10 wire byte limits and server provenance"
+            [ test "an oversized composer body is refused before any mutation or send" <|
+                \_ ->
+                    let
+                        body =
+                            String.repeat 8200 "a"
+
+                        base =
+                            liveRoom "alice" "#c"
+
+                        ( typed, _ ) =
+                            update (ComposerInput body) base
+
+                        ( refused, out ) =
+                            update ComposerSend typed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal body refused.composer
+                        , \_ -> Expect.equal typed.messageSeq refused.messageSeq
+                        , \_ -> Expect.equal 0 refused.messageSeq
+                        , \_ -> Expect.equal (channelBodies typed) (channelBodies refused)
+                        , \_ -> Expect.equal False (List.member body (channelBodies refused))
+                        , \_ -> Expect.equal typed.pendingLabels refused.pendingLabels
+                        , \_ -> Expect.equal (Just "The message could not be sent because it exceeds the client wire limits.") refused.composerError
+                        ]
+                        ()
+            , test "inbound lines past the 64 KiB tag-value or 512 KiB line ceilings leave the model unchanged" <|
+                \_ ->
+                    let
+                        -- Inbound ceilings mirror the parser oracle
+                        -- (64 KiB tag value, 512 KiB line); the 8191-byte
+                        -- bound is the outbound client ceiling only, so a
+                        -- 9000-byte server tag is still a valid line.
+                        base =
+                            liveRoom "me" "#c"
+
+                        ( taggedOut, taggedOutbound ) =
+                            feed base ("@k=" ++ String.repeat 65537 "v" ++ " :bob!u@h PRIVMSG #c :x")
+
+                        ( bodyOut, bodyOutbound ) =
+                            feed base (":bob!u@h PRIVMSG #c :" ++ String.repeat 131072 "😀")
+
+                        ( serverSized, _ ) =
+                            feed base ("@k=" ++ String.repeat 9000 "v" ++ " :bob!u@h PRIVMSG #c :x")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (base == taggedOut)
+                        , \_ -> Expect.equal [] taggedOutbound
+                        , \_ -> Expect.equal True (base == bodyOut)
+                        , \_ -> Expect.equal (channelBodies base) (channelBodies bodyOut)
+                        , \_ -> Expect.equal [] bodyOutbound
+                        , \_ -> Expect.equal [ "x" ] (channelBodies serverSized)
+                        ]
+                        ()
+            , test "after 001 from one server, a different server prefix cannot deliver MEMO or SESSION control notices" <|
+                \_ ->
+                    let
+                        ( registered, _ ) =
+                            feed { blank | ourNick = "alice" } ":irc.example 001 alice :welcome"
+
+                        ( forgedMemo, memoOut ) =
+                            feed registered ":other.example NOTICE alice :MEMO from bob :hi"
+
+                        ( forgedSession, sessionOut ) =
+                            feed registered ":other.example NOTICE alice :SESSION TOKEN t"
+
+                        ( trustedSession, trustedOut ) =
+                            feed registered ":irc.example NOTICE alice :SESSION TOKEN t"
+
+                        ( trustedMemo, _ ) =
+                            feed registered ":irc.example NOTICE alice :MEMO from bob :hi"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "irc.example") registered.serverPrefix
+                        , \_ -> Expect.equal Nothing (offlineMemoFor forgedMemo "bob")
+                        , \_ -> Expect.equal [] (List.filter isOfflineMemoOut memoOut)
+                        , \_ -> Expect.equal Nothing (Maybe.map .count (offlineMemoFor forgedMemo "bob"))
+                        , \_ -> Expect.equal (Just { count = 1, firstMsgId = 0 }) (offlineMemoFor trustedMemo "bob")
+                        , \_ -> Expect.equal registered.sessionTokens forgedSession.sessionTokens
+                        , \_ -> Expect.equal [] (List.filter isSessionTokenStored sessionOut)
+                        , \_ -> Expect.equal True (forgedSession /= registered)
+                        , \_ -> Expect.equal True (trustedSession == registered)
+                        , \_ -> Expect.equal [] trustedOut
+                        ]
+                        ()
+            , test "dotless server names stay fail-closed: a bare localhost prefix is a nick, never trusted provenance" <|
+                \_ ->
+                    let
+                        ( registered, _ ) =
+                            feed { blank | ourNick = "alice" } ":localhost 001 alice :welcome"
+
+                        ( memo, memoOut ) =
+                            feed registered ":localhost NOTICE alice :MEMO from bob :hi"
+
+                        ( session, _ ) =
+                            feed registered ":localhost NOTICE alice :SESSION TOKEN t"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "localhost") registered.serverPrefix
+                        , \_ -> Expect.equal Nothing (offlineMemoFor memo "bob")
+                        , \_ -> Expect.equal [] (List.filter isOfflineMemoOut memoOut)
+                        , \_ -> Expect.equal True (session /= registered)
+                        ]
+                        ()
+            , test "reconnecting to another node relearns the server prefix from the new 001" <|
+                \_ ->
+                    let
+                        base =
+                            openTestSocket { blank | ourNick = "alice" }
+
+                        ( onA, _ ) =
+                            feed base ":a.example 001 alice :welcome"
+
+                        ( memoA, _ ) =
+                            feed onA ":a.example NOTICE alice :MEMO from bob :from a"
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = False, reason = "node lost" }) memoA
+
+                        ( reopened, _ ) =
+                            update (WsOpened { url = "wss://b.example" }) closed
+
+                        ( onB, _ ) =
+                            feed reopened ":b.example 001 alice :welcome"
+
+                        ( staleA, staleOut ) =
+                            feed onB ":a.example NOTICE alice :MEMO from carol :stale node"
+
+                        ( memoB, memoBOut ) =
+                            feed onB ":b.example NOTICE alice :MEMO from dave :from b"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "a.example") onA.serverPrefix
+                        , \_ -> Expect.equal (Just { count = 1, firstMsgId = 0 }) (offlineMemoFor memoA "bob")
+                        , \_ -> Expect.equal Nothing reopened.serverPrefix
+                        , \_ -> Expect.equal (Just "b.example") onB.serverPrefix
+                        , \_ -> Expect.equal Nothing (offlineMemoFor staleA "carol")
+                        , \_ -> Expect.equal [] (List.filter isOfflineMemoOut staleOut)
+                        , \_ -> Expect.equal True (offlineMemoFor memoB "dave" /= Nothing)
+                        , \_ -> Expect.equal True (List.any isOfflineMemoOut memoBOut)
+                        ]
+                        ()
+            , test "a truly unhandled numeric leaves a pending labeled send pending" <|
+                \_ ->
+                    let
+                        label =
+                            Labels.nextClientLabel 0 1
+
+                        ( sending, _ ) =
+                            labeledSend [ "labeled-response" ] "hi"
+
+                        ( odd, oddOut ) =
+                            feed sending ":srv 799 alice FROB #c :odd reply"
+
+                        ( foreign, foreignOut ) =
+                            feed sending "@label=someone-else :srv 799 alice FROB #c :odd reply"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (Dict.size sending.pendingLabels)
+                        , \_ -> Expect.equal sending.pendingLabels odd.pendingLabels
+                        , \_ -> Expect.equal (Just "#c") (Dict.get label odd.pendingLabels |> Maybe.map .target)
+                        , \_ -> Expect.equal Dict.empty odd.uncertainLabels
+                        , \_ -> Expect.equal [ True ] (channelPendings odd)
+                        , \_ -> Expect.equal [] oddOut
+                        , \_ -> Expect.equal sending.pendingLabels foreign.pendingLabels
+                        , \_ -> Expect.equal Dict.empty foreign.uncertainLabels
+                        , \_ -> Expect.equal [ True ] (channelPendings foreign)
+                        , \_ -> Expect.equal [] foreignOut
+                        ]
+                        ()
+            ]
+        , describe "E11 capability inventory across reconnects"
+            [ test "reopen clears negotiated caps, pending requests, groups and media readiness" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) { blank | connection = Offline }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                        ( partial, _ ) =
+                            feed listed ":s CAP me ACK :message-tags"
+
+                        mediaReady =
+                            { partial | mediaAvailable = True }
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = False, reason = "drop" }) mediaReady
+
+                        ( reopened, reopenOut ) =
+                            update (WsOpened { url = "wss://b.example" }) closed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "message-tags" ] partial.caps
+                        , \_ -> Expect.equal 1 partial.capReqPending
+                        , \_ -> Expect.equal False (List.isEmpty partial.capRequestGroups)
+                        , \_ -> Expect.equal [] reopened.caps
+                        , \_ -> Expect.equal 0 reopened.capReqPending
+                        , \_ -> Expect.equal [] reopened.capRequestGroups
+                        , \_ -> Expect.equal [] reopened.capAvailable
+                        , \_ -> Expect.equal Dict.empty reopened.capAvailableValues
+                        , \_ -> Expect.equal False reopened.mediaAvailable
+                        , \_ -> Expect.equal True reopened.capNegotiating
+                        , \_ -> Expect.equal [ "CAP LS 302\r\n" ] (List.take 1 (sendLines reopenOut))
+                        ]
+                        ()
+            , test "a late ACK from the old request arriving after reopen and before LS sets no caps" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) { blank | connection = Offline }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = False, reason = "drop" }) listed
+
+                        ( reopened, _ ) =
+                            update (WsOpened { url = "wss://b.example" }) closed
+
+                        ( late, lateOut ) =
+                            feed reopened ":s CAP me ACK :draft/multiline message-tags"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 listed.capReqPending
+                        , \_ -> Expect.equal [] late.caps
+                        , \_ -> Expect.equal 0 late.capReqPending
+                        , \_ -> Expect.equal [] late.capRequestGroups
+                        , \_ -> Expect.equal [] lateOut
+                        , \_ -> Expect.equal True late.capNegotiating
+                        ]
+                        ()
+            , test "a repeated full CAP LS after negotiation requests nothing and duplicates nothing" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) { blank | connection = Offline }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                        ( acked, ackOut ) =
+                            feed listed ":s CAP me ACK :draft/multiline message-tags"
+
+                        ( again, againOut ) =
+                            feed acked ":s CAP me LS :draft/multiline message-tags"
+
+                        ( live, _ ) =
+                            feed again ":s 001 me :welcome"
+
+                        ( liveAgain, liveAgainOut ) =
+                            feed live ":s CAP me LS :draft/multiline message-tags"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "CAP END\r\n" ] (sendLines ackOut)
+                        , \_ -> Expect.equal [] againOut
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] again.capAvailable
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] again.caps
+                        , \_ -> Expect.equal 0 again.capReqPending
+                        , \_ -> Expect.equal acked.capRequestGroups again.capRequestGroups
+                        , \_ -> Expect.equal [] liveAgainOut
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] liveAgain.capAvailable
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] liveAgain.caps
+                        , \_ -> Expect.equal 0 liveAgain.capReqPending
+                        ]
+                        ()
+            , test "CAP NEW for an already acked cap sends no REQ and adds no duplicate inventory" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) { blank | connection = Offline }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :draft/multiline message-tags"
+
+                        ( partial, _ ) =
+                            feed listed ":s CAP me ACK :message-tags"
+
+                        ( renewed, renewOut ) =
+                            feed partial ":s CAP me NEW :message-tags"
+
+                        ( pendingAgain, pendingOut ) =
+                            feed renewed ":s CAP me NEW :draft/multiline"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] renewOut
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] renewed.capAvailable
+                        , \_ -> Expect.equal [ "message-tags" ] renewed.caps
+                        , \_ -> Expect.equal 1 renewed.capReqPending
+                        , \_ -> Expect.equal partial.capRequestGroups renewed.capRequestGroups
+                        , \_ -> Expect.equal [] pendingOut
+                        , \_ -> Expect.equal [ "draft/multiline", "message-tags" ] pendingAgain.capAvailable
+                        , \_ -> Expect.equal 1 pendingAgain.capReqPending
+                        ]
+                        ()
+            , test "a NAK followed by a repeated inventory cannot make the rejected cap negotiated" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) { blank | connection = Offline }
+
+                        ( listed, _ ) =
+                            feed opened ":s CAP me LS :draft/multiline"
+
+                        ( rejected, _ ) =
+                            feed listed ":s CAP me NAK :draft/multiline"
+
+                        ( live, _ ) =
+                            feed rejected ":s 001 me :welcome"
+
+                        ( again, againOut ) =
+                            feed live ":s CAP me LS :draft/multiline"
+
+                        ( unsolicited, unsolicitedOut ) =
+                            feed again ":s CAP me ACK :draft/multiline"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] rejected.caps
+                        , \_ -> Expect.equal [] againOut
+                        , \_ -> Expect.equal [ "draft/multiline" ] again.capAvailable
+                        , \_ -> Expect.equal [] again.caps
+                        , \_ -> Expect.equal [] unsolicited.caps
+                        , \_ -> Expect.equal [] unsolicitedOut
+                        ]
+                        ()
+            ]
+        , describe "E14 history batches and label correlation"
+            [ test "replayed PART/QUIT/NICK/MODE inside chathistory never touch the live roster, modes, or nick" <|
+                \_ ->
+                    let
+                        live0 =
+                            liveRoom "me" "#c"
+
+                        ( live1, _ ) =
+                            feed live0 ":bob!u@h JOIN #c"
+
+                        ( live2, _ ) =
+                            feed live1 ":carol!u@h JOIN #c"
+
+                        ( live3, _ ) =
+                            feed live2 ":srv MODE #c +o bob"
+
+                        ( live, _ ) =
+                            feed live3 ":srv MODE #c +n"
+
+                        ( opened, _ ) =
+                            feed live "BATCH +h1 draft/chathistory #c"
+
+                        replay =
+                            [ "@batch=h1 :bob!u@h PART #c :bye"
+                            , "@batch=h1 :carol!u@h QUIT :gone"
+                            , "@batch=h1 :bob!u@h NICK :robert"
+                            , "@batch=h1 :me!u@h NICK :someoneelse"
+                            , "@batch=h1 :srv MODE #c -o bob"
+                            , "@batch=h1 :srv MODE #c +m-n"
+                            , "@batch=h1 :srv MODE #c +v carol"
+                            , "@batch=h1 :me!u@h PART #c :old part"
+                            ]
+
+                        ( collected, replayOut ) =
+                            List.foldl (\line ( m, os ) -> let ( m2, o2 ) = feed m line in ( m2, os ++ o2 )) ( opened, [] ) replay
+
+                        ( closed, _ ) =
+                            feed collected "BATCH -h1"
+
+                        roster m =
+                            Dict.get "#c" m.channels
+                                |> Maybe.map (\c -> Dict.toList c.members |> List.map (\( k, v ) -> ( k, v.nick, Set.toList v.modes )))
+
+                        chanModes m =
+                            Maybe.map .modes (Dict.get "#c" m.channels)
+
+                        bodies =
+                            channelBodies closed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ ( "bob", "bob", [ 'o' ] ), ( "carol", "carol", [] ), ( "me", "me", [] ) ]) (roster live)
+                        , \_ -> Expect.equal (roster live) (roster closed)
+                        , \_ -> Expect.equal (chanModes live) (chanModes closed)
+                        , \_ -> Expect.equal "me" closed.ourNick
+                        , \_ -> Expect.equal live.activeChannel closed.activeChannel
+                        , \_ -> Expect.equal True (Dict.member "#c" closed.channels)
+                        , \_ -> Expect.equal [] (sendLines replayOut)
+                        , \_ -> Expect.equal True (List.member "bob left (bye)" bodies)
+                        , \_ -> Expect.equal True (List.member "bob is now known as robert" bodies)
+                        ]
+                        ()
+            , test "interleaved labeled-response wrappers settle only their own sends" <|
+                \_ ->
+                    let
+                        label1 =
+                            Labels.nextClientLabel 0 1
+
+                        label2 =
+                            Labels.nextClientLabel 0 2
+
+                        ( first, _ ) =
+                            labeledSend [ "labeled-response", "echo-message" ] "one"
+
+                        ( typed, _ ) =
+                            update (ComposerInput "two") first
+
+                        ( both, _ ) =
+                            update ComposerSend typed
+
+                        lines =
+                            [ "@label=" ++ label1 ++ " BATCH +w1 labeled-response"
+                            , "@label=" ++ label2 ++ " BATCH +w2 labeled-response"
+                            , "@batch=w2;msgid=echo-two :alice!u@h PRIVMSG #c :two"
+                            , "@batch=w1;msgid=echo-one :alice!u@h PRIVMSG #c :one"
+                            , "BATCH -w2"
+                            , "BATCH -w1"
+                            ]
+
+                        ( settled, out ) =
+                            List.foldl (\line ( m, os ) -> let ( m2, o2 ) = feed m line in ( m2, os ++ o2 )) ( both, [] ) lines
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 2 (Dict.size both.pendingLabels)
+                        , \_ -> Expect.equal [ "two", "one" ] (channelBodies both)
+                        , \_ -> Expect.equal [ "two", "one" ] (channelBodies settled)
+                        , \_ -> Expect.equal [ False, False ] (channelPendings settled)
+                        , \_ -> Expect.equal Dict.empty settled.pendingLabels
+                        , \_ -> Expect.equal Dict.empty settled.uncertainLabels
+                        , \_ -> Expect.equal [ False, False ] (List.map (isDeliveryUnknown settled) (dmMessages settled "#c"))
+                        , \_ -> Expect.equal (Just [ "echo-one", "echo-two" ]) (Maybe.map List.sort (Dict.get "#c" settled.seenMsgids))
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sendLines out))
+                        ]
+                        ()
+            , test "interleaved wrappers: a server-rewritten body settles in place, a wrong-target echo leaves only its send delivery-unknown, no duplication" <|
+                \_ ->
+                    let
+                        -- An exact labeled self-echo is the server's
+                        -- authoritative copy (oracle _resolveLabeledChatEcho),
+                        -- so a rewritten body replaces the optimistic row in
+                        -- place. An echo that does not match the send's
+                        -- target cannot settle it; the closed wrapper then
+                        -- leaves that one send delivery-unknown.
+                        label1 =
+                            Labels.nextClientLabel 0 1
+
+                        label2 =
+                            Labels.nextClientLabel 0 2
+
+                        label3 =
+                            Labels.nextClientLabel 0 3
+
+                        ( first, _ ) =
+                            labeledSend [ "labeled-response", "echo-message" ] "one"
+
+                        send text model =
+                            update (ComposerInput text) model |> Tuple.first |> update ComposerSend |> Tuple.first
+
+                        three =
+                            first |> send "two" |> send "three"
+
+                        lines =
+                            [ "@label=" ++ label1 ++ " BATCH +w1 labeled-response"
+                            , "@label=" ++ label3 ++ " BATCH +w3 labeled-response"
+                            , "@label=" ++ label2 ++ " BATCH +w2 labeled-response"
+                            , "@batch=w1;msgid=echo-one :alice!u@h PRIVMSG #elsewhere :one"
+                            , "@batch=w3;msgid=echo-three :alice!u@h PRIVMSG #c :three (server rewritten)"
+                            , "@batch=w2;msgid=echo-two :alice!u@h PRIVMSG #c :two"
+                            , "BATCH -w1"
+                            , "BATCH -w3"
+                            , "BATCH -w2"
+                            ]
+
+                        ( settled, out ) =
+                            List.foldl (\line ( m, os ) -> let ( m2, o2 ) = feed m line in ( m2, os ++ o2 )) ( three, [] ) lines
+
+                        rowFor body =
+                            List.filter (\row -> row.body == body) (dmMessages settled "#c")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 3 (Dict.size three.pendingLabels)
+                        , \_ -> Expect.equal [ "three (server rewritten)", "two", "one" ] (channelBodies settled)
+                        , \_ -> Expect.equal [ True ] (List.map (isDeliveryUnknown settled) (rowFor "one"))
+                        , \_ -> Expect.equal [ True ] (List.map .pending (rowFor "one"))
+                        , \_ -> Expect.equal [ False ] (List.map .pending (rowFor "two"))
+                        , \_ -> Expect.equal [ False ] (List.map (isDeliveryUnknown settled) (rowFor "two"))
+                        , \_ -> Expect.equal [ False ] (List.map .pending (rowFor "three (server rewritten)"))
+                        , \_ -> Expect.equal Dict.empty settled.pendingLabels
+                        , \_ -> Expect.equal [ label1 ] (Dict.keys settled.uncertainLabels)
+                        , \_ -> Expect.equal Nothing (Dict.get "#elsewhere" settled.channels)
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sendLines out))
+                        ]
+                        ()
+            , test "label timeout bounds uncertain correlations and never resends" <|
+                \_ ->
+                    let
+                        texts =
+                            List.map (\n -> "m" ++ String.fromInt n) (List.range 1 (Labels.maxPendingLabeledSends + 3))
+
+                        sequenced =
+                            List.foldl
+                                (\text m ->
+                                    update (ComposerInput text) { m | activeChannel = Just "#c" }
+                                        |> Tuple.first
+                                        |> (\m2 -> update ComposerSend m2)
+                                        |> Tuple.first
+                                )
+                                { blank | ourNick = "alice", caps = [ "labeled-response" ], activeChannel = Just "#c" }
+                                texts
+
+                        ( expired, expiredOut ) =
+                            update (Tick (Time.millisToPosix 31000)) sequenced
+
+                        ( later, laterOut ) =
+                            update (Tick (Time.millisToPosix 62000)) expired
+
+                        -- Registration keeps pending + uncertain within the
+                        -- bound, so force the defensive case directly: a
+                        -- full uncertain table plus three more expiring sends.
+                        overfull =
+                            { later
+                                | pendingLabels =
+                                    Dict.values sequenced.pendingLabels
+                                        |> List.take 3
+                                        |> List.indexedMap (\i entry -> ( "extra" ++ String.fromInt i, { entry | deadline = 0 } ))
+                                        |> Dict.fromList
+                            }
+
+                        ( bounded, boundedOut ) =
+                            update (Tick (Time.millisToPosix 93000)) overfull
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Labels.maxPendingLabeledSends (Dict.size sequenced.pendingLabels)
+                        , \_ -> Expect.equal Dict.empty expired.pendingLabels
+                        , \_ -> Expect.equal True (Dict.size expired.uncertainLabels <= Labels.maxPendingLabeledSends)
+                        , \_ -> Expect.equal True (Dict.size later.uncertainLabels <= Labels.maxPendingLabeledSends)
+                        , \_ -> Expect.equal (Labels.maxPendingLabeledSends + 3) (List.length (channelBodies expired))
+                        , \_ -> Expect.equal (Labels.maxPendingLabeledSends + 3) (Set.size expired.deliveryUnknownIds)
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sendLines expiredOut))
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sendLines laterOut))
+                        , \_ -> Expect.equal Labels.maxPendingLabeledSends (Dict.size overfull.uncertainLabels)
+                        , \_ -> Expect.equal Dict.empty bounded.pendingLabels
+                        , \_ -> Expect.equal Labels.maxPendingLabeledSends (Dict.size bounded.uncertainLabels)
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sendLines boundedOut))
+                        ]
+                        ()
             ]
         ]
 
@@ -24332,3 +28360,12 @@ searchRow id label query mode createdAt =
         , ( "createdAt", Encode.float createdAt )
         ]
 
+
+isOfflineMemoOut : Outbound -> Bool
+isOfflineMemoOut outbound =
+    case outbound of
+        OfflineMemoNotice _ ->
+            True
+
+        _ ->
+            False

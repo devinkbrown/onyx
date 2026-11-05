@@ -16,7 +16,7 @@ and stays a documented narrowing.
 -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, a, article, div, h1, h2, p, section, span, text)
+import Html exposing (Html, a, article, div, h1, h2, p, section, text)
 import Html.Attributes exposing (attribute, class, href, id, tabindex)
 import Html.Events exposing (preventDefaultOn)
 import Json.Decode as Decode
@@ -113,8 +113,7 @@ priorityCard active card =
                     []
                )
         )
-        [ div [ class "roadmap-card-head" ]
-            [ span [ class "roadmap-state" ] [ text card.label ] ]
+        [ p [ class "roadmap-state" ] [ text card.label ]
         , h2 [ id ("roadmap-" ++ card.state ++ "-title") ] [ text card.title ]
         , p [ class "roadmap-summary" ] [ text card.summary ]
         ]
@@ -122,34 +121,24 @@ priorityCard active card =
 
 contextLine : Html Msg
 contextLine =
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text "What is next" ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text "Rooms, calls, catch-up" ]
-        ]
+    p [ class "site-context-line" ]
+        [ text "What is next — rooms, calls, catch-up" ]
 
 
 {-| The roadmap body. `active` is the selected priority. -}
 view : Maybe String -> Html Msg
 view active =
-    div [ class "ui-root r roadmap-page" ]
-        [ div [ class "r-ground", attribute "aria-hidden" "true" ] []
-        , div [ class "r-grain", attribute "aria-hidden" "true" ] []
-        , section [ class "r-wrap r-section roadmap-hero", attribute "aria-labelledby" "roadmap-bridge-title" ]
-            [ p [ class "roadmap-kicker" ] [ text "what we are working on" ]
-            , h1 [ id "roadmap-bridge-title" ]
-                [ text "Rooms, calls, catch-up, and a Home Screen." ]
-            , p [ class "roadmap-lede" ]
-                [ text "The work in front of us is the life of the rooms — not an operating system, and not a dated promise." ]
-            , div [ class "roadmap-legend", attribute "role" "group", attribute "aria-label" "Roadmap state legend" ]
-                (List.map (legendLink active) roadmapCards)
-            ]
-        , div [ class "r-wrap" ]
-            [ div [ class "r-divider", attribute "aria-hidden" "true" ] [] ]
-        , section [ class "r-wrap r-section roadmap-grid", attribute "aria-label" "Current Onyx product priorities" ]
+    article [ class "site-article" ]
+        [ h1 [ id "roadmap-bridge-title", class "site-display-sm" ]
+            [ text "Rooms, calls, catch-up, and a Home Screen." ]
+        , p [ class "site-lede" ]
+            [ text "The work in front of us is the life of the rooms — not an operating system, and not a dated promise." ]
+        , div [ class "site-legend", attribute "role" "group", attribute "aria-label" "Roadmap state legend" ]
+            (List.map (legendLink active) roadmapCards)
+        , section [ class "site-section", attribute "aria-label" "Current Onyx product priorities" ]
             (List.map (priorityCard active) roadmapCards)
-        , section [ class "r-wrap r-section roadmap-note", attribute "aria-labelledby" "roadmap-note-heading" ]
-            [ h2 [ id "roadmap-note-heading" ] [ text "No dates on the wall" ]
+        , section [ class "site-section", attribute "aria-labelledby" "roadmap-note-heading" ]
+            [ h2 [ id "roadmap-note-heading", class "site-h2" ] [ text "No dates on the wall" ]
             , p []
                 [ text "These are the things we are making better. Nothing here is a ship date, a bindable Terms page, or a claim that everything is fully encrypted." ]
             ]

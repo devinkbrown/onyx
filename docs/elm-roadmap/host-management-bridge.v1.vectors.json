@@ -1,0 +1,598 @@
+{
+  "schemaVersion": 1,
+  "profile": "onyx-host-bridge/v1",
+  "status": "design-fixtures-not-executed",
+  "description": "Typed envelope/body examples and negative expected outcomes. Placeholder IDs and proof strings are shape examples only; they are not cryptographic vectors, credentials, signatures, or proof that an implementation accepts the profile.",
+  "standards": {
+    "canonicalization": "RFC 8785 JCS; canonical byte/digest vector generation is pending implementation with a standards-conforming tool",
+    "signaturePrimitive": "RFC 8032 published Ed25519 vectors; no service keypair is fabricated here",
+    "authenticator": "W3C WebAuthn Level 2; actual browser/authenticator validation remains an implementation gate"
+  },
+  "schemaEntryPoint": {
+    "schema": "docs/elm-roadmap/host-management-bridge.v1.schema.json",
+    "root": "#",
+    "rootBehavior": "The root oneOf accepts an authenticated application request, challenge bootstrap request/response, or authenticated application response. Use each case's schemaRef for the explicitly targeted schema case.",
+    "cryptographicAuthority": "none; structural validity does not validate JCS digests, Ed25519 signatures, WebAuthn assertions, authorization, or durable behavior"
+  },
+  "fixturesScope": "The schemaCases array is the explicit structural validation set: each entry names a JSON Schema target and expected validity. It includes positive and negative plan-kind requiredCapability mappings and operation.cancel terminal-state cases. The fixtures array below is explanatory protocol documentation; angle-bracket placeholders are intentionally not valid schema values and no cryptographic proof is claimed.",
+  "schemaCases": [
+    {
+      "id": "challenge-request-valid-shape",
+      "schemaRef": "#/$defs/challengeRequest",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "operation": "config.plan" }
+    },
+    {
+      "id": "application-request-valid-shape",
+      "schemaRef": "#/$defs/applicationRequest",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "issuedAtMs": 1793800000000, "expiresAtMs": 1793800060000, "permissionRevision": "rev-7", "operation": "config.plan", "body": { "candidateToml": "# Structural fixture only\n", "expectedHostRevision": "host-rev-12" }, "proof": { "challengeRef": "BQUFBQUFBQUFBQUFBQUFBQ", "credentialId": "AAAAAAAAAAAAAAAAAAAAAA", "clientDataJSON": "e30", "authenticatorData": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "userHandle": null } }
+    },
+    {
+      "id": "application-request-reconcile-by-original-key-valid",
+      "schemaRef": "#/$defs/applicationRequest",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "CQkJCQkJCQkJCQkJCQkJCQ", "issuedAtMs": 1793800000000, "expiresAtMs": 1793800060000, "permissionRevision": "rev-7", "operation": "operation.reconcile", "body": { "operationRef": null, "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA" }, "proof": { "challengeRef": "BQUFBQUFBQUFBQUFBQUFBQ", "credentialId": "AAAAAAAAAAAAAAAAAAAAAA", "clientDataJSON": "e30", "authenticatorData": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "userHandle": null } }
+    },
+    {
+      "id": "lost-first-commit-response-reconciles-by-original-key-valid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "CQkJCQkJCQkJCQkJCQkJCQ", "operation": "operation.reconcile", "requestDigest": "3333333333333333333333333333333333333333333333333333333333333333", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": "CAgICAgICAgICAgICAgICAg", "status": "ready", "result": { "record": { "operationRef": "CAgICAgICAgICAgICAgICAg", "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "planDigest": "1111111111111111111111111111111111111111111111111111111111111111", "state": "accepted", "acceptedAtMs": 1793800000000, "updatedAtMs": 1793800000000, "finishedAtMs": null, "hostRevisionBefore": "host-rev-12", "hostRevisionAfter": null, "resultDigest": null, "cancellationRequested": false, "rollback": "unavailable", "error": null } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "host-inspect-ready-response-valid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "host.inspect", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": null, "status": "ready", "result": { "hostRevision": "host-rev-12", "configDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serviceState": "unknown", "grant": { "principalRef": "AgICAgICAgICAgICAgICAg", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "permissionRevision": "rev-7", "issuedAtMs": 1793800000000, "expiresAtMs": 1793800060000, "capabilities": ["host.inspect"], "factors": { "userPresent": true, "userVerified": true, "verifiedAtMs": 1793800000000, "credentialRef": "BwcHBwcHBwcHBwcHBwcHBw" } } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "host-inspect-wrong-operation-status-invalid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": false,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "host.inspect", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": null, "status": "planned", "result": null, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "operation-reconcile-null-reference-not-found-valid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "CQkJCQkJCQkJCQkJCQkJCQ", "operation": "operation.reconcile", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": null, "status": "not-found", "result": { "record": null, "absence": "durable-no-reservation" }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "operation-reconcile-not-found-with-reference-invalid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": false,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "CQkJCQkJCQkJCQkJCQkJCQ", "operation": "operation.reconcile", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": "CAgICAgICAgICAgICAgICAg", "status": "not-found", "result": { "record": null, "absence": "durable-no-reservation" }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "config-plan-result-kind-mismatch-invalid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": false,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.plan", "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": null, "status": "planned", "result": { "plan": { "planRef": "BQUFBQUFBQUFBQUFBQUFBQ", "kind": "restart", "planDigest": "1111111111111111111111111111111111111111111111111111111111111111", "hostRevision": "host-rev-12", "permissionRevision": "rev-7", "expiresAtMs": 1793800120000, "changes": [], "warnings": [], "rollback": "unavailable", "requiredCapability": "config.commit", "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg" }, "grant": { "principalRef": "AgICAgICAgICAgICAgICAg", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "permissionRevision": "rev-7", "issuedAtMs": 1793800000000, "expiresAtMs": 1793800060000, "capabilities": ["config.plan", "config.commit"], "factors": { "userPresent": true, "userVerified": true, "verifiedAtMs": 1793800000000, "credentialRef": "BwcHBwcHBwcHBwcHBwcHBw" } } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "config-commit-record-valid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": true,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": "CAgICAgICAgICAgICAgICAg", "status": "accepted", "result": { "record": { "operationRef": "CAgICAgICAgICAgICAgICAg", "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "planDigest": "1111111111111111111111111111111111111111111111111111111111111111", "state": "accepted", "acceptedAtMs": 1793800000000, "updatedAtMs": 1793800000000, "finishedAtMs": null, "hostRevisionBefore": "host-rev-12", "hostRevisionAfter": null, "resultDigest": null, "cancellationRequested": false, "rollback": "unavailable", "error": null } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "config-commit-response-record-state-mismatch-invalid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": false,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": "CAgICAgICAgICAgICAgICAg", "status": "applied", "result": { "record": { "operationRef": "CAgICAgICAgICAgICAgICAg", "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "planDigest": "1111111111111111111111111111111111111111111111111111111111111111", "state": "accepted", "acceptedAtMs": 1793800000000, "updatedAtMs": 1793800000000, "finishedAtMs": null, "hostRevisionBefore": "host-rev-12", "hostRevisionAfter": null, "resultDigest": null, "cancellationRequested": false, "rollback": "unavailable", "error": null } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "config-commit-record-operation-mismatch-invalid",
+      "schemaRef": "#/$defs/applicationResponse",
+      "expectedValid": false,
+      "value": { "protocol": "onyx-host-bridge", "version": 1, "installationId": "AAAAAAAAAAAAAAAAAAAAAA", "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ", "principalRef": "AgICAgICAgICAgICAgICAg", "requestId": "AwMDAwMDAwMDAwMDAwMDAw", "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "config.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "serverTimeMs": 1793800000000, "permissionRevision": "rev-7", "operationRef": "CAgICAgICAgICAgICAgICAg", "status": "accepted", "result": { "record": { "operationRef": "CAgICAgICAgICAgICAgICAg", "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA", "operation": "service.restart.commit", "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222", "planDigest": "1111111111111111111111111111111111111111111111111111111111111111", "state": "accepted", "acceptedAtMs": 1793800000000, "updatedAtMs": 1793800000000, "finishedAtMs": null, "hostRevisionBefore": "host-rev-12", "hostRevisionAfter": null, "resultDigest": null, "cancellationRequested": false, "rollback": "unavailable", "error": null } }, "error": null, "proof": { "profile": "Ed25519-JCS-v1", "keyId": "CgoKCgoKCgoKCgoKCgoKCg", "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }
+    },
+    {
+      "id": "config-plan-required-capability-valid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": true,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "config",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "config.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "config-plan-wrong-required-capability-invalid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": false,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "config",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "service.restart.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "restart-plan-required-capability-valid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": true,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "restart",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "service.restart.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "restart-plan-wrong-required-capability-invalid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": false,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "restart",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "config.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "rollback-plan-required-capability-valid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": true,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "rollback",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "rollback.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "rollback-plan-wrong-required-capability-invalid",
+      "schemaRef": "#/$defs/plan",
+      "expectedValid": false,
+      "value": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "kind": "rollback",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hostRevision": "host-rev-12",
+        "permissionRevision": "rev-7",
+        "expiresAtMs": 1793800120000,
+        "changes": [],
+        "warnings": [],
+        "rollback": "unavailable",
+        "requiredCapability": "service.restart.commit",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      }
+    },
+    {
+      "id": "cancel-success-cancelled-record-valid",
+      "schemaRef": "#/$defs/cancelSuccess",
+      "expectedValid": true,
+      "value": {
+        "status": "cancelled",
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "result": {
+          "record": {
+            "operationRef": "CAgICAgICAgICAgICAgICAg",
+            "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+            "operation": "config.commit",
+            "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "cancelled",
+            "acceptedAtMs": 1793800000000,
+            "updatedAtMs": 1793800000000,
+            "finishedAtMs": 1793800000000,
+            "hostRevisionBefore": "host-rev-12",
+            "hostRevisionAfter": null,
+            "resultDigest": null,
+            "cancellationRequested": true,
+            "rollback": "unavailable",
+            "error": null
+          }
+        },
+        "error": null
+      }
+    },
+    {
+      "id": "cancel-rejected-terminal-applied-record-valid",
+      "schemaRef": "#/$defs/cancelSuccess",
+      "expectedValid": true,
+      "value": {
+        "status": "rejected",
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "result": {
+          "record": {
+            "operationRef": "CAgICAgICAgICAgICAgICAg",
+            "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+            "operation": "config.commit",
+            "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "applied",
+            "acceptedAtMs": 1793800000000,
+            "updatedAtMs": 1793800000000,
+            "finishedAtMs": 1793800000000,
+            "hostRevisionBefore": "host-rev-12",
+            "hostRevisionAfter": null,
+            "resultDigest": null,
+            "cancellationRequested": false,
+            "rollback": "unavailable",
+            "error": null
+          }
+        },
+        "error": "stale-host-state"
+      }
+    },
+    {
+      "id": "cancel-rejected-accepted-record-invalid",
+      "schemaRef": "#/$defs/cancelSuccess",
+      "expectedValid": false,
+      "value": {
+        "status": "rejected",
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "result": {
+          "record": {
+            "operationRef": "CAgICAgICAgICAgICAgICAg",
+            "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+            "operation": "config.commit",
+            "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "accepted",
+            "acceptedAtMs": 1793800000000,
+            "updatedAtMs": 1793800000000,
+            "finishedAtMs": null,
+            "hostRevisionBefore": "host-rev-12",
+            "hostRevisionAfter": null,
+            "resultDigest": null,
+            "cancellationRequested": false,
+            "rollback": "unavailable",
+            "error": null
+          }
+        },
+        "error": "stale-host-state"
+      }
+    },
+    {
+      "id": "cancel-rejected-running-record-invalid",
+      "schemaRef": "#/$defs/cancelSuccess",
+      "expectedValid": false,
+      "value": {
+        "status": "rejected",
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "result": {
+          "record": {
+            "operationRef": "CAgICAgICAgICAgICAgICAg",
+            "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+            "operation": "config.commit",
+            "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "running",
+            "acceptedAtMs": 1793800000000,
+            "updatedAtMs": 1793800000000,
+            "finishedAtMs": null,
+            "hostRevisionBefore": "host-rev-12",
+            "hostRevisionAfter": null,
+            "resultDigest": null,
+            "cancellationRequested": true,
+            "rollback": "unavailable",
+            "error": null
+          }
+        },
+        "error": "stale-host-state"
+      }
+    },
+    {
+      "id": "cancel-rejected-outcome-unknown-record-invalid",
+      "schemaRef": "#/$defs/cancelSuccess",
+      "expectedValid": false,
+      "value": {
+        "status": "rejected",
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "result": {
+          "record": {
+            "operationRef": "CAgICAgICAgICAgICAgICAg",
+            "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+            "operation": "config.commit",
+            "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "outcome-unknown",
+            "acceptedAtMs": 1793800000000,
+            "updatedAtMs": 1793800000000,
+            "finishedAtMs": null,
+            "hostRevisionBefore": "host-rev-12",
+            "hostRevisionAfter": null,
+            "resultDigest": null,
+            "cancellationRequested": true,
+            "rollback": "unavailable",
+            "error": null
+          }
+        },
+        "error": "stale-host-state"
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "request-config-plan-shape",
+      "kind": "positive-shape",
+      "endpoint": "POST /onyx-host-bridge/v1/request",
+      "request": {
+        "protocol": "onyx-host-bridge",
+        "version": 1,
+        "installationId": "AAAAAAAAAAAAAAAAAAAAAA",
+        "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ",
+        "principalRef": "AgICAgICAgICAgICAgICAg",
+        "requestId": "AwMDAwMDAwMDAwMDAwMDAw",
+        "idempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+        "issuedAtMs": 1793800000000,
+        "expiresAtMs": 1793800060000,
+        "permissionRevision": "rev-7",
+        "operation": "config.plan",
+        "body": {
+          "candidateToml": "# Placeholder only; service must parse against its pinned schema.\n",
+          "expectedHostRevision": "host-rev-12"
+        },
+        "proof": {
+          "challengeRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+          "credentialId": "<canonical-base64url-credential-id>",
+          "clientDataJSON": "<canonical-base64url-clientDataJSON>",
+          "authenticatorData": "<canonical-base64url-authenticatorData>",
+          "signature": "<canonical-base64url-WebAuthn-signature>",
+          "userHandle": null
+        }
+      },
+      "expected": "Application envelope/body shape only. Placeholder proof values are intentionally not valid cryptographic data. No service acceptance is claimed."
+    },
+    {
+      "id": "challenge-bootstrap-shape",
+      "kind": "positive-shape",
+      "endpoint": "POST /onyx-host-bridge/v1/challenge",
+      "request": {
+        "protocol": "onyx-host-bridge",
+        "version": 1,
+        "installationId": "AAAAAAAAAAAAAAAAAAAAAA",
+        "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ",
+        "principalRef": "AgICAgICAgICAgICAgICAg",
+        "requestId": "AwMDAwMDAwMDAwMDAwMDAw",
+        "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "operation": "config.plan"
+      },
+      "expected": "Challenge bootstrap shape only; the digest is a placeholder, and a real challenge response must be Ed25519-JCS signed and bound to the complete unsigned request and current permission revision."
+    },
+    {
+      "id": "signed-challenge-response-shape",
+      "kind": "positive-shape",
+      "response": {
+        "protocol": "onyx-host-bridge",
+        "version": 1,
+        "installationId": "AAAAAAAAAAAAAAAAAAAAAA",
+        "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ",
+        "principalRef": "AgICAgICAgICAgICAgICAg",
+        "requestId": "AwMDAwMDAwMDAwMDAwMDAw",
+        "requestDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "operation": "config.plan",
+        "challengeRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "challenge": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "issuedAtMs": 1793800000000,
+        "expiresAtMs": 1793800060000,
+        "rpId": "example.com",
+        "origin": "https://app.example.com",
+        "permissionRevision": "rev-7",
+        "credentialSelection": "discoverable",
+        "status": "challenge",
+        "error": null,
+        "proof": {
+          "profile": "Ed25519-JCS-v1",
+          "keyId": "CgoKCgoKCgoKCgoKCgoKCg",
+          "signature": "<canonical-base64url-64-byte-signature>"
+        }
+      },
+      "expected": "Shape only. The app origin/RP ID pairing is valid by domain suffix; challenge and signature values are placeholders, and the response is not cryptographically verified."
+    },
+    {
+      "id": "plan-result-shape",
+      "kind": "positive-shape",
+      "result": {
+        "plan": {
+          "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+          "kind": "config",
+          "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "hostRevision": "host-rev-12",
+          "permissionRevision": "rev-7",
+          "expiresAtMs": 1793800120000,
+          "changes": [
+            {
+              "path": "<logical-toml-key>",
+              "action": "set",
+              "oldSummary": "<redacted-summary>",
+              "newSummary": "<redacted-summary>"
+            }
+          ],
+          "warnings": ["service-restart-required"],
+          "rollback": "available",
+          "requiredCapability": "config.commit",
+          "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+        },
+        "grant": {
+          "principalRef": "AgICAgICAgICAgICAgICAg",
+          "hostRef": "AQEBAQEBAQEBAQEBAQEBAQ",
+          "installationId": "AAAAAAAAAAAAAAAAAAAAAA",
+          "permissionRevision": "rev-7",
+          "issuedAtMs": 1793800000000,
+          "expiresAtMs": 1793800060000,
+          "capabilities": ["config.plan", "config.commit"],
+          "factors": {
+            "userPresent": true,
+            "userVerified": true,
+            "verifiedAtMs": 1793800000000,
+            "credentialRef": "BwcHBwcHBwcHBwcHBwcHBw"
+          }
+        }
+      },
+      "expected": "Typed shape only. Digests are placeholders; approval requires an explicit user gesture for the exact plan and a fresh assertion."
+    },
+    {
+      "id": "config-commit-body-shape",
+      "kind": "positive-shape",
+      "operation": "config.commit",
+      "body": {
+        "planRef": "BQUFBQUFBQUFBQUFBQUFBQ",
+        "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "expectedHostRevision": "host-rev-12",
+        "confirmationRef": "BgYGBgYGBgYGBgYGBgYGBg"
+      },
+      "expected": "Shape only; service must revalidate the exact plan, host revision, permissions and confirmation, then durably admit before any effect."
+    },
+    {
+      "id": "operation-reconcile-result-shape",
+      "kind": "positive-shape",
+      "operation": "operation.reconcile",
+      "body": {
+        "operationRef": "CAgICAgICAgICAgICAgICAg",
+        "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA"
+      },
+      "result": {
+        "record": {
+          "operationRef": "CAgICAgICAgICAgICAgICAg",
+          "originalIdempotencyKey": "BAQEBAQEBAQEBAQEBAQEBA",
+          "operation": "config.commit",
+          "requestDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "planDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "state": "outcome-unknown",
+          "acceptedAtMs": 1793800000000,
+          "updatedAtMs": 1793800030000,
+          "finishedAtMs": null,
+          "hostRevisionBefore": "host-rev-12",
+          "hostRevisionAfter": null,
+          "resultDigest": null,
+          "cancellationRequested": false,
+          "rollback": "unavailable",
+          "error": null
+        }
+      },
+      "expected": "Observation only. Reconciliation never replays the mutation or reports absence without authoritative durable evidence."
+    },
+    {
+      "id": "lost-first-commit-response-reconciliation",
+      "kind": "design-flow",
+      "requestBody": { "operationRef": null, "originalIdempotencyKey": "<original-mutation-key>" },
+      "result": "The exact original operation record, including its operationRef and current state.",
+      "expected": "The client resolves a lost first commit response by the original idempotency key and exact installation/host/principal tuple; it does not resend the mutation."
+    },
+    {
+      "id": "authoritative-not-found-shape",
+      "kind": "positive-shape",
+      "status": "not-found",
+      "result": { "record": null, "absence": "durable-no-reservation" },
+      "expected": "Permitted only when authoritative durable storage proves absence before reservation for this exact installation/host/principal/idempotency tuple; lost or corrupt state is unavailable/unknown instead."
+    }
+  ],
+  "negativeCases": [
+    {
+      "id": "duplicate-json-key",
+      "input": "Duplicate property name in one JSON object",
+      "expected": { "layer": "parser", "result": "reject", "error": "invalid-request" }
+    },
+    {
+      "id": "unknown-envelope-field",
+      "input": "Application envelope contains a field not in its exact v1 schema",
+      "expected": { "layer": "schema", "result": "reject", "error": "invalid-request" }
+    },
+    {
+      "id": "unsupported-version",
+      "input": { "version": 2 },
+      "expected": { "layer": "protocol", "result": "reject", "error": "unsupported-version" }
+    },
+    {
+      "id": "oversized-json-body",
+      "input": "HTTP JSON body exceeds 1048576 UTF-8 bytes",
+      "expected": { "layer": "bounded-parser", "result": "reject", "error": "invalid-request" }
+    },
+    {
+      "id": "stale-permission-grant",
+      "input": "Challenge or request permissionRevision differs from the current ACL revision",
+      "expected": { "layer": "authorization", "result": "reject", "error": "stale-permission" }
+    },
+    {
+      "id": "changed-body-same-idempotency-key",
+      "input": "Same installation/host/principal/idempotencyKey tuple with a different unsigned-request digest",
+      "expected": { "layer": "durable-idempotency", "status": "conflict", "error": "idempotency-conflict", "repeatSideEffect": false }
+    },
+    {
+      "id": "cross-host-request",
+      "input": "A request or grant hostRef differs from the exact paired hostRef",
+      "expected": { "layer": "authorization", "result": "reject", "error": "forbidden" }
+    },
+    {
+      "id": "expired-plan",
+      "input": "Commit references a plan past expiresAtMs",
+      "expected": { "layer": "plan-validation", "result": "reject", "error": "plan-expired", "hostEffect": false }
+    },
+    {
+      "id": "changed-plan-digest",
+      "input": "Commit planDigest does not match the exact server-held plan",
+      "expected": { "layer": "plan-validation", "result": "reject", "error": "plan-mismatch", "hostEffect": false }
+    },
+    {
+      "id": "replayed-challenge-nonce",
+      "input": "A one-use challengeRef/challenge is submitted a second time",
+      "expected": { "layer": "challenge-consumption", "result": "reject", "error": "replay", "hostEffect": false }
+    },
+    {
+      "id": "key-rotation-epoch-gap",
+      "input": "A validly signed rotation statement skips the next consecutive keyEpoch",
+      "expected": { "layer": "client-trust", "acceptNewKey": false, "persistNewPin": false, "clearPendingTrust": true }
+    },
+    {
+      "id": "rp-id-outside-calling-origin",
+      "input": { "origin": "https://app.example.com", "rpId": "unrelated.example.net" },
+      "expected": { "layer": "pairing", "result": "reject", "sendChallengeRequest": false }
+    },
+    {
+      "id": "unknown-or-secret-config-key",
+      "input": "TOML candidate contains an unknown key or a secret-bearing setting",
+      "expected": { "layer": "pinned-server-config-schema", "result": "reject", "error": "invalid-request", "silentlyStrip": false }
+    },
+    {
+      "id": "permission-revoked-after-effect-may-start",
+      "input": "Permission revision changes after the operation could have begun",
+      "expected": { "layer": "durable-operation", "status": "outcome-unknown", "retryMutation": false, "reconcileOriginal": true }
+    }
+  ],
+  "cryptographicVectors": {
+    "jcsAndSha256": { "status": "pending-implementation", "reason": "Must be generated and checked by a standards-conforming RFC 8785 and SHA-256 implementation; no digest is guessed." },
+    "ed25519": { "status": "cite-published-vectors", "source": "RFC 8032", "serviceKeypairFixture": false },
+    "webauthn": { "status": "pending-implementation", "reason": "Must exercise actual WebAuthn validation and browser/authenticator policy; placeholder proof fields above are not assertions." }
+  }
+}

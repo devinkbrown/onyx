@@ -25,7 +25,7 @@ function ctcpApp(sent) {
       ports: {
         wsConnect: { subscribe(fn) { handlers.wsConnect = fn; } },
         wsSend: stub(),
-        wsClose: stub(),
+        wsClose: { subscribe(fn) { handlers.wsClose = fn; } },
         wsOpened: { send() {} },
         wsClosed: { send() {} },
         wsLines: { send() {} },
@@ -121,7 +121,7 @@ test("config round-trips verbatim, purges legacy, caps oversize", () => {
 
 test("TIME reply sends a well-formed NOTICE over the live socket", () => {
   class FakeSocket {
-    constructor() { this.readyState = FakeSocket.OPEN; }
+    constructor() { this.readyState = FakeSocket.OPEN; this.protocol = "text.ircv3.net"; }
     addEventListener() {}
     send(line) { FakeSocket.sent.push(line); }
     close() {}
@@ -138,11 +138,13 @@ test("TIME reply sends a well-formed NOTICE over the live socket", () => {
     handlers.ctcpTimeReply({ to: "bob" });
     assert.equal(FakeSocket.sent.length, 1);
     const line = FakeSocket.sent[0];
-    assert.match(line, /^NOTICE bob :\x01TIME .+\x01\r\n$/);
+    assert.match(line, /^NOTICE bob :\x01TIME .+\x01$/);
+    assert.equal(line.endsWith("\r\n"), false, "one IRC line per WebSocket message has no CRLF suffix");
     handlers.ctcpTimeReply({ to: "bad nick" });
     handlers.ctcpTimeReply({ to: ":server" });
     handlers.ctcpTimeReply({ to: "a".repeat(257) });
     assert.equal(FakeSocket.sent.length, 1);
+    if (handlers.wsClose) handlers.wsClose({});
   } finally {
     if (realWebSocket === undefined) delete globalThis.WebSocket;
     else globalThis.WebSocket = realWebSocket;

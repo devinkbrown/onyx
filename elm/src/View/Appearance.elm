@@ -17,10 +17,11 @@ focus (as on the OnyxOS tabs).
 
 import App exposing (Model, Msg(..), backgroundDirty, renderedBackground)
 import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, label, main_, option, p, section, select, small, span, summary, text)
-import Html.Attributes exposing (attribute, class, disabled, href, style, tabindex, title)
+import Html.Attributes exposing (attribute, class, disabled, href, selected, style, tabindex, title, value)
 import Html.Events exposing (on, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave)
 import Json.Decode as Decode
 import Prefs
+import QuietHours
 import ThemeLook
 import Translate
 import View.Studio
@@ -190,8 +191,10 @@ view model =
                     [ privacySwitch "e2eeDms" model.prefs.e2eeDms "End-to-end encrypt direct messages" "When the other person's app supports it, DMs are sealed on your device."
                     , privacySwitch "linkPreviews" model.prefs.linkPreviews "Preview web links" "Show link details fetched through this server."
                     , privacySwitch "httpsOnly" model.prefs.httpsOnly "Only unfurl https links" "When on, plain http links never fetch a preview or media unfurl."
+                    , privacySwitch "localHistory" model.prefs.localHistory "Remember conversations on this device" "Search can look through messages saved on this device."
                     ]
                 ]
+            , quietHours model
             , languageTools model
             , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Motion and data" ]
@@ -286,12 +289,48 @@ lookChip model ids entry =
         ]
 
 
-{-| Local language tools (mirroring the PreferencesPanel
-section: the translator readiness row plus, when available, the
-translation-language select over the curated targets — with the
-effective target surfaced first when it is not curated, so the
-shown selection always matches what captions translate to. The
-caption-transcript row has no Elm counterpart yet). -}
+quietHours : Model -> Html Msg
+quietHours model =
+    section [ class "ap-group", attribute "data-testid" "quiet-hours" ]
+        [ h2 [ class "ap-glabel" ] [ text "Quiet hours" ]
+        , p [ class "ap-desc" ] [ text (QuietHours.quietHoursSummary model.dndQuietStart model.dndQuietEnd) ]
+        , label [ class "ap-label" ] [ text "Start" ]
+        , select
+            [ attribute "aria-label" "Quiet hours start"
+            , on "change" (hourChange (\hour -> SetDndQuietHours hour model.dndQuietEnd))
+            ]
+            (List.map (hourOption model.dndQuietStart) (List.range 0 23))
+        , label [ class "ap-label" ] [ text "End" ]
+        , select
+            [ attribute "aria-label" "Quiet hours end"
+            , on "change" (hourChange (\hour -> SetDndQuietHours model.dndQuietStart hour))
+            ]
+            (List.map (hourOption model.dndQuietEnd) (List.range 0 23))
+        ]
+
+
+hourOption : Int -> Int -> Html Msg
+hourOption selectedHour hour =
+    option [ value (String.fromInt hour), selected (hour == selectedHour) ] [ text (QuietHours.formatQuietHour hour) ]
+
+
+hourChange : (Int -> Msg) -> Decode.Decoder Msg
+hourChange toMsg =
+    Decode.at [ "target", "value" ] Decode.string
+        |> Decode.andThen
+            (\raw ->
+                case String.toInt raw of
+                    Just hour ->
+                        Decode.succeed (toMsg hour)
+
+                    Nothing ->
+                        Decode.fail "hour"
+            )
+
+
+{-| Local language tools (mirroring the PreferencesPanel section:
+translator readiness, the caption-transcript row, and, when
+available, the translation-language select). -}
 languageTools : Model -> Html Msg
 languageTools model =
     let
@@ -314,6 +353,13 @@ languageTools model =
             , span [ class "ap-readiness-main" ]
                 [ span [ class "ap-readiness-title" ] [ text (Translate.readinessLabel model.translationAvailable) ]
                 , small [] [ text (Translate.readinessDetail model.translationAvailable effective) ]
+                ]
+            ]
+        , div [ class "ap-readiness-row", attribute "data-testid" "caption-transcript" ]
+            [ span [ class "ap-readiness-state" ] [ text "Ready" ]
+            , span [ class "ap-readiness-main" ]
+                [ span [ class "ap-readiness-title" ] [ text "Caption transcript copy" ]
+                , small [] [ text "Live caption overlays can copy the current transcript from local client state." ]
                 ]
             ]
         , if model.translationAvailable then

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "candidate": 37,
+  "package": "E63",
+  "status": "bounded-fix-and-current-runtime-unit-confirmed",
+  "source": {
+    "sourceManifestDigest": "5ec98ba79e58903f894ef05aea77c94b18b079b14f5fa09b7098d90c5b5b5bc6",
+    "sourceArchiveSha256": "a889b5eed90848a7a379b9b730ee95a1f5a3310cf864b10bcd6c7751c489ff5e",
+    "manifestReceipt": "/tmp/onyx-elm-verification-final/affected-candidate-37.json",
+    "currentFileHashes": {
+      "elm/runtime/private-crypto-provider.ts": "df4de3708c8512cb4c80042d1aa3e57ba72d69dfe8cd01e44b129afdb734686a",
+      "elm/runtime/private-crypto-provider.test.ts": "2b545a5726824d5d82dfeff9828da2f2c3234795e50db0db61f52e9bc85fb642"
+    }
+  },
+  "priorReviews": {
+    "independentSourceReview": "/tmp/onyx-elm-verification-final/wave37-crypto-source-review.json",
+    "boundedFixReview": "/tmp/onyx-elm-verification-final/wave37-crypto-fix-review.json",
+    "finding": "E63-KEY-RETIREMENT-1",
+    "fixReviewStatus": "source-clear-for-bounded-fix",
+    "fixReviewCurrentFileHashesMatchIntegratedSource": true
+  },
+  "correction": {
+    "file": "elm/runtime/private-crypto-provider.ts",
+    "currentSha256": "df4de3708c8512cb4c80042d1aa3e57ba72d69dfe8cd01e44b129afdb734686a",
+    "anchors": [
+      "1984-1992",
+      "2329-2335"
+    ],
+    "detail": "A shared intentMacCacheKey helper returns `${stableLocalOwnerKey}\\0intent-mac-v1`. intentMacKey uses that exact suffixed key for lookup and population, and retireWorkspace now deletes the same key. Previously retirement deleted the bare stableLocalOwnerKey and left the private HMAC CryptoKey cached. Durable local-AEAD storage rows and intentional durable key reload behavior remain unchanged.",
+    "impactBoundary": "This closes the reachable private-key-cache retirement defect in volatile workspace custody. Existing workspace-grant checks still reject stale operations; the source review found no demonstrated cross-owner signing bypass or public raw-key getter."
+  },
+  "regression": {
+    "file": "elm/runtime/private-crypto-provider.test.ts",
+    "currentSha256": "2b545a5726824d5d82dfeff9828da2f2c3234795e50db0db61f52e9bc85fb642",
+    "anchor": "246-290",
+    "testName": "retires volatile intent-MAC custody on workspace lock without evicting another workspace key",
+    "detail": "Uses indexedDB:null, creates an intent commitment under a workspace grant, retires that grant, confirms stale use is rejected, and regrants the same stable scope with a new epoch. The next commitment differs, showing a fresh volatile HMAC key; a separate workspace commitment remains unchanged."
+  },
+  "execution": {
+    "currentFreshRuntimeUnit": {
+      "stageId": "runtime-unit",
+      "command": ["pnpm", "test:elm-runtime"],
+      "exitStatus": 0,
+      "startedAtUtc": "2026-11-05T02:33:33.369336+00:00",
+      "finishedAtUtc": "2026-11-05T02:34:03.023157+00:00",
+      "elapsedSeconds": 29.65,
+      "testFilesPassed": 42,
+      "testsPassed": 278,
+      "log": "/tmp/onyx-elm-verification-final/runtime-unit-candidate-37.log",
+      "targetTestIncludedBy": "elm/vitest.runtime.config.ts includes elm/runtime/**/*.{test,spec}.ts in its node project; the corrected private-crypto-provider.test.ts is in that set.",
+      "reportingLimit": "The stage log reports aggregate files/tests, not per-test counts."
+    },
+    "sourceBinding": "The runtime-unit stage and result are recorded in affected-candidate-37.json under sourceManifestDigest 5ec98ba79e58903f894ef05aea77c94b18b079b14f5fa09b7098d90c5b5b5bc6."
+  },
+  "acceptanceBoundary": "This confirms the bounded E63 retirement correction and a passing consolidated Elm runtime unit stage. It does not establish the full T53 lifecycle security acceptance or every named logout/reload/worker/cross-device journey.",
+  "remainingPrerequisites": {
+    "execution": [
+      "Bind the required T49-T54 adversarial, owner-switch, logout, reload, worker-race, lost-device, wrong-password, cross-node control-loss and unavailable-welcome journeys to the corrected source cut.",
+      "Run the relevant current crypto vectors against the corrected source; the runtime-unit aggregate is not evidence for every vector or lifecycle scenario.",
+      "For each claimed durable recovery mode, execute an actual lost-device, restart, import and verify-history journey."
+    ],
+    "external": [
+      "Actual server-side durable offline welcome/key delivery remains a roadmap prerequisite; no client-only source change supplies it."
+    ],
+    "status": "Full E60/E63/E64 and M6 acceptance remains open until the named execution and external prerequisites are satisfied."
+  }
+}

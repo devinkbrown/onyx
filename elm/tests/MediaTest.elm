@@ -8,6 +8,30 @@ import Media exposing (..)
 import Set
 import Test exposing (..)
 import Wire
+import RuntimeDomain
+
+
+testRuntimeOwner =
+    { ownerRef = "test_owner_000000000000000000000000"
+    , networkId = "test_network"
+    , accountId = Just "alice"
+    , accountGeneration = 1
+    , connectionGeneration = 1
+    }
+
+
+runtimeActions : List App.Outbound -> List RuntimeDomain.Action
+runtimeActions outbound =
+    List.filterMap
+        (\item ->
+            case item of
+                App.RuntimeDomainCommand command ->
+                    Just command.action
+
+                _ ->
+                    Nothing
+        )
+        outbound
 
 
 params : List String -> Wire.IrcMessage
@@ -16,7 +40,7 @@ params ps =
     , prefix = Nothing
     , nick = Nothing
     , host = Nothing
-    , command = "NOTE"
+    , command = "EVENT"
     , params = ps
     , raw = ""
     }
@@ -536,22 +560,22 @@ suite =
                             update CallLeave blank
 
                         busy =
-                            { blank | calls = { blankCallHub | lifecycle = InCall, channel = Just "#a" }, callSelfMuted = True }
+                            { blank | runtimeOwnerStamp = Just testRuntimeOwner, calls = { blankCallHub | lifecycle = InCall, channel = Just "#a" }, callSelfMuted = True }
 
                         ( left, leftOuts ) =
                             update CallLeave busy
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] idleOuts
-                        , \_ -> Expect.equal [ VoiceLeave { channel = "#a" } ] leftOuts
-                        , \_ -> Expect.equal False left.callSelfMuted
+                        , \_ -> Expect.equal [ RuntimeDomain.MediaLeave (Just "#a") ] (runtimeActions leftOuts)
+                        , \_ -> Expect.equal True left.callSelfMuted
                         ]
                         ()
             , test "CallToggleMute flips the flag and tells the engine" <|
                 \_ ->
                     let
                         ( muted, muteOuts ) =
-                            update CallToggleMute blank
+                            update CallToggleMute { blank | runtimeOwnerStamp = Just testRuntimeOwner }
 
                         ( unmuted, unmuteOuts ) =
                             update CallToggleMute muted
@@ -563,10 +587,10 @@ suite =
                             update (CallHubSnapshot idleSnap) muted
                     in
                     Expect.all
-                        [ \_ -> Expect.equal True muted.callSelfMuted
-                        , \_ -> Expect.equal [ VoiceMute { muted = True } ] muteOuts
+                        [ \_ -> Expect.equal False muted.callSelfMuted
+                        , \_ -> Expect.equal [ RuntimeDomain.MediaMute True ] (runtimeActions muteOuts)
                         , \_ -> Expect.equal False unmuted.callSelfMuted
-                        , \_ -> Expect.equal [ VoiceMute { muted = False } ] unmuteOuts
+                        , \_ -> Expect.equal [ RuntimeDomain.MediaMute True ] (runtimeActions unmuteOuts)
                         , \_ -> Expect.equal False cleared.callSelfMuted
                         ]
                         ()

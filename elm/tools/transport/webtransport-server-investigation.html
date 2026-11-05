@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Onyx WebTransport server investigation</title>
+  </head>
+  <body>
+    <main>
+      <h1>Onyx WebTransport server investigation</h1>
+      <p>This private lab page measures actual server behavior. WebTransport authentication is not assumed equivalent to WSS.</p>
+      <button type="button" data-testid="e91-run">Run WebTransport probe</button>
+      <button type="button" data-testid="e91-confirm-wss-fallback" hidden>Confirm fresh WSS fallback</button>
+      <p data-testid="e91-status" role="status" aria-live="polite">Idle</p>
+      <pre data-testid="e91-result"></pre>
+    </main>
+    <script type="module" src="./webtransport-server-investigation.ts"></script>
+  </body>
+</html>

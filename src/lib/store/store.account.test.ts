@@ -4,7 +4,7 @@
  *
  * Account identity / management actions (Onyx Server built-in services, no NickServ
  * bot). Each action sends a raw server command through the IRC client; the
- * server's reply (a standard FAIL/WARN/NOTE, a NOTICE, or a numeric) is folded
+ * server's reply (a standard FAIL/WARN, a NOTICE, or a numeric) is folded
  * back into state by _handleMessage. We mock the client to capture the exact
  * raw line, and feed parsed replies through _handleMessage to assert state.
  */
@@ -170,7 +170,7 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     });
 
     feed(':eshmaki.me 900 Alice_ Alice_!u@h Alice :You are now logged in as Alice');
-    feed(':eshmaki.me NOTE SESSION MTOKEN :mesh-token');
+    feed(':eshmaki.me NOTICE onyx :SESSION MTOKEN mesh-token');
 
     expect(loadCredentials('wss://eshmaki.me', 'Alice_')).toBeNull();
     expect(loadCredentials('wss://eshmaki.me', 'Alice')).toMatchObject({
@@ -191,8 +191,8 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     });
 
     feed(':eshmaki.me 900 coolnick coolnick!u@h Alice :You are now logged in as Alice');
-    feed(':eshmaki.me NOTE SESSION MTOKEN :mesh-token');
-    feed(':eshmaki.me NOTE SESSION TOKEN :session-token');
+    feed(':eshmaki.me NOTICE onyx :SESSION MTOKEN mesh-token');
+    feed(':eshmaki.me NOTICE onyx :SESSION TOKEN session-token');
 
     expect(loadCredentials('wss://eshmaki.me', 'Alice')).toMatchObject({
       nick: 'Alice',
@@ -229,7 +229,7 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     expect(bob?.meshToken).toBeUndefined();
   });
 
-  it('keeps NOTE token rotation on the newly identified account without re-keying the previous account', () => {
+  it('keeps NOTICE token rotation on the newly identified account without re-keying the previous account', () => {
     const client = makeClient();
     saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
     saveCredentials({ nick: 'bob', server: 'wss://eshmaki.me', password: 'bob-pw' });
@@ -240,7 +240,7 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     });
 
     feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
-    feed(':eshmaki.me NOTE SESSION TOKEN :bob-local');
+    feed(':eshmaki.me NOTICE onyx :SESSION TOKEN bob-local');
 
     expect(loadCredentials('wss://eshmaki.me', 'alice')).toMatchObject({
       nick: 'alice',
@@ -481,10 +481,10 @@ describe('account replies — state from the message handler', () => {
     expect(store.getState().accountInfoPending).toBe(false);
   });
 
-  it('a NOTE ACCOUNTINFO standard reply also populates accountInfo', () => {
+  it('a server NOTICE ACCOUNTINFO response populates accountInfo', () => {
     store.setState({ client: makeClient() as never, server: seedServer('bob') });
     store.getState().accountInfo_fetch();
-    feed(':eshmaki.me NOTE ACCOUNTINFO :account=bob flags=2');
+    feed(':eshmaki.me NOTICE bob :account=bob flags=2');
     expect(store.getState().accountInfo).toMatchObject({ account: 'bob', flags: 2 });
     expect(store.getState().accountInfoPending).toBe(false);
   });
@@ -722,7 +722,7 @@ describe('account replies — state from the message handler', () => {
     feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
     client.sendRaw.mockClear();
     feed(':eshmaki.me FAIL ACCOUNTSET INVALID_VALUE :Alice email failed');
-    feed(':eshmaki.me NOTE ACCOUNTSET UPDATED :email updated');
+    feed(':eshmaki.me NOTICE alice :email updated');
 
     expect(store.getState().accountActionError).toBeNull();
     expect(client.sendRaw).not.toHaveBeenCalled();
@@ -1121,14 +1121,6 @@ describe('account replies — state from the message handler', () => {
     // for fresh details to reflect the new value in the panel.
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
     expect(store.getState().accountActionError).toBeNull();
-  });
-
-  it('a NOTE ACCOUNTSET confirmation (no payload) re-fetches ACCOUNTINFO', () => {
-    const client = makeClient();
-    store.setState({ client: client as never, server: seedServer('alice') });
-    store.getState().accountSet('email', 'alice@example.net', 'alice-password');
-    feed(':eshmaki.me NOTE ACCOUNTSET :email updated');
-    expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
   });
 
   it('a DROP confirmation NOTICE clears the account', () => {

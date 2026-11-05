@@ -6,13 +6,12 @@
  * existing register + sign-in ceremonies. Each action dispatches a raw
  * `WEBAUTHN …` line; the server's SUCCESS replies now ride the IRCX EVENT plane
  * (`:server EVENT <me> WEBAUTHN <SUBTYPE> …`, mirroring MEDIA presence) and the
- * EVENT handler re-dispatches them into the passkey fold-in. Errors still arrive
+ * typed EVENT fold-in. Errors still arrive
  * as `FAIL WEBAUTHN …` standard replies. Both are folded into state by
  * _handleMessage.
  *
- * The daemon's contract — the `<SUBTYPE> <args>` BODY is unchanged from the old
- * NOTE form; only the ENVELOPE moved from `NOTE WEBAUTHN …` to `EVENT <me>
- * WEBAUTHN …`:
+ * The daemon's contract keeps the `<SUBTYPE> <args>` body on the direct
+ * `EVENT <me> WEBAUTHN …` form:
  *   LIST   → `EVENT <me> WEBAUTHN CRED <credId> <sign_count> [<created_unix>] :<label>` (0..n)
  *            then `EVENT <me> WEBAUTHN LIST :end (<n>)`
  *   REMOVE → `EVENT <me> WEBAUTHN REMOVED :<target>`
@@ -52,6 +51,7 @@ const initialState = store.getInitialState();
 function makeClient() {
   return {
     sendRaw: vi.fn(),
+    learnedServerPrefix: 'srv.example',
     isupport: { CHANTYPES: '#&' },
     negotiatedCaps: new Set<string>(),
   };
@@ -75,7 +75,7 @@ function seedServer(account: string | null): Server {
 }
 
 beforeEach(() => {
-  store.setState(initialState, true);
+  store.setState({ ...initialState, ourNick: 'me' }, true);
   _resetPasskeyStateForTests();
 });
 
@@ -112,12 +112,12 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
 
-    feed(':srv EVENT me WEBAUTHN CRED credAAA 7 :My laptop');
-    feed(':srv EVENT me WEBAUTHN CRED credBBB 0 :');
+    feed(':srv.example EVENT me WEBAUTHN CRED credAAA 7 :My laptop');
+    feed(':srv.example EVENT me WEBAUTHN CRED credBBB 0 :');
     // Not committed until the terminating LIST line arrives.
     expect(store.getState().passkeyCreds).toHaveLength(0);
 
-    feed(':srv EVENT me WEBAUTHN LIST :end (2)');
+    feed(':srv.example EVENT me WEBAUTHN LIST :end (2)');
 
     const creds = store.getState().passkeyCreds;
     expect(creds).toHaveLength(2);
@@ -130,8 +130,8 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
   it('parses an optional created_unix column when the server sends it', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
-    feed(':srv EVENT me WEBAUTHN CRED credAAA 3 1700000000 :phone');
-    feed(':srv EVENT me WEBAUTHN LIST :end (1)');
+    feed(':srv.example EVENT me WEBAUTHN CRED credAAA 3 1700000000 :phone');
+    feed(':srv.example EVENT me WEBAUTHN LIST :end (1)');
     expect(store.getState().passkeyCreds[0]).toMatchObject({
       id: 'credAAA',
       signCount: 3,
@@ -145,12 +145,12 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
 
     for (let index = 0; index < MAX_PASSKEY_CREDENTIALS + 8; index += 1) {
       const id = `cred${index.toString().padStart(4, '0')}`;
-      feed(`:srv EVENT me WEBAUTHN CRED ${id} ${index} :key ${index}`);
+      feed(`:srv.example EVENT me WEBAUTHN CRED ${id} ${index} :key ${index}`);
     }
-    feed(':srv EVENT me WEBAUTHN CRED cred0000 999 :duplicate');
-    feed(':srv EVENT me WEBAUTHN CRED bad+id 4 :invalid alphabet');
-    feed(`:srv EVENT me WEBAUTHN CRED ${'a'.repeat(MAX_PASSKEY_CREDENTIAL_ID_LENGTH + 1)} 4 :too long`);
-    feed(`:srv EVENT me WEBAUTHN LIST :end (${MAX_PASSKEY_CREDENTIALS + 11})`);
+    feed(':srv.example EVENT me WEBAUTHN CRED cred0000 999 :duplicate');
+    feed(':srv.example EVENT me WEBAUTHN CRED bad+id 4 :invalid alphabet');
+    feed(`:srv.example EVENT me WEBAUTHN CRED ${'a'.repeat(MAX_PASSKEY_CREDENTIAL_ID_LENGTH + 1)} 4 :too long`);
+    feed(`:srv.example EVENT me WEBAUTHN LIST :end (${MAX_PASSKEY_CREDENTIALS + 11})`);
 
     const creds = store.getState().passkeyCreds;
     expect(creds).toHaveLength(MAX_PASSKEY_CREDENTIALS);
@@ -167,8 +167,8 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     store.getState().listPasskeys();
     const label = `${'x'.repeat(MAX_PASSKEY_LABEL_LENGTH - 2)}\u0007AB\ud800`;
 
-    feed(`:srv EVENT me WEBAUTHN CRED credAAA 7junk -1 :${label}`);
-    feed(':srv EVENT me WEBAUTHN LIST :end (1)');
+    feed(`:srv.example EVENT me WEBAUTHN CRED credAAA 7junk -1 :${label}`);
+    feed(':srv.example EVENT me WEBAUTHN LIST :end (1)');
 
     expect(store.getState().passkeyCreds).toEqual([{
       id: 'credAAA',
@@ -181,7 +181,7 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
   it('commits an empty list (no CRED rows) as supported with zero creds', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
-    feed(':srv EVENT me WEBAUTHN LIST :end (0)');
+    feed(':srv.example EVENT me WEBAUTHN LIST :end (0)');
     expect(store.getState().passkeyCreds).toHaveLength(0);
     expect(store.getState().passkeySupported).toBe(true);
     expect(store.getState().passkeyListPending).toBe(false);
@@ -191,18 +191,18 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     const client = makeClient();
     store.setState({ client: client as never, server: seedServer('alice'), ourNick: 'alice' });
     store.getState().listPasskeys();
-    feed(':srv EVENT alice WEBAUTHN CRED alice-cred 7 :Alice laptop');
+    feed(':srv.example EVENT alice WEBAUTHN CRED alice-cred 7 :Alice laptop');
 
     feed(':srv 900 alice alice!u@h bob :You are now logged in as bob');
-    feed(':srv EVENT alice WEBAUTHN LIST :end (1)');
+    feed(':srv.example EVENT alice WEBAUTHN LIST :end (1)');
 
     expect(store.getState().server?.account).toBe('bob');
     expect(store.getState().passkeyCreds).toEqual([]);
     expect(store.getState().passkeyListPending).toBe(false);
 
     store.getState().listPasskeys();
-    feed(':srv EVENT alice WEBAUTHN CRED bob-cred 2 :Bob phone');
-    feed(':srv EVENT alice WEBAUTHN LIST :end (1)');
+    feed(':srv.example EVENT alice WEBAUTHN CRED bob-cred 2 :Bob phone');
+    feed(':srv.example EVENT alice WEBAUTHN LIST :end (1)');
     expect(store.getState().passkeyCreds).toMatchObject([
       { id: 'bob-cred', label: 'Bob phone' },
     ]);
@@ -214,7 +214,7 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     store.getState().registerPasskey('Alice laptop');
 
     feed(':srv 900 alice alice!u@h bob :You are now logged in as bob');
-    feed(':srv EVENT alice WEBAUTHN REGISTERED alice-cred :Alice laptop');
+    feed(':srv.example EVENT alice WEBAUTHN REGISTERED alice-cred :Alice laptop');
 
     expect(store.getState().server?.account).toBe('bob');
     expect(store.getState().passkeyNotice).toBeNull();
@@ -230,10 +230,10 @@ describe('WEBAUTHN AUTH reply bounds', () => {
     const client = makeClient();
     store.setState({ client: client as never });
     store.getState().signInWithPasskey('alice');
-    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+    feed(`:srv.example EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
 
     for (let index = 0; index <= MAX_PASSKEY_CREDENTIALS; index += 1) {
-      feed(`:srv EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
+      feed(`:srv.example EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
     }
     vi.advanceTimersByTime(100);
 
@@ -252,12 +252,12 @@ describe('WEBAUTHN AUTH reply bounds', () => {
     } as unknown);
     store.setState({ client: makeClient() as never });
     store.getState().signInWithPasskey('alice');
-    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+    feed(`:srv.example EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
 
     for (let index = 0; index < MAX_PASSKEY_CREDENTIALS; index += 1) {
-      feed(`:srv EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
+      feed(`:srv.example EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
     }
-    feed(':srv EVENT me WEBAUTHN ALLOW-CRED :id0000');
+    feed(':srv.example EVENT me WEBAUTHN ALLOW-CRED :id0000');
     vi.advanceTimersByTime(100);
 
     expect(getCredential).toHaveBeenCalledOnce();
@@ -269,7 +269,7 @@ describe('WEBAUTHN AUTH reply bounds', () => {
     vi.useFakeTimers();
     store.setState({ client: makeClient() as never });
     store.getState().signInWithPasskey('alice');
-    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+    feed(`:srv.example EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
 
     _resetPasskeyStateForTests();
     vi.advanceTimersByTime(100);
@@ -279,25 +279,26 @@ describe('WEBAUTHN AUTH reply bounds', () => {
 });
 
 describe('EVENT-plane envelope routing', () => {
-  it('routes a WEBAUTHN EVENT into the fold-in regardless of the <me> target token', () => {
+  it('routes only the current recipient WEBAUTHN EVENT into the fold-in', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
-    // The re-dispatch drops the target token, so a server-chosen nick still folds.
-    feed(':srv EVENT SomeNick WEBAUTHN CRED credAAA 4 :desk');
-    feed(':srv EVENT SomeNick WEBAUTHN LIST :end (1)');
+    feed(':srv.example EVENT SomeNick WEBAUTHN CRED wrong-recipient 4 :desk');
+    expect(store.getState().passkeyCreds).toEqual([]);
+    feed(':srv.example EVENT me WEBAUTHN CRED credAAA 4 :desk');
+    feed(':srv.example EVENT me WEBAUTHN LIST :end (1)');
     expect(store.getState().passkeyCreds).toMatchObject([{ id: 'credAAA', signCount: 4 }]);
   });
 
   it('marks the feature supported on a bare STATUS event', () => {
     store.setState({ client: makeClient() as never });
     expect(store.getState().passkeySupported).toBeNull(); // unknown before any reply
-    feed(':srv EVENT me WEBAUTHN STATUS');
+    feed(':srv.example EVENT me WEBAUTHN STATUS');
     expect(store.getState().passkeySupported).toBe(true);
   });
 
   it('ignores a non-WEBAUTHN, non-MEDIA EVENT plane without touching passkey state', () => {
     store.setState({ client: makeClient() as never });
-    feed(':srv EVENT me OTHER SOMETHING :x');
+    feed(':srv.example EVENT me OTHER SOMETHING :x');
     expect(store.getState().passkeyCreds).toHaveLength(0);
     expect(store.getState().passkeyError).toBeNull();
   });
@@ -318,7 +319,7 @@ describe('removePasskey()', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'REMOVE', 'credAAA');
     expect(store.getState().passkeyBusy).toBe(true);
 
-    feed(':srv EVENT me WEBAUTHN REMOVED :credAAA');
+    feed(':srv.example EVENT me WEBAUTHN REMOVED :credAAA');
     const creds = store.getState().passkeyCreds;
     expect(creds.map((c) => c.id)).toEqual(['credBBB']);
     expect(store.getState().passkeyBusy).toBe(false);
@@ -344,7 +345,7 @@ describe('renamePasskey()', () => {
     store.getState().renamePasskey('credAAA', 'work laptop');
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'RENAME', 'credAAA', 'work laptop');
 
-    feed(':srv EVENT me WEBAUTHN RENAMED credAAA :work laptop');
+    feed(':srv.example EVENT me WEBAUTHN RENAMED credAAA :work laptop');
     expect(store.getState().passkeyCreds[0]).toMatchObject({ id: 'credAAA', label: 'work laptop' });
     expect(store.getState().passkeyBusy).toBe(false);
   });
@@ -383,7 +384,7 @@ describe('REGISTERED refreshes the list', () => {
     const client = makeClient();
     store.setState({ client: client as never });
     store.getState().registerPasskey('My key');
-    feed(':srv EVENT me WEBAUTHN REGISTERED credNEW :My key');
+    feed(':srv.example EVENT me WEBAUTHN REGISTERED credNEW :My key');
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
     expect(store.getState().passkeyNotice).toBeTruthy();
   });

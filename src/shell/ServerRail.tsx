@@ -53,8 +53,9 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
       <div class="commercial-onyx-brand" aria-label="Onyx">
         <span class="commercial-onyx-mark" aria-hidden="true">
           <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M16 3.5a12.5 12.5 0 1 0 0 25 12.5 12.5 0 0 0 0-25Zm0 5.2a7.3 7.3 0 1 1 0 14.6 7.3 7.3 0 0 1 0-14.6Z" />
-            <path d="M16 12.1a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8Z" />
+            <rect x="2" y="2" width="28" height="28" rx="8" fill="#4c5662" />
+            <circle cx="16" cy="16.5" r="7.2" fill="#202429" />
+            <circle cx="21.6" cy="11.2" r="2.1" fill="#65adf5" />
           </svg>
         </span>
         <span class="commercial-onyx-wordmark">Onyx</span>
@@ -68,7 +69,6 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
         aria-label={`Onyx — active server${unreadTotal() > 0 ? `, ${unreadTotal()} unread` : ''}${mentionTotal() > 0 ? `, ${mentionTotal()} mentions` : ''}`}
         aria-current="true"
       >
-        <span class="commercial-network-mark" aria-hidden="true">O</span>
         <Show when={unreadTotal() > 0}>
           <span
             class={`shell-rail-badge${mentionTotal() > 0 ? ' shell-rail-badge--mention' : ''}`}

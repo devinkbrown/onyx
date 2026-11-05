@@ -426,6 +426,21 @@ export function isMultiEnvelope(text: string): boolean {
   return text.startsWith(MULTI_ENVELOPE_PREFIX);
 }
 
+/** Strict structural/canonical validation for persistence and outbox policy.
+ * `isEnvelope` is intentionally only a cheap rendering prefix check. */
+export function isValidDmEnvelope(text: string): boolean {
+  if (typeof text !== 'string' || text.length > 64 * 1024) return false;
+  const prefix = envelopeBodyOffset(text);
+  if (prefix < 0) return false;
+  const encoded = text.slice(prefix);
+  if (!encoded || !/^[A-Za-z0-9_-]+$/u.test(encoded)) return false;
+  const bytes = fromB64url(encoded);
+  if (!bytes || toB64url(bytes) !== encoded) return false;
+  if (text.startsWith(ENVELOPE_PREFIX)) return bytes.length >= MIN_BODY_BYTES;
+  const bodies = decodeMultiSealBodies(bytes);
+  return bodies !== null && bodies.length > 0;
+}
+
 /** Body offset after a recognized envelope prefix, or -1. */
 export function envelopeBodyOffset(text: string): number {
   if (text.startsWith(MULTI_ENVELOPE_PREFIX)) return MULTI_ENVELOPE_PREFIX.length;
@@ -524,6 +539,51 @@ async function openBodyFrom(
   } catch {
     return null;
   }
+}
+
+/** Open an existing DM envelope with a caller-owned device key. This keeps
+ * private-key custody in the runtime provider instead of the legacy global
+ * `onyx-keys` singleton. Wire encoding and derivation are identical to openDm. */
+export async function openDmWithDeviceKey(
+  privateKey: CryptoKey,
+  localPublicB64: string,
+  peerPublicB64: string,
+  envelope: string,
+): Promise<string | null> {
+  if (!isValidPeerPublicKey(localPublicB64) || !isValidPeerPublicKey(peerPublicB64)
+    || !isValidDmEnvelope(envelope)) return null;
+  let sharedBits: ArrayBuffer | null = null;
+  try {
+    const peerRaw = fromB64url(peerPublicB64);
+    if (!peerRaw) return null;
+    const peerKey = await crypto.subtle.importKey('raw', peerRaw.buffer as ArrayBuffer,
+      { name: 'ECDH', namedCurve: CURVE }, false, []);
+    sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: peerKey }, privateKey, 256);
+    const hkdfKey = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+    const pair = [localPublicB64, peerPublicB64].sort();
+    const info = new TextEncoder().encode(`onyx-dm:${pair[0]}:${pair[1]}`);
+    const aesKey = await crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: HKDF_SALT, info },
+      hkdfKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const open = async (body: Uint8Array): Promise<string | null> => {
+      if (body.length < MIN_BODY_BYTES) return null;
+      try {
+        const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: body.slice(0, NONCE_BYTES) }, aesKey, body.slice(NONCE_BYTES));
+        return new TextDecoder('utf-8', { fatal: true }).decode(plaintext);
+      } catch { return null; }
+    };
+    if (isMultiEnvelope(envelope)) {
+      const packed = fromB64url(envelope.slice(MULTI_ENVELOPE_PREFIX.length));
+      const bodies = packed && decodeMultiSealBodies(packed);
+      if (!bodies) return null;
+      for (const body of bodies) { const plaintext = await open(body); if (plaintext !== null) return plaintext; }
+      return null;
+    }
+    const offset = envelopeBodyOffset(envelope);
+    if (offset < 0) return null;
+    const body = fromB64url(envelope.slice(offset));
+    return body ? open(body) : null;
+  } catch { return null; }
+  finally { if (sharedBits) new Uint8Array(sharedBits).fill(0); }
 }
 
 /** Encrypt plaintext for the peer. Null when E2EE is unavailable. */

@@ -171,3 +171,82 @@ test("outside targets and claimed events never trap", async () => {
     cleanup(dom);
   }
 });
+
+test("client sheets isolate nested app chrome, trap focus, and restore existing attributes", async () => {
+  const dom = harness();
+  try {
+    const document = dom.window.document;
+    const app = document.createElement('div');
+    const chrome = document.createElement('div');
+    chrome.setAttribute('aria-hidden', 'false');
+    chrome.inert = false;
+    const trigger = document.createElement('button');
+    chrome.appendChild(trigger);
+    app.appendChild(chrome);
+    document.body.appendChild(app);
+    trigger.focus();
+    const veil = document.createElement('div');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const first = document.createElement('button');
+    const last = document.createElement('button');
+    dialog.append(first, last);
+    veil.appendChild(dialog);
+    app.appendChild(veil);
+    await tick();
+    assert.equal(document.activeElement, dialog);
+    assert.equal(chrome.getAttribute('aria-hidden'), 'true');
+    assert.equal(chrome.inert, true);
+    last.focus();
+    keydown(dom, last, 'Tab');
+    assert.equal(document.activeElement, first);
+    veil.remove();
+    await tick();
+    assert.equal(document.activeElement, trigger);
+    assert.equal(chrome.getAttribute('aria-hidden'), 'false');
+    assert.equal(chrome.inert, false);
+  } finally { cleanup(dom); }
+});
+
+test("closing a nested modal restores the parent control and then the original opener", async () => {
+  const dom = harness();
+  try {
+    const { trigger, box, save } = mount(dom);
+    await tick();
+    save.focus();
+    const nested = document.createElement('div');
+    nested.innerHTML = '<div role="dialog" aria-modal="true"><button>Close</button></div>';
+    dom.window.document.body.appendChild(nested);
+    await tick();
+    assert.equal(dom.window.document.activeElement, nested.firstElementChild);
+    nested.remove();
+    await tick();
+    assert.equal(dom.window.document.activeElement, save);
+    box.remove();
+    await tick();
+    assert.equal(dom.window.document.activeElement, trigger);
+  } finally { cleanup(dom); }
+});
+
+test("Escape closes the highest visual modal rather than a later background sheet", async () => {
+  const dom = harness();
+  try {
+    const { box, dialog, close } = mount(dom);
+    box.style.zIndex = '90';
+    close.setAttribute('aria-label', 'Close image');
+    let closed = 0;
+    close.addEventListener('click', () => { closed += 1; box.remove(); });
+    const background = document.createElement('div');
+    background.style.zIndex = '60';
+    background.innerHTML = '<div role="dialog" aria-modal="true"><button aria-label="Close pins">Close</button></div>';
+    dom.window.document.body.appendChild(background);
+    await tick();
+    assert.equal(dom.window.document.activeElement, dialog);
+    keydown(dom, dialog, 'Escape');
+    await tick();
+    assert.equal(closed, 1);
+    assert.equal(background.isConnected, true);
+    assert.equal(dom.window.document.activeElement, background.firstElementChild);
+  } finally { cleanup(dom); }
+});

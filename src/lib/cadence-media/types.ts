@@ -6,6 +6,32 @@
 export type CallState     = 'idle' | 'ringing_out' | 'ringing_in' | 'in_call';
 export type VoiceCallState = CallState;
 export type MediaKind     = 'voice' | 'video' | 'screen';
+export type MediaQualityPolicy = 'auto' | 'balanced' | 'audio-priority';
+export interface MediaQualityObservation {
+  readonly observedNetworkTier: 0 | 1 | 2 | 3 | null;
+  readonly observedAudioQuality: 0 | 1 | 2 | null;
+  readonly videoState: 'inactive' | 'encoding' | 'audio-only' | 'unknown';
+}
+
+export interface MediaIdentityContext {
+  readonly owner: import('../../../elm/runtime/contracts').OwnerSnapshot;
+  readonly conversationId: import('../../../elm/runtime/contracts').ConversationId;
+  readonly requestId: import('../../../elm/runtime/contracts').RequestId;
+  readonly callRef: string;
+}
+export interface MediaPublicIdentity {
+  readonly deviceId: string;
+  readonly ecdhPublicRaw: Uint8Array;
+  readonly signingPublicRaw: Uint8Array;
+  readonly directoryRevision: string;
+}
+/** Scoped signer/verifier; no long-term private keys cross into Cadence. */
+export interface MediaIdentityAdapter {
+  getPublicIdentity(context: MediaIdentityContext): Promise<MediaPublicIdentity | null>;
+  signHandshake(context: MediaIdentityContext, canonicalHandshake: Uint8Array): Promise<Uint8Array | null>;
+  signFrame(context: MediaIdentityContext, canonicalFrame: Uint8Array): Promise<Uint8Array | null>;
+  verifyPeerBinding(context: MediaIdentityContext, input: { readonly peerNick: string; readonly attachmentId: Uint8Array; readonly ecdhPublicRaw: Uint8Array; readonly signingPublicRaw: Uint8Array; readonly handshakeTranscript: Uint8Array; readonly signature: Uint8Array }): Promise<{ readonly accountId: import('../../../elm/runtime/contracts').AccountId; readonly deviceId: string; readonly directoryRevision: string } | null>;
+}
 
 export interface CadencePeerState {
   nick:     string;

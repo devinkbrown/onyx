@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "wave": 37,
+  "packages": [
+    "E60",
+    "E63",
+    "E64"
+  ],
+  "status": "bounded-independent-source-review-changes-required",
+  "role": "Independent read-only reviewer; Luna remains sole corrective writer.",
+  "authority": {
+    "roadmap": "/home/kain/onyx-server/docs/design/onyx-elm-client-roadmap.md:1337-1351",
+    "clauses": [
+      "E60: reviewed current DM/Group algorithms and trust roots, reconcile exact v1/v2 envelope/vector contracts.",
+      "E63: locked views, ciphertext-only vault/outbox and transient plaintext ownership; fail closed through logout/reload/worker races.",
+      "E64: explicit durable recovery/multi-device/backup lifecycle and fresh review; no durable-key claim before tested recovery."
+    ],
+    "assessment": "/tmp/onyx-elm-verification-final/implementation-assessment-C.json"
+  },
+  "execution": "No tests, checks, builds, daemon changes, browser/server operations or source edits. Source-only audit of concrete boundary paths; hashes below bind reviewed sources. Parent reports crypto source unchanged from candidate36; I do not infer unexecuted security journeys from green generic suite counts.",
+  "scope": {
+    "reviewed": [
+      "DM ECDH/HKDF/AES-GCM envelope generation/open and current-peer/pinned-directory provider callers.",
+      "Group v2 signed routing, trusted signer checks, v1 diagnostic-only rejection, welcome recipient AEAD and epoch/commitment/replay state machine.",
+      "Private identity/workspace scope, asynchronous owner/grant rechecks, owner/workspace retirement and key/session caches.",
+      "Queued intent local AEAD and MAC commitments, ciphertext history storage/projection and fail-closed dispatch.",
+      "Portable v2 backup container/KDF/AAD, verified checkpoint escrow promotion, explicit preview/fingerprint approval, history-only keyring and removal/welcome intent paths."
+    ],
+    "limits": [
+      "Bounded source review, not a formal cryptographic proof, independent execution receipt, full browser memory dump audit or audit of every line of the runtime.",
+      "Native media handshake algorithms and unrelated host-management design are outside this pass.",
+      "No new server API or wire protocol is assumed."
+    ]
+  },
+  "findings": [
+    {
+      "id": "E63-KEY-RETIREMENT-1",
+      "severity": "medium-custody-lifecycle",
+      "classification": "concrete reachable private-key-cache retirement defect; no demonstrated cross-owner signing bypass",
+      "path": "elm/runtime/private-crypto-provider.ts",
+      "line": 2328,
+      "relatedLines": [
+        1986,
+        1987,
+        1988,
+        1996,
+        2024,
+        2034,
+        2041
+      ],
+      "issue": "intentMacKey caches private HMAC CryptoKeys under `${scope}\\0intent-mac-v1`, but retireWorkspace deletes intentMacKeys with the bare grant.stableLocalOwnerKey. That deletion never targets the cached key. A workspace authority loss/lock therefore leaves its private intent-MAC key strongly reachable in the provider; later same-stable-scope grants can reuse that cached reference, and multiple retired scopes remain until whole-provider retire/dispose.",
+      "reachability": [
+        "Queue/persist an authenticated intent so intentMacKey populates the map.",
+        "Lock/change workspace; bootstrap onAuthorityLost at407 invokes privateCrypto.retireWorkspace(lastWorkspaceGrant).",
+        "retireWorkspace removes local AES and historical room-key cache entries but misses the suffixed intent HMAC entry.",
+        "A later valid same-stable-owner workspace grant enters intentMacKey and reads the old cached CryptoKey. In volatile custody, this also incorrectly carries that key into the new grant lifetime."
+      ],
+      "impactBoundary": "The old grant is still rejected by workspaceGrantValid/localRequestCurrent and there is no public raw-key getter. This review does not claim stale owners can sign or decrypt across account boundaries. The defect is failure to retire the private cached capability as required by E63, plus unnecessary retention; durable IndexedDB key persistence itself is intentional and is not requested for deletion.",
+      "boundedFix": "Delete the exact intent-MAC cache key `${grant.stableLocalOwnerKey}\\0intent-mac-v1` in retireWorkspace. Prefer one small shared key-name helper used by intentMacKey and retireWorkspace to prevent drift. Preserve durable local-aead rows, workspace grant validation, nonextractable key policy and whole-provider cleanup.",
+      "writerTask": {
+        "files": [
+          "elm/runtime/private-crypto-provider.ts",
+          "elm/runtime/private-crypto-provider.test.ts"
+        ],
+        "ownership": "One isolated Luna custody writer; do not revert other archive/history/lab/RTC edits.",
+        "allowedScope": "Exact cache-key retirement correction and meaningful lifecycle regression only. No protocol, cryptographic primitive, namespace migration, storage schema or broader crypto redesign.",
+        "meaningfulRegression": "Exercise intent commitment generation in volatile/no-IDB custody under a valid workspace grant, revoke that grant and call retireWorkspace, then regrant the same stable workspace scope with a fresh capability/epoch. Assert old-grant operations remain rejected and the next valid grant cannot reuse the retired cached HMAC key (e.g. observe a fresh HMAC key generation through injected/spied WebCrypto and different commitment for identical canonical intent). A durable-storage test should preserve intended persisted-key reload behavior; do not require durable key destruction. Avoid a test that merely mirrors the string concatenation or adds a public key-extraction/debug getter.",
+        "validationOwnership": "Root owns focused regression/full gates after integration. No commands were run in this review."
+      }
+    }
+  ],
+  "sourceConclusions": [
+    {
+      "package": "E60",
+      "topic": "DM algorithms and exact accepted envelope contract",
+      "anchors": [
+        "src/lib/e2ee/dmCipher.ts:28-54,156-186,350-395,431-449,547-580",
+        "elm/runtime/private-crypto-provider.ts:834-909,1531-1590"
+      ],
+      "conclusion": "Current DM envelope is bounded canonical ONYXDM1 / ONYXDMN1 with fresh12-byte random nonce and AES-GCM128tag, P256 static ECDH and HKDF-SHA256 with sorted public pair binding. Current runtime callers use owner-scoped nonextractable wrapping keys and authenticated exact-server peer route/directory plus preexisting trusted signer/device bindings; fresh directory/routing/owner rechecks precede plaintext/ciphertext return. No fail-open plaintext substitution found in inspected provider flows. These are static keypair envelopes, not a ratchet/PFS protocol; per-message IRC sender metadata is not a signature inside the DM ciphertext. Preserve that protocol/trust limitation rather than claiming stronger guarantees."
+    },
+    {
+      "package": "E60",
+      "topic": "v1/v2 group-control and trusted signer",
+      "anchors": [
+        "src/lib/e2ee/groupControlPayload.ts:29-44,550-609",
+        "src/lib/e2ee/trustedGroupSigner.ts:286-349",
+        "elm/runtime/group-directory-trust.ts:42-95"
+      ],
+      "conclusion": "Group control v2 verifies Ed25519 over normalized outer routing including authenticated account/device, kind, room, epoch, body and exact signer key. Trusted signer bytes must equal payload signer bytes; directory/device-derived binding and signature are checked before first-use pin persistence. v1 control is parseable only for diagnostics and cannot verify/install. First-use pinning is explicitly first-use trust, not independently authenticated human verification."
+    },
+    {
+      "package": "E60",
+      "topic": "Welcome and epoch/replay validation",
+      "anchors": [
+        "src/lib/e2ee/groupWelcome.ts:422-488",
+        "src/lib/e2ee/groupSession.ts:464-556,704-776",
+        "elm/runtime/private-crypto-provider.ts:1142-1173"
+      ],
+      "conclusion": "Welcome open requires a verified resolution and recipient-specific account/device/room/epoch/commit context. ECDH-derived key and AES-GCM AAD bind that context; plaintext epoch/commitId/membershipDigest and key commitment must agree. Group session requires contiguous epoch advancement and prior hash, rejects duplicate/equivocation/stale/gap, serializes mutations and checks destroyed/abort state. Safe one-use ingress receipts bind actual accepted evidence to owner/room/account/device/epoch/hash/digest. No signature/recipient/epoch acceptance bypass established in these inspected seams."
+    },
+    {
+      "package": "E63",
+      "topic": "Ciphertext storage and queued intent",
+      "anchors": [
+        "elm/runtime/outbox-journal.ts:118-139,268-299,434",
+        "elm/runtime/private-crypto-provider.ts:1769-1857,2062-2108",
+        "elm/runtime/owned-storage.ts:197,673,1090"
+      ],
+      "conclusion": "Queued plaintext is locally AEAD-sealed and canonical operation/target/message-kind/reply/audience intent metadata is authenticated. Wire ciphertext projections are validated; legacy mismatched queued intent remains held for explicit review. Workspace local AEAD uses scoped purpose/target AAD and current opaque grant checks before and after awaits. History row acceptance is runtime-policy/namespace fenced; encrypted reply previews are not trusted plaintext persistence authority. No durable plaintext fallback found in reviewed dispatch/history paths."
+    },
+    {
+      "package": "E63",
+      "topic": "Owner and workspace retirement",
+      "anchors": [
+        "elm/runtime/bootstrap.ts:407,2588-2633",
+        "elm/runtime/private-crypto-provider.ts:154-158,416-423,2325-2332,2358-2404"
+      ],
+      "conclusion": "Identity/account transition locks outgoing local workspace before mutating the account stamp, retires facts/acceptance/queued/media contexts and privateCrypto owner. Provider retired-owner set, exact owner equality and generation guards fence late asynchronous results; live group sessions are destroyed and evidence/preview byte buffers wiped. Workspace revocation clears historical room keyrings and local AES cache. Intent-MAC cache cleanup is defective as findingE63-KEY-RETIREMENT-1; bounded source acceptance requires its correction."
+    },
+    {
+      "package": "E64",
+      "topic": "Portable checkpoint recovery remains history only",
+      "anchors": [
+        "elm/runtime/crypto-backup.ts:3-11,108-154,175-212",
+        "elm/runtime/private-crypto-provider.ts:448-480,544-573,2109-2309",
+        "elm/runtime/group-recovery.ts:89-152"
+      ],
+      "conclusion": "Backup container uses bounded PBKDF2-SHA256600k minimum iterations, random salt and12-byte nonce, AES-GCM and domain/header AAD; password and epoch material stay in private runtime buffers. Export requires accepted escrow/receipt linkage, not a raw key getter. Import verifies signed checkpoint, network/account/room/key commitment and explicit fingerprint/history-only confirmation; one-use preview/selection/grant boundaries prevent stale approval. Installed history-only keyring is separate from live publish GroupSession; it does not establish current membership or sending authority. No history-import-to-publish escalation found in inspected path."
+    },
+    {
+      "package": "E64",
+      "topic": "Enrollment, unavailable welcome and device removal",
+      "anchors": [
+        "elm/runtime/private-crypto-provider.ts:1463-1529",
+        "elm/runtime/group-recovery.ts:60-109",
+        "elm/runtime/group-authoring.ts"
+      ],
+      "conclusion": "Device enrollment requires explicit intent and actual registered public identity/directory binding. Welcome request reports request-admitted rather than key-install success; removal rotates using current verified authoring/membership head and exact excluded device. Durable server-side offline welcome delivery is not fabricated. No current source evidence makes unavailable welcome a successful durable restore."
+    }
+  ],
+  "remainingPrerequisites": {
+    "execution": [
+      "Required T49-T54 adversarial/owner-switch/logout/reload/worker-race/lost-device/wrong-password/cross-node control-loss/unavailable-welcome journeys must bind the corrected source cut. Existing candidate36 green suites are parent evidence, not rerun or a substitute for every named security scenario.",
+      "Meaningful E63 cache retirement regression and current crypto vectors need execution after isolated fix.",
+      "Every claimed durable recovery mode requires an actual lost-device/restart/import/verify-history journey; do not promote source presence to tested durability."
+    ],
+    "external": [
+      "Actual server durable offline welcome/key delivery remains the roadmap prerequisite; no invented API proposed."
+    ],
+    "freshReviewAcceptance": "This artifact is fresh independent bounded source review of listed seams/hashes with one concrete finding. It does not accept the full M6 lifecycle or silently close E60/E63/E64 package delivery. Review the isolated fix and bind required execution evidence before promotion."
+  },
+  "sourceHashes": {
+    "elm/runtime/private-crypto-provider.ts": "8bac0536953cce87cad4fc2b412833d02edff7e2ecc0d7b283827f27e720384c",
+    "elm/runtime/private-crypto-provider.test.ts": "77a8e37dd1c8d09c02f2edda48d0c92abe7c3897617d35ffb4914659dcd40a8b",
+    "elm/runtime/group-authoring.ts": "22d356b372979a61719937c5979efa6e9e256e82b540b2bb52dc6bdfbe95518f",
+    "elm/runtime/group-recovery.ts": "c3c025e7daca9ea1a2a3368ad8a8e59ce1faf6f94d87746de0b218974d2d7962",
+    "elm/runtime/crypto-backup.ts": "8bfa9f59d6685f4c2209ffe9f99979175695a9dde57aec66cb69a10f380f36c9",
+    "elm/runtime/private-backup-storage.ts": "14e4f533eeae16f851ddd1779383bbfce1ff5b0cfb55b207b6c62028a2f73dbc",
+    "elm/runtime/group-directory-trust.ts": "56fd52f875fefce73907f63f5b5a86026d762adb8558129d93a483869cf4a284",
+    "elm/runtime/outbox-journal.ts": "7bcb1d0b1e44ac43cc9f8ee3621465c252ad75a29b715077b5a82fe6c45aa8bc",
+    "elm/runtime/owned-storage.ts": "737dccbc38b9b782c5e9310bdcf2d2c06b1931556e18e6cc5aa08cb8d1f3ea9c",
+    "elm/runtime/local-workspace-owner.ts": "669ad2dbb343878248314cc34657b21a0dcd8d060f55781162c21387b605f535",
+    "elm/runtime/bootstrap.ts": "acb1d73ea0f73b5d599bd934d3b48f68b707c3665507cec9c6072f4ae978ac31",
+    "src/lib/e2ee/dmCipher.ts": "22097d739c432546fad260681c7d9be939e9059c567e683c5bdde8cb0f98919d",
+    "src/lib/e2ee/groupControlPayload.ts": "cce64097eeaae9ccfdde0f9857a93613fd8b85e0371cf1d2cd9b6be5a3b5e09f",
+    "src/lib/e2ee/trustedGroupSigner.ts": "d5161bf2b23c82bf03c875c790eef75bbd1d218421fbd8d0f0400d254db37116",
+    "src/lib/e2ee/groupWelcome.ts": "4234a37db38683da88463acb0595bd9c469ff1826123cd2154b154f2e800ef64",
+    "src/lib/e2ee/groupSession.ts": "6d6eff695658e5ea781092cd8c019f09fb5d6ab844e19cea3cbe0df6c5257e6d",
+    "src/lib/e2ee/groupEnvelope.ts": "13cfc4b5805473483f4fc2bf774b6ca8f6a9d8b1277d94fa51471672f2595e39",
+    "src/lib/e2ee/groupControlSessionAdapter.ts": "443863df3d7a04f16c2033686c3ca134d1b0d6d6cdde2baedc1f12089389af30",
+    "src/lib/e2ee/groupControlRuntime.ts": "6db6c373d5ada0e8afbbbb1c47cdd742d0035706e9c9135bf6ae31d701b09011",
+    "docs/elm-roadmap/portable-group-backup.md": "a7a1bbf1882aaeaa0be0af1178e1d3800c2eab6625e99184e7486de0702aa261",
+    "docs/elm-roadmap/default-chat-closure.md": "8d39d798db8f7fe0a32eb9838c18d99abaf1f45f741dd101b2b06aa805bc0f27"
+  }
+}

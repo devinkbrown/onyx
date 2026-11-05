@@ -34,10 +34,10 @@ function harness({ store, permission = "granted", visibilityState = "visible", f
 
   function FakeOsc() {
     this.type = null;
-    this.frequency = { setValueAtTime(v) { audioCalls.push("freq"); }, exponentialRampToValueAtTime(v) { audioCalls.push("ramp"); } };
+    this.frequency = { setValueAtTime(_v) { audioCalls.push("freq"); }, exponentialRampToValueAtTime(_v) { audioCalls.push("ramp"); } };
   }
   function FakeGain() {
-    this.gain = { setValueAtTime(v) { audioCalls.push("gain"); }, exponentialRampToValueAtTime(v) { audioCalls.push("gainRamp"); } };
+    this.gain = { setValueAtTime(_v) { audioCalls.push("gain"); }, exponentialRampToValueAtTime(_v) { audioCalls.push("gainRamp"); } };
   }
   function FakeCtx() {
     this.currentTime = 10;

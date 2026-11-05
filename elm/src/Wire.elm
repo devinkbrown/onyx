@@ -1,5 +1,6 @@
 module Wire exposing
     ( AccountInfoFields
+    , EncodeError(..)
     , IrcMessage
     , MonitorKind(..)
     , MonitorNumeric
@@ -8,8 +9,12 @@ module Wire exposing
     , StandardReply
     , StandardReplyKind(..)
     , buildSessionResumeLine
+    , checkedUtf8ByteLength
     , chunkSaslPayload
     , escapeTagValue
+    , encodeIrcLine
+    , encodeIrcLineWithTrailing
+    , encodeTaggedLine
     , formatIrcLine
     , formatTaggedLine
     , isValidSessionCredential
@@ -35,25 +40,27 @@ module Wire exposing
     , parsePrefix
     , parseSaslMechanisms
     , parseServerTime
-    , parseSessionMeshTokenNote
-    , parseSessionTokenNote
+    , parseSessionMeshTokenNotice
+    , parseSessionTokenNotice
     , parseStandardReply
     , saslChunkBytes
     , saslMechanismName
     , selectSaslMechanism
     , splitWireFrame
     , unescapeTagValue
+    , validateClientLine
+    , validateClientOutboundLine
+    , validateSemanticMessage
     )
 
-{-| IRC wire framing, parsing, and formatting — Elm port of
-`src/lib/irc/parser.ts` (+ the `IRCMessage`/`StandardReply` subset of
-`src/lib/irc/types.ts`).
-
-Identical bounds, identical fail-closed behavior, pure functions. The
-TypeScript sources remain the web-behavior oracle; the test suite in
-`tests/WireTest.elm` mirrors its vectors.
+{-| IRC wire framing, parsing, and formatting. Inbound bounds match the
+transport's text-frame ceiling and keep larger server records separate from
+the daemon's client-line limits. Checked outbound builders use the live
+daemon's client parser contract; legacy formatters remain for unmigrated
+callers.
 -}
 
+import Char
 import Dict exposing (Dict)
 import Regex exposing (Regex)
 import Set exposing (Set)
@@ -84,6 +91,11 @@ maxWireFrameLines =
     512
 
 
+maxInboundLineBytes : Int
+maxInboundLineBytes =
+    512 * 1024
+
+
 maxIrcPrefixLength : Int
 maxIrcPrefixLength =
     512
@@ -109,11 +121,6 @@ maxStandardReplyTokenLength =
     4 * 1024
 
 
-maxStandardReplyMemoLength : Int
-maxStandardReplyMemoLength =
-    128 * 1024
-
-
 maxSessionCredentialLength : Int
 maxSessionCredentialLength =
     4 * 1024
@@ -131,7 +138,7 @@ type alias IrcMessage =
 
 
 type StandardReplyKind
-    = Note
+    = Event
     | Fail
     | Warn
 
@@ -190,6 +197,16 @@ type SaslMechanism
     = ScramSha256
     | Plain
     | External
+    | SessionToken
+
+
+type EncodeError
+    = InvalidCommand
+    | InvalidParameter
+    | InvalidTags
+    | TooManyParameters
+    | LineTooLong
+    | InvalidFraming
 
 
 
@@ -261,18 +278,25 @@ trailing CR, drops empty segments, caps at `maxWireFrameLines`.
 -}
 splitWireFrame : String -> List String
 splitWireFrame frame =
-    frame
-        |> String.split "\n"
-        |> List.map
-            (\seg ->
-                if String.endsWith "\r" seg then
-                    String.dropRight 1 seg
+    let
+        lines =
+            frame
+                |> String.split "\n"
+                |> List.map
+                    (\seg ->
+                        if String.endsWith "\r" seg then
+                            String.dropRight 1 seg
 
-                else
-                    seg
-            )
-        |> List.filter (not << String.isEmpty)
-        |> List.take maxWireFrameLines
+                        else
+                            seg
+                    )
+                |> List.filter (not << String.isEmpty)
+    in
+    if List.length lines > maxWireFrameLines then
+        []
+
+    else
+        lines
 
 
 unescapeTagValue : String -> String
@@ -332,28 +356,195 @@ parseIrcMessage : String -> IrcMessage
 parseIrcMessage raw =
     let
         line =
-            raw |> stripLineEnd |> String.filter (\c -> c /= nul)
+            raw |> stripLineEnd
 
-        ( tags, afterTags ) =
-            parseTags line
-
-        { prefix, nick, host, afterPrefix } =
-            parsePrefixPart afterTags
-
-        ( command, afterCommand ) =
-            parseCommand afterPrefix
-
-        params =
-            parseParams afterCommand
+        emptyMessage =
+            { tags = Dict.empty
+            , prefix = Nothing
+            , nick = Nothing
+            , host = Nothing
+            , command = ""
+            , params = []
+            , raw = line
+            }
     in
-    { tags = tags
-    , prefix = prefix
-    , nick = nick
-    , host = host
-    , command = command
-    , params = params
-    , raw = line
-    }
+    if not (withinUtf8ByteLimit raw maxInboundLineBytes) || not (validInboundLine line) then
+        emptyMessage
+
+    else
+        let
+            ( tags, afterTags ) =
+                parseTags line
+
+            { prefix, nick, host, afterPrefix } =
+                parsePrefixPart afterTags
+
+            ( command, afterCommand ) =
+                parseCommand afterPrefix
+
+            params =
+                parseParams afterCommand
+        in
+        { tags = tags
+        , prefix = prefix
+        , nick = nick
+        , host = host
+        , command = command
+        , params = params
+        , raw = line
+        }
+
+
+validInboundLine : String -> Bool
+validInboundLine line =
+    if String.length line > maxInboundLineBytes then
+        False
+
+    else if not (withinUtf8ByteLimit line maxInboundLineBytes) then
+        False
+
+    else if String.any (\c -> c == nul || c == '\r' || c == '\n') line then
+        False
+
+    else
+        validInboundLineParts line
+
+
+validInboundLineParts : String -> Bool
+validInboundLineParts line =
+    let
+        withoutTags =
+            case String.uncons line of
+                Just ( '@', _ ) ->
+                    case indexOf " " line of
+                        Just space -> String.dropLeft (space + 1) line
+                        Nothing -> ""
+
+                _ ->
+                    line
+
+        rawPrefix =
+            case String.uncons withoutTags of
+                Just ( ':', _ ) ->
+                    let rest = String.dropLeft 1 withoutTags
+                    in
+                    case indexOf " " rest of
+                        Just space -> String.left space rest
+                        Nothing -> rest
+
+                _ ->
+                    ""
+
+        afterPrefix =
+            parsePrefixPart withoutTags |> .afterPrefix
+
+        afterCommand =
+            parseCommand afterPrefix |> Tuple.second
+    in
+    validTagBounds line
+        && withinUtf8ByteLimit rawPrefix maxIrcPrefixLength
+        && not (hasTooManyParams afterCommand)
+
+
+withinUtf8ByteLimit : String -> Int -> Bool
+withinUtf8ByteLimit value limit =
+    String.length value <= limit
+        && (checkedUtf8ByteLength value
+                |> Maybe.map (\count -> count <= limit)
+                |> Maybe.withDefault False
+           )
+
+
+checkedUtf8ByteLength : String -> Maybe Int
+checkedUtf8ByteLength value =
+    String.foldr
+        (\char tail -> Maybe.map2 (+) (utf8CodePointByteLength char) tail)
+        (Just 0)
+        value
+
+
+utf8CodePointByteLength : Char -> Maybe Int
+utf8CodePointByteLength char =
+    let
+        code = Char.toCode char
+        units = String.length (String.fromChar char)
+        surrogate = code >= 0xD800 && code <= 0xDFFF
+    in
+    if units == 1 && code >= 0 && code < 0x80 && not surrogate then
+        Just 1
+
+    else if units == 1 && code >= 0x80 && code < 0x800 && not surrogate then
+        Just 2
+
+    else if units == 1 && code >= 0x800 && code < 0x10000 && not surrogate then
+        Just 3
+
+    else if units == 2 && code >= 0x10000 && code <= 0x10FFFF then
+        Just 4
+
+    else
+        Nothing
+
+
+hasTooManyParams : String -> Bool
+hasTooManyParams line =
+    let
+        go remaining count =
+            let
+                rest = String.trimLeft remaining
+            in
+            case String.uncons rest of
+                Nothing ->
+                    False
+
+                Just ( ':', _ ) ->
+                    count >= maxIrcMessageParams
+
+                Just _ ->
+                    if count >= maxIrcMessageParams then
+                        True
+
+                    else
+                        case indexOf " " rest of
+                            Nothing ->
+                                False
+
+                            Just space ->
+                                go (String.dropLeft (space + 1) rest) (count + 1)
+    in
+    go line 0
+
+
+validTagBounds : String -> Bool
+validTagBounds line =
+    case String.uncons line of
+        Just ( '@', _ ) ->
+            let
+                rest = String.dropLeft 1 line
+
+                tagBlock =
+                    case indexOf " " rest of
+                        Just space -> String.left space rest
+                        Nothing -> rest
+
+                tags = String.split ";" tagBlock
+
+                tagWithinBounds tag =
+                    let
+                        ( key, value ) =
+                            case splitOnce "=" tag of
+                                Just pair -> pair
+                                Nothing -> ( tag, "" )
+                    in
+                    withinUtf8ByteLimit key maxIrcv3TagKeyLength
+                        && withinUtf8ByteLimit value maxIrcv3TagValueLength
+            in
+            withinUtf8ByteLimit tagBlock maxIrcv3TagBlockLength
+                && List.length tags <= maxIrcv3MessageTags
+                && List.all tagWithinBounds tags
+
+        _ ->
+            True
 
 
 parseTags : String -> ( Dict String String, String )
@@ -383,7 +574,7 @@ parseTags line =
                         Nothing ->
                             ""
             in
-            if String.length tagStr > maxIrcv3TagBlockLength then
+            if not (withinUtf8ByteLimit tagStr maxIrcv3TagBlockLength) then
                 ( Dict.empty, after )
 
             else
@@ -402,10 +593,10 @@ parseTags line =
                                         Nothing ->
                                             ( tag, "" )
                             in
-                            if String.length key > maxIrcv3TagKeyLength then
+                            if not (withinUtf8ByteLimit key maxIrcv3TagKeyLength) then
                                 acc
 
-                            else if String.length value > maxIrcv3TagValueLength then
+                            else if not (withinUtf8ByteLimit value maxIrcv3TagValueLength) then
                                 acc
 
                             else if String.any isWireBad key then
@@ -449,7 +640,7 @@ parsePrefixPart line =
                         Nothing ->
                             ""
             in
-            if String.length rawPrefix > maxIrcPrefixLength then
+            if not (withinUtf8ByteLimit rawPrefix maxIrcPrefixLength) then
                 { prefix = Nothing, nick = Nothing, host = Nothing, afterPrefix = after }
 
             else if String.any (\c -> c == ',' || isWireBad c) rawPrefix then
@@ -677,6 +868,280 @@ formatTaggedLine tags command params =
         "@" ++ tagStr ++ " " ++ line
 
 
+{-| Checked counterpart for new or migrated send paths. Unlike the legacy
+formatter this rejects unsafe field contents before flattening them into a
+wire string.
+-}
+encodeIrcLine : String -> List String -> Result EncodeError String
+encodeIrcLine command params =
+    if not (validClientCommand command) then
+        Err InvalidCommand
+
+    else if List.length params > 15 then
+        Err TooManyParameters
+
+    else if not (validClientParams params) then
+        Err InvalidParameter
+
+    else
+        validateClientLine (formatIrcLine command params)
+
+
+{-| Checked builder for protocol commands whose final parameter is defined by
+the server as trailing text even when it contains no spaces (for example EDIT).
+-}
+encodeIrcLineWithTrailing : String -> List String -> String -> Result EncodeError String
+encodeIrcLineWithTrailing command middle trailing =
+    if not (validClientCommand command) then
+        Err InvalidCommand
+
+    else if List.length middle + 1 > 15 then
+        Err TooManyParameters
+
+    else if not (List.all validMiddleParam middle) || not (validTrailingParam trailing) then
+        Err InvalidParameter
+
+    else
+        (String.join " " (command :: middle) ++ " :" ++ trailing ++ "\r\n")
+            |> validateClientLine
+
+
+encodeTaggedLine : Dict String String -> String -> List String -> Result EncodeError String
+encodeTaggedLine tags command params =
+    if not (validClientTags tags) then
+        Err InvalidTags
+
+    else
+        encodeIrcLine command params
+            |> Result.map
+                (\line ->
+                    let
+                        rendered =
+                            tags
+                                |> Dict.toList
+                                |> List.map
+                                    (\( key, value ) ->
+                                        if String.isEmpty value then
+                                            key
+
+                                        else
+                                            key ++ "=" ++ escapeTagValue value
+                                    )
+                                |> String.join ";"
+                    in
+                    if String.isEmpty rendered then
+                        line
+
+                    else
+                        "@" ++ rendered ++ " " ++ line
+                )
+            |> Result.andThen validateClientLine
+
+
+{-| Validate message text submitted to the semantic delivery journal. This
+allows LF for encrypted or server-planned multiline messages, but rejects
+framing controls, malformed UTF-16, and text beyond the journal's existing
+64 KiB bound. The journal remains responsible for planning the eventual wire
+representation and its negotiated limits.
+-}
+validateSemanticMessage : String -> Result EncodeError ()
+validateSemanticMessage text =
+    case checkedUtf8ByteLength text of
+        Nothing ->
+            Err InvalidParameter
+
+        Just byteLength ->
+            if byteLength > 65536 then
+                Err LineTooLong
+
+            else if String.contains (String.fromChar nul) text || String.contains "\r" text then
+                Err InvalidFraming
+
+            else
+                Ok ()
+
+
+validClientCommand : String -> Bool
+validClientCommand command =
+    not (String.isEmpty command)
+        && String.length command <= maxIrcCommandLength
+        && Regex.contains commandChars command
+
+
+validClientParams : List String -> Bool
+validClientParams params =
+    case List.reverse params of
+        [] ->
+            True
+
+        trailing :: middleReversed ->
+            validTrailingParam trailing
+                && List.all validMiddleParam middleReversed
+
+
+validMiddleParam : String -> Bool
+validMiddleParam value =
+    not (String.isEmpty value)
+        && not (hasLineBreakOrNul value)
+        && not (String.contains " " value)
+        && not (String.startsWith ":" value)
+        && not (String.any (\c -> Char.toCode c <= 0x20 || Char.toCode c == 0x7F) value)
+
+
+validTrailingParam : String -> Bool
+validTrailingParam value =
+    not (hasLineBreakOrNul value)
+
+
+hasLineBreakOrNul : String -> Bool
+hasLineBreakOrNul value =
+    String.any (\c -> c == '\r' || c == '\n' || c == nul) value
+
+
+validClientTags : Dict String String -> Bool
+validClientTags tags =
+    let
+        validKey key =
+            let
+                body =
+                    if String.startsWith "+" key then
+                        String.dropLeft 1 key
+
+                    else
+                        key
+            in
+            not (String.isEmpty body)
+                && withinUtf8ByteLimit key 96
+                && String.all isClientTagKeyChar body
+
+        validPair ( key, value ) =
+            validKey key && not (String.contains (String.fromChar nul) value)
+
+        rendered =
+            tags
+                |> Dict.toList
+                |> List.map
+                    (\( key, value ) ->
+                        if String.isEmpty value then key else key ++ "=" ++ escapeTagValue value
+                    )
+                |> String.join ";"
+    in
+    Dict.size tags <= 32
+        && List.all validPair (Dict.toList tags)
+        && withinUtf8ByteLimit rendered 4094
+
+
+isClientTagKeyChar : Char -> Bool
+isClientTagKeyChar char =
+    (char >= 'a' && char <= 'z')
+        || (char >= 'A' && char <= 'Z')
+        || (char >= '0' && char <= '9')
+        || List.member char [ '-', '.', '/' ]
+
+
+{-| Final defense for already encoded client lines, including lines assembled
+with tags or multiline helpers. Requires exactly one CRLF terminator and the
+live daemon's client-side byte, tag and parameter limits.
+-}
+validateClientLine : String -> Result EncodeError String
+validateClientLine line =
+    if not (String.endsWith "\r\n" line) then
+        Err InvalidFraming
+
+    else
+        let
+            body =
+                String.dropRight 2 line
+
+            ( rawTags, afterTags ) =
+                case String.uncons body of
+                    Just ( '@', _ ) ->
+                        case indexOf " " body of
+                            Just space ->
+                                ( Just (String.slice 1 space body), String.dropLeft (space + 1) body )
+
+                            Nothing ->
+                                ( Just (String.dropLeft 1 body), "" )
+
+                    _ ->
+                        ( Nothing, body )
+
+            parsed =
+                parseIrcMessage body
+
+            tagsValid =
+                case rawTags of
+                    Nothing ->
+                        True
+
+                    Just raw ->
+                        validEncodedTagBlock raw
+
+            lineShapeValid =
+                validClientCommand parsed.command
+                    && List.length parsed.params <= 15
+                    && validClientParams parsed.params
+                    && not (hasLineBreakOrNul body)
+                    && parsed.raw == body
+                    && (rawTags == Nothing || afterTags /= "")
+        in
+        if String.length body > 8191 || not (withinUtf8ByteLimit body 8191) then
+            Err LineTooLong
+
+        else if not tagsValid then
+            Err InvalidTags
+
+        else if not lineShapeValid then
+            Err InvalidParameter
+
+        else
+            Ok line
+
+
+{-| Boundary validator for already assembled outbound API lines. Older
+internal producers may omit the final CRLF; accept that form only when the
+input has no CR or LF anywhere, validate a framed copy, and return the
+original string unchanged. Checked encoders continue to require framing.
+-}
+validateClientOutboundLine : String -> Result EncodeError String
+validateClientOutboundLine line =
+    if String.endsWith "\r\n" line then
+        validateClientLine line
+
+    else if String.contains "\r" line || String.contains "\n" line then
+        Err InvalidFraming
+
+    else
+        validateClientLine (line ++ "\r\n") |> Result.map (always line)
+
+
+validEncodedTagBlock : String -> Bool
+validEncodedTagBlock raw =
+    let
+        validTag tag =
+            let
+                ( key, value ) =
+                    case splitOnce "=" tag of
+                        Just pair -> pair
+                        Nothing -> ( tag, "" )
+
+                keyBody =
+                    if String.startsWith "+" key then String.dropLeft 1 key else key
+            in
+            not (String.isEmpty keyBody)
+                && withinUtf8ByteLimit key 96
+                && String.all isClientTagKeyChar keyBody
+                && not (hasLineBreakOrNul value)
+                && not (String.contains " " value)
+
+        tags = String.split ";" raw
+    in
+    withinUtf8ByteLimit raw 4094
+        && List.length tags <= 32
+        && List.all (not << String.isEmpty) tags
+        && List.all validTag tags
+
+
 {-| Parse NAMES list prefix characters into mode letters + bare nick. -}
 parseNamesPrefix : String -> Dict Char Char -> { nick : String, modes : Set Char }
 parseNamesPrefix prefixStr prefixMap =
@@ -863,16 +1328,59 @@ parseChanGroups parts out seen =
 {-| RFC 1459 case-mapping fold. -}
 normalizeCase : String -> String -> String
 normalizeCase value casemapping =
-    if String.toLower casemapping == "ascii" then
-        String.toLower value
+    let
+        mapping =
+            case String.toLower casemapping of
+                "ascii" ->
+                    "ascii"
 
-    else
-        value
-            |> String.toLower
-            |> String.replace "[" "{"
-            |> String.replace "]" "}"
-            |> String.replace "\\" "|"
-            |> String.replace "^" "~"
+                "strict-rfc1459" ->
+                    "strict-rfc1459"
+
+                _ ->
+                    "rfc1459"
+
+        foldAscii char =
+            let
+                code =
+                    Char.toCode char
+
+                lowerAscii =
+                    if code >= 65 && code <= 90 then
+                        Char.fromCode (code + 32)
+
+                    else
+                        char
+            in
+            case ( mapping, lowerAscii ) of
+                ( "ascii", _ ) ->
+                    lowerAscii
+
+                ( "strict-rfc1459", '[' ) ->
+                    '{'
+
+                ( "strict-rfc1459", ']' ) ->
+                    '}'
+
+                ( "strict-rfc1459", '\\' ) ->
+                    '|'
+
+                ( "rfc1459", '[' ) ->
+                    '{'
+
+                ( "rfc1459", ']' ) ->
+                    '}'
+
+                ( "rfc1459", '\\' ) ->
+                    '|'
+
+                ( "rfc1459", '^' ) ->
+                    '~'
+
+                _ ->
+                    lowerAscii
+    in
+    String.fromList (List.map foldAscii (String.toList value))
 
 
 {-| Prefer SCRAM-SHA-256, then PLAIN, then EXTERNAL — each only when the
@@ -909,6 +1417,9 @@ saslMechanismName mech =
 
         External ->
             "EXTERNAL"
+
+        SessionToken ->
+            "SESSION-TOKEN"
 
 
 {-| Oracle `MAX_CLIENT_SASL_MECHANISMS`: at most 16 advertised mechanisms. -}
@@ -981,10 +1492,10 @@ chunkSaslPayloadFrom offset payload =
         String.slice offset (offset + saslChunkBytes) payload :: chunkSaslPayloadFrom (offset + saslChunkBytes) payload
 
 
-{-| Parse a NOTE / FAIL / WARN standard reply. Fail-closed on bounds. -}
+{-| Parse source-supported FAIL / WARN standard replies. Fail-closed on bounds. -}
 parseStandardReply : IrcMessage -> Maybe StandardReply
 parseStandardReply msg =
-    if msg.command /= "NOTE" && msg.command /= "FAIL" && msg.command /= "WARN" then
+    if msg.command /= "FAIL" && msg.command /= "WARN" then
         Nothing
 
     else if List.isEmpty msg.params || List.length msg.params > maxStandardReplyParams then
@@ -998,17 +1509,12 @@ parseStandardReply msg =
             code =
                 msg.params |> List.drop 1 |> List.head |> Maybe.withDefault ""
 
-            codeLimit =
-                if msg.command == "NOTE" && String.toUpper command == "MEMO" && List.length msg.params == 2 then
-                    maxStandardReplyMemoLength
-
-                else
-                    maxStandardReplyTokenLength
+            codeLimit = maxStandardReplyTokenLength
         in
         if
             String.isEmpty command
-                || String.length command > maxStandardReplyTokenLength
-                || String.length code > codeLimit
+                || not (withinUtf8ByteLimit command maxStandardReplyTokenLength)
+                || not (withinUtf8ByteLimit code codeLimit)
         then
             Nothing
 
@@ -1028,19 +1534,16 @@ parseStandardReply msg =
                         |> List.drop 1
                         |> List.reverse
             in
-            if String.length description > maxStandardReplyTokenLength then
+            if not (withinUtf8ByteLimit description maxStandardReplyTokenLength) then
                 Nothing
 
-            else if List.any (\v -> String.length v > maxStandardReplyTokenLength) context then
+            else if List.any (\v -> not (withinUtf8ByteLimit v maxStandardReplyTokenLength)) context then
                 Nothing
 
             else
                 Just
                     { kind =
-                        if msg.command == "NOTE" then
-                            Note
-
-                        else if msg.command == "FAIL" then
+                        if msg.command == "FAIL" then
                             Fail
 
                         else
@@ -1058,8 +1561,7 @@ isValidSessionCredential token =
     case token of
         Just t ->
             not (String.isEmpty t)
-                && String.length t
-                <= maxSessionCredentialLength
+                && withinUtf8ByteLimit t maxSessionCredentialLength
                 && not (String.any isWireBad t)
 
         Nothing ->
@@ -1125,119 +1627,44 @@ parseAttrAtoms atoms acc =
                     Nothing
 
 
-parseSessionCredentialBody : String -> Maybe SessionCredential
-parseSessionCredentialBody body =
-    let
-        trimmed =
-            String.trim body
-    in
-    if String.isEmpty trimmed then
+parseSessionCredential : IrcMessage -> String -> Maybe SessionCredential
+parseSessionCredential msg kind =
+    if msg.command /= "NOTICE" then
         Nothing
 
     else
         let
-            token =
-                String.words trimmed |> List.head |> Maybe.withDefault ""
-
-            rest =
-                String.words trimmed |> List.drop 1 |> String.join " "
+            body =
+                msg.params |> List.reverse |> List.head |> Maybe.withDefault "" |> String.trim
         in
-        if not (isValidSessionCredential (Just token)) then
+        if not (withinUtf8ByteLimit body (maxSessionCredentialLength + 512)) then
             Nothing
 
         else
-            case parseSessionCredentialAttrs rest of
-                Just attrs ->
-                    Just { token = token, expiresAt = Dict.get "expiresAt" attrs }
-
-                Nothing ->
-                    Nothing
-
-
-parseSessionCredential : IrcMessage -> String -> Maybe SessionCredential
-parseSessionCredential msg kind =
-    case parseStandardReply msg of
-        Just reply ->
-            if reply.kind == Note && reply.command == "SESSION" && reply.code == kind then
-                if not (List.isEmpty reply.context) then
-                    let
-                        token =
-                            reply.context |> List.head |> Maybe.withDefault ""
-
-                        attrParts =
-                            List.drop 1 reply.context
-                                ++ (if String.isEmpty reply.description then
-                                        []
-
-                                    else
-                                        [ reply.description ]
-                                   )
-                    in
-                    if not (isValidSessionCredential (Just token)) then
-                        Nothing
-
-                    else
-                        case parseSessionCredentialAttrs (String.join " " attrParts) of
-                            Just attrs ->
-                                Just { token = token, expiresAt = Dict.get "expiresAt" attrs }
-
-                            Nothing ->
+            case Regex.find (ciRegex "^SESSION\\s+(TOKEN|MTOKEN)\\s+(\\S+)((?:\\s+\\S+)*)$") body of
+                m :: _ ->
+                    case m.submatches of
+                        [ Just which, Just token, maybeAttrs ] ->
+                            if String.toUpper which /= kind || not (isValidSessionCredential (Just token)) then
                                 Nothing
 
-                else
-                    parseSessionCredentialBody reply.description
+                            else
+                                case parseSessionCredentialAttrs (Maybe.withDefault "" maybeAttrs) of
+                                    Just attrMap -> Just { token = token, expiresAt = Dict.get "expiresAt" attrMap }
+                                    Nothing -> Nothing
 
-            else
-                Nothing
+                        _ -> Nothing
 
-        Nothing ->
-            if msg.command /= "NOTICE" then
-                Nothing
-
-            else
-                let
-                    body =
-                        msg.params |> List.reverse |> List.head |> Maybe.withDefault "" |> String.trim
-                in
-                if String.length body > maxSessionCredentialLength + 512 then
-                    Nothing
-
-                else
-                    case Regex.find (ciRegex "^SESSION\\s+(TOKEN|MTOKEN)\\s+(\\S+)((?:\\s+\\S+)*)$") body of
-                        m :: _ ->
-                            case m.submatches of
-                                [ Just which, Just token, maybeAttrs ] ->
-                                    if String.toUpper which /= kind then
-                                        Nothing
-
-                                    else if not (isValidSessionCredential (Just token)) then
-                                        Nothing
-
-                                    else
-                                        -- Elm reports an empty trailer group as
-                                        -- Nothing; the oracle's `match[3] ?? ''`
-                                        -- treats it as no attributes.
-                                        case parseSessionCredentialAttrs (Maybe.withDefault "" maybeAttrs) of
-                                            Just attrMap ->
-                                                Just { token = token, expiresAt = Dict.get "expiresAt" attrMap }
-
-                                            Nothing ->
-                                                Nothing
-
-                                _ ->
-                                    Nothing
-
-                        [] ->
-                            Nothing
+                [] -> Nothing
 
 
-parseSessionTokenNote : IrcMessage -> Maybe SessionCredential
-parseSessionTokenNote msg =
+parseSessionTokenNotice : IrcMessage -> Maybe SessionCredential
+parseSessionTokenNotice msg =
     parseSessionCredential msg "TOKEN"
 
 
-parseSessionMeshTokenNote : IrcMessage -> Maybe SessionCredential
-parseSessionMeshTokenNote msg =
+parseSessionMeshTokenNotice : IrcMessage -> Maybe SessionCredential
+parseSessionMeshTokenNotice msg =
     parseSessionCredential msg "MTOKEN"
 
 
@@ -1261,7 +1688,7 @@ parseMonitorTargets value =
     if String.isEmpty value then
         []
 
-    else if String.length value > maxMonitorNumericTargets * (maxMonitorNumericTargetLength + 1) then
+    else if not (withinUtf8ByteLimit value (maxMonitorNumericTargets * (maxMonitorNumericTargetLength + 1))) then
         []
 
     else
@@ -1289,8 +1716,7 @@ parseMonitorTargetsHelp raws acc seen =
             in
             if
                 String.isEmpty target
-                    || String.length target
-                    > maxMonitorNumericTargetLength
+                    || not (withinUtf8ByteLimit target maxMonitorNumericTargetLength)
                     || String.any (\c -> c == ',' || isWireBad c) target
             then
                 []
@@ -1382,8 +1808,7 @@ maxAccountInfoTextLength =
 validAccountInfoToken : String -> Int -> Bool
 validAccountInfoToken value maxLength =
     not (String.isEmpty value)
-        && String.length value
-        <= maxLength
+        && withinUtf8ByteLimit value maxLength
         && not (String.any (\c -> c == ',' || isWireBad c) value)
 
 
@@ -1421,7 +1846,7 @@ parseBoolToken value =
 {-| Parse an ACCOUNTINFO body. Null when no recognised pair is found. -}
 parseAccountInfo : String -> Maybe AccountInfoFields
 parseAccountInfo text =
-    if String.isEmpty text || String.length text > maxAccountInfoTextLength then
+    if String.isEmpty text || not (withinUtf8ByteLimit text maxAccountInfoTextLength) then
         Nothing
 
     else

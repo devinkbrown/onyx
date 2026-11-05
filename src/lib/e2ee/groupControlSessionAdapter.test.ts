@@ -9,6 +9,7 @@ import { prepareGroupWelcome } from './groupWelcome';
 import {
   createGroupControlSessionAdapter,
   GROUP_CONTROL_ADAPTER_MAX_PENDING_PER_SENDER,
+  type VerifiedGroupCommitCandidate,
 } from './groupControlSessionAdapter';
 import { createInMemoryTrustedGroupSignerStore } from './trustedGroupSigner';
 import { fromB64url, toB64url } from './dmCipher';
@@ -155,6 +156,28 @@ async function signedWelcome(value: Awaited<ReturnType<typeof fixture>>, input: 
 }
 
 describe('Packet-B group control session adapter', () => {
+  it('retains a verified checkpoint pair until explicit approval and replays it through bootstrap', async () => {
+    const value = await fixture();
+    let approved = false;
+    const adopt = vi.fn(() => true);
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => null,
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      localIdentity: { account: 'alice', deviceId: 'phone' },
+      adoptBootstrappedSession: adopt,
+      onVerifiedCommit: () => approved ? true : 'checkpoint-required',
+    });
+    await expect(adapter.accept(value.commitLine)).resolves.toMatchObject({ status: 'queued' });
+    await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'queued' });
+    approved = true;
+    const result = await adapter.retryPendingBootstrap([...value.preparedCommit.commitHash].map((byte) => byte.toString(16).padStart(2, '0')).join(''));
+    expect(result.status).toBe('applied');
+    expect(adopt).toHaveBeenCalledTimes(1);
+    await adapter.destroy(); value.session.destroy();
+  });
+
   it('pairs welcome-before-commit and applies through one session lane', async () => {
     const value = await fixture();
     await expect(value.adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'queued' });
@@ -322,6 +345,39 @@ describe('Packet-B group control session adapter', () => {
     await expect(adapter.accept(value.welcomeLine)).resolves.toMatchObject({ status: 'rejected', reason: 'welcome-stage-failed' });
     expect(stage).toHaveBeenCalledTimes(1);
     expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('requires the private verified-commit authorization hook before queuing a commit', async () => {
+    const value = await fixture();
+    const authorize = vi.fn(async (_candidate: VerifiedGroupCommitCandidate) => false);
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => ({ room: '#room', account: 'alice', deviceId: 'phone', stageVerifiedWelcome: async () => ({ ok: true as const, epoch: 1n, commitHash: bytes(6), commitId: bytes(4) }), applyVerifiedCommit: async () => ({ ok: true as const, epoch: 1n, commitHash: bytes(6), commitId: bytes(4) }) }),
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      onVerifiedCommit: authorize,
+    });
+    await expect(adapter.accept(value.commitLine)).resolves.toMatchObject({ status: 'rejected', reason: 'author-unauthorized' });
+    expect(authorize).toHaveBeenCalledTimes(1);
+    expect(authorize.mock.calls[0]?.[0]).toMatchObject({ room: '#room', fromAccount: 'alice', fromDevice: value.deviceId });
+  });
+
+  it('does not queue a verified commit when authorization is cancelled by adapter destruction', async () => {
+    const value = await fixture();
+    let release!: (allowed: boolean) => void;
+    const authorization = new Promise<boolean>((resolve) => { release = resolve; });
+    const adapter = createGroupControlSessionAdapter({
+      sessionForRoom: () => ({ room: '#room', account: 'alice', deviceId: 'phone', stageVerifiedWelcome: async () => ({ ok: true as const, epoch: 1n, commitHash: bytes(6), commitId: bytes(4) }), applyVerifiedCommit: async () => ({ ok: true as const, epoch: 1n, commitHash: bytes(6), commitId: bytes(4) }) }),
+      directoryForAccount: () => value.directory,
+      trustedSignerStore: createInMemoryTrustedGroupSignerStore(),
+      recipientPrivateKeyFor: () => value.recipient.privateKey,
+      onVerifiedCommit: () => authorization,
+    });
+    const accepted = adapter.accept(value.commitLine);
+    await Promise.resolve();
+    await adapter.destroy();
+    release(true);
+    await expect(accepted).resolves.toMatchObject({ status: 'ignored', reason: 'destroyed' });
   });
 
   it('contains a throwing stage callback and still never applies', async () => {

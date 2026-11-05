@@ -50,6 +50,94 @@ function feed(client: IRCClient, data: string): void {
   (client as unknown as { _onMessage(ev: { data: string }): void })._onMessage({ data });
 }
 
+describe('IRCClient learned server prefix', () => {
+  it('learns once from a valid current 001 and clears it for the replacement socket', () => {
+    class StubWS {
+      static OPEN = 1;
+      readyState = StubWS.OPEN;
+      bufferedAmount = 0;
+      binaryType = '';
+      protocol = 'onyx.irc-media.v1';
+      onopen: ((event: Event) => void) | null = null;
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onclose: ((event: CloseEvent) => void) | null = null;
+      onerror: ((event: Event) => void) | null = null;
+      send = vi.fn();
+      close = vi.fn();
+    }
+    vi.stubGlobal('WebSocket', StubWS);
+    try {
+      const order: string[] = [];
+      let client!: IRCClient;
+      client = new IRCClient({
+        url: 'wss://ircx.us:8080/',
+        nick: 'onyx',
+        onConnected: () => order.push(`connected:${client.learnedServerPrefix}`),
+        onMessage: (message) => order.push(`message:${message.command}:${client.learnedServerPrefix}`),
+      });
+      expect(client.connect()).toBe(true);
+
+      feed(client, ':server-a.example 001 onyx :Welcome');
+      expect(client.learnedServerPrefix).toBe('server-a.example');
+      expect(order).toEqual([
+        'connected:server-a.example',
+        'message:001:server-a.example',
+      ]);
+
+      feed(client, ':server-b.example 001 onyx :duplicate welcome');
+      expect(client.learnedServerPrefix).toBe('server-a.example');
+
+      expect(client.connect()).toBe(true);
+      expect(client.learnedServerPrefix).toBeNull();
+      feed(client, ':server-b.example 001 someone-else :Wrong recipient');
+      expect(client.learnedServerPrefix).toBeNull();
+      feed(client, ':attacker!user@host 001 onyx :Bad prefix');
+      expect(client.learnedServerPrefix).toBeNull();
+      feed(client, ':server-b.example 001 onyx :Welcome');
+      expect(client.learnedServerPrefix).toBe('server-b.example');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('clears the learned prefix on close and destroy', () => {
+    const { client } = makeClient();
+    feed(client, ':server.example 001 onyx :Welcome');
+    expect(client.learnedServerPrefix).toBe('server.example');
+    (client as unknown as { _onClose(event: CloseEvent): void })._onClose(
+      new CloseEvent('close', { code: 1006 }),
+    );
+    expect(client.learnedServerPrefix).toBeNull();
+    feed(client, ':server.example 001 onyx :Welcome');
+    expect(client.learnedServerPrefix).toBe('server.example');
+    client.destroy();
+    expect(client.learnedServerPrefix).toBeNull();
+  });
+
+  it('learns for the active nickname after a valid collision alias', () => {
+    class StubWS {
+      static OPEN = 1;
+      readyState = StubWS.OPEN;
+      bufferedAmount = 0;
+      binaryType = '';
+      protocol = 'onyx.irc-media.v1';
+      send = vi.fn();
+      close = vi.fn();
+    }
+    vi.stubGlobal('WebSocket', StubWS);
+    try {
+      const client = new IRCClient({ url: 'wss://ircx.us:8080/', nick: 'onyx', onMessage: () => {} });
+      client.connect();
+      feed(client, ':server.example 433 * onyx :Nickname is already in use');
+      expect(client.currentNick).toBe('onyx_');
+      feed(client, ':server.example 001 onyx_ :Welcome');
+      expect(client.learnedServerPrefix).toBe('server.example');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('IRCClient WebSocket subprotocol', () => {
   it('prefers the Onyx media protocol and offers text.ircv3.net as fallback', () => {
     const constructions: Array<{ url: string | URL; protocols?: string | string[] }> = [];
@@ -282,6 +370,28 @@ describe('IRCClient WebSocket frame handling', () => {
       code: 4003,
       reason: 'Registered nickname requires authentication',
     }]);
+  });
+
+  it('does not give malformed or mismatched sensitive 432 replies the registered-name exception', () => {
+    const errors: string[] = [];
+    const messages: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'alice',
+      onMessage: (message) => messages.push(message.command),
+      onError: (error) => errors.push(error),
+    });
+    const { sent } = attachSocket(client);
+
+    feed(client, ':onyx 432 * alice AUTHENTICATE :Nickname is registered; authenticate as this account before using it');
+    feed(client, ':onyx 432 bob alice :Nickname is registered; authenticate as this account before using it');
+    feed(client, ':onyx 432 * bob :Nickname is registered; authenticate as this account before using it');
+    feed(client, ':onyx 432 * alice :Nickname is registered; authenticate as this account before using it extra');
+    feed(client, ':bob!user@host 432 * alice :Nickname is registered; authenticate as this account before using it');
+
+    expect(sent).toEqual([]);
+    expect(errors).toEqual([]);
+    expect(messages).toEqual([]);
   });
 
   it('processes a single frame that has NO trailing CRLF', () => {
@@ -614,7 +724,7 @@ describe('IRCClient bounded WebSocket sends', () => {
 });
 
 // ── Session-resume token refresh ───────────────────────────────────────────
-// The server issues fresh resume tokens mid-session (NOTE SESSION TOKEN / MTOKEN);
+// The server issues fresh resume tokens mid-session (NOTICE SESSION TOKEN / MTOKEN);
 // auto-reconnect reuses the SAME IRCClient instance (store: reconnectNow →
 // client.connect()), so unless the refreshed token is pushed back into the live
 // client, every reconnect replays the stale construction-time token — undefined
@@ -774,7 +884,7 @@ describe('IRCClient session-resume token lifecycle', () => {
 
   it('a TOKEN refresh never clobbers a held MTOKEN (partial merge)', () => {
     const { client, sent, feed001 } = makeLoggedInClient({ meshToken: 'mesh-held' });
-    // A later NOTE SESSION TOKEN updates only the local token.
+    // A later SESSION TOKEN refresh updates only the local token.
     client.updateResumeTokens({ sessionToken: 'local-new' });
     feed001();
     // Mesh token still preferred and intact.

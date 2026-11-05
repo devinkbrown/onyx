@@ -15,15 +15,18 @@ roster), with the composer pinned under the thread.
 -}
 
 import App exposing (Model, Msg, inviteCard)
+import Dict
 import Invite exposing (inviteTitle)
+import Media
 import Browser
 import Html exposing (Html, div, main_)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (class, classList, id, style)
 import Route
 import Guides exposing (surfaceForRoute, surfaceTitle)
+import View.Connection
 import View.About
 import View.Appearance
-import View.Calls exposing (callsHub)
+import View.Calls exposing (callsHub, mediaControlPanel, recordingStatus)
 import View.Download
 import View.Guides
 import View.Stats
@@ -35,9 +38,7 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
-import View.Bans exposing (banPanel)
 import View.Stewardship exposing (stewardPanel)
-import View.Inbox exposing (inbox)
 import View.Trust exposing (trustPageForRoute)
 import View.Rail exposing (rail)
 import View.Roadmap
@@ -52,14 +53,23 @@ import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Toast exposing (toaster)
-import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
+import View.Topbar exposing (reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
+import View.RuntimeServices
 
 
 view : Model -> Browser.Document Msg
 view model =
     { title = documentTitle model
     , body =
-        case pageForRoute model.route of
+        [ div [ id "app", style "display" "contents" ] (viewBody model) ]
+    }
+
+
+{-| The document body. `display: contents` keeps this node from
+changing layout while giving the boot mount (`#app`) a live shell. -}
+viewBody : Model -> List (Html Msg)
+viewBody model =
+    case pageForRoute model.route of
             Just page ->
                 route model page
 
@@ -71,7 +81,7 @@ view model =
                     Nothing ->
                         case model.route of
                             Route.Landing ->
-                                [ landing model.landingBoardTab ]
+                                [ landing ]
 
                             Route.About ->
                                 View.About.route model
@@ -108,7 +118,6 @@ view model =
 
                             _ ->
                                 [ shell model ]
-    }
 
 
 {-| A miss under `/app` offers the app; anywhere else offers home. -}
@@ -178,7 +187,12 @@ documentTitle model =
 shell : Model -> Html Msg
 shell model =
     div [ class "onyx-shell" ]
-        ([ topbar model, reconnectBanner model, reclaimDialog model ]
+        ([ topbar model
+         , recordingStatus model.mediaControlView (Maybe.map2 (==) model.mediaControlViewOwner model.runtimeOwnerStamp |> Maybe.withDefault False)
+         , reconnectBanner model
+         , sessionRecoveryBanner model
+         , reclaimDialog model
+         ]
             ++ (if model.searchOpen then
                     [ panel model ]
 
@@ -187,26 +201,38 @@ shell model =
                )
             ++ [ if model.callsOpen then
                     main_ [ class "onyx-main onyx-main-calls" ]
-                        [ callsHub model.calls model.activeChannel model.callSelfMuted ]
+                        [ callsHub model.calls model.activeChannel ((if model.mediaControlViewOwner == model.runtimeOwnerStamp then model.mediaControlView else Nothing) |> Maybe.andThen .call |> Maybe.map .callRef) model.callSelfMuted model.callSelfDeafened model.mediaQualityView (model.mediaQualityViewOwner == model.runtimeOwnerStamp) (model.runtimeDomainPending /= Nothing)
+                        , mediaControlPanel model.mediaControlView (model.mediaControlViewOwner == model.runtimeOwnerStamp) model.activeChannel
+                            (model.activeChannel |> Maybe.map (String.toLower >> (\room -> Dict.get room model.media.transcripts |> Maybe.withDefault [])) |> Maybe.withDefault [])
+                            model.mediaCaptionLanguage
+                            (model.mediaBrowserAudioConsent
+                                && (model.runtimeOwnerStamp
+                                        |> Maybe.andThen (\stamp -> model.mediaControlView |> Maybe.andThen (\viewState -> App.mediaConsentScope stamp viewState.call))
+                                   )
+                                == model.mediaBrowserAudioConsentCall
+                            )
+                            model.mediaOutputVolumePercent
+                            model.mediaGestureResult
+                            (model.runtimeDomainPending /= Nothing)
+                        ]
 
                  else
-                    main_ [ class "onyx-main" ]
+                    main_
+                        [ class "onyx-main"
+                        , classList
+                            [ ( "onyx-main-rooms-open", model.clientRoomsOpen )
+                            , ( "onyx-main-members-open", model.clientMembersOpen )
+                            ]
+                        ]
                         [ rail model
                         , thread model
                         , roster model
-                        , case model.activeChannel of
-                            Just name ->
-                                banPanel model name
-
-                            Nothing ->
-                                div [] []
                         ]
                , if model.callsOpen then
                     div [] []
 
                  else
                     composer model
-               , inbox model
                , toaster model
                , stewardPanel model
                , guestClaim model
@@ -219,5 +245,7 @@ shell model =
                , profileCard model
                , moderationReview model
                , personSafetySheet model
+               , View.Connection.dialog model
+               , View.RuntimeServices.view model.runtimeDomainResult model.sessionRecoveryView model.webAuthnObservationView model.privateAccountStatus (model.runtimeDomainPending /= Nothing) model.activeChannel model.composer (model.eventClock + 1) model.accountName (Maybe.map .networkId model.runtimeOwnerStamp) model.groupBackupRoomInput (model.accountName /= Nothing) (model.calls.lifecycle /= Media.Idle) model.callSelfMuted model.callSelfDeafened
                ]
         )

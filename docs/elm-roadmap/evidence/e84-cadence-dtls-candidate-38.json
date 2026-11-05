@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "onyx-e84-webrtc-server-investigation",
+  "startedAt": "2026-11-05T02:59:17.898Z",
+  "finishedAt": "2026-11-05T02:59:40.076Z",
+  "sourceBinding": null,
+  "networkContainment": {
+    "status": "unknown",
+    "reason": "child-receipt-missing"
+  },
+  "probe": {
+    "schemaVersion": 1,
+    "mode": "cadence-dtls",
+    "status": "unknown",
+    "stage": "preflight",
+    "serverFailureCode": null,
+    "responseFamily": "none",
+    "requestedCodecs": [],
+    "browserCodecs": [],
+    "browserFingerprintGenerated": false,
+    "browserFingerprintSent": false,
+    "fingerprintAlgorithm": null,
+    "fingerprintOctets": null,
+    "serverFingerprintFormatValid": null,
+    "mediaInterop": false,
+    "decodedAudioPackets": null,
+    "decodedVideoFrames": null,
+    "errorCode": "child-receipt-missing"
+  },
+  "interpretation": {
+    "expectedSourceObservation": false,
+    "standardsCodecInteroperability": false,
+    "customCodecSignalingOnly": false,
+    "remoteCertificateBindingVerified": false,
+    "decodedMediaVerified": false,
+    "normalCallSelectionEnabled": false
+  },
+  "harness": {
+    "namespaceRunnerStatus": 1,
+    "namespaceRunnerSignal": null,
+    "namespaceRunnerTimedOut": false,
+    "namespaceRunnerCancelledBy": null
+  },
+  "limitations": [
+    "The isolated child ended without a receipt; startup and cleanup outcome are unknown. No server refusal is inferred."
+  ]
+}

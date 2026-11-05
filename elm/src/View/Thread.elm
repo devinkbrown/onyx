@@ -5,12 +5,14 @@ channel, newest last.
 -}
 
 import App exposing (Model, Msg(..))
+import FirstHour
 import Avatar
 import Dict
 import Emoji
 import Facepile
 import Topic
-import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
+import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, video)
+import Html.Keyed as Keyed
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
@@ -21,37 +23,74 @@ import Translate
 import Upload
 
 
+homeCoach : Model -> Html Msg
+homeCoach model =
+    case FirstHour.coachTip model.firstHourSeen model.firstHourHandoff FirstHour.Home of
+        Nothing ->
+            text ""
+
+        Just tip ->
+            div [ class "onyx-first-hour", attribute "data-testid" "first-hour-home" ]
+                [ span [] [ text tip.text ]
+                , button [ type_ "button", onClick FirstHourDismiss ] [ text "Dismiss" ]
+                ]
+
+
+{- Keep keyed children scoped to their conversation, and give the divider and
+   message siblings distinct slots for each `ChatMessage.id`. -}
+threadChildKey : String -> String -> Int -> String
+threadChildKey target slot messageId =
+    String.fromInt (String.length target)
+        ++ ":"
+        ++ target
+        ++ ":"
+        ++ slot
+        ++ ":"
+        ++ String.fromInt messageId
+
+
 thread : Model -> Html Msg
 thread model =
-    section [ class "onyx-thread-pane" ]
+    section [ class "onyx-thread-pane", attribute "aria-label" "Conversation", attribute "data-conversation" (Maybe.withDefault "" model.activeChannel |> String.toLower), attribute "data-loaded-message-count" (String.fromInt (loadedMessageCount model)) ]
         [ case model.activeChannel of
             Nothing ->
                 div [ class "onyx-empty" ]
                     [ h2 [] [ text "Welcome to Onyx" ]
-                    , text "Join a channel from the rail to start reading."
+                    , homeCoach model
+                    , p [] [ text "Find a room, meet people, and make yourself at home." ]
+                    , div [ class "onyx-empty-actions" ]
+                        [ button [ type_ "button", onClick ConnectionDialogOpen ] [ text "Connect" ]
+                        , button [ type_ "button", onClick BrowserOpen ] [ text "Browse rooms" ]
+                        , button [ type_ "button", onClick CreateRoomOpen ] [ text "Start a room" ]
+                        , button [ type_ "button", onClick FirstHourInvite ] [ text "Invite a friend" ]
+                        ]
                     ]
 
             Just name ->
                 case Dict.get (String.toLower name) model.channels of
                     Nothing ->
-                        div [ class "onyx-empty" ] [ text "Select a channel." ]
+                        div [ class "onyx-empty" ] [ text "Choose a conversation from Rooms." ]
 
                     Just channel ->
                         if List.isEmpty channel.messages then
                             div [ class "onyx-empty" ]
                                 [ facepileRow channel
                                 , h2 [] [ text channel.name ]
+                                , ephemeralPolicyNotice model channel.name
+                                , retentionScopeNotice model channel.name
                                 , text "No messages yet. Say hello."
                                 ]
 
                         else
                             let
-                                win =
-                                    App.threadWindowFor model channel
+                                conversationKey =
+                                    String.toLower channel.name
 
                                 chronological =
-                                    App.topicVisibleRows model channel.name (List.reverse channel.messages)
-                                        |> List.filter (notCollapsed model)
+                                    App.threadVisibleRows model channel
+
+                                win =
+                                    App.threadWindowForRows model chronological
 
                                 rows =
                                     chronological
@@ -65,24 +104,49 @@ thread model =
                                     App.threadParentIds channel.messages
 
                                 dayLabels =
-                                    dayDividerLabels model chronological
-                                        |> List.drop win.start
-                                        |> List.take win.rendered
+                                    dayDividerLabels model chronological win.start win.rendered
                             in
                             div []
                                 [ facepileRow channel
+                                , ephemeralPolicyNotice model channel.name
+                                , retentionScopeNotice model channel.name
                                 , topicFilterBar model channel
                                 , topicTools model channel
+                                , div [ class "history-catch-up", attribute "aria-label" "History catch-up" ]
+                                    [ button [ type_ "button", onClick ThreadCatchUp, disabled (model.connection /= App.Live || Set.member (String.toLower channel.name) model.historyLoading || not (List.any (\cap -> cap == "chathistory" || cap == "draft/chathistory") model.caps)) ] [ text "Catch up after latest message" ]
+                                    , button [ type_ "button", onClick ThreadFillGaps, disabled (model.connection /= App.Live || Set.member (String.toLower channel.name) model.historyLoading || List.length channel.messages < 2 || not (List.any (\cap -> cap == "chathistory" || cap == "draft/chathistory") model.caps)) ] [ text "Request history between loaded bounds" ]
+                                    , small [] [ text "Server paging can leave gaps when messages share a timestamp." ]
+                                    ]
                                 , forumCards model channel
-                                , if win.hiddenBefore > 0 then
+                                , case dividerId of
+                                    Just _ ->
+                                        button
+                                            [ type_ "button"
+                                            , class "onyx-unread-jump"
+                                            , attribute "data-testid" "unread-jump"
+                                            , onClick App.ThreadJumpUnread
+                                            ]
+                                            [ text "New" ]
+
+                                    Nothing ->
+                                        text ""
+                                , if List.isEmpty chronological then
+                                    p [ class "onyx-filter-empty", attribute "role" "status" ]
+                                        [ text "No messages match this view. Show all topics or expand hidden senders to continue." ]
+                                  else
+                                    text ""
+                                , if win.hiddenBefore > 0 || (not (App.isHistoryExhausted model channel.name) && List.any (\cap -> cap == "chathistory" || cap == "draft/chathistory") model.caps) then
                                     div [ class "onyx-earlier" ]
                                         [ button
                                             [ class "onyx-earlier-button"
                                             , onClick App.ThreadShowEarlier
-                                            , attribute "aria-label" ("Show earlier messages (" ++ String.fromInt win.hiddenBefore ++ " not shown)")
+                                            , disabled (Set.member (String.toLower channel.name) model.historyLoading || (win.hiddenBefore == 0 && model.connection /= App.Live))
+                                            , attribute "aria-label"
+                                                (if win.hiddenBefore > 0 then "Show earlier messages (" ++ String.fromInt win.hiddenBefore ++ " not shown)" else "Load older messages from the network")
                                             ]
-                                            [ text "Show earlier messages "
-                                            , span [ class "onyx-earlier-count" ] [ text (String.fromInt win.hiddenBefore) ]
+                                            [ text
+                                                (if Set.member (String.toLower channel.name) model.historyLoading then "Loading history…" else if win.hiddenBefore > 0 then "Show earlier messages " else if model.connection /= App.Live then "Reconnect to load older messages" else "Load older messages")
+                                            , if win.hiddenBefore > 0 then span [ class "onyx-earlier-count" ] [ text (String.fromInt win.hiddenBefore) ] else text ""
                                             ]
                                         ]
 
@@ -96,9 +160,17 @@ thread model =
 
                                   else
                                     text ""
-                                , ul [ class "onyx-thread" ]
+                                , Keyed.ul [ class "onyx-thread", attribute "aria-label" ("Messages in " ++ channel.name) ]
                                     (List.concatMap
-                                        (\( ( prev, m ), label ) -> [ dividerAbove dividerId label m, messageRow model channel.name prev parents m ])
+                                        (\( ( prev, m ), label ) ->
+                                            [ ( threadChildKey conversationKey "divider" m.id
+                                              , dividerAbove dividerId label m
+                                              )
+                                            , ( threadChildKey conversationKey "message" m.id
+                                              , messageRow model channel.name prev parents m
+                                              )
+                                            ]
+                                        )
                                         (List.map2 Tuple.pair
                                             (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
                                             dayLabels
@@ -126,6 +198,70 @@ thread model =
         , mediaLightboxDialog model
         , threadPanelDialog model
         ]
+
+
+ephemeralPolicyNotice : Model -> String -> Html Msg
+ephemeralPolicyNotice model conversationId =
+    if not (App.isChannelName model conversationId) then
+        text ""
+
+    else
+        let
+            value =
+                Dict.get (String.toLower conversationId) model.props.channelProps
+                    |> Maybe.andThen (Dict.get "EPHEMERAL")
+        in
+        case value of
+            Nothing ->
+                div [ class "onyx-history-policy", attribute "role" "note" ]
+                    [ small [] [ text "Server replay retention is not currently known. This browser’s local history is a separate cache and does not prove what recipients retained." ] ]
+
+            Just seconds ->
+                div [ class "onyx-history-policy", attribute "role" "note" ]
+                    [ small []
+                        [ text
+                            (if seconds == "0" then
+                                "Server EPHEMERAL replay is disabled for this room. This browser’s local cache follows its own retention policy; deleting server history cannot erase copies recipients saved."
+
+                             else
+                                "Server EPHEMERAL replay window: " ++ seconds ++ " seconds. This limits server history replay; it does not erase recipient caches. This browser applies its own current cache policy."
+                            )
+                        ]
+                    ]
+
+
+retentionScopeNotice : Model -> String -> Html Msg
+retentionScopeNotice model conversationId =
+    case Dict.get (String.toLower conversationId) model.retentionReadScopes of
+        Just scope ->
+            case ( scope.kind, scope.lastSyncMs ) of
+                ( "cached", Just lastSyncMs ) ->
+                    div [ class "onyx-history-policy", attribute "role" "status" ]
+                        [ small []
+                            [ text
+                                ("Cached history · last synchronized "
+                                    ++ App.formatRowClock model.zone model.prefs.clock (round lastSyncMs)
+                                )
+                            ]
+                        ]
+
+                ( "unknown", _ ) ->
+                    div [ class "onyx-history-policy", attribute "role" "note" ]
+                        [ small [] [ text "Local cached history is withheld or incomplete because its retention policy is unknown." ] ]
+
+                _ ->
+                    text ""
+
+        Nothing ->
+            text ""
+
+
+loadedMessageCount : Model -> Int
+loadedMessageCount model =
+    model.activeChannel
+        |> Maybe.andThen (\name -> Dict.get (String.toLower name) model.channels)
+        |> Maybe.map (.messages >> List.length)
+        |> Maybe.withDefault 0
 
 
 {-| Replies affordance for messages with children (mirroring
@@ -228,12 +364,13 @@ threadPanelDialog model =
                                 Just par ->
                                     div
                                         [ class "onyx-thread-msg"
-                                        , attribute "aria-label" ("Thread parent: " ++ App.messageAccessibleLabel par)
+                                        , attribute "aria-label" ("Thread parent: " ++ App.messageAccessibleLabelFor model par)
                                         ]
                                         [ div [ class "onyx-thread-msg-meta" ]
                                             [ span [ class "onyx-thread-msg-from" ] [ text par.from ]
                                             , time [ datetime (App.millisToIso (toFloat par.at)), attribute "aria-hidden" "true" ]
                                                 [ text (App.formatRowClock model.zone model.prefs.clock par.at) ]
+                                            , deliveryStatusNote model par
                                             ]
                                         , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody par) ]
                                         , case par.msgid of
@@ -263,12 +400,13 @@ threadPanelDialog model =
                                             (\msg ->
                                                 div
                                                     [ class "onyx-thread-msg"
-                                                    , attribute "aria-label" ("Thread reply: " ++ App.messageAccessibleLabel msg)
+                                                    , attribute "aria-label" ("Thread reply: " ++ App.messageAccessibleLabelFor model msg)
                                                     ]
                                                     [ div [ class "onyx-thread-msg-meta" ]
                                                         [ span [ class "onyx-thread-msg-from" ] [ text msg.from ]
                                                         , time [ datetime (App.millisToIso (toFloat msg.at)), attribute "aria-hidden" "true" ]
                                                             [ text (App.formatRowClock model.zone model.prefs.clock msg.at) ]
+                                                        , deliveryStatusNote model msg
                                                         ]
                                                     , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody msg) ]
                                                     ]
@@ -278,6 +416,18 @@ threadPanelDialog model =
                                 ]
                             ]
                         ]
+
+
+deliveryStatusNote : Model -> App.ChatMessage -> Html Msg
+deliveryStatusNote model message =
+    if App.isDeliveryUnknown model message then
+        span [ class "onyx-pending-note" ] [ text "Delivery outcome unknown" ]
+
+    else if message.pending || message.outboxId /= Nothing then
+        span [ class "onyx-pending-note" ] [ text "queued" ]
+
+    else
+        text ""
 
 
 {-| Escape dismisses the thread panel (same IME-yielding shape
@@ -825,17 +975,6 @@ facepileFace channel entry =
         ]
 
 
-{-| Collapsed senders hide their lines in the feed (mirroring the
-oracle collapse filter; nameless service rows never collapse). -}
-notCollapsed : Model -> App.ChatMessage -> Bool
-notCollapsed model m =
-    if String.isEmpty (String.trim m.from) then
-        True
-
-    else
-        not (Set.member (String.toLower (String.trim m.from)) model.collapsedNicks)
-
-
 dividerAbove : Maybe Int -> Maybe String -> App.ChatMessage -> Html Msg
 dividerAbove dividerId dayLabel m =
     div []
@@ -1016,14 +1155,34 @@ dayLabelFor model at =
             ++ String.fromInt (Time.toDay zone posix)
 
 
-{-| Per-row day-divider labels over the full chronological feed
-(mirroring the `dayBoundaryFlags` pass: positional, first row
-always labelled, a label wherever the day changes; the caller
-slices the window exactly like the rows).
+{-| Per-row day-divider labels for the rendered window. Include the
+one preceding row when the window starts mid-feed so the first visible
+divider keeps the same day-boundary meaning as a full-feed pass.
 -}
-dayDividerLabels : Model -> List App.ChatMessage -> List (Maybe String)
-dayDividerLabels model messages =
+dayDividerLabels : Model -> List App.ChatMessage -> Int -> Int -> List (Maybe String)
+dayDividerLabels model messages start rendered =
     let
+        safeStart =
+            max 0 start
+
+        hasPredecessor =
+            safeStart > 0
+
+        from =
+            if hasPredecessor then
+                safeStart - 1
+
+            else
+                0
+
+        count =
+            max 0 rendered + (if hasPredecessor then 1 else 0)
+
+        windowWithPredecessor =
+            messages
+                |> List.drop from
+                |> List.take count
+
         step m ( prevDay, labels ) =
             let
                 day =
@@ -1034,8 +1193,15 @@ dayDividerLabels model messages =
 
             else
                 ( Just day, Just (dayLabelFor model m.at) :: labels )
+
+        windowLabels =
+            List.reverse (Tuple.second (List.foldl step ( Nothing, [] ) windowWithPredecessor))
     in
-    List.reverse (Tuple.second (List.foldl step ( Nothing, [] ) messages))
+    if hasPredecessor then
+        List.drop 1 windowLabels
+
+    else
+        windowLabels
 
 
 {-| System event rows render without an identity avatar
@@ -1061,13 +1227,21 @@ isContinuation prev m =
 messageRow : Model -> String -> Maybe App.ChatMessage -> Set Int -> App.ChatMessage -> Html Msg
 messageRow model target prev parents m =
     let
-        uncertainDelivery =
-            case m.outboxId of
-                Just oid ->
-                    List.member oid model.outboxUncertain
+        deliveryUnknown =
+            App.isDeliveryUnknown model m
 
-                Nothing ->
-                    False
+        uncertainDelivery =
+            deliveryUnknown
+                || (case m.outboxId of
+                        Just oid ->
+                            List.member oid model.outboxUncertain
+
+                        Nothing ->
+                            False
+                   )
+
+        accessibleLabel =
+            App.messageAccessibleLabelFor model m
 
         withdrawn =
             m.deleted || m.redacted
@@ -1084,6 +1258,7 @@ messageRow model target prev parents m =
         div
             [ class "onyx-system"
             , attribute "data-event" m.msgType
+            , attribute "data-message-id" (String.fromInt m.id)
             , attribute "role" "article"
             , attribute "tabindex" "-1"
             , attribute "aria-label" m.body
@@ -1103,8 +1278,10 @@ messageRow model target prev parents m =
                 , ( "onyx-mention", m.highlight && not withdrawn )
                 , ( "onyx-withdrawn", withdrawn )
                 ]
+            , attribute "data-message-id" (String.fromInt m.id)
             , attribute "role" "article"
-            , attribute "aria-label" (App.messageAccessibleLabel m)
+            , tabindex -1
+            , attribute "aria-label" accessibleLabel
             ]
             [ (if cont || isSystemRow m then
                 text ""
@@ -1152,7 +1329,10 @@ messageRow model target prev parents m =
                 time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
                     [ text (App.formatRowClock model.zone model.prefs.clock m.at) ]
             , span [ class "onyx-body" ] (messageBody model m)
-            , if m.outboxId == Nothing && not m.pending then
+            , if deliveryUnknown then
+                span [ class "onyx-pending-note" ] [ text " · Delivery outcome unknown" ]
+
+              else if m.outboxId == Nothing && not m.pending then
                 text ""
 
               else if uncertainDelivery then
@@ -1221,14 +1401,13 @@ menuInput : Model -> String -> App.ChatMessage -> App.CapabilityInput
 menuInput model target m =
     { msg = m
     , selfNick = model.ourNick
-    , editingEnabled = List.member "draft/message-editing" model.caps
-    , deleteSupported = List.member "draft/message-redaction" model.caps
+    , editingEnabled = List.member "draft/message-editing" model.caps || List.member "message-editing" model.caps
+    , deleteSupported = List.member "draft/message-redaction" model.caps || List.member "message-redaction" model.caps
     , channelTarget = App.isChannelName model target
     }
 
 
-{-| Whether any menu item applies (translate stays a later
-slice). -}
+{-| Whether any menu item applies, including on-device translate. -}
 menuHasActions : Model -> String -> App.Capabilities -> Bool
 menuHasActions model target caps =
     caps.canReply
@@ -1256,7 +1435,7 @@ menuCanPin model target =
 copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
 Pin, Ignore, Collapse, then Delete behind its inline confirm
 step; tiers are flattened into one menu with a light-dismiss
-backdrop, and translate stays a later slice). -}
+backdrop). Translate sits in the same menu when the row has text. -}
 messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuPanel model target m =
     case m.msgid of
@@ -1509,8 +1688,8 @@ messageMenuPanel model target m =
                                             deleteConfirm actionTarget target msgid
 
                                          else
-                                            menuItem ("Delete " ++ actionTarget ++ " for everyone")
-                                                "Delete for everyone"
+                                            menuItem ("Request server-history deletion for " ++ actionTarget)
+                                                "Request deletion from server history"
                                                 App.MessageMenuDeleteAsk
                                         )
 
@@ -1666,11 +1845,11 @@ deleteConfirm actionTarget target msgid =
     div
         [ class "onyx-msg-menu-delete-confirm"
         , attribute "role" "group"
-        , attribute "aria-label" ("Confirm deleting " ++ actionTarget ++ " for everyone")
+        , attribute "aria-label" ("Confirm removing " ++ actionTarget ++ " from server history")
         ]
-        [ p [ class "onyx-msg-menu-delete-confirm-title" ] [ text "Delete for everyone?" ]
+        [ p [ class "onyx-msg-menu-delete-confirm-title" ] [ text "Remove from server history?" ]
         , p [ class "onyx-msg-menu-delete-confirm-copy" ]
-            [ text "This removes the message from the conversation and cannot be undone." ]
+            [ text "This asks the server to remove this message from conversation history. It cannot erase copies already saved by other people or change this room’s retention policy." ]
         , div [ class "onyx-msg-menu-delete-confirm-actions" ]
             [ button
                 [ type_ "button"
@@ -1682,10 +1861,10 @@ deleteConfirm actionTarget target msgid =
             , button
                 [ type_ "button"
                 , class "onyx-msg-menu-delete-confirm-delete"
-                , attribute "aria-label" ("Confirm deleting " ++ actionTarget ++ " for everyone")
+                , attribute "aria-label" ("Confirm removing " ++ actionTarget ++ " from server history")
                 , onClick (App.MessageDeleteRequested target msgid)
                 ]
-                [ text "Delete for everyone" ]
+                [ text "Request server deletion" ]
             ]
         ]
 
@@ -1924,10 +2103,17 @@ messageBody model m =
 sender plus the sanitized preview clipped to 80 chars). -}
 replyContext : App.ReplyRef -> Html Msg
 replyContext ref =
-    div [ class "shell-msg-reply", attribute "aria-label" ("Replying to " ++ ref.from) ]
-        [ span [ class "shell-msg-reply-from" ] [ text ref.from ]
-        , span [] [ text (clippedReplyPreview ref.text) ]
-        ]
+    if String.isEmpty (String.trim ref.from) then
+        -- The parent is not in this buffer (gone, or never loaded):
+        -- say so instead of rendering a blank quote.
+        div [ class "shell-msg-reply shell-msg-reply--missing", attribute "aria-label" "Reply to an unavailable message" ]
+            [ span [] [ text "Original message unavailable" ] ]
+
+    else
+        div [ class "shell-msg-reply", attribute "aria-label" ("Replying to " ++ ref.from) ]
+            [ span [ class "shell-msg-reply-from" ] [ text ref.from ]
+            , span [] [ text (clippedReplyPreview ref.text) ]
+            ]
 
 
 clippedReplyPreview : String -> String

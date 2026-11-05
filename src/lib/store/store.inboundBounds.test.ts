@@ -57,6 +57,7 @@ beforeEach(() => {
   store.setState({
     ...initialState,
     client: {
+      learnedServerPrefix: 'eshmaki.me',
       isupport: { CHANTYPES: '#&' },
       negotiatedCaps: new Set<string>(),
       capValues: new Map<string, string>(),
@@ -252,8 +253,8 @@ describe('live inbound message bounds', () => {
     expect(stored?.replyTo).toBeUndefined();
   });
 
-  it('applies vault field bounds to offline memo delivery', () => {
-    feed(`@msgid=${'m'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1)} :eshmaki.me NOTE MEMO :from alice :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 8)}`);
+  it('folds the native NOTICE MEMO envelope with vault field bounds', () => {
+    feed(`@msgid=${'m'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1)} :eshmaki.me NOTICE me :MEMO from alice :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 8)}`);
 
     const stored = store.getState().dms.get('alice')?.messages[0];
     expect(stored?.text).toHaveLength(MAX_VAULT_MESSAGE_TEXT_LENGTH);
@@ -261,13 +262,33 @@ describe('live inbound message bounds', () => {
     expect(stored?.id.length).toBeLessThanOrEqual(MAX_VAULT_MESSAGE_ID_LENGTH);
     expect(store.getState().offlineMemo.get('alice')).toEqual({ count: 1, firstMsgId: stored?.id });
 
-    feed(`:eshmaki.me NOTE MEMO :from ${'a'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} :rejected`);
+    feed(`:eshmaki.me NOTICE me :MEMO from ${'a'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} :rejected`);
     expect(store.getState().dms.size).toBe(1);
     expect(store.getState().offlineMemo.size).toBe(1);
   });
 
+  it('rejects spoofed, misaddressed, and stale-owner memo notices', () => {
+    feed(':attacker.example NOTICE me :MEMO from alice :spoofed');
+    feed(':eshmaki.me NOTICE someone-else :MEMO from alice :misaddressed');
+    expect(store.getState().dms.size).toBe(0);
+
+    store.setState({
+      client: {
+        learnedServerPrefix: 'replacement.example',
+        isupport: { CHANTYPES: '#&' },
+        negotiatedCaps: new Set<string>(),
+        capValues: new Map<string, string>(),
+        prefixToMode: { '@': 'o' },
+        sendRaw: () => true,
+        send: () => true,
+      } as never,
+    });
+    feed(':eshmaki.me NOTICE me :MEMO from alice :stale owner');
+    expect(store.getState().dms.size).toBe(0);
+  });
+
   it('caps offline aggregates and repairs an oversized legacy aggregate map', () => {
-    feed(':eshmaki.me NOTE MEMO :from alice :first');
+    feed(':eshmaki.me NOTICE me :MEMO from alice :first');
     store.setState({
       offlineMemo: new Map([
         ...Array.from(
@@ -278,7 +299,7 @@ describe('live inbound message bounds', () => {
       ]),
     });
 
-    feed(':eshmaki.me NOTE MEMO :from alice :again');
+    feed(':eshmaki.me NOTICE me :MEMO from alice :again');
     expect(store.getState().offlineMemo.size).toBe(MAX_OFFLINE_MEMO_CONVERSATIONS);
     expect(store.getState().offlineMemo.get('alice')?.count).toBe(MAX_OFFLINE_MEMO_COUNT);
   });

@@ -24,6 +24,7 @@ const initialState = store.getInitialState();
 function makeClient() {
   return {
     sendRaw: vi.fn(),
+    learnedServerPrefix: 'eshmaki.me',
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     sessionSyncActive: false,
@@ -210,6 +211,23 @@ describe('MEDIA presence via the IRCX EVENT plane', () => {
     seedChannel('#root');
     feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
     expect(callRoster('#root')?.has('alice')).toBe(true);
+  });
+
+  it('requires a current owner, server prefix, and exact EVENT recipient', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT other MEDIA JOIN #root bob voice');
+    feed(':alice!u@host EVENT me MEDIA JOIN #root carol voice');
+    feed(':other.example EVENT me MEDIA JOIN #root eve voice');
+    expect(callRoster('#root')).toBeUndefined();
+
+    const client = seedChannel('#root');
+    store.setState({ client: { ...client, learnedServerPrefix: null } as never });
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root frank voice');
+    expect(callRoster('#root')).toBeUndefined();
+
+    store.setState({ client: null });
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root dave voice');
+    expect(callRoster('#root')).toBeUndefined();
   });
 
   it('an EVENT MEDIA LEAVE removes the actor', () => {

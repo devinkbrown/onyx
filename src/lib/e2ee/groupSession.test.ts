@@ -7,7 +7,7 @@ import {
   openGroupWelcome,
   prepareGroupWelcome,
 } from './groupWelcome';
-import { GroupSession } from './groupSession';
+import { GroupSession, type GroupSessionBootstrapInput } from './groupSession';
 import type { ResolveResult } from './trustedGroupSigner';
 
 const bytes = (value: number, length = 32) => new Uint8Array(length).fill(value);
@@ -143,7 +143,8 @@ async function genesisPair(input: {
   };
 }
 
-function bootstrapArgs(pair: Awaited<ReturnType<typeof genesisPair>>, overrides: Record<string, unknown> = {}) {
+function bootstrapArgs(pair: Awaited<ReturnType<typeof genesisPair>>,
+  overrides: Partial<GroupSessionBootstrapInput> & { expectedEpoch?: number | bigint } = {}): GroupSessionBootstrapInput & { expectedEpoch: number | bigint } {
   return {
     opened: pair.welcome.opened,
     welcomeResolution: pair.welcome.resolution,
@@ -152,8 +153,9 @@ function bootstrapArgs(pair: Awaited<ReturnType<typeof genesisPair>>, overrides:
     commitRouting: pair.commitRouting,
     room: pair.room,
     account: pair.account,
-    deviceId: pair.deviceId,
     ...overrides,
+    deviceId: overrides.deviceId ?? pair.deviceId,
+    expectedEpoch: overrides.expectedEpoch ?? 1,
   };
 }
 
@@ -169,6 +171,24 @@ describe('pure GroupSession state machine', () => {
     state.destroy();
     await expect(state.sealRoomMessage('#room', 'nope')).resolves.toEqual({ ok: false, reason: 'destroyed' });
     await expect(state.openRoomMessage('#room', sealed.envelope)).resolves.toEqual({ ok: false, reason: 'destroyed' });
+  });
+
+  it('installs a recovered key only at the exact current head and retains random nonce semantics', async () => {
+    const state = session();
+    const before = await state.sealRoomMessage('#room', 'before recovery');
+    expect(before.ok).toBe(true);
+    const wrongHash = bytes(9);
+    expect(state.installRecoveredCurrentKey({ expectedEpoch: 0n, expectedCommitHash: wrongHash, expectedMembershipDigest: bytes(2), epochKey: bytes(1) })).toBe(false);
+    wrongHash.fill(0);
+    const hash = state.commitHash()!;
+    const digest = state.membershipDigest()!;
+    expect(state.installRecoveredCurrentKey({ expectedEpoch: 0n, expectedCommitHash: hash, expectedMembershipDigest: digest, epochKey: bytes(1) })).toBe(true);
+    hash.fill(0); digest.fill(0);
+    if (!before.ok) return;
+    await expect(state.openRoomMessage('#room', before.envelope)).resolves.toMatchObject({ ok: true, plaintext: 'before recovery' });
+    const after = await state.sealRoomMessage('#room', 'after recovery');
+    expect(after.ok).toBe(true);
+    if (after.ok) expect(after.envelope).not.toBe(before.envelope);
   });
 
   it('applies one prepared commit transactionally and zeroizes retired key material', async () => {
@@ -326,6 +346,30 @@ describe('pure GroupSession state machine', () => {
     expect(consumeOpenedGroupWelcome(pair.welcome.opened)).toBeNull();
     result.session.destroy();
     expect(result.session.isDestroyed).toBe(true);
+  });
+
+  it('captures only commitment-verified material before both genesis and later-epoch buffers are wiped', async () => {
+    const captured: Array<{ epoch: bigint; key: Uint8Array; callbackBuffer: Uint8Array }> = [];
+    const hook = async (material: import('./groupSession').VerifiedGroupEpochMaterial) => {
+      captured.push({ epoch: material.epoch, key: material.epochKey.slice(), callbackBuffer: material.epochKey });
+    };
+    const genesis = await genesisPair({ epochKey: bytes(31) });
+    const first = await GroupSession.bootstrapVerifiedGenesis(bootstrapArgs(genesis, { onVerifiedEpochMaterial: hook }));
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.epoch).toBe(1n);
+    expect(captured[0]?.key).toEqual(bytes(31));
+    expect(captured[0]?.callbackBuffer).toEqual(new Uint8Array(32));
+    const head = first.session.commitHash()!;
+    const next = await genesisPair({ epochKey: bytes(32), priorEpoch: 1, nextEpoch: 2, priorCommitHash: head });
+    head.fill(0);
+    const second = await GroupSession.bootstrapVerifiedEpoch(bootstrapArgs(next, { expectedEpoch: 2, onVerifiedEpochMaterial: hook }));
+    expect(second.ok).toBe(true);
+    if (second.ok) { expect(second.epoch).toBe(2n); second.session.destroy(); }
+    expect(captured[1]?.epoch).toBe(2n);
+    expect(captured[1]?.key).toEqual(bytes(32));
+    expect(captured[1]?.callbackBuffer).toEqual(new Uint8Array(32));
+    first.session.destroy(); captured.forEach((item) => item.key.fill(0));
   });
 
   it('does not weaken create() and still rejects a non-genesis zero anchor', () => {

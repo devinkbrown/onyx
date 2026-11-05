@@ -35,6 +35,13 @@ function harness(sent) {
   return handlers;
 }
 
+function localTomorrowAtNine(epoch) {
+  const date = new Date(epoch);
+  date.setDate(date.getDate() + 1);
+  date.setHours(9, 0, 0, 0);
+  return date.getTime();
+}
+
 test("clock answers a next-9am epoch and a datetime-local floor", async () => {
   const sent = [];
   try {
@@ -46,7 +53,10 @@ test("clock answers a next-9am epoch and a datetime-local floor", async () => {
     const { tomorrow9, minLocal } = sent[0].payload;
     assert.ok(Number.isFinite(tomorrow9), "tomorrow9 is finite");
     assert.ok(tomorrow9 > before, "tomorrow9 is strictly in the future");
-    assert.ok(tomorrow9 <= after + 24 * 60 * 60 * 1000, "tomorrow9 is at most a day out");
+    assert.ok(
+      [localTomorrowAtNine(before), localTomorrowAtNine(after)].includes(tomorrow9),
+      "tomorrow9 is 9:00 on the next local calendar day"
+    );
     assert.match(minLocal, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     const floorBack = new Date(minLocal).getTime();
     assert.ok(Math.abs(floorBack - before) < 120000, "floor parses back near now");

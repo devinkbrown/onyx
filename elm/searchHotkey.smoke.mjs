@@ -134,7 +134,7 @@ test("a modal dialog owns the keyboard", () => {
 
 test("no searchHotkey port means no listener, no crash", () => {
   const heard = [];
-  globalThis.window = { addEventListener(name, fn) { heard.push(name); } };
+  globalThis.window = { addEventListener(name, _fn) { heard.push(name); } };
   globalThis.document = { querySelector: () => null };
   const h = harness({ withPort: false });
   try {

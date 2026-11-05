@@ -464,7 +464,7 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send.mock.calls
       .filter(([line]) => line === 'NICK kain\r\n')).toHaveLength(reclaimAttemptsBeforeSuccess + 1);
 
-    receive(':example.test NOTE SESSION TOKEN :fresh-token');
+    receive(':example.test NOTICE onyx :SESSION TOKEN fresh-token');
 
     expect(store.getState().server?.account).toBe('kain');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('fresh-token');
@@ -486,7 +486,7 @@ describe('remembered session roster restoration', () => {
     expect(store.getState().server?.account).toBe('kain');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
 
-    receive(':example.test NOTE SESSION TOKEN :late-token');
+    receive(':example.test NOTICE onyx :SESSION TOKEN late-token');
 
     expect(store.getState().server?.account).toBe('kain');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('late-token');
@@ -520,14 +520,22 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME mesh-held\r\n');
   });
 
-  it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
+  it('does not promote an ordinary guest from an unsolicited SESSION token notice', () => {
     store.getState().connect({ url: 'wss://example.test', nick: 'Guest42' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
     receive(':example.test 001 Guest42 :Welcome to Onyx');
 
-    receive(':example.test NOTE SESSION TOKEN :unsolicited-token');
+    receive(':example.test NOTICE onyx :SESSION TOKEN unsolicited-token');
 
     expect(store.getState().server?.account).toBeNull();
+  });
+
+  it('ignores an unknown secret-shaped command without rotating credentials', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test' });
+    const client = { isupport: { CHANTYPES: '#&' }, destroy: vi.fn() };
+    store.setState({ client: client as never, ourNick: 'kain' });
+    store.getState()._handleMessage(parseIRCMessage(':example.test XUNSUPPORTED SESSION TOKEN :secret-shaped-payload'));
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
   });
 
   it('does not reuse remembered tokens after the account logs out', () => {
@@ -540,8 +548,8 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
     receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
-    receive(':example.test NOTE SESSION TOKEN :fresh-token');
-    receive(':example.test NOTE SESSION MTOKEN :fresh-mesh');
+    receive(':example.test NOTICE onyx :SESSION TOKEN fresh-token');
+    receive(':example.test NOTICE onyx :SESSION MTOKEN fresh-mesh');
     expect(store.getState().server?.account).toBe('kain');
 
     receive(':example.test 901 kain kain!webchat@example :You are now logged out');
@@ -552,8 +560,8 @@ describe('remembered session roster restoration', () => {
 
     // A rotation already queued before 901 must not re-arm the logged-out
     // identity after logout cleanup wins the race.
-    receive(':example.test NOTE SESSION TOKEN :late-token');
-    receive(':example.test NOTE SESSION MTOKEN :late-mesh');
+    receive(':example.test NOTICE onyx :SESSION TOKEN late-token');
+    receive(':example.test NOTICE onyx :SESSION MTOKEN late-mesh');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
     expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBeUndefined();
 
@@ -621,8 +629,8 @@ describe('remembered session roster restoration', () => {
       .map(([line]) => line)
       .filter(line => line.startsWith('SESSION RESUME '))).toEqual([]);
 
-    receive(':example.test NOTE SESSION TOKEN :local-fresh');
-    receive(':example.test NOTE SESSION MTOKEN :mesh-fresh');
+    receive(':example.test NOTICE onyx :SESSION TOKEN local-fresh');
+    receive(':example.test NOTICE onyx :SESSION MTOKEN mesh-fresh');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('local-fresh');
     expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBe('mesh-fresh');
 
@@ -670,7 +678,7 @@ describe('remembered session roster restoration', () => {
     expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME legacy-mesh\r\n');
   });
 
-  it('rejects an oversized SESSION TOKEN note without persisting or arming resume', () => {
+  it('rejects an oversized SESSION TOKEN notice without persisting or arming resume', () => {
     saveCredentials({ nick: 'kain', server: 'wss://example.test', password: 'remembered-secret' });
     store.getState().connect({
       url: 'wss://example.test',
@@ -682,8 +690,8 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 001 kain :Welcome to Onyx');
 
     const oversized = 'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1);
-    receive(`:example.test NOTE SESSION TOKEN :${oversized}`);
-    receive(`:example.test NOTE SESSION MTOKEN :${oversized}`);
+    receive(`:example.test NOTICE onyx :SESSION TOKEN ${oversized}`);
+    receive(`:example.test NOTICE onyx :SESSION MTOKEN ${oversized}`);
 
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
     expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBeUndefined();
@@ -712,7 +720,6 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 001 kain :Welcome to Onyx');
 
     // Current Onyx Server delivers fresh credentials as NOTICE <nick> :SESSION TOKEN …
-    // (not only the older NOTE standard-reply envelope).
     receive(':example.test NOTICE kain :SESSION TOKEN notice-local');
     receive(':example.test NOTICE kain :SESSION MTOKEN notice-mesh');
 

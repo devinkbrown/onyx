@@ -223,10 +223,15 @@
   box-shadow: none;
 }
 
-.shell-rail-entry--active {
+.shell-rail > .shell-rail-entry--active {
+  width: 8px;
+  min-width: 8px;
+  height: 28px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
   color: var(--lapis-bright);
-  border-color: color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
-  background: color-mix(in oklab, var(--stone-2) 72%, transparent);
 }
 
 .shell-rail-entry--active::before {
@@ -422,8 +427,9 @@
 
 .shell-primary-nav-btn--active {
   color: var(--paper);
-  border-color: color-mix(in oklab, var(--lapis) 28%, var(--seam-faint));
-  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  border-color: transparent;
+  background: var(--stone-2);
+  box-shadow: inset 0 -2px 0 var(--commercial-action-primary, var(--shu));
 }
 
 .shell-primary-nav-btn--active .shell-primary-nav-icon {
@@ -433,9 +439,10 @@
 /* A selected collection is the list the user asked to browse. It is kept
    distinct from the current conversation surface, which owns aria-current. */
 .shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active) {
-  color: var(--paper);
-  border-color: color-mix(in oklab, var(--lapis) 22%, var(--seam-faint));
-  background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
+  color: var(--paper-dim);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .shell-primary-nav-btn--selected:not(.shell-primary-nav-btn--active) .shell-primary-nav-icon {

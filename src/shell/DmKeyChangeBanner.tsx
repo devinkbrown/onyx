@@ -24,7 +24,7 @@
  *     loads whenever the banner becomes active for a peer, and the display
  *     reads the cached values reactively.
  */
-import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { DM_KEY_CHANGE_BODY, DM_PRIVACY_SCOPE, dmKeyChangeAlert } from '@/lib/e2ee/dmPrivacyChrome';
 import './dm-key-change.css';
@@ -112,7 +112,7 @@ export function DmKeyChangeBanner(): JSX.Element {
     // Some test/adapter implementations also return the persistence outcome;
     // consume it when available, but never infer failure from elapsed time.
     void getState().acceptPeerKeyChange(p).then((ok) => {
-      if (attemptIdentity !== attempt || changeIdentity() !== identity) return;
+      if (attemptIdentity !== attempt || untrack(changeIdentity) !== identity) return;
       if (ok) {
         setAccepting(false);
       } else {
@@ -120,7 +120,7 @@ export function DmKeyChangeBanner(): JSX.Element {
         setPersistFailed(true);
       }
     }, () => {
-      if (attemptIdentity !== attempt || changeIdentity() !== identity) return;
+      if (attemptIdentity !== attempt || untrack(changeIdentity) !== identity) return;
       setAccepting(false);
       setPersistFailed(true);
     });

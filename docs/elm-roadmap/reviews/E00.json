@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "itemId": "E00",
+  "scope": {
+    "kind": "package",
+    "id": "E00"
+  },
+  "reviewer": {
+    "name": "root integrator",
+    "role": "independent bounded package reviewer"
+  },
+  "verdict": "accepted",
+  "summary": "Accept the bounded E00 source-closure package: the source38 manifest and archive are bound; closure/restore preserves 2,080 files and the corrected pins and native CLI patch; the 134-row module map includes the corrected App/MainTest import attribution; and the source37 closure regression passed. This does not accept any T scenario, M milestone, or release.",
+  "sourceArtifacts": [
+    {
+      "path": "elm/tools/source-closure.mjs",
+      "sha256": "02af87be61b7873b5fce51e655fc7928815c03d85184c3138f75423e69063809"
+    },
+    {
+      "path": "elm/tools/source-closure.test.mjs",
+      "sha256": "bb4e0c881fd48f5c4d438250e34ef49bcfe21426bfafd09b7d7700858fd8520e"
+    },
+    {
+      "path": "docs/elm-roadmap/module-ownership.md",
+      "sha256": "0c1927433e2d6f55dc8aee6227d8018e422ca96e87551e34d93c9c29c9fc241f"
+    },
+    {
+      "path": "package.json",
+      "sha256": "45d7be324282a578e01142ac0f44c1f4dc7eb1c8eaa0434785937df37c4b743d"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "85f819a9c09b7e89803cd8446ea6a2be51e4f2dd09b343672bbdad59d9546516"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "sha256": "f06cb42c8d6354bd758215314a333a473379f01fb866beb7d51e39e6fd8f67e0"
+    },
+    {
+      "path": ".zigversion",
+      "sha256": "2c0d09def115331b1e2ad839f6b4d320d9b082882c291a6fdcb663e338eebcca"
+    },
+    {
+      "path": "patches/@native-sdk__cli@0.6.2.patch",
+      "sha256": "ae5e2d1c372b3bf4a2487e0955ba88d7e1c8881c2f8573b85628267af7c9c498"
+    }
+  ],
+  "evidenceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/evidence/wave38-E00-E04-row-review.json",
+      "sha256": "8ead5b4f4a79cba79826369d925e50c9606082ec2391468c086882067df21895"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/source-candidate-38.json",
+      "sha256": "25bb08070869b2a1488f56684d81272431446fe44bdb26643cc0ff120532ee2c"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/source-closure-regression-candidate-37.txt",
+      "sha256": "46c4c7c829ff9590c35992a740badb51a9f7847a4fc1b8fb1b6a7b8606ef887e"
+    }
+  ],
+  "applicability": {
+    "configuration": {
+      "status": "applicable",
+      "evidenceArtifacts": [
+        "docs/elm-roadmap/evidence/source-candidate-38.json",
+        "docs/elm-roadmap/evidence/wave38-E00-E04-row-review.json"
+      ]
+    },
+    "deployment": {
+      "status": "not-applicable",
+      "reason": "The bounded source-closure review makes no deployment or release-readiness claim."
+    }
+  }
+}

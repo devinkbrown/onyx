@@ -50,6 +50,13 @@ describe('Landing', () => {
     expect(container.querySelector('.home-hero-grid')).toBeTruthy();
     expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
     expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('See the public room');
+    const ctaLinks = [...container.querySelectorAll('.home-cta-row a')];
+    expect(ctaLinks.map((link) => link.textContent)).toEqual([
+      'Open Onyx',
+      'See the public room',
+      'Keep it on this device',
+    ]);
+    expect(ctaLinks[2]?.getAttribute('href')).toBe('/download/');
     expect(container).toHaveTextContent('A place for your friends to talk, play, and catch up. Open a room in your browser.');
     expect(container.querySelector('.home-device-note')?.textContent).toMatch(
       /Browser first\. Keep it on this device from a supporting browser/,

@@ -22,11 +22,8 @@ import View.PublicFrame exposing (frame)
 
 contextLine : Html Msg
 contextLine =
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text "This device" ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text "Browser first" ]
-        ]
+    p [ class "site-context-line" ]
+        [ text "This device — browser first" ]
 
 
 {-| The download body. -}

@@ -1,0 +1,166 @@
+{
+  "candidate": 40,
+  "startedAtUtc": "2026-11-05T03:30:30.598693+00:00",
+  "sourceManifestDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+  "sourceArchiveSha256": "91f2651ed5d7ab8776e5d11ece4effaf621772ed9ca123b9379286439dc8ed97",
+  "source39ManifestDigest": "ced0261fd908f480387262aa30419910ba91b2e99046a78d9681467b79506898",
+  "changedSince39": [
+    "elm/src/View/Roster.elm",
+    "elm/tools/perf/fixtures.ts",
+    "tests/e2e/elm-performance.measure.spec.ts"
+  ],
+  "sourceUnchanged": true,
+  "sourceGuards": [
+    {
+      "afterStage": "elm-full:before",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "elm-full",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "chromium-mock:before",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "chromium-mock",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "stress-browser:before",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "stress-browser",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "paired-e90:before",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    },
+    {
+      "afterStage": "paired-e90",
+      "observedDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "unchanged": true
+    }
+  ],
+  "stages": [
+    {
+      "id": "elm-full",
+      "command": [
+        "node",
+        "elm/tools/run-roadmap-checks.mjs",
+        "elm-full"
+      ],
+      "startedAtUtc": "2026-11-05T03:30:34.595419+00:00",
+      "log": "/tmp/onyx-elm-verification-final/elm-full-candidate-40.log",
+      "timeoutSeconds": 1800,
+      "exitStatus": 0,
+      "finishedAtUtc": "2026-11-05T03:30:49.597351+00:00",
+      "elapsedSeconds": 15.0
+    },
+    {
+      "id": "chromium-mock",
+      "command": [
+        "node",
+        "elm/tools/run-roadmap-checks.mjs",
+        "chromium-mock"
+      ],
+      "startedAtUtc": "2026-11-05T03:30:53.627900+00:00",
+      "log": "/tmp/onyx-elm-verification-final/chromium-mock-candidate-40.log",
+      "timeoutSeconds": 1800,
+      "exitStatus": 0,
+      "finishedAtUtc": "2026-11-05T03:31:17.004249+00:00",
+      "elapsedSeconds": 23.38
+    },
+    {
+      "id": "stress-browser",
+      "command": [
+        "node",
+        "elm/tools/perf/run.mjs",
+        "--suite=stress",
+        "--receipt",
+        "/tmp/onyx-elm-verification-final/stress-candidate-40.json"
+      ],
+      "startedAtUtc": "2026-11-05T03:31:21.020528+00:00",
+      "log": "/tmp/onyx-elm-verification-final/stress-browser-candidate-40.log",
+      "timeoutSeconds": 2400,
+      "exitStatus": 0,
+      "finishedAtUtc": "2026-11-05T03:32:10.446572+00:00",
+      "elapsedSeconds": 49.43
+    },
+    {
+      "id": "paired-e90",
+      "command": [
+        "node",
+        "/tmp/onyx-elm-verification-final/paired-observe37.mjs",
+        "/tmp/onyx-elm-verification-final/paired-observation-candidate-40.json"
+      ],
+      "startedAtUtc": "2026-11-05T03:32:14.502260+00:00",
+      "log": "/tmp/onyx-elm-verification-final/paired-e90-candidate-40.log",
+      "timeoutSeconds": 5400,
+      "exitStatus": 2,
+      "finishedAtUtc": "2026-11-05T03:42:11.906998+00:00",
+      "elapsedSeconds": 597.4
+    }
+  ],
+  "frozenSource": {
+    "manifest": "/tmp/onyx-elm-verification-final/source-candidate-40.json",
+    "archive": "/tmp/onyx-elm-verification-final/source-candidate-40.tar.gz",
+    "restoreVerified": true,
+    "archiveBytesVerified": true,
+    "archiveSha256Observed": "91f2651ed5d7ab8776e5d11ece4effaf621772ed9ca123b9379286439dc8ed97"
+  },
+  "transportReruns": {
+    "status": "not-run-no-transport-source-changes",
+    "changedPaths": []
+  },
+  "pairedE90": {
+    "driver": "/tmp/onyx-elm-verification-final/paired-observe37.mjs",
+    "driverSha256Before": "0d1f75ba14f50b9453af4c1e119922f62fda11bbfb5bb1a5fde6774c0f901f1f",
+    "baselineManifest": "/tmp/onyx-elm-verification-final/source-candidate-24.json",
+    "baselineManifestDigest": "0cd0af1eef63f716c7d546290b9f0ce8f7b87bc74655538856d8e2a84c791c2a",
+    "baselineArchiveSha256": "ac44bf1233091c1e1ed5653837a0b9f22be59fe31ebb51257d55de6dadc1ea1a",
+    "receipt": "/tmp/onyx-elm-verification-final/paired-observation-candidate-40.json",
+    "status": "observed-with-open-failure",
+    "driverSha256After": "0d1f75ba14f50b9453af4c1e119922f62fda11bbfb5bb1a5fde6774c0f901f1f",
+    "driverUnchanged": true,
+    "exitStatus": 2
+  },
+  "scopedReuse": {
+    "candidate37": "/tmp/onyx-elm-verification-final/affected-candidate-37.json",
+    "candidate38": "/tmp/onyx-elm-verification-final/affected-candidate-38.json",
+    "candidate39Checkpoint": "/tmp/onyx-elm-verification-final/wave39-terminal-checkpoint.json",
+    "candidate39StartupDiagnostic": "/tmp/onyx-elm-verification-final/e91-startup-diagnostic-candidate39.json",
+    "note": "Root/runtime/lab observations already established for unchanged source are not rerun or promoted; this packet reports only candidate-40 affected lanes."
+  },
+  "reviewedChanges": [
+    {
+      "path": "elm/src/View/Roster.elm",
+      "before": "7077b166b2216f4e61e16863a6aecd9377ee15ca829b154506bc98466d4292db",
+      "after": "b8aaab45aa8058e9c252708087a0f54c1eda308c3129f2bb42f05b68869c30c0"
+    },
+    {
+      "path": "elm/tools/perf/fixtures.ts",
+      "before": "9e59e8b0e19ab7b6d060219e05179e8ce750906e39850c9d6ce7279464b3ea0e",
+      "after": "c4a56d2e84cfdbe286d4237a9d0ac9b484ad4f158c4705a37da20c3bdc0af05e"
+    },
+    {
+      "path": "tests/e2e/elm-performance.measure.spec.ts",
+      "before": "638a4fe63a335a62bdba1d1043b2facc8b071d98e6968c49fd1c77f80b89e7f2",
+      "after": "422d5674938cb494927e5a7e40edbf15d02168f7f44ee912332f96524b0cf179"
+    }
+  ],
+  "sourceAtFreezeDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+  "sourcePostDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+  "outcome": "failed",
+  "finishedAtUtc": "2026-11-05T03:42:15.907198+00:00"
+}

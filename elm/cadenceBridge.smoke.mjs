@@ -60,13 +60,25 @@ test("mediaReceiveRaw leaves text for the line buffer", () => {
   assert.equal(app.received.length, 0);
 });
 
+test("mediaReceiveRaw closes 1002 on binary without the media subprotocol", () => {
+  const app = fakeApp();
+  const buf = new Uint8Array(katBytes()).buffer;
+  let closed = null;
+  const outcome = OnyxPorts.mediaReceiveRaw(app, buf, "", (c, r) => { closed = [c, r]; });
+  assert.equal(outcome, "closed");
+  assert.deepEqual(closed, [1002, "Binary frame without onyx.irc-media.v1"]);
+  assert.equal(app.received.length, 0);
+});
+
 test("mediaReceiveRaw closes 1002 on binary over the text subprotocol", () => {
   const app = fakeApp();
   const buf = new Uint8Array(katBytes()).buffer;
   let closed = null;
-  const outcome = OnyxPorts.mediaReceiveRaw(app, buf, TEXT_PROTOCOL, (c, r) => { closed = [c, r]; });
-  assert.equal(outcome, "closed");
-  assert.deepEqual(closed, [1002, "Binary frame on text.ircv3.net"]);
+  assert.equal(
+    OnyxPorts.mediaReceiveRaw(app, buf, TEXT_PROTOCOL, (c, r) => { closed = [c, r]; }),
+    "closed",
+  );
+  assert.deepEqual(closed, [1002, "Binary frame without onyx.irc-media.v1"]);
   assert.equal(app.received.length, 0);
 });
 
@@ -109,6 +121,7 @@ test("sendDatagram sheds closed, text, full, oversized, and misshapen sends", ()
   const cases = [
     [{ readyState: 3, protocol: MEDIA_PROTOCOL, bufferedAmount: 0, sent: [], send(d) { this.sent.push(d); } }, katBytes()],
     [openSocket(TEXT_PROTOCOL), katBytes()],
+    [openSocket(""), katBytes()],
     [openSocket(MEDIA_PROTOCOL, 8 * 1024 * 1024), katBytes()],
     [openSocket(MEDIA_PROTOCOL), new Array(OnyxPorts.mediaMaxBinaryBytes + 1).fill(0)],
     [openSocket(MEDIA_PROTOCOL), [1, 2, 300]],

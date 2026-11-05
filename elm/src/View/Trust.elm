@@ -145,9 +145,9 @@ houseRules =
 
 guidelinesArticle : Html Msg
 guidelinesArticle =
-    article [ class "data-card public-info-card trust-article" ]
-        [ h2 [ class "trust-article-heading", id "trust-guidelines-body-heading" ] [ text "Rooms" ]
-        , ol [ class "trust-rules" ] (List.map (\rule -> li [] [ text rule ]) houseRules)
+    section [ class "site-section", attribute "aria-labelledby" "trust-guidelines-body-heading" ]
+        [ h2 [ class "site-h2", id "trust-guidelines-body-heading" ] [ text "Rooms" ]
+        , ol [ class "site-ruled site-ruled--numbered" ] (List.map (\rule -> li [] [ text rule ]) houseRules)
         , p []
             [ text "Report a security issue through GitHub’s private vulnerability reporting on this repository, as "
             , a [ href "https://github.com/devinkbrown/onyx/blob/onyx-solid/SECURITY.md" ] [ text "SECURITY.md" ]
@@ -158,8 +158,8 @@ guidelinesArticle =
 
 privacyArticle : Html Msg
 privacyArticle =
-    article [ class "data-card public-info-card trust-article" ]
-        [ h2 [ class "trust-article-heading", id "trust-privacy-body-heading" ] [ text "This device and the server" ]
+    section [ class "site-section", attribute "aria-labelledby" "trust-privacy-body-heading" ]
+        [ h2 [ class "site-h2", id "trust-privacy-body-heading" ] [ text "This device and the server" ]
         , p []
             [ text "If you register, the server stores the account name and the email you give it. Room messages stay with the room so it can stay open. Group rooms are not end-to-end encrypted. Group E2EE is not live." ]
         , p []
@@ -182,8 +182,8 @@ privacyArticle =
 
 contactArticle : Html Msg
 contactArticle =
-    article [ class "data-card public-info-card trust-article" ]
-        [ h2 [ class "trust-article-heading", id "trust-contact-body-heading" ] [ text "How to reach us" ]
+    section [ class "site-section", attribute "aria-labelledby" "trust-contact-body-heading" ]
+        [ h2 [ class "site-h2", id "trust-contact-body-heading" ] [ text "How to reach us" ]
         , p []
             [ text "Ordinary product questions belong on GitHub issues for "
             , a [ href "https://github.com/devinkbrown/onyx", rel "noreferrer noopener", target "_blank" ] [ text "devinkbrown/onyx" ]
@@ -220,15 +220,11 @@ view page =
                 Contact ->
                     contactArticle
     in
-    div [ class ("ui-root r data-page public-info-page trust-page trust-page--" ++ key) ]
-        [ div [ class "r-ground", attribute "aria-hidden" "true" ] []
-        , section [ class "r-wrap data-hero trust-hero", attribute "aria-labelledby" ("trust-" ++ key ++ "-heading") ]
-            [ p [ class "r-kicker" ] [ text meta.kicker ]
-            , h1 [ id ("trust-" ++ key ++ "-heading") ] [ text meta.heading ]
-            , p [ class "sub" ] [ text meta.lede ]
-            ]
-        , section [ class "r-wrap r-section trust-reading", attribute "aria-labelledby" ("trust-" ++ key ++ "-body-heading") ]
-            [ body ]
+    article [ class "site-article" ]
+        [ p [ class "site-note" ] [ text meta.kicker ]
+        , h1 [ id ("trust-" ++ key ++ "-heading"), class "site-display-sm" ] [ text meta.heading ]
+        , p [ class "site-lede" ] [ text meta.lede ]
+        , body
         ]
 
 

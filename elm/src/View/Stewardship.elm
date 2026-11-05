@@ -236,7 +236,7 @@ inviteHint view =
 transferSection : Model -> StewardView -> List (Html Msg)
 transferSection model view =
     if not view.isOwner then
-        []
+        transferRecoverySection model view
 
     else
         [ section [ class "onyx-steward-section" ]
@@ -270,34 +270,114 @@ transferSection model view =
                             ]
 
                         Just offer ->
-                            [ p [ class "onyx-steward-status", attribute "data-testid" "steward-transfer-wait" ]
-                                [ text
-                                    (if offer.accepted then
-                                        Stewardship.stewardshipCopy.transferGrant
+                            let
+                                attempt =
+                                    Dict.get (Stewardship.channelKey view.channel) model.stewardTransferAttempts
 
-                                     else
-                                        Stewardship.stewardshipCopy.transferWait ++ " Waiting for " ++ offer.to ++ "."
-                                    )
-                                ]
+                                attemptStatus =
+                                    attempt |> Maybe.map .status |> Maybe.withDefault ""
+
+                                grantReady =
+                                    offer.accepted && (attempt == Nothing || List.member attemptStatus [ "reconciled", "observed" ])
+
+                                statusCopy =
+                                    case attemptStatus of
+                                        "pending" ->
+                                            "Waiting for the server to confirm the requested owner ranks."
+
+                                        "partial" ->
+                                            "The server confirmed only part of the handover. Refresh the roster before deciding what to do next."
+
+                                        "unknown" ->
+                                            "The command outcome is unknown. Refresh the roster before deciding what to do next."
+
+                                        "reconciling" ->
+                                            "Refreshing the current room roster. No ownership command will be resent."
+
+                                        "reconciled" ->
+                                            "The roster is refreshed. Review the ranks, then confirm any remaining change."
+
+                                        "observed" ->
+                                            "The current roster shows the requested ranks, but the earlier command outcome is unknown. Review and explicitly confirm any remaining change."
+
+                                        _ ->
+                                            if offer.accepted then
+                                                Stewardship.stewardshipCopy.transferGrant
+
+                                            else
+                                                Stewardship.stewardshipCopy.transferWait ++ " Waiting for " ++ offer.to ++ "."
+                            in
+                            [ p [ class "onyx-steward-status", attribute "data-testid" "steward-transfer-wait", attribute "role" "status" ]
+                                [ text statusCopy ]
                             , div [ class "onyx-steward-actions" ]
-                                [ button
+                                ([ button
                                     [ class "onyx-steward-btn onyx-steward-btn-primary"
                                     , attribute "data-testid" "steward-grant"
-                                    , disabled (not view.live || not offer.accepted)
+                                    , disabled (not view.live || not grantReady)
                                     , onClick (StewardGrantTransfer view.channel)
                                     ]
-                                    [ text "Hand it over" ]
-                                , button
+                                    [ text (if List.member attemptStatus [ "reconciled", "observed" ] then "Confirm remaining change" else "Hand it over") ]
+                                 , button
                                     [ class "onyx-steward-btn"
                                     , attribute "data-testid" "steward-cancel-offer"
                                     , onClick (StewardDeclineTransfer view.channel)
                                     ]
                                     [ text "Cancel" ]
-                                ]
+                                 ]
+                                    ++ (if offer.accepted && List.member attemptStatus [ "partial", "unknown", "observed" ] then
+                                            [ button
+                                                [ class "onyx-steward-btn"
+                                                , attribute "data-testid" "steward-transfer-reconcile"
+                                                , disabled (not view.live)
+                                                , onClick (StewardReconcileTransfer view.channel)
+                                                ]
+                                                [ text "Refresh roster" ]
+                                            ]
+
+                                        else
+                                            []
+                                       )
+                                )
                             ]
                    )
             )
         ]
+
+
+transferRecoverySection : Model -> StewardView -> List (Html Msg)
+transferRecoverySection model view =
+    case Dict.get (Stewardship.channelKey view.channel) model.stewardTransferAttempts of
+        Just attempt ->
+            if not (Maybe.withDefault False (Maybe.map ((==) attempt.owner) model.runtimeOwnerStamp))
+                || Stewardship.channelKey attempt.channel /= Stewardship.channelKey view.channel
+                || Stewardship.nickKey attempt.from /= Stewardship.nickKey model.ourNick
+                || not (List.member attempt.status [ "partial", "unknown", "reconciling", "observed" ]) then
+                []
+
+            else
+                [ section [ class "onyx-steward-section" ]
+                    [ h3 [ class "onyx-steward-label" ] [ text "Ownership handover status" ]
+                    , p [ class "onyx-steward-status", attribute "data-testid" "steward-transfer-wait", attribute "role" "status" ]
+                        [ text
+                            (if attempt.status == "observed" then
+                                "The visible roster has been reviewed, but the earlier command outcome is still unknown. You no longer have owner privileges, so only roster refresh is available."
+
+                             else
+                                "The ownership command outcome is unknown. You no longer have owner privileges, so this view can only refresh the roster."
+                            )
+                        ]
+                    , button
+                        [ class "onyx-steward-btn"
+                        , attribute "data-testid" "steward-transfer-reconcile"
+                        , disabled (not view.live || attempt.status == "reconciling")
+                        , onClick (StewardReconcileTransfer view.channel)
+                        ]
+                        [ text "Refresh roster" ]
+                    ]
+                ]
+
+        Nothing ->
+            []
 
 
 transferCandidates : Model -> StewardView -> List Stewardship.StewardMember
@@ -436,7 +516,8 @@ webhookSection model view =
         [ section [ class "onyx-steward-section" ]
             ([ h3 [ class "onyx-steward-label" ] [ text "Incoming webhooks" ]
              , p [ class "onyx-steward-body" ]
-                [ text "Discord-compatible webhook URLs can post into this room. The created URL is shown once in server notices." ]
+                [ text "Discord-compatible webhook URLs can post into this room. A created URL appears once in the protected browser panel and is never added to chat history or service logs." ]
+             , privateWebhookStatusView view.channel model
              , label [ class "onyx-steward-label", for "steward-webhook-name" ] [ text "Webhook name" ]
              , input
                 [ id "steward-webhook-name"
@@ -505,6 +586,28 @@ webhookNoticeRows model =
                     notices
                 )
             ]
+
+
+privateWebhookStatusView : String -> Model -> Html Msg
+privateWebhookStatusView channel model =
+    case model.privateWebhookStatus of
+        Just result ->
+            if result.room /= channel then
+                text ""
+
+            else
+                p [ class "onyx-steward-notice", attribute "role" "status" ]
+                    [ text
+                        (if result.status == "created" then
+                            "Webhook created for " ++ result.room ++ ". Copy its one-time URL from the protected browser panel now."
+
+                         else
+                            "The webhook reply could not be safely presented. Check permissions and retry if the server did not create it."
+                        )
+                    ]
+
+        Nothing ->
+            text ""
 
 
 lastMemberHint : StewardView -> List (Html Msg)

@@ -15,13 +15,15 @@ renders inline in the panel where the oracle uses a Sheet modal.
 -}
 
 import App exposing (ConnectionState(..), Model, Msg(..), TotpCopy(..), TotpStatus(..), accountCertNotices, accountKeytransNotices, dropReady, isTotpCode, millisToIso, totpCodeLength)
-import Html exposing (Html, a, button, code, dd, div, dl, dt, form, h2, h3, h4, input, label, li, nav, p, section, span, strong, text, ul)
+import Html exposing (Html, a, button, code, dd, div, dl, dt, form, h2, h3, h4, input, label, li, nav, p, pre, section, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, pattern, placeholder, tabindex, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
-import Passkey exposing (PasskeyCredential, maxLabelLength)
+import Passkey exposing (maxLabelLength)
 import Retention
+import RuntimeDomain
 import Session exposing (CapStatus(..), SessionState(..))
+import View.Integrations
 
 
 accountPanel : Model -> Html Msg
@@ -58,23 +60,124 @@ accountPanel model =
                         div []
                             [ sectionNav
                             , overviewSection model
+                            , privateAccountStatusView model
                             , securitySection model
                             , certSection model
                             , keytransSection model
                             , deviceKeysSection model
                             , personasSection model
-                            , emailSection model
-                            , passwordSection model
+                            , if model.runtimeOwnerStamp /= Nothing then
+                                privateManagementSection "Email address" "Enter the new address and current password in a private form. Server acceptance does not verify ownership of the new address."
+                                    [ ( "account-email", "account-email", "Change email address" ) ]
+                              else
+                                emailSection model
+                            , if model.runtimeOwnerStamp /= Nothing then
+                                privateManagementSection "Password and account" "Passwords stay in a private browser form. A successful password change does not automatically sign this connection in again."
+                                    [ ( "account-password", "account-password", "Change password" ), ( "account-drop", "account-drop", "Delete this account" ) ]
+                              else
+                                passwordSection model
                             , recoverySection model
-                            , passkeysSection model
+                            , if model.runtimeOwnerStamp /= Nothing then
+                                privatePasskeySection model
+                              else
+                                passkeysSection model
                             , devicesSection model
+                            , accountCommunitySection model
                             , sessionSection model
+                            , draftRecoverySection model
                             , capsSection model
                             , retentionSection model
                             , dataSection model
                             ]
+                , if model.runtimeOwnerStamp /= Nothing then
+                    View.Integrations.serviceIntegrationPanel model.serviceIntegrationView model.serviceIntegrationForm
+
+                  else
+                    text ""
                 ]
             ]
+
+
+privateAccountNotice : String -> String -> Html Msg
+privateAccountNotice title description =
+    section [ class "onyx-account-section", attribute "role" "status" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text title ]
+        , p [ class "onyx-account-hint" ] [ text description ]
+        ]
+
+
+privateAccountStatusView : Model -> Html Msg
+privateAccountStatusView model =
+    case model.privateAccountStatus of
+        Nothing ->
+            text ""
+
+        Just status ->
+            let
+                outcome =
+                    case status.outcome of
+                        "email-updated" -> "The account email setting was updated. Verify the address separately if the server requires it."
+                        "password-changed" -> "The password was changed. Sign in again with the new password when needed."
+                        "certificate-password-reset" -> "The password was reset using the verified client certificate."
+                        "account-dropped" -> "The server confirmed account deletion. Local encrypted data remains until you clear it."
+                        "reset-request-acknowledged" -> "The reset request was acknowledged. The server does not reveal whether that account has a verified email."
+                        "password-reset" -> "The password reset completed. Sign in explicitly with the new password."
+                        "account-registered" -> "The account was registered. Registration does not prove sign-in or email verification."
+                        "email-verified" -> "The account email was verified."
+                        "no-pending-verification" -> "There is no pending email verification for this account."
+                        _ -> ""
+
+                phase =
+                    case status.phase of
+                        "pending" -> "Waiting for a matching server response."
+                        "unknown" -> "The result is unknown; do not repeat this account operation automatically."
+                        "blocked" -> "The account operation could not be sent."
+                        "failed" -> "The account operation failed."
+                        "accepted" -> outcome
+                        _ -> ""
+            in
+            if String.isEmpty phase then
+                text ""
+            else
+                section [ class "onyx-account-section", attribute "role" "status", attribute "aria-live" "polite" ]
+                    [ h3 [ class "onyx-account-section__title" ] [ text "Private account operation" ]
+                    , p [ class "onyx-account-hint" ] [ text phase ]
+                    , Maybe.withDefault (text "") (Maybe.map (\account -> p [ class "onyx-account-hint" ] [ text ("Account: " ++ account) ]) status.targetAccount)
+                    , if status.requiresLogin then p [ class "onyx-account-hint" ] [ text "Sign in is a separate action." ] else text ""
+                    , Maybe.withDefault (text "") (Maybe.map (\_ -> p [ class "onyx-account-hint" ] [ text "The private operation could not be completed; review the form and server state before trying again." ]) status.reason)
+                    ]
+
+
+privateManagementSection : String -> String -> List ( String, String, String ) -> Html Msg
+privateManagementSection title description forms =
+    section [ class "onyx-account-section", attribute "role" "group" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text title ]
+        , p [ class "onyx-account-hint" ] [ text description ]
+        , div [ class "onyx-account-actions" ]
+            (List.map
+                (\( kind, action, labelText ) ->
+                    button
+                        [ type_ "button"
+                        , onClick (App.RuntimePrivateAccountFormRequested { kind = kind, action = action, account = Nothing })
+                        ]
+                        [ text labelText ]
+                )
+                forms
+            )
+        ]
+
+
+privatePasskeySection : Model -> Html Msg
+privatePasskeySection model =
+    section [ class "onyx-account-section", id "acct-passkeys-title" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text "Passkeys" ]
+        , p [ class "onyx-account-hint" ]
+            [ text "Passkey challenge and response bytes stay in the private browser runtime. A browser prompt may be denied if transient user activation has expired by the time the server challenge arrives." ]
+        , div [ class "onyx-account-actions" ]
+            [ button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.WebAuthnBegin "register" model.accountName)) ] [ text "Register a passkey" ]
+            , button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.WebAuthnBegin "authenticate" model.accountName)) ] [ text "Sign in with a passkey" ]
+            ]
+        ]
 
 
 sectionNav : Html Msg
@@ -187,7 +290,7 @@ devicesSection model =
          ]
             ++ pendingNote model.accountSessionsPending "Loading sessions…"
             ++ sessionError model
-            ++ [ sessionList model ]
+            ++ [ sessionList model, meshSessionPanel model ]
         )
 
 
@@ -203,12 +306,163 @@ sessionError model =
 
 sessionList : Model -> Html Msg
 sessionList model =
-    if List.isEmpty model.accountSessions then
-        p [ class "onyx-account-empty" ] [ text "No other sessions." ]
+    case model.sessionInventoryView of
+        Nothing ->
+            p [ class "onyx-account-empty" ] [ text "Refresh to load local session attachments." ]
 
-    else
-        ul [ class "onyx-account-sessions" ]
-            (List.map sessionRow model.accountSessions)
+        Just inventory ->
+            if inventory.mode /= "local" then
+                p [ class "onyx-account-empty" ] [ text "The local session list is not available in this view." ]
+
+            else if List.isEmpty inventory.localRows then
+                p [ class "onyx-account-empty", attribute "role" "status" ] [ text (inventoryMessage inventory) ]
+
+            else
+                ul [ class "onyx-account-sessions" ]
+                    (List.map
+                        (\row ->
+                            li [ class "onyx-account-session" ]
+                                [ span [ class "onyx-account-session__name" ] [ text ("Local session " ++ String.fromInt row.index) ]
+                                , span [ class "onyx-account-session__state" ] [ text row.state ]
+                                , if row.current then span [ class "onyx-account-session__current" ] [ text "This connection" ]
+                                  else button [ type_ "button", class "onyx-account-session__drop", attribute "aria-label" ("Sign out local session " ++ String.fromInt row.index), onClick (SessionDropRequested { index = row.index }) ] [ text "Sign out" ]
+                                ]
+                        )
+                        inventory.localRows
+                    )
+
+
+inventoryMessage : RuntimeDomain.SessionInventoryView -> String
+inventoryMessage inventory =
+    case inventory.status of
+        "pending" -> "Loading session inventory…"
+        "partial" -> "The inventory is partial. Refresh before relying on it."
+        "stale" -> "This inventory is stale. Refresh to reconcile it."
+        "unknown" -> "The inventory result is unknown. Refresh explicitly to check again."
+        "unsupported" -> "This server does not provide this session inventory."
+        "failed" -> "The session inventory could not be loaded."
+        _ -> String.fromInt (List.length inventory.localRows + List.length inventory.meshRows) ++ " rows were returned."
+
+
+meshSessionPanel : Model -> Html Msg
+meshSessionPanel model =
+    let
+        inventory = model.sessionInventoryView
+        revocation = model.sessionRevocationView
+        scanRef = Maybe.andThen .scanRef inventory
+        canContinue = Maybe.map (\view -> view.mode == "mesh" && view.continuationAvailable && view.scanRef /= Nothing && view.status /= "unknown") inventory == Just True
+    in
+    section [ class "onyx-account-section", attribute "data-testid" "mesh-session-inventory" ]
+        ([ h4 [ class "onyx-account-section__title" ] [ text "Other server attachments" ]
+         , p [ class "onyx-account-hint" ] [ text "Mesh attachment groups are server-wide identities. Local session IDs and mesh group references are separate selectors." ]
+         , div [ class "onyx-account-actions" ]
+            [ button [ type_ "button", disabled (model.runtimeDomainPending /= Nothing), onClick (App.RuntimeDomainActionRequested RuntimeDomain.MeshSessionList) ] [ text "Refresh mesh inventory" ]
+            , if canContinue then button [ type_ "button", disabled (model.runtimeDomainPending /= Nothing), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.MeshSessionNext (Maybe.withDefault "" scanRef))) ] [ text "Load next mesh page" ] else text ""
+            ]
+         ]
+            ++ (case inventory of
+                    Just view ->
+                        if view.mode /= "mesh" then [] else
+                            [ p [ attribute "role" "status", attribute "aria-live" "polite" ]
+                                [ text (inventoryMessage view ++ " Pages: " ++ String.fromInt view.pageCount ++ ". " ++ (if view.scanComplete then "Scan complete; coverage is reported per group." else "More pages may remain.")) ]
+                            , if List.isEmpty view.meshRows then p [ class "onyx-account-empty" ] [ text "No mesh rows are available in this scan." ] else
+                                ul [] (List.map meshSessionRow view.meshRows)
+                            ]
+                    Nothing -> [ p [ class "onyx-account-empty" ] [ text "Mesh inventory has not been requested." ] ]
+               )
+            ++ (case revocation of
+                    Just state ->
+                        [ p [ attribute "role" "status", attribute "aria-live" "polite" ] [ text ("Mesh revoke " ++ state.status ++ Maybe.withDefault "" (Maybe.map (\reason -> " (" ++ reason ++ ")") state.reason)) ]
+                        , if List.member state.status [ "completion-unknown", "preflight-pending", "local-denial-committed" ] then
+                            div [ class "onyx-account-actions" ]
+                                [ button [ type_ "button", disabled (model.runtimeDomainPending /= Nothing), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.MeshSessionReconcile state.revokeRef)) ] [ text "Reconcile this revoke" ]
+                                , button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.MeshSessionDismiss state.revokeRef)) ] [ text "Dismiss unresolved revoke" ]
+                                ]
+                          else text ""
+                        ]
+                    Nothing -> []
+               )
+        )
+
+
+meshSessionRow : RuntimeDomain.SessionMeshRow -> Html Msg
+meshSessionRow row =
+    li [ attribute "data-testid" "mesh-session-row" ]
+        [ p [] [ text ("Group " ++ row.groupRef ++ " · node " ++ row.nodeHex ++ " · " ++ row.state) ]
+        , p [] [ text ("Inventory " ++ row.inventory ++ "; coverage " ++ row.coverage ++ "; observed " ++ row.observedAt) ]
+        , case row.attachmentId of
+            Just aid -> code [] [ text ("Attachment " ++ aid) ]
+            Nothing -> text ""
+        , button [ type_ "button", disabled (List.member row.state [ "revoked", "unknown" ]), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.MeshSessionRevoke row.groupRef)) ] [ text "Revoke this group" ]
+        ]
+
+
+accountCommunitySection : Model -> Html Msg
+accountCommunitySection model =
+    let
+        view = model.accountCommunityView
+        busy = model.runtimeDomainPending /= Nothing
+        inputValue = String.trim model.accountCommunityInput
+    in
+    section [ class "onyx-account-section", attribute "data-testid" "account-community" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text "Account lists" ]
+        , p [ class "onyx-account-hint" ] [ text "Changes are shown only after a matching server acknowledgement and a fresh authoritative list." ]
+        , div [ class "onyx-account-actions" ]
+            [ button [ type_ "button", disabled busy, onClick (App.RuntimeDomainActionRequested RuntimeDomain.AutojoinList) ] [ text "Refresh autojoin list" ]
+            , button [ type_ "button", disabled busy, onClick (App.RuntimeDomainActionRequested RuntimeDomain.GroupList) ] [ text "Refresh nick groups" ]
+            ]
+        , label [ for "account-community-input" ] [ text "Channel or nick" ]
+        , input [ id "account-community-input", type_ "text", maxlength 128, value model.accountCommunityInput, onInput AccountCommunityInput, attribute "autocomplete" "off" ] []
+        , div [ class "onyx-account-actions" ]
+            [ button [ type_ "button", disabled (busy || String.isEmpty inputValue), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AutojoinAdd inputValue)) ] [ text "Add autojoin channel" ]
+            , button [ type_ "button", disabled (busy || String.isEmpty inputValue), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.GroupAdd inputValue)) ] [ text "Add nick group member" ]
+            ]
+        , case view of
+            Nothing -> p [ class "onyx-account-empty" ] [ text "Refresh a list to review the server state." ]
+            Just state ->
+                div [ attribute "role" "status", attribute "aria-live" "polite" ]
+                    ([ p [] [ text (state.section ++ " list: " ++ state.status ++ Maybe.withDefault "" (Maybe.map (\reason -> " (" ++ reason ++ ")") state.reason)) ] ]
+                        ++ (if state.section == "autojoin" then
+                                [ ul [] (List.map (\channel -> li [] [ text channel, button [ type_ "button", disabled busy, onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AutojoinRemove channel)) ] [ text "Remove" ] ]) state.autojoinRows) ]
+                            else
+                                [ ul [] (List.map (\member -> li [] [ text (member.nick ++ (if member.primary then " · primary" else "")), if member.primary then text "" else button [ type_ "button", disabled busy, onClick (App.RuntimeDomainActionRequested (RuntimeDomain.GroupPrimary member.nick)) ] [ text "Make primary" ], button [ type_ "button", disabled busy, onClick (App.RuntimeDomainActionRequested (RuntimeDomain.GroupRemove member.nick)) ] [ text "Remove" ] ]) state.groupRows) ]
+                           )
+                    )
+        ]
+
+
+draftRecoverySection : Model -> Html Msg
+draftRecoverySection model =
+    let
+        view = model.draftRecoveryView
+        activeTarget = model.activeChannel
+    in
+    section [ class "onyx-account-section", attribute "data-testid" "draft-recovery" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text "Recover a saved draft" ]
+        , p [ class "onyx-account-hint" ] [ text "Choose an unlocked local workspace first. Recovery only previews text for the matching conversation; it never sends or saves it." ]
+        , button [ type_ "button", disabled (model.runtimeDomainPending /= Nothing), onClick (App.RuntimeDomainActionRequested RuntimeDomain.DraftRecoveryList) ] [ text "List saved drafts in the selected workspace" ]
+        , case view of
+            Nothing -> p [ class "onyx-account-empty" ] [ text "No saved-draft list has been loaded." ]
+            Just state ->
+                div []
+                    ([ p [ attribute "role" "status" ] [ text ("Draft list: " ++ state.status ++ Maybe.withDefault "" (Maybe.map (\reason -> " (" ++ reason ++ ")") state.reason)) ]
+                     , if state.truncated then p [ attribute "role" "status" ] [ text "Showing up to 100 drafts; additional drafts remain stored." ] else text ""
+                     , ul [] (List.map (\item -> li [] [ text (item.conversationId ++ " · revision " ++ String.fromFloat item.revision ++ " · " ++ String.fromInt item.ciphertextBytes ++ " encrypted bytes"), button [ type_ "button", disabled (model.runtimeDomainPending /= Nothing || activeTarget /= Just item.conversationId), onClick (App.RuntimeDomainActionRequested (RuntimeDomain.DraftRecover item.draftRef)) ] [ text "Preview in this conversation" ] ]) state.items)
+                     ]
+                        ++ (case model.draftRecoveryPreview of
+                                Just preview ->
+                                    [ section [ attribute "role" "group", attribute "aria-label" "Recovered draft preview" ]
+                                        [ h4 [] [ text "Review recovered draft" ]
+                                        , p [] [ text ("Conversation: " ++ preview.conversationId ++ ". Review the text below before replacing the composer.") ]
+                                        , pre [] [ text preview.text ]
+                                        , button [ type_ "button", onClick DraftRecoveryPreviewInserted ] [ text "Replace composer with this draft" ]
+                                        , button [ type_ "button", onClick DraftRecoveryPreviewDismissed ] [ text "Dismiss preview" ]
+                                        ]
+                                    ]
+                                Nothing -> []
+                           )
+                    )
+        ]
 
 
 sessionRow : Session.AccountSessionRow -> Html Msg
@@ -501,7 +755,20 @@ pushStatusCopy model =
 
 securitySection : Model -> Html Msg
 securitySection model =
-    section [ class "onyx-account-section", id "acct-two-factor-authentication-title" ]
+    if model.runtimeOwnerStamp /= Nothing then
+        section [ class "onyx-account-section", id "acct-two-factor-authentication-title" ]
+            [ h3 [ class "onyx-account-section__title" ] [ text "Two-factor authentication" ]
+            , p [ class "onyx-account-hint", attribute "role" "status" ]
+                [ text "Authenticator secrets and confirmation codes are handled in the private local-services panel. They are never shown in this account view." ]
+            , div [ class "onyx-account-actions" ]
+                [ button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "totp-status" Nothing Nothing)) ] [ text "Check authenticator status" ]
+                , button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "totp-enroll" Nothing Nothing)) ] [ text "Set up authenticator" ]
+                , button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "totp-disable" Nothing Nothing)) ] [ text "Disable authenticator" ]
+                ]
+            ]
+
+    else
+        section [ class "onyx-account-section", id "acct-two-factor-authentication-title" ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Two-factor authentication" ]
          , p [ class "onyx-account-hint" ]
             [ text "A six-digit code from your authenticator app, required at every login." ]
@@ -1107,7 +1374,25 @@ passwordError model =
 
 recoverySection : Model -> Html Msg
 recoverySection model =
-    section
+    if model.runtimeOwnerStamp /= Nothing then
+        section
+            [ class "onyx-account-section"
+            , id "acct-recovery-title"
+            , attribute "data-testid" "recovery-codes-section"
+            ]
+            [ h3 [ class "onyx-account-section__title" ] [ text "Recovery codes" ]
+            , p [ class "onyx-account-hint", attribute "role" "status" ]
+                [ text "Recovery-code status, login, clearing, and one-time display are handled in the private local-services panel. Codes are not retained in this account view." ]
+            , div [ class "onyx-account-actions" ]
+                [ button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "recovery-status" Nothing Nothing)) ] [ text "Check recovery-code status" ]
+                , button [ type_ "button", onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "recovery-generate" Nothing Nothing)) ] [ text "Generate new recovery codes" ]
+                , button [ type_ "button", onClick (App.RuntimePrivateAccountFormRequested { kind = "recovery-password", action = "recovery-clear", account = Nothing }) ] [ text "Clear recovery codes" ]
+                , button [ type_ "button", onClick (App.RuntimePrivateAccountFormRequested { kind = "recovery-code", action = "recovery-login", account = Nothing }) ] [ text "Sign in with a recovery code" ]
+                ]
+            ]
+
+    else
+        section
         [ class "onyx-account-section"
         , id "acct-recovery-title"
         , attribute "data-testid" "recovery-codes-section"
@@ -1326,7 +1611,7 @@ passkeyRegisterForm model =
             [ type_ "submit"
             , class "onyx-account-passkey-add"
             , attribute "data-testid" "account-passkey-add"
-            , disabled model.passkey.busy
+            , disabled (model.passkey.busy || Maybe.map (\view -> view.status == "pending") model.passkeyManagementView == Just True)
             ]
             [ text
                 (if model.passkey.busy then
@@ -1363,10 +1648,26 @@ passkeyListWrap : Model -> Html Msg
 passkeyListWrap model =
     let
         listing =
-            model.passkey.pendingList /= Nothing
+            Maybe.map (\view -> view.status == "pending") model.passkeyManagementView == Just True
+
+        rows =
+            model.passkeyManagementView |> Maybe.map .rows |> Maybe.withDefault []
 
         empty =
-            List.isEmpty model.passkey.creds
+            List.isEmpty rows
+
+        statusNote =
+            model.passkeyManagementView
+                |> Maybe.andThen
+                    (\view ->
+                        case ( view.status, view.reason ) of
+                            ( "unknown", _ ) -> Just "The passkey operation outcome is unknown. Refresh the list before trying again."
+                            ( "rejected", Just "not-owned" ) -> Just "That passkey is not available to this account."
+                            ( "rejected", Just "not-found" ) -> Just "That passkey could not be found. Refresh the list."
+                            ( "rejected", Just "owner-changed" ) -> Just "The account changed before the passkey operation completed. Refresh the list."
+                            ( "rejected", _ ) -> Just "The passkey operation could not be completed."
+                            _ -> Nothing
+                    )
     in
     div [ class "onyx-account-passkey-list" ]
         [ div [ class "onyx-account-actions" ]
@@ -1375,7 +1676,7 @@ passkeyListWrap model =
                 [ type_ "button"
                 , class "onyx-account-passkey-refresh"
                 , attribute "data-testid" "account-passkey-refresh"
-                , disabled listing
+                , disabled (listing || model.passkey.busy)
                 , onClick PasskeyListRequested
                 ]
                 [ text
@@ -1387,11 +1688,12 @@ passkeyListWrap model =
                     )
                 ]
             ]
+        , Maybe.withDefault (text "") (Maybe.map (\note -> p [ class "onyx-account-error", attribute "role" "status" ] [ text note ]) statusNote)
         , if listing && empty then
             p [ class "onyx-account-empty", attribute "data-testid" "passkeys-loading" ]
                 [ text "Loading your passkeys…" ]
 
-          else if model.passkey.supported /= Nothing && not listing && empty then
+          else if model.passkeyManagementView /= Nothing && not listing && empty then
             p [ class "onyx-account-empty", attribute "data-testid" "passkeys-empty" ]
                 [ text "No passkeys yet. Add one above to sign in without a password." ]
 
@@ -1400,14 +1702,14 @@ passkeyListWrap model =
 
           else
             ul [ class "onyx-account-cert-list", attribute "aria-label" "Your passkeys" ]
-                (List.map (passkeyRow model) model.passkey.creds)
+                (List.map (passkeyRow model) rows)
         ]
 
 
-passkeyRow : Model -> PasskeyCredential -> Html Msg
+passkeyRow : Model -> RuntimeDomain.PasskeyRow -> Html Msg
 passkeyRow model cred =
     li [ class "onyx-account-cert-item", attribute "data-testid" "passkey-row" ]
-        [ if model.passkeyRenamingId == Just cred.id then
+        [ if model.passkeyRenamingId == Just cred.credentialRef then
             passkeyRenameForm model cred
 
           else
@@ -1434,7 +1736,7 @@ passkeyRow model cred =
                             [ type_ "button"
                             , class "onyx-account-passkey-rename"
                             , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
-                            , onClick (PasskeyRenameStarted { id = cred.id, label = cred.label })
+                            , onClick (PasskeyRenameStarted { id = cred.credentialRef, label = cred.label })
                             ]
                             [ text "Rename" ]
                      ]
@@ -1444,7 +1746,7 @@ passkeyRow model cred =
         ]
 
 
-passkeyDisplayName : PasskeyCredential -> String
+passkeyDisplayName : RuntimeDomain.PasskeyRow -> String
 passkeyDisplayName cred =
     if String.isEmpty cred.label then
         "passkey"
@@ -1453,28 +1755,28 @@ passkeyDisplayName cred =
         cred.label
 
 
-passkeyMeta : PasskeyCredential -> String
+passkeyMeta : RuntimeDomain.PasskeyRow -> String
 passkeyMeta cred =
     let
         added =
-            case cred.createdAt of
+            case String.toFloat cred.createdUnix of
                 Nothing ->
                     ""
 
                 Just seconds ->
-                    "Added " ++ String.left 10 (millisToIso (toFloat seconds * 1000)) ++ " · "
+                    "Added " ++ String.left 10 (millisToIso (seconds * 1000)) ++ " · "
     in
-    added ++ "Used " ++ String.fromInt cred.signCount ++ "×"
+    added ++ "Used " ++ cred.signCount ++ "×"
 
 
-passkeyRemoveControl : Model -> PasskeyCredential -> List (Html Msg)
+passkeyRemoveControl : Model -> RuntimeDomain.PasskeyRow -> List (Html Msg)
 passkeyRemoveControl model cred =
-    if model.passkeyRemoveArmed == Just cred.id then
+    if model.passkeyRemoveArmed == Just cred.credentialRef then
         [ span [ class "onyx-account-passkey-confirm", attribute "role" "group", attribute "aria-label" "Confirm removal" ]
             [ button
                 [ type_ "button"
                 , class "onyx-account-passkey-remove-go"
-                , disabled model.passkey.busy
+                , disabled (model.passkey.busy || Maybe.map (\view -> view.status == "pending") model.passkeyManagementView == Just True)
                 , onClick PasskeyRemoveConfirmed
                 ]
                 [ text "Remove?" ]
@@ -1492,24 +1794,24 @@ passkeyRemoveControl model cred =
             [ type_ "button"
             , class "onyx-account-passkey-remove"
             , attribute "aria-label" ("Remove " ++ passkeyDisplayName cred)
-            , onClick (PasskeyRemoveArmed cred.id)
+            , onClick (PasskeyRemoveArmed cred.credentialRef)
             ]
             [ text "Remove" ]
         ]
 
 
-passkeyRenameForm : Model -> PasskeyCredential -> Html Msg
+passkeyRenameForm : Model -> RuntimeDomain.PasskeyRow -> Html Msg
 passkeyRenameForm model cred =
     form
         [ class "onyx-account-passkey-rename"
         , onSubmit PasskeyRenameSubmitted
         , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
         ]
-        [ label [ class "onyx-account-field-label", for ("acct-passkey-rename-" ++ cred.id) ]
+        [ label [ class "onyx-account-field-label", for "acct-passkey-rename" ]
             [ text "New name" ]
         , input
             [ class "onyx-account-field"
-            , id ("acct-passkey-rename-" ++ cred.id)
+            , id "acct-passkey-rename"
             , type_ "text"
             , value model.passkeyRenameValue
             , onInput PasskeyRenameInput

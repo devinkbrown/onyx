@@ -1,0 +1,20 @@
+Validated roadmap evidence ledger: 53 packages, 74 scenarios, 11 milestones; 2 package acceptances have current source-bound reviews. T/M acceptance remains row-scoped.
+Validated 4 catalog-bound Elm transcript cases; deterministic seed 11031904.
+$ /tmp/onyx-elm-tools/elm make src/Main.elm --output /dev/null
+Compiling ...Compiling (1)Compiling (2)Compiling (3)Compiling (4)Compiling (5)Compiling (6)Compiling (7)Compiling (8)Compiling (9)Compiling (10)Compiling (11)Compiling (12)Compiling (13)Compiling (14)Compiling (15)Compiling (16)Compiling (17)Compiling (18)Compiling (19)Compiling (20)Compiling (21)Compiling (22)Compiling (23)Compiling (24)Compiling (25)Compiling (26)Compiling (27)Compiling (28)Compiling (29)Compiling (30)Compiling (31)Compiling (32)Compiling (33)Compiling (34)Compiling (35)Compiling (36)Compiling (37)Compiling (38)Compiling (39)Compiling (40)Success! Compiled 40 modules.
+$ /tmp/onyx-elm-tools/node_modules/.bin/elm-test --seed 11031904 --fuzz 100
+CompilingCompiling > Starting tests
+
+elm-test 0.19.1-revision17
+--------------------------
+
+Running 2704 tests. To reproduce these results, run: elm-test --fuzz 100 --seed 11031904
+
+
+TEST RUN PASSED
+
+Duration: 6597 ms
+Passed:   2704
+Failed:   0
+
+Receipt: /tmp/onyx-elm-verification-final/receipts/elm-full-1793846100801.json

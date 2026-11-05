@@ -9,19 +9,15 @@ Fold ownership: open/query/index/save-name state and the bounded live
 filter live in `App` (`searchResults`); this module renders the
 oracle's chrome and hooks.
 
-Documented narrowings: the history-off branch stays ahead — the
-panel covers the live conversation plus saved searches plus live-tier
-recall chips plus mode-switched device-memory hits ("Saved on this
-device", open-via-travel; hybrid/exact/semantic toggle mirrors the
-in-search mode cycle) plus archived server results ("Archived
-history" with deep search over Ctrl+Enter, open-navigates without
-server time-travel until the CHATHISTORY request half lands), and
-opens against the active channel; label elements use `aria-label` (no
-`sr-only` utility in `app.css`); the Room-ledger link stays with the
-Stats slice; nav arrows are text glyphs (the oracle inlines SVG).
+The history-off branch matches `MessageSearch.tsx`: with no open
+conversation and device history off, the field is disabled and the
+panel offers Appearance. With history on and no conversation, the
+count is the remembered vault hits. Label elements use `aria-label`
+(no `sr-only` utility in `app.css`). Nav arrows are text glyphs.
 -}
 
 import App exposing (Model, Msg(..))
+import Dict
 import Html exposing (Html, button, div, form, input, li, p, section, small, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, id, maxlength, placeholder, title, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
@@ -118,6 +114,35 @@ panel model =
 
         query =
             String.trim model.searchQuery
+
+        hasConversation =
+            model.activeChannel /= Nothing
+
+        historyOn =
+            model.prefs.localHistory
+
+        remembered =
+            List.length (App.vaultHits model)
+
+        placeholderText =
+            if hasConversation then
+                "Find messages in " ++ target
+
+            else if historyOn then
+                "Search messages saved on this device"
+
+            else
+                "Device history is turned off"
+
+        countText =
+            if not hasConversation && not historyOn then
+                "History off"
+
+            else if not hasConversation then
+                String.fromInt remembered ++ " remembered"
+
+            else
+                Search.countLabel count position
     in
     div [ class "onyx-message-search", attribute "role" "search", attribute "aria-label" "Message search", on "keydown" panelKey ]
         [ div [ class "onyx-message-search__surface" ]
@@ -132,13 +157,14 @@ panel model =
                     , attribute "spellcheck" "false"
                     , attribute "aria-label" "Search messages"
                     , attribute "aria-describedby" statusId
-                    , placeholder ("Find messages in " ++ target)
+                    , placeholder placeholderText
+                    , disabled (not hasConversation && not historyOn)
                     , onInput (\next -> SearchQuery { query = next })
                     , on "keydown" searchKey
                     ]
                     []
                 , span [ class "onyx-message-search__count", attribute "aria-hidden" "true" ]
-                    [ text (Search.countLabel count position) ]
+                    [ text countText ]
                 ]
             , button
                 [ type_ "button"
@@ -177,6 +203,14 @@ panel model =
                     ]
                     [ text "↓" ]
                 ]
+            , if not hasConversation && not historyOn then
+                div [ class "onyx-message-search__history-off", attribute "role" "status", attribute "data-testid" "history-off" ]
+                    [ span [] [ text "Device history is off, so there are no remembered conversations to search." ]
+                    , button [ type_ "button", class "onyx-message-search__deep", onClick SearchOpenHistory ] [ text "Open history preferences" ]
+                    ]
+
+              else
+                text ""
             , savedSection model query
             , recallSection model
             , serverSection model query
@@ -264,6 +298,24 @@ vaultRow model hit =
             , onClick (VaultOpenHit { target = hit.target, at = hit.at })
             ]
             [ span [ class "onyx-message-search__vault-target" ] [ text hit.target ]
+            , case Dict.get (String.toLower hit.target) model.retentionReadScopes of
+                Just scope ->
+                    if scope.kind == "cached" then
+                        case scope.lastSyncMs of
+                            Just lastSyncMs ->
+                                small [] [ text ("Cached · last synchronized " ++ App.formatRowClock model.zone model.prefs.clock (round lastSyncMs)) ]
+
+                            Nothing ->
+                                small [] [ text "Cached · last synchronization time unavailable" ]
+
+                    else if scope.kind == "unknown" then
+                        small [] [ text "Retention policy unknown; results may be incomplete" ]
+
+                    else
+                        text ""
+
+                Nothing ->
+                    text ""
             , if hit.at <= 0 then
                 text ""
 

@@ -316,7 +316,7 @@
   overflow-wrap: anywhere;
   white-space: normal;
   color: var(--paper);
-  font-size: var(--text-sm, 0.8125rem);
+  font-size: max(1rem, var(--text-sm, 0.8125rem));
   font-weight: 600;
   line-height: 1.25;
 }

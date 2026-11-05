@@ -116,7 +116,7 @@
   inset: 0 auto 0 0;
   width: 3px;
   content: "";
-  background: var(--lapis);
+  background: var(--commercial-action-primary, var(--shu));
 }
 .home-signal-strip__lead {
   min-width: 0;
@@ -125,12 +125,12 @@
   display: block;
   margin-bottom: 7px;
   color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: 0.67rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .home-signal-strip__headline {
   display: flex;
@@ -169,12 +169,12 @@
 }
 .home-signal-strip__metric dt {
   color: var(--paper-mute);
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-family: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: none;
 }
 .home-signal-strip__metric dd {
   margin: 0;

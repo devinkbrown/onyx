@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 /home/kain/onyx
+
+
+ Test Files  1 passed (1)
+      Tests  123 passed (123)
+   Start at  11:05:43
+   Duration  2.07s (transform 244ms, setup 474ms, import 59ms, tests 86ms, environment 1.18s)
+

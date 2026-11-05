@@ -35,6 +35,12 @@ export type CallsHubProps = {
   onOpenRooms: () => void;
   /** Navigate to the call channel or DM peer without mutating voice state. */
   onReturnToCall: (target: string) => void;
+  /**
+   * What happened to the most recent call, when known. Rendered only while
+   * idle so a finished call is acknowledged instead of silently vanishing.
+   * The hub never invents this — the parent supplies it or omits it.
+   */
+  lastCallOutcome?: CallOutcome | null;
 };
 
 export type CallsHubPresentation =
@@ -43,6 +49,30 @@ export type CallsHubPresentation =
   | 'ringing_out'
   | 'provisional'
   | 'established';
+
+/** What happened to the most recent call, when the parent knows. */
+export type CallOutcome = 'ended' | 'failed' | 'dropped';
+
+/** Honest outcome copy — plain language, no protocol detail, no blame. */
+export function callOutcomeCopy(outcome: CallOutcome): { title: string; detail: string } {
+  switch (outcome) {
+    case 'ended':
+      return {
+        title: 'That call ended.',
+        detail: 'Start the next one from a room whenever you are ready.',
+      };
+    case 'failed':
+      return {
+        title: 'Couldn\u2019t start the call.',
+        detail: 'Check the room\u2019s call controls and try again.',
+      };
+    case 'dropped':
+      return {
+        title: 'The connection dropped.',
+        detail: 'Rejoin from the room \u2014 your place in the conversation is kept.',
+      };
+  }
+}
 
 /** Pure classifier — tests and UI share the same truth table. */
 export function classifyCallsHubPresentation(
@@ -129,6 +159,10 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
     return (p === 'provisional' || p === 'established') && Boolean(roomLabel());
   });
 
+  /** Idle-only outcome: a live call always wins over history. */
+  const idleOutcome = (): CallOutcome | null =>
+    presentation() === 'idle' ? (props.lastCallOutcome ?? null) : null;
+
   return (
     <main
       class="shell-calls-hub"
@@ -147,6 +181,23 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
         <h1 id="shell-calls-title">{title()}</h1>
         <p class="shell-calls-intro">{intro()}</p>
       </header>
+
+      <Show when={idleOutcome()}>
+        {(outcome) => {
+          const copy = callOutcomeCopy(outcome());
+          return (
+            <p
+              class="shell-calls-outcome"
+              role="status"
+              data-testid="calls-hub-outcome"
+              data-outcome={outcome()}
+            >
+              <strong>{copy.title}</strong>
+              <span>{copy.detail}</span>
+            </p>
+          );
+        }}
+      </Show>
 
       <p class="shell-calls-truth" role="note">
         <strong>What happens next</strong>

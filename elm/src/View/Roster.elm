@@ -7,19 +7,21 @@ PREFIX declaration order first (mirroring `memberGroups.ts`), so an
 exotic server letter ranks instead of dropping.
 -}
 
-import App exposing (Channel, Member, Model, Msg(..))
+import App exposing (Member, Model, Msg(..))
 import Avatar
 import Dict
 import Html exposing (Html, button, div, h2, li, section, span, text, ul)
-import Html.Attributes exposing (attribute, class, classList)
+import Html.Attributes exposing (attribute, class, classList, id)
 import Html.Events exposing (onClick)
+import Html.Lazy as Lazy
 import Modes
 import View.Stewardship exposing (roomCareButton)
+import View.Bans exposing (banPanel)
 
 
 roster : Model -> Html Msg
 roster model =
-    section [ class "onyx-roster" ]
+    section [ class "onyx-roster", id "client-members", attribute "aria-label" "Members" ]
         [ h2 [] [ text "Members" ]
         , case model.activeChannel of
             Nothing ->
@@ -32,39 +34,46 @@ roster model =
 
                     Just channel ->
                         div []
-                            ([ roomCareButton model name ]
-                                ++ rosterGroups model channel
-                            )
+                            [ roomCareButton model name
+                            , Lazy.lazy4 rosterGroups
+                                channel.name
+                                channel.members
+                                model.isupport.prefixOrder
+                                model.isupport.modeToPrefix
+                            , banPanel model name
+                            ]
         ]
 
 
-rosterGroups : Model -> Channel -> List (Html Msg)
-rosterGroups model channel =
+rosterGroups : String -> Dict.Dict String Member -> List Char -> Dict.Dict Char Char -> Html Msg
+rosterGroups channelName channelMembers prefixOrder modeToPrefix =
     let
         withRoles =
             List.map
-                (\m -> ( Modes.resolveRole m.modes model.isupport.prefixOrder model.isupport.modeToPrefix, m ))
-                (Dict.values channel.members)
+                (\m -> ( Modes.resolveRole m.modes prefixOrder modeToPrefix, m ))
+                (Dict.values channelMembers)
 
         group key =
             withRoles
                 |> List.filter (\( role, _ ) -> role.key == key)
                 |> List.sortWith (\( _, a ) ( _, b ) -> Modes.compareNicks a.nick b.nick)
     in
-    Modes.roleSequence
-        |> List.concatMap
-            (\key ->
-                case group key of
-                    [] ->
-                        []
+    div []
+        (Modes.roleSequence
+            |> List.concatMap
+                (\key ->
+                    case group key of
+                        [] ->
+                            []
 
-                    members ->
-                        [ div [ class "onyx-roster-group" ]
-                            [ h2 [] [ text (Modes.groupLabelFor key ++ " (" ++ String.fromInt (List.length members) ++ ")") ]
-                            , ul [] (List.map (\( role, m ) -> rosterRow channel.name role m) members)
+                        members ->
+                            [ div [ class "onyx-roster-group" ]
+                                [ h2 [] [ text (Modes.groupLabelFor key ++ " (" ++ String.fromInt (List.length members) ++ ")") ]
+                                , ul [] (List.map (\( role, m ) -> rosterRow channelName role m) members)
+                                ]
                             ]
-                        ]
-            )
+                )
+        )
 
 
 rosterRow : String -> Modes.ResolvedRole -> Member -> Html Msg

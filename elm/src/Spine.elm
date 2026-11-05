@@ -681,15 +681,14 @@ privsQuery =
 -- ── Folds ────────────────────────────────────────────────────────────
 
 
-{-| Re-dispatch of one raw `EVENT` line. MEDIA presence re-shapes into
-the NOTE MEDIA param order the media handler consumes; WEBAUTHN drops
-the `<me>` target so the existing standard-reply fold stays the single
-source of truth. Every other plane is ignored, like the oracle.
+{-| Dispatch one raw `EVENT` line into a typed family payload. Each
+payload contains the family marker followed by its event-specific
+fields. Every other plane is ignored.
 -}
 type EventRedispatch
     = EventIgnored
-    | EventAsNote { params : List String }
-    | EventAsPasskey { params : List String }
+    | EventAsMedia { params : List String }
+    | EventAsWebAuthn { params : List String }
 
 
 foldEventLine : Wire.IrcMessage -> EventRedispatch
@@ -700,7 +699,7 @@ foldEventLine message =
     else
         case List.map String.toUpper (List.take 2 message.params) of
             _ :: "MEDIA" :: [] ->
-                EventAsNote
+                EventAsMedia
                     { params =
                         [ "MEDIA"
                         , paramAt 3 message.params
@@ -711,7 +710,7 @@ foldEventLine message =
                     }
 
             _ :: "WEBAUTHN" :: [] ->
-                EventAsPasskey { params = List.drop 1 message.params }
+                EventAsWebAuthn { params = List.drop 1 message.params }
 
             _ ->
                 EventIgnored

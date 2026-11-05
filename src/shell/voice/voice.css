@@ -21,7 +21,9 @@
   background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
+  box-shadow:
+    inset 0 2px 0 color-mix(in oklab, var(--shu, #ff6f61) 72%, var(--paper)),
+    inset 0 1px 0 color-mix(in oklab, var(--paper) 8%, transparent);
   padding: clamp(10px, 1.3vw, 16px);
   gap: clamp(8px, 1vw, 12px);
   box-sizing: border-box;
@@ -57,11 +59,16 @@
   cursor: pointer;
 }
 
-.voice-stage__size-btn:hover,
+.voice-stage__size-btn:hover {
+  color: var(--paper);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+}
+
 .voice-stage__size-btn:focus-visible {
   color: var(--paper);
   background: color-mix(in oklab, var(--lapis) 22%, transparent);
-  outline: none;
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .voice-stage__size-btn[aria-pressed='true'] {
@@ -305,7 +312,7 @@
   background:
     linear-gradient(115deg, transparent 8%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 12%, transparent 18%),
     linear-gradient(102deg, transparent 58%, color-mix(in oklab, var(--lapis) 10%, transparent) 63%, transparent 70%);
-  opacity: 0.42;
+  opacity: 0.16;
   transform: translateX(-8%);
   animation: voice-current-drift 18s var(--ease) infinite alternate;
 }
@@ -323,11 +330,17 @@
   z-index: 1;
 }
 
-/* The generic child stacking rule must not pull the size switcher back into
-   flex flow; it is overlay chrome, not a blank row above the participant. */
+/* The generic child stacking rule must not pull the size switcher or the
+   status line back into flex flow. Both are overlays. */
 .voice-stage > .voice-stage__chrome {
   position: absolute;
   z-index: 5;
+}
+
+.voice-stage > .voice-stage__state {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
 }
 
 /* Grid layout adapts to participant count */
@@ -527,12 +540,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 9px 7px;
-  background: color-mix(in oklab, var(--ink) 86%, transparent);
+  background: color-mix(in oklab, var(--ink) 94%, var(--stone));
   border-top: 1px solid var(--seam-faint);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   color: var(--paper);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .voice-tile__nick {
@@ -542,6 +555,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--paper);
+  font-weight: 700;
 }
 
 .voice-tile__you-tag {
@@ -639,6 +653,7 @@
   .voice-tile__hand-badge {
     animation: none !important;
   }
+  .voice-stage::before { transform: none; opacity: 0.08; }
   .voice-tile__pin,
   .voice-tile__pip {
     transition: opacity var(--dur) var(--ease);
@@ -1560,6 +1575,7 @@
       radial-gradient(circle at 50% 24%, color-mix(in oklab, var(--lapis-deep) 24%, transparent), transparent 55%),
       color-mix(in oklab, var(--stone-2) 70%, var(--ink));
     box-shadow:
+      inset 0 2px 0 color-mix(in oklab, var(--shu, #ff6f61) 72%, var(--paper)),
       inset 0 1px 0 color-mix(in oklab, var(--paper) 9%, transparent),
       0 16px 34px -28px color-mix(in oklab, var(--lapis) 62%, transparent);
   }
@@ -1580,9 +1596,46 @@
     font-size: 14px;
   }
 
+  /* The size toolbar owns the top-left. The status hugs its text and stops
+     before the right-hand tile actions, so an empty stretch cannot steal clicks. */
+  .voice-stage > .voice-stage__state {
+    top: 12px;
+    left: 150px;
+    right: auto;
+    width: max-content;
+    max-width: calc(100% - 246px);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .voice-stage--size-compact .voice-tile__topbar {
+    top: auto;
+    right: 8px;
+    bottom: 44px;
+  }
+
+  /* A phone has no hover. Keep pin and picture-in-picture visible and tappable
+     above the name, clear of the status line. */
+  .voice-stage--size-compact .voice-tile__pin,
+  .voice-stage--size-compact .voice-tile__pip {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    opacity: 1;
+  }
+
   .voice-stage--size-compact {
-    padding: 10px;
-    max-height: 13rem;
+    height: 200px;
+    max-height: 200px;
+    padding: 8px;
+  }
+
+  .voice-stage--size-compact .voice-stage__grid {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    align-content: stretch;
   }
 
   .voice-stage--size-compact .voice-tile {
@@ -1591,9 +1644,16 @@
     border-radius: 16px;
   }
 
+  .voice-stage--size-compact .voice-stage__grid[data-count='1'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .voice-stage--size-compact .voice-stage__grid[data-count='1'] .voice-tile {
-    width: min(100%, 20rem);
-    max-width: 20rem;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    aspect-ratio: auto;
   }
 
   .voice-bar {
@@ -1717,17 +1777,17 @@
   .voice-stage {
     gap: 8px;
     padding: 8px;
-    /* Rem-based min-heights explode at 400% zoom — allow the short-viewport
-       reflow to own the box instead of forcing a tall empty tray. */
+    /* Rem-based min-heights explode at 400% zoom. Cap the dock at one
+       readable tile and let the participant grid scroll the rest. */
     min-height: 0;
-    max-height: 34dvh;
+    max-height: 192px;
   }
 
   .voice-stage--size-compact,
   .voice-stage--size-expanded {
     min-height: 0;
     height: auto;
-    max-height: 34dvh;
+    max-height: 192px;
   }
 
   .voice-stage__grid[data-count] {

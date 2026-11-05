@@ -444,7 +444,7 @@
   .stats-page .stats-view-nav,
   .stats-page .data-card,
   .stats-page .data-room-row { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-  .stats-page .stats-hero > h1 { max-width: 100%; font-size: 2.6rem; }
+  .stats-page .stats-hero > h1 { max-width: 100%; font-size: min(2.6rem, 20vw); }
   .stats-page .stats-hero > .sub,
   .stats-page .data-card p { font-size: 1rem; }
   .stats-page .stats-view-nav a,
@@ -453,6 +453,7 @@
   .stats-page .stats-room-search input,
   .stats-page .data-action,
   .stats-page .r-btn { width: 100%; min-width: 0; min-height: 44px; }
+  .stats-page .stats-window-options button { min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

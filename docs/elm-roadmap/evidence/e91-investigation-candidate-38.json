@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "onyx-e91-webtransport-server-investigation",
+  "startedAt": "2026-11-05T02:59:40.381Z",
+  "finishedAt": "2026-11-05T03:00:00.226Z",
+  "networkContainment": {
+    "status": "unknown",
+    "reason": "namespace-worker-incomplete"
+  },
+  "sourceBinding": null,
+  "probe": {
+    "schemaVersion": 1,
+    "status": "unknown",
+    "stage": "cleanup",
+    "failureCode": "cleanup-incomplete",
+    "wt": {
+      "ready": false,
+      "registration": "unknown",
+      "rawPingPong": null,
+      "textCanary": null,
+      "saslMechanisms": [],
+      "plainProbe": "unknown",
+      "sessionToken": "unknown"
+    },
+    "wss": {
+      "ready": false,
+      "auth": "unknown",
+      "saslMechanisms": [],
+      "joined": null,
+      "canaryEcho": null
+    },
+    "fallback": {
+      "explicitOnly": true,
+      "freshOwner": null,
+      "staleWtBlocked": null,
+      "canaryExactlyOnce": null
+    },
+    "externalParity": false
+  },
+  "interpretation": {
+    "expectedObservationComplete": false,
+    "wssPolicyEquivalent": false,
+    "mediaTransportAvailable": false
+  },
+  "limitations": [
+    "The namespace worker did not produce a final receipt; whether listeners were started is unknown."
+  ],
+  "teardown": {
+    "ownedChildrenStopped": false,
+    "privateScratchRemoved": true
+  }
+}

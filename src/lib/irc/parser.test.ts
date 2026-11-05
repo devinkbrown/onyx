@@ -13,8 +13,8 @@ import {
   parseStandardReply,
   MAX_STANDARD_REPLY_PARAMS,
   MAX_STANDARD_REPLY_TOKEN_LENGTH,
-  parseSessionTokenNote,
-  parseSessionMeshTokenNote,
+  parseSessionTokenCredential,
+  parseSessionMeshTokenCredential,
   isValidSessionCredential,
   MAX_SESSION_CREDENTIAL_LENGTH,
   buildSessionResumeLine,
@@ -48,6 +48,18 @@ describe('parseIRCMessage', () => {
     expect(m.prefix).toBe('eshmaki.me');
     expect(m.command).toBe('001');
     expect(m.params[0]).toBe('onyx');
+  });
+
+  it('accepts only the source-backed dotted E2EE group-control commands', () => {
+    for (const command of ['E2EE.KEYPACKAGE', 'E2EE.COMMIT', 'E2EE.WELCOME']) {
+      expect(parseIRCMessage(`:server.example ${command} #room account device :payload`).command).toBe(command);
+    }
+    expect(parseIRCMessage(':server.example e2ee.keypackage #room account device :payload').command)
+      .toBe('E2EE.KEYPACKAGE');
+
+    for (const command of ['E2EE.UNKNOWN', 'E2EE-KEYPACKAGE', 'E2EE..COMMIT', 'FOO.BAR', 'E2EE/COMMIT']) {
+      expect(parseIRCMessage(`${command} #room :payload`).command).toBe('');
+    }
   });
 
   it('parses IRCv3 message tags with escapes', () => {
@@ -211,6 +223,18 @@ describe('normalizeCase', () => {
   it('rfc1459 folds []\\^ to {}|~', () => {
     expect(normalizeCase('Foo[]\\^', 'rfc1459')).toBe('foo{}|~');
   });
+  it('strict-rfc1459 folds brackets and backslash but keeps caret distinct', () => {
+    expect(normalizeCase('Foo[]\\^', 'strict-rfc1459')).toBe('foo{}|^');
+    expect(normalizeCase('#room^', 'strict-rfc1459')).not.toBe(normalizeCase('#room~', 'strict-rfc1459'));
+  });
+  it('folds ASCII letters only, leaving non-ASCII letters byte-distinct', () => {
+    expect(normalizeCase('#Σ', 'rfc1459')).toBe('#Σ');
+    expect(normalizeCase('#Σ', 'rfc1459')).not.toBe(normalizeCase('#σ', 'rfc1459'));
+    expect(normalizeCase('#İ', 'ascii')).toBe('#İ');
+  });
+  it('keeps the RFC1459 fallback for unrecognized mappings', () => {
+    expect(normalizeCase('Foo[]\\^', 'future-mapping')).toBe('foo{}|~');
+  });
 });
 
 describe('selectSaslMechanism', () => {
@@ -228,10 +252,12 @@ describe('selectSaslMechanism', () => {
   });
 });
 
-describe('standard replies + SESSION notes', () => {
-  it('parses a NOTE standard reply', () => {
-    const r = parseStandardReply(parseIRCMessage(':srv NOTE REGISTER SUCCESS :done'));
-    expect(r).toMatchObject({ kind: 'NOTE', command: 'REGISTER', code: 'SUCCESS', description: 'done' });
+describe('standard replies + SESSION credentials', () => {
+  it('accepts source-shaped FAIL/WARN replies', () => {
+    expect(parseStandardReply(parseIRCMessage(':srv FAIL REGISTER INVALID :failed')))
+      .toMatchObject({ kind: 'FAIL', command: 'REGISTER', code: 'INVALID', description: 'failed' });
+    expect(parseStandardReply(parseIRCMessage(':srv WARN REGISTER RETRY :again')))
+      .toMatchObject({ kind: 'WARN', command: 'REGISTER', code: 'RETRY', description: 'again' });
   });
   it('ignores non standard-reply commands', () => {
     expect(parseStandardReply(parseIRCMessage(':srv PRIVMSG #c :hi'))).toBeNull();
@@ -241,94 +267,78 @@ describe('standard replies + SESSION notes', () => {
       { length: MAX_STANDARD_REPLY_PARAMS + 1 },
       (_, index) => `value-${index}`,
     ).join(' ');
-    expect(parseStandardReply(parseIRCMessage(`:srv NOTE ${params}`))).toBeNull();
+    expect(parseStandardReply(parseIRCMessage(`:srv FAIL ${params}`))).toBeNull();
     expect(parseStandardReply(parseIRCMessage(
       `:srv FAIL SEARCH RATE_LIMITED :${'x'.repeat(MAX_STANDARD_REPLY_TOKEN_LENGTH + 1)}`,
     ))).toBeNull();
   });
-  it('extracts a SESSION TOKEN', () => {
-    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123')))
-      .toEqual({ token: 'abc123' });
-  });
   it('extracts a SESSION TOKEN from the current server NOTICE envelope', () => {
-    expect(parseSessionTokenNote(
+    expect(parseSessionTokenCredential(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION TOKEN abc123'),
     )).toEqual({ token: 'abc123' });
   });
+  it('does not parse unrelated command bodies as session credentials', () => {
+    expect(parseSessionTokenCredential(parseIRCMessage(':srv.example PRIVMSG onyx :SESSION TOKEN abc123'))).toBeNull();
+    expect(parseSessionMeshTokenCredential(parseIRCMessage(':srv.example PRIVMSG onyx :SESSION MTOKEN abc123'))).toBeNull();
+  });
   it('keeps an attachment-scoped local credential byte-exact', () => {
-    expect(parseSessionTokenNote(
+    expect(parseSessionTokenCredential(
       parseIRCMessage(`:srv.example NOTICE onyx :SESSION TOKEN ${SRM2_LOCAL}`),
     )).toEqual({ token: SRM2_LOCAL });
     expect(buildSessionResumeLine(SRM2_LOCAL)).toBe(`SESSION RESUME ${SRM2_LOCAL}\r\n`);
   });
-  it('extracts a SESSION MTOKEN (mesh)', () => {
-    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh')))
-      .toEqual({ token: 'm3sh' });
-  });
   it('extracts a SESSION MTOKEN from the current server NOTICE envelope', () => {
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3sh'),
     )).toEqual({ token: 'm3sh' });
   });
   it('extracts MTOKEN expires= from the live server NOTICE form', () => {
     // Onyx Server: `SESSION MTOKEN {hex} expires={unix}` (mesh wall clock).
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv.example NOTICE onyx :SESSION MTOKEN m3shdeadbeef expires=1800000000'),
     )).toEqual({ token: 'm3shdeadbeef', expiresAt: 1_800_000_000 });
   });
   it('keeps an attachment-scoped mesh credential and expiry byte-exact', () => {
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(`:srv.example NOTICE onyx :SESSION MTOKEN ${SRM2_MESH} expires=1800000000`),
     )).toEqual({ token: SRM2_MESH, expiresAt: 1_800_000_000 });
     expect(buildSessionResumeLine(SRM2_MESH)).toBe(`SESSION RESUME ${SRM2_MESH}\r\n`);
   });
-  it('extracts MTOKEN expires= from a standard-reply description trailer', () => {
-    expect(parseSessionMeshTokenNote(
-      parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh expires=1800000000'),
-    )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
-  });
-  it('extracts MTOKEN expires= when the token sits in standard-reply context', () => {
-    // NOTE SESSION MTOKEN <token> :expires=<unix>
-    expect(parseSessionMeshTokenNote(
-      parseIRCMessage(':srv NOTE SESSION MTOKEN m3sh :expires=1800000000'),
-    )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
-  });
   it('does not confuse TOKEN and MTOKEN', () => {
-    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc'))).toBeNull();
+    expect(parseSessionMeshTokenCredential(parseIRCMessage(':srv NOTICE onyx :SESSION TOKEN abc'))).toBeNull();
   });
   it('rejects malformed or oversized session credentials', () => {
-    // Free-text trailer (not key=value) fails closed on both envelopes.
-    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc extra'))).toBeNull();
-    expect(parseSessionTokenNote(
+    // Free-text trailer (not key=value) fails closed.
+    expect(parseSessionTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION TOKEN abc extra'),
     )).toBeNull();
-    expect(parseSessionTokenNote(parseIRCMessage(
+    expect(parseSessionTokenCredential(parseIRCMessage(
       `:srv NOTICE onyx :SESSION TOKEN ${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
     ))).toBeNull();
-    expect(parseSessionMeshTokenNote(parseIRCMessage(
-      `:srv NOTE SESSION MTOKEN :${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
+    expect(parseSessionMeshTokenCredential(parseIRCMessage(
+      `:srv NOTICE onyx :SESSION MTOKEN ${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
     ))).toBeNull();
   });
   it('rejects a malformed expires= attr fail-closed (does not return the bare token)', () => {
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=not-a-number'),
     )).toBeNull();
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=-1'),
     )).toBeNull();
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=01'),
     )).toBeNull();
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=1 expires=2'),
     )).toBeNull();
     // Oversized digit run.
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(`:srv NOTICE onyx :SESSION MTOKEN m3sh expires=${'9'.repeat(17)}`),
     )).toBeNull();
   });
   it('ignores unknown key=value attrs for forward-compat', () => {
-    expect(parseSessionMeshTokenNote(
+    expect(parseSessionMeshTokenCredential(
       parseIRCMessage(':srv NOTICE onyx :SESSION MTOKEN m3sh expires=1800000000 scope=mesh'),
     )).toEqual({ token: 'm3sh', expiresAt: 1_800_000_000 });
   });
@@ -382,9 +392,11 @@ describe('parseMonitorNumeric', () => {
     )).toMatchObject({
       kind: 'full', targets: ['bob', 'carol'], limit: 128,
     });
-    expect(parseMonitorNumeric(
+    const invalidLimit = parseMonitorNumeric(
       parseIRCMessage(':srv 734 onyx 128junk bob :Monitor list is full'),
-    )).toMatchObject({ kind: 'full', targets: ['bob'], limit: undefined });
+    );
+    expect(invalidLimit).toMatchObject({ kind: 'full', targets: ['bob'] });
+    expect(invalidLimit?.limit).toBeUndefined();
   });
   it('non-monitor numerics return null', () => {
     expect(parseMonitorNumeric(parseIRCMessage(':srv 001 onyx :hi'))).toBeNull();

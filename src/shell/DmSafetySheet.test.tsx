@@ -100,7 +100,7 @@ describe('DmSafetySheet', () => {
     const safetyA = '11111 22222 33333 44444 55555 66666 77777 88888 99999 00000 12121 34343';
     const safetyC = '99999 88888 77777 66666 55555 44444 33333 22222 11111 00000 56565 78787';
     let resolveA!: (value: string) => void;
-    const loadSafetyNumber = vi.fn((peer: string) => {
+    const loadSafetyNumber = vi.fn((_peer: string) => {
       if (loadSafetyNumber.mock.calls.length === 1) {
         return new Promise<string>((resolve) => { resolveA = resolve; });
       }

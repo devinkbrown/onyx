@@ -109,7 +109,7 @@ test("apply commits token vars and removes stale ones", () => {
       dataTheme: "ocean", scheme: "dark",
       tokens: [["color", "red"], ["--ok", "#00ff00"]],
     });
-    assert.ok(!style.calls.some(([op, k]) => k === "color"));
+    assert.ok(!style.calls.some(([_op, k]) => k === "color"));
   } finally {
     delete globalThis.document;
   }

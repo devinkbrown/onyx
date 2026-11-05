@@ -105,14 +105,126 @@ suite =
                     , \_ -> Expect.equal "beIZ" support.chanGroups.lists
                     ]
                     ()
-        , test "unknown and hostile tokens are ignored" <|
+        , test "valid unknown tokens are retained while hostile tokens are ignored" <|
             \_ ->
                 let
                     support =
                         applyIsupportLine defaultSupport
-                            (line005 "FROBNICATE=1 lower=2 BAD KEY=1 =v")
+                            (line005 "FROBNICATE=1 lower=2 BAD! =v")
                 in
-                Expect.equal defaultSupport support
+                Expect.all
+                    [ \_ -> Expect.equal defaultSupport.network support.network
+                    , \_ -> Expect.equal (Dict.singleton "FROBNICATE" (Just "1")) (unknownTokens support)
+                    ]
+                    ()
+        , test "decodes escaped values after splitting and merges multiline inventory" <|
+            \_ ->
+                let
+                    first =
+                        applyIsupportLine defaultSupport
+                            (line005 "NETWORK=Onyx\\x20Net ESCAPE=a\\x5Cb\\x3Dc EMPTY= BARE")
+
+                    second =
+                        applyIsupportLine first (line005 "NETWORK=Onyx\\x20Mesh")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "Onyx Net" first.network
+                    , \_ -> Expect.equal "Onyx Mesh" second.network
+                    , \_ -> Expect.equal (Just (Just "a\\b=c")) (Dict.get "ESCAPE" second.tokens)
+                    , \_ -> Expect.equal (Just (Just "")) (Dict.get "EMPTY" second.tokens)
+                    , \_ -> Expect.equal (Just Nothing) (Dict.get "BARE" second.tokens)
+                    , \_ -> Expect.equal (Just (Just "café")) (Dict.get "UTF8" (applyIsupportLine second (line005 "UTF8=caf\\xC3\\xA9")).tokens)
+                    , \_ -> Expect.equal (Just (Just "a\\b=c")) (Dict.get "ESCAPE" (unknownTokens second))
+                    ]
+                    ()
+        , test "malformed escapes and decoded controls preserve the last good token" <|
+            \_ ->
+                let
+                    initial =
+                        applyIsupportLine defaultSupport (line005 "NETWORK=Onyx\\x20Net")
+
+                    malformed =
+                        applyIsupportLine initial (line005 "NETWORK=bad\\xQ0")
+
+                    control =
+                        applyIsupportLine malformed (line005 "NETWORK=bad\\x0D")
+
+                    invalidUtf8 =
+                        applyIsupportLine control (line005 "NETWORK=bad\\xC0\\xAF")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "Onyx Net" malformed.network
+                    , \_ -> Expect.equal "Onyx Net" control.network
+                    , \_ -> Expect.equal "Onyx Net" invalidUtf8.network
+                    , \_ -> Expect.equal (Just (Just "Onyx Net")) (Dict.get "NETWORK" control.tokens)
+                    ]
+                    ()
+        , test "valid removals reset projections and remove diagnostic tokens" <|
+            \_ ->
+                let
+                    advertised =
+                        applyIsupportLine defaultSupport
+                            (line005 "STATUSMSG=!.@+ PREFIX=(ov)@+ CHANLIMIT=#&:12 MAXCHANNELS=30 UNKNOWN=retained")
+
+                    removedStatus =
+                        applyIsupportLine advertised (line005 "-STATUSMSG -UNKNOWN")
+
+                    removedPrefix =
+                        applyIsupportLine removedStatus (line005 "-PREFIX")
+
+                    removedLimits =
+                        applyIsupportLine removedPrefix (line005 "-CHANLIMIT")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "!.@+" advertised.statusmsg
+                    , \_ -> Expect.equal "" removedStatus.statusmsg
+                    , \_ -> Expect.equal Nothing (Dict.get "UNKNOWN" (unknownTokens removedStatus))
+                    , \_ -> Expect.equal defaultSupport.modeToPrefix removedPrefix.modeToPrefix
+                    , \_ -> Expect.equal 30 removedLimits.maxchannels
+                    , \_ -> Expect.equal Dict.empty removedLimits.chanlimits
+                    ]
+                    ()
+        , test "repeated token updates retain last-arrival precedence after unrelated removal" <|
+            \_ ->
+                let
+                    initial =
+                        applyIsupportLine defaultSupport
+                            (line005 "CHANLIMIT=#&:12 MAXCHANNELS=30 UNKNOWN=old")
+
+                    latest =
+                        applyIsupportLine initial (line005 "CHANLIMIT=#&:14")
+
+                    afterRemoval =
+                        applyIsupportLine latest (line005 "-UNKNOWN")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 14 latest.maxchannels
+                    , \_ -> Expect.equal 14 afterRemoval.maxchannels
+                    , \_ -> Expect.equal (Just 14) (Dict.get '#' afterRemoval.chanlimits)
+                    ]
+                    ()
+        , test "distinct token cap allows updates to existing keys" <|
+            \_ ->
+                let
+                    filler =
+                        List.range 1 255 |> List.map (\n -> "X" ++ String.fromInt n ++ "=v")
+
+                    full =
+                        applyIsupportLine defaultSupport ("alice" :: ("NICKLEN=65" :: filler) ++ [ "are supported" ])
+
+                    updated =
+                        applyIsupportLine full (line005 "NICKLEN=77")
+
+                    rejected =
+                        applyIsupportLine updated (line005 "TOONEW=val")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal maxTokenCount (Dict.size full.tokens)
+                    , \_ -> Expect.equal 77 updated.nicklen
+                    , \_ -> Expect.equal Nothing (Dict.get "TOONEW" rejected.tokens)
+                    , \_ -> Expect.equal maxTokenCount (Dict.size rejected.tokens)
+                    ]
+                    ()
         , test "bare SILENCE means 20" <|
             \_ ->
                 Expect.equal 20 (applyIsupportLine defaultSupport (line005 "SILENCE")).silence

@@ -64,7 +64,8 @@ assert_contains() {
 # Capture whether PROD_OUT mtime/inode changed during the suite.
 prod_marker_before=""
 if [[ -d "${PROD_OUT}" ]]; then
-  prod_marker_before="$(find "${PROD_OUT}" -printf '%T@ %i %p\n' 2>/dev/null | sha256sum | awk '{print $1}')"
+  # Portable marker (BusyBox find lacks -printf): mtime/inode/path via stat.
+  prod_marker_before="$(find "${PROD_OUT}" -exec stat -c '%Y %i %n' {} + 2>/dev/null | sort | sha256sum | awk '{print $1}')"
 else
   prod_marker_before="ABSENT"
 fi
@@ -609,11 +610,12 @@ assert_contains "snapshot_missing evidence" \
   "RECOVERY_EVIDENCE: result=snapshot_missing" "${nosnap_out}"
 
 echo "-- ordering: snapshot before ACL/content mutation in deploy.sh"
-# Grep line numbers: backup_live_out must appear before setfacl and sync_live_with_rollback
-# inside deploy_main (not merely in helper definitions).
+# Grep line numbers: backup_live_out must appear before ensure_web_traverse
+# and sync_live_with_rollback inside deploy_main (not merely in helper
+# definitions).
 main_start="$(grep -n '^deploy_main()' "${DEPLOY}" | head -1 | cut -d: -f1)"
 backup_line="$(awk -v s="${main_start}" 'NR>=s && /backup_live_out / {print NR; exit}' "${DEPLOY}")"
-acl_line="$(awk -v s="${main_start}" 'NR>=s && /setfacl / {print NR; exit}' "${DEPLOY}")"
+acl_line="$(awk -v s="${main_start}" 'NR>=s && /ensure_web_traverse / {print NR; exit}' "${DEPLOY}")"
 sync_line="$(awk -v s="${main_start}" 'NR>=s && /sync_live_with_rollback / {print NR; exit}' "${DEPLOY}")"
 if [[ -n "${backup_line}" && -n "${acl_line}" && -n "${sync_line}" \
    && "${backup_line}" -lt "${acl_line}" && "${backup_line}" -lt "${sync_line}" ]]; then
@@ -631,6 +633,15 @@ if grep -q 'Identical content is only a problem' "${DEPLOY}"; then
 else
   echo "  PASS meaningless no-op comparison loop removed"
   PASS=$((PASS + 1))
+fi
+
+echo "-- elm client selection"
+if grep -q 'ONYX_CLIENT' "${DEPLOY}" && grep -q 'build_elm_site' "${DEPLOY}"; then
+  echo "  PASS elm client branch present in deploy.sh"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL elm client branch missing"
+  FAIL=$((FAIL + 1))
 fi
 
 echo "-- dry-run non-mutation against nonexistent temp target"
@@ -664,6 +675,37 @@ else
   fi
 fi
 
+echo "-- elm client dry-run stages route documents"
+if [[ "${ONYX_DEPLOY_FULL_DRY_RUN:-0}" == "1" ]]; then
+  if command -v elm >/dev/null 2>&1; then
+    ELM_DRY_TARGET="${TMP}/nonexistent-elm-live/out"
+    DEPLOY_DRY_RUN=1 ONYX_CLIENT=elm ONYX_LIVE_OUT="${ELM_DRY_TARGET}" bash "${DEPLOY}" >/dev/null
+    assert_ok "elm dry-run stages app route" \
+      test -f "${ROOT}/dist/app/index.html"
+    assert_ok "elm dry-run stages download route" \
+      test -f "${ROOT}/dist/download/index.html"
+    assert_ok "elm dry-run emits flat 404" \
+      test -f "${ROOT}/dist/404.html"
+    assert_fail "elm dry-run never nests 404" \
+      test -e "${ROOT}/dist/404/index.html"
+    assert_ok "elm dry-run stamps service worker" \
+      bash -c "grep -q 'onyx-shell-' \"${ROOT}/dist/sw.js\" && ! grep -q '__BUILD_VERSION__' \"${ROOT}/dist/sw.js\""
+    assert_ok "elm 404 carries noindex without canonical" \
+      bash -c "grep -q 'noindex, nofollow' \"${ROOT}/dist/404.html\" && ! grep -q 'rel=\"canonical\"' \"${ROOT}/dist/404.html\""
+    if [[ -e "${ELM_DRY_TARGET}" ]]; then
+      echo "  FAIL elm dry-run created live target"
+      FAIL=$((FAIL + 1))
+    else
+      echo "  PASS elm dry-run did not create live target"
+      PASS=$((PASS + 1))
+    fi
+  else
+    echo "  SKIP elm dry-run (no elm on PATH)"
+  fi
+else
+  echo "  SKIP elm full dry-run (set ONYX_DEPLOY_FULL_DRY_RUN=1 for full)"
+fi
+
 # Ensure allowlist does not include root documents
 for forbidden in index.html 404.html robots.txt sitemap.xml favicon.ico favicon.svg about app assets sw.js; do
   if printf '%s\n' "${LEGACY_SUPPORT_ALLOWLIST[@]}" | grep -qx "${forbidden}"; then
@@ -675,6 +717,37 @@ for forbidden in index.html 404.html robots.txt sitemap.xml favicon.ico favicon.
   fi
 done
 
+echo "-- web traverse grant with unsupported setfacl"
+TRAVERSE_TMP="${TMP}/traverse"
+mkdir -p "${TRAVERSE_TMP}/open" "${TRAVERSE_TMP}/closed"
+chmod 755 "${TRAVERSE_TMP}/open"
+chmod 750 "${TRAVERSE_TMP}/closed"
+mkdir -p "${TRAVERSE_TMP}/bin"
+printf '#!/bin/sh\nexit 1\n' > "${TRAVERSE_TMP}/bin/setfacl"
+chmod +x "${TRAVERSE_TMP}/bin/setfacl"
+# Shadow setfacl with a stub that always fails, so the fallback path is
+# exercised deterministically whether or not the host supports named ACLs.
+traverse_with_broken_setfacl() {
+  local PATH="${TRAVERSE_TMP}/bin:${PATH}"
+  ensure_web_traverse "$@"
+}
+assert_ok "other_execute_set sees 755 traverse" \
+  other_execute_set "${TRAVERSE_TMP}/open"
+assert_fail "other_execute_set rejects 750" \
+  other_execute_set "${TRAVERSE_TMP}/closed"
+assert_fail "other_execute_set rejects missing path" \
+  other_execute_set "${TRAVERSE_TMP}/nope"
+assert_ok "unknown web user is a no-op" \
+  ensure_web_traverse "onyx-no-such-user-xyz" "${TRAVERSE_TMP}/closed"
+if id -u http >/dev/null 2>&1; then
+  assert_ok "broken setfacl + other+x proceeds" \
+    traverse_with_broken_setfacl "http" "${TRAVERSE_TMP}/open"
+  assert_fail "broken setfacl without other+x fails closed" \
+    traverse_with_broken_setfacl "http" "${TRAVERSE_TMP}/closed"
+else
+  echo "  SKIP http traverse legs (no http user)"
+fi
+
 echo "-- production out untouched"
 if [[ "${prod_marker_before}" == "ABSENT" ]]; then
   if [[ -d "${PROD_OUT}" ]]; then
@@ -685,7 +758,7 @@ if [[ "${prod_marker_before}" == "ABSENT" ]]; then
     PASS=$((PASS + 1))
   fi
 else
-  prod_marker_after="$(find "${PROD_OUT}" -printf '%T@ %i %p\n' 2>/dev/null | sha256sum | awk '{print $1}')"
+  prod_marker_after="$(find "${PROD_OUT}" -exec stat -c '%Y %i %n' {} + 2>/dev/null | sort | sha256sum | awk '{print $1}')"
   assert_eq "production /home/kain/onyx/out marker unchanged" \
     "${prod_marker_before}" "${prod_marker_after}"
 fi

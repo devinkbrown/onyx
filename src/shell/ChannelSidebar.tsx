@@ -41,6 +41,7 @@ import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } fr
 import { openRoomInviteShare } from './roomInviteShareState';
 import { preferences } from '@/lib/prefs/preferences';
 import './collection-navigation.css';
+import './collection-density.css';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */

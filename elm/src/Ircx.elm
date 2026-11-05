@@ -1038,6 +1038,9 @@ wireToken value =
     if String.isEmpty value || String.length value > 512 then
         Nothing
 
+    else if String.startsWith ":" value then
+        Nothing
+
     else if String.any (\c -> c <= ' ' || Char.toCode c == 127) value then
         Nothing
 
@@ -1051,6 +1054,15 @@ wireText value =
         Nothing
 
     else if String.any (\c -> c == '\r' || c == '\n' || Char.toCode c == 0) value then
+        Nothing
+
+    else
+        Just value
+
+
+wirePropertyValue : String -> Maybe String
+wirePropertyValue value =
+    if String.any (\c -> c == '\r' || c == '\n' || Char.toCode c == 0) value then
         Nothing
 
     else
@@ -1072,17 +1084,22 @@ build command args =
                 )
                 (Just [])
     in
-    Maybe.map (Wire.formatIrcLine command) (collect args)
+    Maybe.andThen (encode command) (collect args)
+
+
+encode : String -> List String -> Maybe String
+encode command params =
+    Wire.encodeIrcLine command params |> Result.toMaybe
 
 
 ircxEnable : Maybe String -> Maybe String
 ircxEnable version =
     case version of
         Nothing ->
-            Just (Wire.formatIrcLine "IRCX" [])
+            encode "IRCX" []
 
         Just v ->
-            Maybe.map (\x -> Wire.formatIrcLine "IRCX" [ x ]) (wireToken v)
+            Maybe.andThen (encode "IRCX") (wireToken v |> Maybe.map List.singleton)
 
 
 ircxDisable : String
@@ -1136,7 +1153,7 @@ sendData : String -> String -> String -> Maybe String
 sendData target tag message =
     case ( wireToken target, validateDataTag tag, wireText message ) of
         ( Just t, Just g, Just m ) ->
-            Just (Wire.formatIrcLine "DATA" [ t, g, m ])
+            encode "DATA" [ t, g, m ]
 
         _ ->
             Nothing
@@ -1146,7 +1163,7 @@ sendRequest : String -> String -> String -> Maybe String
 sendRequest target tag message =
     case ( wireToken target, validateDataTag tag, wireText message ) of
         ( Just t, Just g, Just m ) ->
-            Just (Wire.formatIrcLine "REQUEST" [ t, g, m ])
+            encode "REQUEST" [ t, g, m ]
 
         _ ->
             Nothing
@@ -1156,7 +1173,7 @@ sendReply : String -> String -> String -> Maybe String
 sendReply target tag message =
     case ( wireToken target, validateDataTag tag, wireText message ) of
         ( Just t, Just g, Just m ) ->
-            Just (Wire.formatIrcLine "REPLY" [ t, g, m ])
+            encode "REPLY" [ t, g, m ]
 
         _ ->
             Nothing
@@ -1176,7 +1193,7 @@ whisper channel nicks message =
                 in
                 case wireToken joined of
                     Just ns ->
-                        Just (Wire.formatIrcLine "WHISPER" [ c, ns, m ])
+                        encode "WHISPER" [ c, ns, m ]
 
                     Nothing ->
                         Nothing
@@ -1187,7 +1204,7 @@ whisper channel nicks message =
 
 propList : String -> Maybe String
 propList entity =
-    Maybe.map (\e -> Wire.formatIrcLine "PROP" [ e ]) (wireToken entity)
+    Maybe.andThen (encode "PROP" << List.singleton) (wireToken entity)
 
 
 propGet : String -> List String -> Maybe String
@@ -1201,9 +1218,9 @@ propGet entity keys =
 
 propSet : String -> String -> String -> Maybe String
 propSet entity key value =
-    case ( wireToken entity, normalizePropertyName (Just key), wireText value ) of
+    case ( wireToken entity, normalizePropertyName (Just key), wirePropertyValue value ) of
         ( Just e, Just k, Just v ) ->
-            Just (Wire.formatIrcLine "PROP" [ e, k, v ])
+            encode "PROP" [ e, k, v ]
 
         _ ->
             Nothing
@@ -1213,12 +1230,12 @@ accessList : String -> Maybe String -> Maybe String -> Maybe String
 accessList channel level mask =
     case ( wireToken channel, level, mask ) of
         ( Just c, Nothing, _ ) ->
-            Just (Wire.formatIrcLine "ACCESS" [ c, "LIST" ])
+            encode "ACCESS" [ c, "LIST" ]
 
         ( Just c, Just l, Nothing ) ->
             case parseAccessLevel (Just l) of
                 Just _ ->
-                    Just (Wire.formatIrcLine "ACCESS" [ c, "LIST", String.toUpper (String.trim l) ])
+                    encode "ACCESS" [ c, "LIST", String.toUpper (String.trim l) ]
 
                 Nothing ->
                     Nothing
@@ -1226,7 +1243,7 @@ accessList channel level mask =
         ( Just c, Just l, Just m ) ->
             case ( parseAccessLevel (Just l), normalizeAccessMask (Just m) ) of
                 ( Just _, Just norm ) ->
-                    Just (Wire.formatIrcLine "ACCESS" [ c, "LIST", String.toUpper (String.trim l), norm ])
+                    encode "ACCESS" [ c, "LIST", String.toUpper (String.trim l), norm ]
 
                 _ ->
                     Nothing
@@ -1249,7 +1266,7 @@ accessAdd channel level mask timeout reason =
                     -- the wire; fail closed instead of mis-shaping it.
                     case reason of
                         Nothing ->
-                            Just (Wire.formatIrcLine "ACCESS" head)
+                            encode "ACCESS" head
 
                         Just _ ->
                             Nothing
@@ -1262,12 +1279,12 @@ accessAdd channel level mask timeout reason =
                         Just n ->
                             case reason of
                                 Nothing ->
-                                    Just (Wire.formatIrcLine "ACCESS" (head ++ [ String.fromInt n ]))
+                                    encode "ACCESS" (head ++ [ String.fromInt n ])
 
                                 Just r ->
                                     case wireText r of
                                         Just text ->
-                                            Just (Wire.formatIrcLine "ACCESS" (head ++ [ String.fromInt n, text ]))
+                                            encode "ACCESS" (head ++ [ String.fromInt n, text ])
 
                                         Nothing ->
                                             Nothing
@@ -1280,7 +1297,7 @@ accessDelete : String -> String -> String -> Maybe String
 accessDelete channel level mask =
     case ( wireToken channel, parseAccessLevel (Just level), normalizeAccessMask (Just mask) ) of
         ( Just c, Just _, Just norm ) ->
-            Just (Wire.formatIrcLine "ACCESS" [ c, "DELETE", String.toUpper (String.trim level), norm ])
+            encode "ACCESS" [ c, "DELETE", String.toUpper (String.trim level), norm ]
 
         _ ->
             Nothing
@@ -1295,12 +1312,12 @@ accessClear channel level =
         Just c ->
             case level of
                 Nothing ->
-                    Just (Wire.formatIrcLine "ACCESS" [ c, "CLEAR" ])
+                    encode "ACCESS" [ c, "CLEAR" ]
 
                 Just l ->
                     case parseAccessLevel (Just l) of
                         Just _ ->
-                            Just (Wire.formatIrcLine "ACCESS" [ c, "CLEAR", String.toUpper (String.trim l) ])
+                            encode "ACCESS" [ c, "CLEAR", String.toUpper (String.trim l) ]
 
                         Nothing ->
                             Nothing
@@ -1310,7 +1327,7 @@ listx : Maybe String -> Maybe String
 listx filter =
     case filter of
         Nothing ->
-            Just (Wire.formatIrcLine "LISTX" [])
+            encode "LISTX" []
 
         Just f ->
-            Maybe.map (\x -> Wire.formatIrcLine "LISTX" [ x ]) (wireText f)
+            Maybe.andThen (encode "LISTX" << List.singleton) (wireText f)

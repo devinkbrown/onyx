@@ -28,7 +28,7 @@ function capturePort() {
 test("offlineMemoNotice dispatches onyx:offlineMemo with the aggregate", () => {
   const memo = capturePort();
   const seen = [];
-  const app = {
+  const _app = {
     ports: {
       offlineMemoNotice: memo.port,
     },

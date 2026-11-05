@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages)
+module App exposing (ServiceIntegrationForm, emptyServiceIntegrationForm, mediaConsentScope, runtimeDomainActionIsAuthoring, serviceIntegrationFormIsDirty, AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), RuntimeOwnerStamp, StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, slashSuggestionCommands, nickSuggestionMatches, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, ircCaseKey, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, messageAccessibleLabelFor, isDeliveryUnknown, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, editOutcomeUnknown, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNotice, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, threadWindowForRows, threadVisibleRows, captureUnreadDivider, historyReferenceRow, requestRewindHistory, requestCatchUpHistory, requestHistoryBetween, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, activeConversationKeep, messageRetentionFor)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -11,9 +11,9 @@ unit-testable without a socket. `update` returns `Outbound` intentions;
 the `Main` port module performs them (WS send, navigation). Effects
 (vault, crypto, clock) will join `Outbound` as ports land.
 
-Not yet wired (planned, see COVERAGE.md): E2EE
-seal/open, SCRAM/WebAuthn ceremonies, WebRTC media legs (the `Media`
-control-plane fold is wired; engine/bytes stay behind ports), uploads.
+E2EE seal/open, SCRAM/WebAuthn ceremonies, Cadence media legs, and
+uploads fold their control plane here. Ciphertext, ceremonies, and
+bytes stay behind ports (see COVERAGE.md).
 -}
 
 import Base64Url
@@ -51,6 +51,11 @@ import Moderation
 import Modes
 import PersonSafety
 import MessageWindow
+import QuietHours
+import FirstHour
+import ChannelNavigation
+import SlashSuggest
+import NickComplete
 import Multiline
 import Notify
 import Outbox
@@ -67,6 +72,7 @@ import Schedule
 import Search
 import Services
 import Session
+import Ids
 import Set exposing (Set)
 import Translate
 import Spine
@@ -78,6 +84,58 @@ import Transcript
 import VaultImport
 import Webhook
 import Wire
+import RuntimeDomain
+import VaultSeenIds exposing (VaultSeenIds)
+
+
+type alias ServiceIntegrationForm =
+    { account : String
+    , grantKind : String
+    , channel : String
+    , ttlSeconds : String
+    , botCommandName : String
+    , botCommandArgc : String
+    , botCommandHelp : String
+    , botCommandArgs : String
+    , deferUnixMs : String
+    , cronMinute : String
+    , cronHour : String
+    , cronDayOfMonth : String
+    , cronMonth : String
+    , cronDayOfWeek : String
+    , operatorMode : String
+    , text : String
+    , unfurlUrl : String
+    , memoForwardAccount : String
+    }
+
+
+emptyServiceIntegrationForm : ServiceIntegrationForm
+emptyServiceIntegrationForm =
+    { account = ""
+    , grantKind = "speak"
+    , channel = ""
+    , ttlSeconds = "3600"
+    , botCommandName = ""
+    , botCommandArgc = "0"
+    , botCommandHelp = ""
+    , botCommandArgs = ""
+    , deferUnixMs = ""
+    , cronMinute = "*"
+    , cronHour = "*"
+    , cronDayOfMonth = "*"
+    , cronMonth = "*"
+    , cronDayOfWeek = "*"
+    , operatorMode = "m"
+    , text = ""
+    , unfurlUrl = ""
+    , memoForwardAccount = ""
+    }
+
+
+serviceIntegrationFormIsDirty : Model -> Bool
+serviceIntegrationFormIsDirty model =
+    model.serviceIntegrationFormRevision /= model.serviceIntegrationFormCleanRevision
 
 
 type ConnectionState
@@ -164,6 +222,29 @@ type alias ChatMessage =
     }
 
 
+type alias RetiredDraftOrigin =
+    { networkId : String
+    , accountId : Maybe String
+    , ownerRef : String
+    , connectionGeneration : Int
+    }
+
+
+type alias PendingMessageEdit =
+    { target : String
+    , targetKey : String
+    , msgid : String
+    , desiredText : String
+    , originalText : String
+    , owner : RuntimeOwnerStamp
+    , label : Maybe String
+    , generation : Int
+    , deadline : Float
+    , outcomeUnknown : Bool
+    , draftRevision : Maybe Int
+    }
+
+
 {-| Ban-add form state for the moderation desk (raw mask or the
 extban builder parts plus minutes and a submit error). -}
 type alias BanAddForm =
@@ -189,10 +270,9 @@ blankBanAdd =
     }
 
 
-{-| Live room-desk moderation forms — the member-action and
-ban-mask inputs inside the moderation cockpit (mirroring the
-`ModerationCockpit` signals; the INVITE and toggle rows arrive with
-their backends in a later slice).
+{-| Live room-desk moderation forms — the member-action, ban-mask,
+invite, and mode-toggle inputs inside the moderation cockpit
+(mirroring the `ModerationCockpit` signals).
 -}
 type alias ModerationDeskForm =
     { member : String
@@ -225,12 +305,11 @@ type alias AccountActionError =
     }
 
 
-{-| In-flight optimistic send awaiting its labeled server reply (echo,
-ACK, or FAIL) — Elm port of the oracle's `PendingLabeledSend`. `seq`
-is the mint counter at registration so eviction drops the oldest
-first; the registry itself is unordered. Sealed DM/room sends never
-register here (they resolve through their envelope transports), so no
-plaintext travels with the entry.
+{-| In-flight optimistic send awaiting its labeled server reply.
+ACK completes only the response correlation; delivery stays unknown
+until an exact self-echo with a msgid. `seq` is the mint counter at
+registration so eviction drops the oldest first. Sealed DM/room sends
+never register here, so no plaintext travels with the entry.
 -}
 type alias PendingLabeledSend =
     { messageIds : List Int
@@ -238,6 +317,46 @@ type alias PendingLabeledSend =
     , targetKey : String
     , text : String
     , seq : Int
+    , generation : Int
+    , deadline : Float
+    , ownerStamp : Maybe RuntimeOwnerStamp
+    }
+
+
+type alias RuntimeOwnerStamp =
+    { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int }
+
+
+type alias StewardTransferAttempt =
+    { owner : RuntimeOwnerStamp
+    , channel : String
+    , from : String
+    , to : String
+    , expected : List { adding : Bool, nick : String }
+    , accepted : List String
+    , status : String
+    , deadline : Float
+    , reconcileAt : Maybe Float
+    , reconcileSawNames : Bool
+    }
+
+
+type alias SessionRecoveryIntent =
+    { networkId : String
+    , accountId : String
+    , requestId : String
+    , credentialRef : String
+    }
+
+
+type alias DraftRecoveryCapture =
+    { requestId : String
+    , draftRef : String
+    , target : String
+    , composerRevision : Int
+    , ownerRef : String
+    , accountGeneration : Int
+    , connectionGeneration : Int
     }
 
 
@@ -308,9 +427,41 @@ type alias Channel =
     }
 
 
+type CapRequestState
+    = CapRequestPending
+    | CapRequestAcked
+    | CapRequestRejected
+
+
+type CapRoundPurpose
+    = InitialRegistration
+    | RuntimeFeatures
+
+
+type alias CapRequestGroup =
+    { id : Int
+    , requested : List String
+    , unresolved : List String
+    , state : CapRequestState
+    , purpose : CapRoundPurpose
+    , roundRef : Maybe String
+    }
+
+
+type alias VaultDirtyOwner =
+    { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int }
+
+
 type alias Model =
     { route : Route
     , connection : ConnectionState
+    , connectionDialogOpen : Bool
+    , connectionNickDraft : String
+    , connectionNickPending : Maybe String
+    , connectionNickNotice : Maybe String
+    , connectionAccountDraft : String
+    , connectionSignIn : Bool
+    , connectionDialogError : Maybe String
     , autoReconnect : Bool
     , reconnectIn : Int
     , reconnectDueMs : Float
@@ -322,6 +473,7 @@ type alias Model =
     , ourNick : String
     , caps : List String
     , composer : String
+    , composerComposing : Bool
     , composerError : Maybe String
     , composerAudience : Maybe Char
     , attachments : List StagedAttachment
@@ -342,12 +494,20 @@ type alias Model =
     , zone : Time.Zone
     , replyingTo : Maybe ReplyParent
     , editingMessage : Maybe { target : String, msgid : String, draft : String }
+    , pendingMessageEdits : Dict String PendingMessageEdit
     , composerDrafts : Dict.Dict String String
+    , composerDraftVersions : Dict.Dict String Int
+    , retiredDraftOwner : Maybe RetiredDraftOrigin
+    , hydratedDraftTargets : Set String
+    , draftLoadPending : Maybe { requestId : Ids.RequestId, target : String, version : Int }
+    , draftSavePending : Dict.Dict String { requestId : Ids.RequestId, revision : Int }
+    , queuedDraftRevisions : Dict.Dict String { target : String, revision : Int, text : String }
     , messageMenu : Maybe { target : String, msgid : String, confirmDelete : Bool }
     , reactionPicker : Maybe { target : String, msgid : String, query : String }
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
+    , clientBatchSeq : Int
     , seenMsgids : Dict String (List String)
     , isOper : Bool
     , isNetworkAdmin : Bool
@@ -386,6 +546,8 @@ type alias Model =
     , scheduledSeals : Dict String ScheduledSeal
     , labelCounter : Int
     , pendingLabels : Dict String PendingLabeledSend
+    , uncertainLabels : Dict String PendingLabeledSend
+    , deliveryUnknownIds : Set Int
     , ownEchoBatches : Set String
     , historyBatches : Dict String HistoryBatch
     , serverSearchTarget : String
@@ -403,6 +565,7 @@ type alias Model =
     , lastHistoryTargetsSweepAt : Maybe Int
     , historyTargets : Dict String HistoryTarget
     , historyLoading : Set String
+    , pendingHistoryRequests : Dict String PendingHistoryRequest
     , historyExhausted : Set String
     , pendingPins : Dict String String
     , pendingDiscoveries : Dict String HistoryTarget
@@ -412,7 +575,13 @@ type alias Model =
     , firstUnreadId : Dict String Int
     , viewUnreadDividerId : Dict String Int
     , historyMerging : Bool
+    , pendingRedactions : List ( String, String )
+    , ownedRowIds : Set Int
+    , seenReactionEventIds : List String
+    , pendingPropWrites : Dict String String
     , readMarkers : Dict String String
+    , viewedReadMarkers : Dict String String
+    , anchorLoadPending : Maybe { requestId : Ids.RequestId, conversationId : String }
     , lastReadAt : Dict String Int
     , ignoredUsers : Set String
     , collapsedNicks : Set String
@@ -443,12 +612,32 @@ type alias Model =
     , scheduledLabels : Dict String ScheduledLabelLink
     , scheduledInflight : List ScheduledInflight
     , scheduledDispatching : List { id : String, token : String }
+    , scheduledJournalPending : Dict String { id : String, token : String, owner : Schedule.ScheduledMessageOwner }
+    , pendingScheduledCapture : Maybe { requestId : String, operationId : String, scheduleRef : Maybe String, expectedRevision : Maybe Int, channel : String, dueAtMs : Int, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, messageKind : String, replyTo : Maybe String, audiencePrefix : Maybe Char, composerText : String, composerRevision : Int }
+    , pendingScheduledSave : Maybe { requestId : String, target : String, text : String, revision : Int, prefilledComposer : Bool }
     , scheduledCanceling : Dict String Schedule.ScheduledMessageOwner
     , pushEnabled : Bool
     , soundEnabled : Bool
     , soundVolume : Float
     , dndEnabled : Bool
     , dndUntil : Maybe Int
+    , dndQuietStart : Int
+    , dndQuietEnd : Int
+    , slashDismissed : Bool
+    , slashIndex : Int
+    , nickDismissed : Bool
+    , nickIndex : Int
+    , firstHourSeen : Bool
+    , firstHourHandoff : Maybe FirstHour.Handoff
+    , firstHourComposerFocused : Bool
+    , forceUnreadNav : Bool
+    , channelNavigation : ChannelNavigation.Memory
+    , navigationReady : Bool
+    , navigationRequested : Bool
+    , navigationStarAdds : List String
+    , navigationStarRemoves : List String
+    , navigationForumAdds : List String
+    , navigationForumRemoves : List String
     , pageVisible : Bool
     , appFocused : Bool
     , notifyPermission : Notify.Permission
@@ -460,6 +649,7 @@ type alias Model =
     , groupControlInFlight : Set String
     , serverPrefix : Maybe String
     , endpoint : Maybe String
+    , physicalConnectionGeneration : Int
     , groupCollectors : Dict String GroupDirectory.Collector
     , groupDirectory : Dict String (List GroupDirectory.DirectoryRecord)
     , groupPending : Dict String PendingControl
@@ -467,9 +657,11 @@ type alias Model =
     , groupWelcomeInFlight : Dict String GroupOpenAttempt
     , groupCompletedPairs : List CompletedGroupPair
     , groupInstalledEpochs : Dict String Int
-    , vaultSeenIds : List String
+    , vaultSeenIds : VaultSeenIds
     , vaultPersistSig : Dict String String
     , vaultPersistOrder : List String
+    , vaultDirtyTargets : Dict String VaultDirtyOwner
+    , vaultDirtyOrder : List String
     , modexModes : Dict String (List String)
     , modexPending : Dict String (List String)
     , retentionPolicy : Retention.RetentionPolicy
@@ -529,7 +721,10 @@ type alias Model =
     , nickReclaimDueMs : Float
     , calls : Media.CallHub
     , callSelfMuted : Bool
+    , callSelfDeafened : Bool
     , callsOpen : Bool
+    , clientRoomsOpen : Bool
+    , clientMembersOpen : Bool
     , navMenuOpen : Bool
     , navPath : String
     , roadmapPriority : Maybe String
@@ -598,10 +793,10 @@ type alias Model =
     , studioCustoms : List Studio.CustomTheme
     , studioTab : String
     , studioBootTheme : Maybe String
-    , landingBoardTab : String
     , publisher : GroupPublisher.State
     , attribution : Attribution.AttributionSession
     , roomTransfers : Dict String Stewardship.RoomTransferOffer
+    , stewardTransferAttempts : Dict String StewardTransferAttempt
     , stewardRoom : Maybe String
     , stewardHelper : String
     , stewardSuccessor : String
@@ -611,11 +806,13 @@ type alias Model =
     , stewardDeleting : Bool
     , webhookName : String
     , webhookDeleteId : String
+    , privateWebhookStatus : Maybe { room : String, status : String }
     , webPushOn : Bool
     , webPushBusy : Bool
     , webPushError : Maybe String
     , webPushSupported : Maybe Bool
     , awayNicks : Set String
+    , dmAway : Dict String Bool
     , friends : Dict String FriendEntry
     , watchList : List WatchEntry
     , monitoredNicks : Set String
@@ -665,6 +862,52 @@ type alias Model =
     , outboxFailed : Bool
     , outboxRetries : Int
     , capAvailable : List String
+    , capAvailableValues : Dict String String
+    , capRequestGroups : List CapRequestGroup
+    , capRequestGroupSeq : Int
+    , runtimeOwnerStamp : Maybe RuntimeOwnerStamp
+    , retentionReadScopes : Dict String RetentionReadScope
+    , runtimeDomainPending : Maybe Ids.RequestId
+    , runtimeDomainPendingAction : Maybe RuntimeDomain.Action
+    , runtimeDomainResult : Maybe RuntimeDomain.ResultView
+    , pendingStorageExportSelection : Maybe String
+    , groupBackupRoomInput : String
+    , pendingGroupBackupSelection : Maybe { conversationId : String, configuredNetworkId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    , pendingGroupBackupInput : Maybe { inputRef : String, conversationId : String, configuredNetworkId : String }
+    , pendingGroupBackupOutput : Maybe { outputRef : String, conversationId : String, epoch : Int, commitHashHex : String }
+    , pendingSecurityFormRequest : Maybe { requestId : String, kind : String, action : String }
+    , runtimeDomainObservation : Dict String Int
+    , sessionInventoryView : Maybe RuntimeDomain.SessionInventoryView
+    , sessionRevocationView : Maybe RuntimeDomain.SessionRevocationView
+    , accountCommunityView : Maybe RuntimeDomain.AccountCommunityView
+    , serviceIntegrationView : Maybe RuntimeDomain.ServiceIntegrationView
+    , serviceIntegrationForm : ServiceIntegrationForm
+    , serviceIntegrationFormRevision : Int
+    , serviceIntegrationFormCleanRevision : Int
+    , serviceIntegrationPendingFormRevision : Maybe Int
+    , draftRecoveryView : Maybe RuntimeDomain.DraftRecoveryView
+    , mediaQualityView : Maybe RuntimeDomain.MediaQualityView
+    , mediaQualityViewOwner : Maybe RuntimeOwnerStamp
+    , mediaControlView : Maybe RuntimeDomain.MediaControlView
+    , mediaControlViewOwner : Maybe RuntimeOwnerStamp
+    , mediaCaptionLanguage : String
+    , mediaBrowserAudioConsent : Bool
+    , mediaBrowserAudioConsentCall : Maybe String
+    , mediaGestureResult : Maybe { gesture : String, state : String, reason : Maybe String, conversationId : String, callRef : String }
+    , mediaOutputVolumePercent : Int
+    , accountCommunityInput : String
+    , draftRecoveryPreview : Maybe RuntimeDomain.DraftRecovered
+    , draftRecoveryCapture : Maybe DraftRecoveryCapture
+    , sessionRecoveryView : Maybe RuntimeDomain.SessionRecoveryView
+    , sessionRecoveryViewOwner : Maybe RuntimeOwnerStamp
+    , sessionRecoveryExpectedAccount : Maybe SessionRecoveryIntent
+    , passkeyManagementView : Maybe RuntimeDomain.PasskeyManagementView
+    , webAuthnObservationView : Maybe RuntimeDomain.WebAuthnView
+    , scheduledObservationView : Maybe RuntimeDomain.ScheduledListView
+    , privateAccountStatus : Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool }
+    , runtimeFeatureRound : Maybe { roundRef : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, e2ee : Bool, media : Bool, newCapabilities : List String, ended : Bool, endRequested : Bool }
+    -- Compatibility projections for existing view/tests; the groups are
+    -- authoritative and these are refreshed only by syncCapRequestProjections.
     , capReqPending : Int
     , capReqNames : List String
     , capNegotiating : Bool
@@ -672,8 +915,13 @@ type alias Model =
     , nickAliasTryIdx : Int
     , nickAliasesOwner : Maybe DeviceMemoryOwner
     , sessionTokens : Session.ReclaimTokens
+    , selectedContinuationRef : Maybe String
+    , sessionTokenSaslRequestId : Maybe String
     , sessionTokenWritesAllowed : Bool
     , sessionCommandsSent : Bool
+    , sessionTokenIssuanceRequested : Bool
+    , sessionCredentialIssuance : Session.CredentialIssuance
+    , sessionCredentialsRemembered : Bool
     , sessionReclaim : Maybe SessionReclaimNotice
     , toasts : List Toast
     , toastSeq : Int
@@ -746,6 +994,7 @@ type alias Model =
     , searchOpen : Bool
     , searchQuery : String
     , searchIndex : Int
+    , threadFollowing : Bool
     , threadWindowSize : Int
     , threadPageStart : Maybe Int
     , ignoreUnreadAnchor : Bool
@@ -763,6 +1012,24 @@ type alias Model =
     , accountSessionsPending : Bool
     , accountSessionsError : Maybe String
     }
+
+
+type alias RetentionReadScope =
+    { kind : String
+    , policyRevision : Maybe String
+    , lastSyncMs : Maybe Float
+    }
+
+
+type alias RetentionScopeEntry =
+    { conversationId : String
+    , scope : RetentionReadScope
+    }
+
+
+unknownRetentionReadScope : RetentionReadScope
+unknownRetentionReadScope =
+    { kind = "unknown", policyRevision = Nothing, lastSyncMs = Nothing }
 
 
 {-| SASL exchange state, mirroring the oracle's `_saslPending` /
@@ -790,6 +1057,9 @@ Bearer [REDACTED] in play (present for `Restoring`/`Reclaimed` only).
 type alias SessionReclaimNotice =
     { phase : ReclaimPhase
     , kind : Maybe Session.ReclaimTokenKind
+    , credentialKind : Maybe Session.CredentialKind
+    , credentialRef : Maybe Ids.CredentialRef
+    , outcome : Session.ResumeOutcome
     }
 
 
@@ -830,6 +1100,7 @@ type alias StagedAttachment =
 
 type Outbound
     = SendLine String
+    | RuntimeNotificationNavigationReceipt { requestId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, opened : Bool }
     | PushUrl String
     | LoadUrl String
     | WsConnect { url : String }
@@ -837,10 +1108,10 @@ type Outbound
     | UploadPick { key : String, accept : String, multiple : Bool }
     | UploadSend { key : String, endpoint : String, fieldName : String, index : Int }
     | PreviewFetch { key : String, endpoint : String, url : String }
-    | VaultPersist { target : String, rows : List VaultRow }
-    | VaultFetch { target : String, limit : Int }
-    | VaultFetchAround { target : String, at : Int, limit : Int }
-    | VaultSearch { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float }
+    | VaultPersist { target : String, rows : List VaultRow, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
+    | VaultFetch { target : String, limit : Int, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
+    | VaultFetchAround { target : String, at : Int, limit : Int, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
+    | VaultSearch { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
     | ClassifyVaultDm { target : String }
     | VaultSearchModeSave { mode : String }
     | VoiceJoin { channel : String, video : Bool }
@@ -852,13 +1123,26 @@ type Outbound
     | RetentionPolicySave { json : String }
     | OutboxQueue { target : String, text : String }
     | OutboxFlush { labeled : Bool }
+    | RuntimeJournalFlush { ownerRef : String, accountGeneration : Int, connectionGeneration : Int, requestId : String }
+    | RuntimeDraftAutosaveTimerStarted { target : String, revision : Int, delayMs : Int, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimeDraftAutosaveTimerCancelled { target : String, revision : Int, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
     | OutboxRetryTimer { delayMs : Int }
     | PingObserved
-    | SessionTokenStored { kind : String, token : String, expiresAt : Maybe Int, server : String, nick : String }
-    | SessionTokensCleared { server : String, nick : String }
+    | SessionTokenIssueRequested
+    | CredentialForgetRequested { credentialRef : Ids.CredentialRef }
+    | SessionRememberConsentRequested { remember : Bool }
+    | RuntimeCapabilityRequest { roundRef : String, names : List String }
+    | RuntimeCapabilityEnd { roundRef : String }
+    | RuntimeDomainCommand RuntimeDomain.Command
+    | RuntimePrivateFilePick String
+    | RuntimePrivateOutputPick String
+    | RuntimePrivatePasswordRequest { purpose : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateAccountFormRequest { requestId : String, kind : String, action : String, account : Maybe String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateScheduledMessageRequest { requestId : String, operationId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, kind : String, conversationId : String, initialDueAtMs : Int, prefillFromComposer : Bool }
+    | PrivateIdentifyRequested { account : String, requestId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
     | ReclaimTimerStarted { stage : String }
     | ReclaimTimersCleared
-    | SaslCredentialsStored { account : String, password : String, hasClientCert : Bool }
+    | SaslCredentialsStored { account : String, hasClientCert : Bool }
     | SaslRespond { mech : String, nick : String, param : String }
     | SaslTimerStarted
     | SaslTimerCleared
@@ -875,7 +1159,7 @@ type Outbound
     | PasskeySettleRequest
     | VhostRefreshRequest
     | DmSealRequested { target : String, keys : List String, plaintext : String, owner : Maybe DeviceMemoryOwner, schedId : Maybe String }
-    | DmOpenRequested { peer : String, presentedKey : String, messageId : Int, envelope : String, owner : Maybe DeviceMemoryOwner }
+    | DmOpenRequested { peer : String, presentedKey : String, messageId : Int, envelope : String, owner : Maybe DeviceMemoryOwner, runtimeOwnerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
     | DmPublishKey
     | E2eeDeviceIdentityRequest
     | RoomSealRequested { room : String, plaintext : String }
@@ -940,6 +1224,11 @@ type Outbound
     | FollowedSave { keys : List String }
     | HighlightWordsSave { words : List String }
     | DndSave { enabled : Bool, until : Maybe Int }
+    | DndQuietSave { start : Int, end : Int }
+    | FirstHourSeenSave
+    | ComposerFocus
+    | NavigationLoad { key : String }
+    | NavigationSave { key : String, json : String }
     | ChannelNotifySave { entries : List ChannelNotifyEntry }
     | StarredSave { channels : List String }
     | ForumChannelsSave { channels : List String }
@@ -983,6 +1272,7 @@ across sessions without a clock: on load the model fast-forwards
 -}
 type alias VaultRow =
     { id : String
+    , wireMessageId : Maybe String
     , target : String
     , from : String
     , body : String
@@ -1012,6 +1302,7 @@ type VaultSearchStatus
     = VaultSearchIdle
     | VaultSearchPending
     | VaultSearchDone
+    | VaultSearchIncomplete
     | VaultSearchError
 
 
@@ -1153,6 +1444,7 @@ epochs ride through as integral floats (the same shape the ports
 importVaultRow : VaultImport.VaultImportMessage -> VaultRow
 importVaultRow message =
     { id = message.id
+    , wireMessageId = Nothing
     , target = message.target
     , from = message.from
     , body = message.body
@@ -2119,7 +2411,7 @@ statsInspectorAwaiting model =
                 String.toLower stale.channel /= String.toLower room
 
             Nothing ->
-                False
+                                                False
 
 
 {-| Feed state for the stats route against the clock.
@@ -2427,10 +2719,64 @@ type Msg
     | UrlChanged Url.Url
     | WsLineReceived String
     | WsBatchReceived { at : Int, lines : List String }
-    | NodesProbed { wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float }
+    | WsFramesReceived { owner : RuntimeOwnerStamp, frames : List { at : Int, lines : List String } }
+    | NodesProbed { wss : String }
+    | SessionCredentialsReceived (List Session.CredentialMetadata)
+    | SessionCredentialStateReceived { credentials : List Session.CredentialMetadata, issuance : Session.CredentialIssuance, remembered : Bool }
+    | RuntimeOwnerStateReceived { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateWebhookResult { requestId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, room : String, status : String }
+    | RuntimeFeatureReadinessReceived { roundRef : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, e2ee : Bool, media : Bool, newCapabilities : List String }
+    | RuntimeCapabilityAdmissionReceived { roundRef : String, names : List String, status : String }
+    | RuntimeCapabilityResolutionReceived { roundRef : String, names : List String, result : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimeDomainActionRequested RuntimeDomain.Action
+    | RuntimePrivateFilePickRequested String
+    | GroupBackupRoomInputChanged String
+    | RuntimePrivateFileSelected { purpose : String, inputRef : String }
+    | RuntimePrivateOutputPickRequested String
+    | RuntimePrivateOutputSelected { purpose : String, outputRef : String }
+    | RuntimePrivatePasswordSelected { purpose : String, passwordRef : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateAccountFormRequested { kind : String, action : String, account : Maybe String }
+    | RuntimePrivateAccountFormReady { requestId : String, kind : String, action : String, formRef : String, account : Maybe String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateScheduledMessageReady { requestId : String, operationId : String, kind : String, inputRef : String, dueAtMs : Int, prefilledComposer : Bool, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimePrivateScheduledMessageFailed { requestId : String, reason : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | EditRuntimeScheduledMessage { scheduleRef : String, revision : Int, target : String, dueAtMs : Int, messageKind : String, replyTo : Maybe String, audiencePrefix : Maybe Char }
+    | CheckRuntimeScheduledMessageStatus { scheduleRef : String, revision : Int }
+    | RuntimeSessionTokenSaslStatus { requestId : String, status : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
+    | RuntimeStorageExportPickRequested String
+    | RuntimeCapturePrepared { ownerRef : String, connectionGeneration : Int, accountGeneration : Int, conversationId : String, captureRef : String, kind : String, available : Bool, reason : Maybe String, deviceRef : Maybe String, callRef : Maybe String }
+    | RuntimeMediaGestureResult { ownerRef : String, accountGeneration : Int, connectionGeneration : Int, gesture : String, conversationId : String, callRef : String, state : String, reason : Maybe String }
+    | RuntimeDomainResultReceived RuntimeDomain.ResultView
+    | RuntimeDomainObservationReceived { ownerRef : String, accountGeneration : Int, connectionGeneration : Int, domain : String, sequence : Int, securityStatus : Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool }, scheduledView : Maybe RuntimeDomain.ScheduledListView, sessionRecovery : Maybe RuntimeDomain.SessionRecoveryView, passkeyManagement : Maybe RuntimeDomain.PasskeyManagementView, webAuthn : Maybe RuntimeDomain.WebAuthnView, sessionInventory : Maybe RuntimeDomain.SessionInventoryView, sessionRevocation : Maybe RuntimeDomain.SessionRevocationView, accountCommunity : Maybe RuntimeDomain.AccountCommunityView, serviceIntegration : Maybe RuntimeDomain.ServiceIntegrationView, draftRecovery : Maybe RuntimeDomain.DraftRecoveryView, mediaQuality : Maybe RuntimeDomain.MediaQualityView, mediaControl : Maybe RuntimeDomain.MediaControlView }
+    | RuntimeNotificationNavigationReceived { requestId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, kind : String, conversationId : Maybe String }
+    | ComposerCompositionStarted
+    | ComposerCompositionEnded
+    | MediaQualityPolicySet String
+    | MediaCaptionLanguageChanged String
+    | MediaBrowserAudioConsentChanged Bool
+    | MediaOutputDeviceSelected String
+    | MediaOutputVolumeChanged String
+    | AccountCommunityInput String
+    | ServiceIntegrationFieldChanged String String
+    | ServiceIntegrationFormReset
+    | DraftRecoveryPreviewDismissed
+    | DraftRecoveryPreviewInserted
+    | SessionCredentialsIgnored
+    | SessionNewAttachmentRequested
+    | SessionRetryRequested
     | WsOpened { url : String }
     | WsClosed { clean : Bool, reason : String }
+    | ClientLineRejected { endpoint : Maybe String, physicalConnectionGeneration : Int, runtimeOwnerStamp : Maybe { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int } }
     | ReconnectNow
+    | ConnectionDialogOpen
+    | ConnectionDialogClose
+    | ConnectionNickInput String
+    | ConnectionAccountInput String
+    | ConnectionModeChanged Bool
+    | ConnectionNickSubmit
+    | ConnectionCancelSignIn
+    | ConnectionSignInSubmit
+    | ConnectionKeepName
+    | ConnectionAccountSettings
     | ReclaimOpen
     | ReclaimClose
     | ReclaimPasswordInput String
@@ -2459,6 +2805,7 @@ type Msg
     | CreateHangLabelInput String
     | CreateInviteeInput String
     | CreateInviteeAdd
+    | CreateInviteePick String
     | CreateInviteeRemove String
     | CreateCopyRequest
     | CreateSubmit
@@ -2471,8 +2818,11 @@ type Msg
     | BrowserSortInput BrowseSort
     | ComposerAudienceCycle
     | VaultRowsReceived { target : String, rows : List VaultRow, status : String }
+    | VaultRowsScopedReceived { target : String, rows : List VaultRow, status : String, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int, retentionScope : RetentionReadScope }
     | VaultRowsAroundReceived { target : String, at : Int, rows : List VaultRow, status : String }
+    | VaultRowsAroundScopedReceived { target : String, at : Int, rows : List VaultRow, status : String, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int, retentionScope : RetentionReadScope }
     | VaultSearched { rows : List VaultRow, status : String, seq : Int, mode : String }
+    | VaultSearchedScoped { rows : List VaultRow, status : String, seq : Int, mode : String, ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int, retentionScopes : List RetentionScopeEntry }
     | VaultDmPrivacyClassified { target : String, privacy : String }
     | VaultOpenHit { target : String, at : Int }
     | SearchRunServer
@@ -2486,13 +2836,14 @@ type Msg
     | VaultExported { targets : Int, messages : Int }
     | VaultStored { target : String, stored : Int }
     | VaultImportFile { json : String }
-    | OutboxQueued { id : String, target : String, text : String, queuedAt : Float }
+    | OutboxQueued { id : String, target : String, text : String, queuedAt : Float, revision : Maybe Int }
     | OutboxQueueFailed { target : String }
     | OutboxFlushed { sent : List String, uncertain : List String, dropped : List String, rows : List OutboxEntry, sentLabels : List { id : String, label : String }, waiting : Int, pruneFailed : Int, expiredPruneFailed : Int, admittedPruneFailed : Int, walkOk : Bool }
     | OutboxFlushRequest
     | OutboxRetryFired
     | ScheduleMessage { channel : String, text : String, sendAt : Int }
     | CancelScheduledMessage { id : String }
+    | CancelRuntimeScheduledMessage { scheduleRef : String, revision : Int }
     | ScheduledPersisted { ok : Bool }
     | SetShowScheduledMessages Bool
     | SetAccountOpen Bool
@@ -2511,8 +2862,7 @@ type Msg
     | PingDue
     | Tick Time.Posix
     | ReclaimTimerFired { stage : String }
-    | SaslCredentialsProvided { account : String, password : String, hasClientCert : Bool }
-    | SaslPayload { payload : String }
+    | SaslCredentialsProvided { account : String, hasClientCert : Bool }
     | SaslFailed { reason : String }
     | SaslTimeout
     | SearchRowsReceived { rows : List Decode.Value, status : String }
@@ -2707,6 +3057,7 @@ type Msg
     | StewardOfferTransfer String
     | StewardAcceptTransfer String
     | StewardDeclineTransfer String
+    | StewardReconcileTransfer String
     | StewardDeclineAndClose String
     | StewardGrantTransfer String
     | StewardConfirmClose String
@@ -2726,7 +3077,20 @@ type Msg
     | MediaBinaryReceived { bytes : List Int }
     | GroupWelcomeOpened { key : String, room : String, epoch : Int, ok : Bool, reason : String }
     | ComposerInput String
+    | RetiredDraftReauthorize
+    | RetiredDraftDiscard
+    | DraftLoadRequested String
+    | DraftAutosaveTimerFired { target : String, revision : Int, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
     | ComposerSend
+    | SlashSuggestMove Int
+    | SlashSuggestPick String
+    | SlashSuggestDismiss
+    | NickSuggestMove Int
+    | NickSuggestPick String
+    | NickSuggestDismiss
+    | SetDndQuietHours Int Int
+    | FirstHourDismiss
+    | FirstHourInvite
     | AttachPick
     | AttachRemove Int
     | UploadPicked { key : String, files : List { name : String, size : Float, mime : String } }
@@ -2756,15 +3120,23 @@ type Msg
     | MessageCollapseToggle { nick : String }
     | EditArm { target : String, msgid : String }
     | EditCancel
+    | DismissEditUncertainty String String
     | ZoneReceived Time.Zone
     | ChannelSelect String
     | ThreadShowEarlier
+    | ThreadCatchUp
+    | ThreadFillGaps
+    | ThreadJumpUnread
+    | NavigationLoaded Decode.Value
+    | DeviceSlotsLoaded Decode.Value
+    | SearchOpenHistory
     | PinnedMessageRequest { channel : String, messageId : String }
     | PinnedMessagesOpen
     | PinnedMessagesClose
     | PinnedMessageJump { channel : String, messageId : String }
     | PinnedMessagePin { channel : String, messageId : String }
     | PinnedMessageUnpin { channel : String, messageId : String }
+    | ThreadFollowChanged { target : String, following : Bool }
     | ThreadShowLatest
     | IgnoreUser String
     | UnignoreUser String
@@ -2779,6 +3151,8 @@ type Msg
     | VisibilityChanged { visible : Bool, focused : Bool }
     | RequestNotifyPermission
     | ToggleCalls
+    | ToggleClientRooms
+    | ToggleClientMembers
     | ToggleNavMenu
     | NavMenuEscape
     | SelectRoadmapPriority { state : String }
@@ -2856,17 +3230,41 @@ type Msg
     | CallJoin { channel : String, video : Bool }
     | CallLeave
     | CallToggleMute
+    | CallToggleDeafen
     | CallHubChanged Media.CallHub
     | CallHubSnapshot Decode.Value
-    | SelectBoardTab String
 
 
-{-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
-live view and the vault agree on the bound.
+{-| Durable and inactive-target retention bound. This stays aligned with
+`VAULT_KEEP = 400`; the active conversation has a separate larger in-memory
+horizon so a live history session can hold 1,000 rows without expanding disk
+retention.
 -}
 keepMessages : Int
 keepMessages =
     400
+
+
+{-| Active in-memory conversation horizon. The rendered message window remains
+bounded separately by `View.Thread`.
+-}
+activeConversationKeep : Int
+activeConversationKeep =
+    1000
+
+
+messageRetentionFor : Model -> String -> Int
+messageRetentionFor model target =
+    case model.activeChannel of
+        Just active ->
+            if String.toLower active == String.toLower target then
+                activeConversationKeep
+
+            else
+                keepMessages
+
+        _ ->
+            keepMessages
 
 
 {-| Server-log lines retained for WALLOPS and other unscoped notices.
@@ -2937,9 +3335,19 @@ init nick url =
     , scheduledLabels = Dict.empty
     , scheduledInflight = []
     , scheduledDispatching = []
+    , scheduledJournalPending = Dict.empty
+    , pendingScheduledCapture = Nothing
+    , pendingScheduledSave = Nothing
     , scheduledCanceling = Dict.empty
     , route = Route.fromUrl url
     , connection = Offline
+    , connectionDialogOpen = False
+    , connectionNickDraft = ""
+    , connectionNickPending = Nothing
+    , connectionNickNotice = Nothing
+    , connectionAccountDraft = ""
+    , connectionSignIn = False
+    , connectionDialogError = Nothing
     , autoReconnect = False
     , reconnectIn = 0
     , reconnectDueMs = 0
@@ -2999,7 +3407,14 @@ init nick url =
     , reclaimPassword = ""
     , caps = []
     , composer = ""
+    , composerComposing = False
     , composerDrafts = Dict.empty
+    , composerDraftVersions = Dict.empty
+    , retiredDraftOwner = Nothing
+    , hydratedDraftTargets = Set.empty
+    , draftLoadPending = Nothing
+    , draftSavePending = Dict.empty
+    , queuedDraftRevisions = Dict.empty
     , messageMenu = Nothing
     , reactionPicker = Nothing
     , composerError = Nothing
@@ -3021,10 +3436,12 @@ init nick url =
     , zone = Time.utc
     , replyingTo = Nothing
     , editingMessage = Nothing
+    , pendingMessageEdits = Dict.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
     , messageSeq = 0
+    , clientBatchSeq = 0
     , seenMsgids = Dict.empty
     , isOper = False
     , isNetworkAdmin = False
@@ -3063,6 +3480,8 @@ init nick url =
     , scheduledSeals = Dict.empty
     , labelCounter = 0
     , pendingLabels = Dict.empty
+    , uncertainLabels = Dict.empty
+    , deliveryUnknownIds = Set.empty
     , ownEchoBatches = Set.empty
     , historyBatches = Dict.empty
     , serverSearchTarget = ""
@@ -3080,6 +3499,7 @@ init nick url =
     , lastHistoryTargetsSweepAt = Nothing
     , historyTargets = Dict.empty
     , historyLoading = Set.empty
+    , pendingHistoryRequests = Dict.empty
     , historyExhausted = Set.empty
     , pendingPins = Dict.empty
     , pendingDiscoveries = Dict.empty
@@ -3089,7 +3509,13 @@ init nick url =
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     , historyMerging = False
+    , pendingRedactions = []
+    , ownedRowIds = Set.empty
+    , seenReactionEventIds = []
+    , pendingPropWrites = Dict.empty
     , readMarkers = Dict.empty
+    , viewedReadMarkers = Dict.empty
+    , anchorLoadPending = Nothing
     , lastReadAt = Dict.empty
     , ignoredUsers = Set.empty
     , collapsedNicks = Set.empty
@@ -3107,6 +3533,26 @@ init nick url =
     , soundVolume = 0.5
     , dndEnabled = False
     , dndUntil = Nothing
+    -- Equal hours are an empty window, so this zero model does not
+    -- suppress alerts. Boot flags in `Main` apply the oracle 22/8 default.
+    , dndQuietStart = 0
+    , dndQuietEnd = 0
+    , slashDismissed = False
+    , slashIndex = 0
+    , nickDismissed = False
+    , nickIndex = 0
+    -- Already recorded, so ordinary sends do not also emit
+    -- `FirstHourSeenSave`. Boot flags and first-hour tests clear it.
+    , firstHourSeen = True
+    , firstHourComposerFocused = False
+    , forceUnreadNav = False
+    , channelNavigation = ChannelNavigation.empty
+    , navigationReady = False
+    , navigationRequested = False
+    , navigationStarAdds = []
+    , navigationStarRemoves = []
+    , navigationForumAdds = []
+    , navigationForumRemoves = []
     , pageVisible = True
     , appFocused = True
     , notifyPermission = Notify.Default
@@ -3118,6 +3564,7 @@ init nick url =
     , groupControlInFlight = Set.empty
     , serverPrefix = Nothing
     , endpoint = Nothing
+    , physicalConnectionGeneration = 0
     , groupCollectors = Dict.empty
     , groupDirectory = Dict.empty
     , groupPending = Dict.empty
@@ -3125,9 +3572,11 @@ init nick url =
     , groupWelcomeInFlight = Dict.empty
     , groupCompletedPairs = []
     , groupInstalledEpochs = Dict.empty
-    , vaultSeenIds = []
+    , vaultSeenIds = VaultSeenIds.empty
     , vaultPersistSig = Dict.empty
     , vaultPersistOrder = []
+    , vaultDirtyTargets = Dict.empty
+    , vaultDirtyOrder = []
     , modexModes = Dict.empty
     , modexPending = Dict.empty
     , retentionPolicy = Retention.defaultPolicy
@@ -3145,7 +3594,10 @@ init nick url =
     , notifSeq = 0
     , calls = Media.blankCallHub
     , callSelfMuted = False
+    , callSelfDeafened = False
     , callsOpen = False
+    , clientRoomsOpen = False
+    , clientMembersOpen = False
     , navMenuOpen = False
     , navPath = ""
     , roadmapPriority = Nothing
@@ -3214,10 +3666,10 @@ init nick url =
     , studioCustoms = []
     , studioTab = "surfaces"
     , studioBootTheme = Nothing
-    , landingBoardTab = "public-room"
     , publisher = GroupPublisher.blank ""
     , attribution = Attribution.blankSession
     , roomTransfers = Dict.empty
+    , stewardTransferAttempts = Dict.empty
     , stewardRoom = Nothing
     , stewardHelper = ""
     , stewardSuccessor = ""
@@ -3227,11 +3679,13 @@ init nick url =
     , stewardDeleting = False
     , webhookName = "ci"
     , webhookDeleteId = ""
+    , privateWebhookStatus = Nothing
     , webPushOn = False
     , webPushBusy = False
     , webPushError = Nothing
     , webPushSupported = Nothing
     , awayNicks = Set.empty
+    , dmAway = Dict.empty
     , friends = Dict.empty
     , watchList = []
     , monitoredNicks = Set.empty
@@ -3275,15 +3729,64 @@ init nick url =
     , outboxFailed = False
     , outboxRetries = 0
     , capAvailable = []
+    , capAvailableValues = Dict.empty
+    , capRequestGroups = []
+    , capRequestGroupSeq = 0
+    , runtimeOwnerStamp = Nothing
+    , retentionReadScopes = Dict.empty
+    , runtimeDomainPending = Nothing
+    , runtimeDomainPendingAction = Nothing
+    , runtimeDomainResult = Nothing
+    , pendingStorageExportSelection = Nothing
+    , groupBackupRoomInput = ""
+    , pendingGroupBackupSelection = Nothing
+    , pendingGroupBackupInput = Nothing
+    , pendingGroupBackupOutput = Nothing
+    , pendingSecurityFormRequest = Nothing
+    , runtimeDomainObservation = Dict.empty
+    , sessionInventoryView = Nothing
+    , sessionRevocationView = Nothing
+    , accountCommunityView = Nothing
+    , serviceIntegrationView = Nothing
+    , serviceIntegrationForm = emptyServiceIntegrationForm
+    , serviceIntegrationFormRevision = 0
+    , serviceIntegrationFormCleanRevision = 0
+    , serviceIntegrationPendingFormRevision = Nothing
+    , draftRecoveryView = Nothing
+    , mediaQualityView = Nothing
+    , mediaQualityViewOwner = Nothing
+    , mediaControlView = Nothing
+    , mediaControlViewOwner = Nothing
+    , mediaCaptionLanguage = "en-US"
+    , mediaBrowserAudioConsent = False
+    , mediaBrowserAudioConsentCall = Nothing
+    , mediaGestureResult = Nothing
+    , mediaOutputVolumePercent = 100
+    , accountCommunityInput = ""
+    , draftRecoveryPreview = Nothing
+    , draftRecoveryCapture = Nothing
+    , sessionRecoveryView = Nothing
+    , sessionRecoveryViewOwner = Nothing
+    , sessionRecoveryExpectedAccount = Nothing
+    , passkeyManagementView = Nothing
+    , webAuthnObservationView = Nothing
+    , scheduledObservationView = Nothing
+    , privateAccountStatus = Nothing
+    , runtimeFeatureRound = Nothing
     , capReqPending = 0
     , capReqNames = []
     , capNegotiating = False
     , nickAliases = []
     , nickAliasTryIdx = 0
     , nickAliasesOwner = Nothing
-    , sessionTokens = { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing }
+    , sessionTokens = { credentials = [] }
+    , selectedContinuationRef = Nothing
+    , sessionTokenSaslRequestId = Nothing
     , sessionTokenWritesAllowed = True
     , sessionCommandsSent = False
+    , sessionTokenIssuanceRequested = False
+    , sessionCredentialIssuance = Session.CredentialIdle
+    , sessionCredentialsRemembered = False
     , sessionReclaim = Nothing
     , toasts = []
     , toastSeq = 0
@@ -3343,6 +3846,19 @@ init nick url =
     , nowMs = 0
     , pendingTravel = Nothing
     , pendingDeepLinkJoin = deepLink.join
+    , firstHourHandoff =
+        Just
+            (FirstHour.record
+                { landing =
+                    if deepLink.join == Nothing then
+                        FirstHour.Home
+
+                    else
+                        FirstHour.Room
+                , channel = deepLink.join
+                , guest = True
+                }
+            )
     , pendingDeepLinkAt = deepLink.at
     , pendingDeepLinkTopic = deepLink.topic
     , connectNick = nick
@@ -3357,6 +3873,7 @@ init nick url =
     , searchOpen = False
     , searchQuery = ""
     , searchIndex = 0
+    , threadFollowing = True
     , threadWindowSize = MessageWindow.defaultWindowSize
     , threadPageStart = Nothing
     , ignoreUnreadAnchor = False
@@ -3396,9 +3913,19 @@ blank =
     , scheduledLabels = Dict.empty
     , scheduledInflight = []
     , scheduledDispatching = []
+    , scheduledJournalPending = Dict.empty
+    , pendingScheduledCapture = Nothing
+    , pendingScheduledSave = Nothing
     , scheduledCanceling = Dict.empty
     , route = Route.App
     , connection = Live
+    , connectionDialogOpen = False
+    , connectionNickDraft = ""
+    , connectionNickPending = Nothing
+    , connectionNickNotice = Nothing
+    , connectionAccountDraft = ""
+    , connectionSignIn = False
+    , connectionDialogError = Nothing
     , autoReconnect = False
     , reconnectIn = 0
     , reconnectDueMs = 0
@@ -3458,7 +3985,14 @@ blank =
     , reclaimPassword = ""
     , caps = []
     , composer = ""
+    , composerComposing = False
     , composerDrafts = Dict.empty
+    , composerDraftVersions = Dict.empty
+    , retiredDraftOwner = Nothing
+    , hydratedDraftTargets = Set.empty
+    , draftLoadPending = Nothing
+    , draftSavePending = Dict.empty
+    , queuedDraftRevisions = Dict.empty
     , messageMenu = Nothing
     , reactionPicker = Nothing
     , composerError = Nothing
@@ -3480,10 +4014,12 @@ blank =
     , zone = Time.utc
     , replyingTo = Nothing
     , editingMessage = Nothing
+    , pendingMessageEdits = Dict.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
     , messageSeq = 0
+    , clientBatchSeq = 0
     , seenMsgids = Dict.empty
     , isOper = False
     , isNetworkAdmin = False
@@ -3522,6 +4058,8 @@ blank =
     , scheduledSeals = Dict.empty
     , labelCounter = 0
     , pendingLabels = Dict.empty
+    , uncertainLabels = Dict.empty
+    , deliveryUnknownIds = Set.empty
     , ownEchoBatches = Set.empty
     , historyBatches = Dict.empty
     , serverSearchTarget = ""
@@ -3539,6 +4077,7 @@ blank =
     , lastHistoryTargetsSweepAt = Nothing
     , historyTargets = Dict.empty
     , historyLoading = Set.empty
+    , pendingHistoryRequests = Dict.empty
     , historyExhausted = Set.empty
     , pendingPins = Dict.empty
     , pendingDiscoveries = Dict.empty
@@ -3548,7 +4087,12 @@ blank =
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     , historyMerging = False
+    , pendingRedactions = []
+    , ownedRowIds = Set.empty
+    , seenReactionEventIds = []
+    , pendingPropWrites = Dict.empty
     , readMarkers = Dict.empty
+    , viewedReadMarkers = Dict.empty
     , lastReadAt = Dict.empty
     , ignoredUsers = Set.empty
     , collapsedNicks = Set.empty
@@ -3566,6 +4110,26 @@ blank =
     , soundVolume = 0.5
     , dndEnabled = False
     , dndUntil = Nothing
+    -- Equal hours are an empty window, so this zero model does not
+    -- suppress alerts. Boot flags in `Main` apply the oracle 22/8 default.
+    , dndQuietStart = 0
+    , dndQuietEnd = 0
+    , slashDismissed = False
+    , slashIndex = 0
+    , nickDismissed = False
+    , nickIndex = 0
+    -- Already recorded, so ordinary sends do not also emit
+    -- `FirstHourSeenSave`. Boot flags and first-hour tests clear it.
+    , firstHourSeen = True
+    , firstHourComposerFocused = False
+    , forceUnreadNav = False
+    , channelNavigation = ChannelNavigation.empty
+    , navigationReady = False
+    , navigationRequested = False
+    , navigationStarAdds = []
+    , navigationStarRemoves = []
+    , navigationForumAdds = []
+    , navigationForumRemoves = []
     , pageVisible = True
     , appFocused = True
     , notifyPermission = Notify.Default
@@ -3577,6 +4141,7 @@ blank =
     , groupControlInFlight = Set.empty
     , serverPrefix = Nothing
     , endpoint = Nothing
+    , physicalConnectionGeneration = 0
     , groupCollectors = Dict.empty
     , groupDirectory = Dict.empty
     , groupPending = Dict.empty
@@ -3584,9 +4149,11 @@ blank =
     , groupWelcomeInFlight = Dict.empty
     , groupCompletedPairs = []
     , groupInstalledEpochs = Dict.empty
-    , vaultSeenIds = []
+    , vaultSeenIds = VaultSeenIds.empty
     , vaultPersistSig = Dict.empty
     , vaultPersistOrder = []
+    , vaultDirtyTargets = Dict.empty
+    , vaultDirtyOrder = []
     , modexModes = Dict.empty
     , modexPending = Dict.empty
     , retentionPolicy = Retention.defaultPolicy
@@ -3604,7 +4171,10 @@ blank =
     , notifSeq = 0
     , calls = Media.blankCallHub
     , callSelfMuted = False
+    , callSelfDeafened = False
     , callsOpen = False
+    , clientRoomsOpen = False
+    , clientMembersOpen = False
     , navMenuOpen = False
     , navPath = ""
     , roadmapPriority = Nothing
@@ -3673,10 +4243,10 @@ blank =
     , studioCustoms = []
     , studioTab = "surfaces"
     , studioBootTheme = Nothing
-    , landingBoardTab = "public-room"
     , publisher = GroupPublisher.blank ""
     , attribution = Attribution.blankSession
     , roomTransfers = Dict.empty
+    , stewardTransferAttempts = Dict.empty
     , stewardRoom = Nothing
     , stewardHelper = ""
     , stewardSuccessor = ""
@@ -3686,11 +4256,13 @@ blank =
     , stewardDeleting = False
     , webhookName = "ci"
     , webhookDeleteId = ""
+    , privateWebhookStatus = Nothing
     , webPushOn = False
     , webPushBusy = False
     , webPushError = Nothing
     , webPushSupported = Nothing
     , awayNicks = Set.empty
+    , dmAway = Dict.empty
     , friends = Dict.empty
     , watchList = []
     , monitoredNicks = Set.empty
@@ -3734,15 +4306,65 @@ blank =
     , outboxFailed = False
     , outboxRetries = 0
     , capAvailable = []
+    , capAvailableValues = Dict.empty
+    , capRequestGroups = []
+    , capRequestGroupSeq = 0
+    , runtimeOwnerStamp = Nothing
+    , retentionReadScopes = Dict.empty
+    , runtimeDomainPending = Nothing
+    , runtimeDomainPendingAction = Nothing
+    , runtimeDomainResult = Nothing
+    , anchorLoadPending = Nothing
+    , pendingStorageExportSelection = Nothing
+    , groupBackupRoomInput = ""
+    , pendingGroupBackupSelection = Nothing
+    , pendingGroupBackupInput = Nothing
+    , pendingGroupBackupOutput = Nothing
+    , pendingSecurityFormRequest = Nothing
+    , runtimeDomainObservation = Dict.empty
+    , sessionInventoryView = Nothing
+    , sessionRevocationView = Nothing
+    , accountCommunityView = Nothing
+    , serviceIntegrationView = Nothing
+    , serviceIntegrationForm = emptyServiceIntegrationForm
+    , serviceIntegrationFormRevision = 0
+    , serviceIntegrationFormCleanRevision = 0
+    , serviceIntegrationPendingFormRevision = Nothing
+    , draftRecoveryView = Nothing
+    , mediaQualityView = Nothing
+    , mediaQualityViewOwner = Nothing
+    , mediaControlView = Nothing
+    , mediaControlViewOwner = Nothing
+    , mediaCaptionLanguage = "en-US"
+    , mediaBrowserAudioConsent = False
+    , mediaBrowserAudioConsentCall = Nothing
+    , mediaGestureResult = Nothing
+    , mediaOutputVolumePercent = 100
+    , accountCommunityInput = ""
+    , draftRecoveryPreview = Nothing
+    , draftRecoveryCapture = Nothing
+    , sessionRecoveryView = Nothing
+    , sessionRecoveryViewOwner = Nothing
+    , sessionRecoveryExpectedAccount = Nothing
+    , passkeyManagementView = Nothing
+    , webAuthnObservationView = Nothing
+    , scheduledObservationView = Nothing
+    , privateAccountStatus = Nothing
+    , runtimeFeatureRound = Nothing
     , capReqPending = 0
     , capReqNames = []
     , capNegotiating = False
     , nickAliases = []
     , nickAliasTryIdx = 0
     , nickAliasesOwner = Nothing
-    , sessionTokens = { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing }
+    , sessionTokens = { credentials = [] }
+    , selectedContinuationRef = Nothing
+    , sessionTokenSaslRequestId = Nothing
     , sessionTokenWritesAllowed = True
     , sessionCommandsSent = False
+    , sessionTokenIssuanceRequested = False
+    , sessionCredentialIssuance = Session.CredentialIdle
+    , sessionCredentialsRemembered = False
     , sessionReclaim = Nothing
     , toasts = []
     , toastSeq = 0
@@ -3802,6 +4424,7 @@ blank =
     , nowMs = 0
     , pendingTravel = Nothing
     , pendingDeepLinkJoin = Nothing
+    , firstHourHandoff = Nothing
     , pendingDeepLinkAt = Nothing
     , pendingDeepLinkTopic = Nothing
     , connectNick = "me"
@@ -3816,6 +4439,7 @@ blank =
     , searchOpen = False
     , searchQuery = ""
     , searchIndex = 0
+    , threadFollowing = True
     , threadWindowSize = MessageWindow.defaultWindowSize
     , threadPageStart = Nothing
     , ignoreUnreadAnchor = False
@@ -3934,6 +4558,15 @@ closeMotd model =
 {-| Pure fold: one parsed line in, new model plus outbound lines out.
 `update` sends the outbound lines through `wsSend`.
 -}
+isPrivateMediaControl : Wire.IrcMessage -> Bool
+isPrivateMediaControl message =
+    List.member message.command [ "FAIL", "WARN" ]
+        && (message.params
+                |> List.take 3
+                |> List.any (String.toUpper >> (==) "MEDIA")
+           )
+
+
 foldLine : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldLine model message =
     case message.command of
@@ -3982,12 +4615,15 @@ foldLine model message =
             ( finishMotd model, [] )
 
         "353" ->
-            ( foldNames model message, [] )
+            ( markStewardReconcileNamesSeen (foldNames model message) message, [] )
 
         "366" ->
             let
+                settledTransfer =
+                    settleStewardTransferRoster model message
+
                 settled =
-                    settleNamesBurst model message
+                    settleNamesBurst settledTransfer message
             in
             ( settled, requestPropsOnNamesEnd model message )
 
@@ -4080,8 +4716,23 @@ foldLine model message =
                                         -- settles a matching pending room
                                         -- creation (TOPIC + first line).
                                         let
-                                            browserSettled =
+                                            browserConfirmed =
+                                                model.browserPendingJoin == Just (String.toLower chan)
+                                                    && model.browserJoinPhase == BrowserJoinPending
+                                                    || (model.browserPendingJoin == Nothing
+                                                            && model.browserJoinPhase == BrowserJoinUncertain
+                                                            && model.browserAttemptedJoin == Just (String.toLower chan)
+                                                       )
+
+                                            settled =
                                                 settleBrowserJoin (clearJoinPromptFor fetched chan) chan
+
+                                            ( browserSettled, browserOuts ) =
+                                                if browserConfirmed then
+                                                    update (ChannelSelect chan) { settled | browserOpen = False }
+
+                                                else
+                                                    ( settled, [] )
 
                                             ( created, createOuts ) =
                                                 settlePendingCreateRoom browserSettled chan
@@ -4126,6 +4777,7 @@ foldLine model message =
                                         in
                                         ( linked
                                         , outs
+                                            ++ browserOuts
                                             ++ createOuts
                                             ++ linkOuts
                                             ++ [ SendLine (Wire.formatIrcLine "WHO" [ chan ]) ]
@@ -4236,59 +4888,69 @@ foldLine model message =
                             captured
 
                         Nothing ->
-                            case directoryNoticeBody withAttr message of
-                                Just body ->
-                                    foldDirectoryNotice withAttr body
+                            case foldMemoNotice withAttr message of
+                                Just memo ->
+                                    memo
 
                                 Nothing ->
-                                    case foldAccountSessionNotice withAttr message of
-                                        Just captured ->
-                                            captured
+                                    case foldSessionResumeNotice withAttr message of
+                                        Just settled ->
+                                            settled
 
                                         Nothing ->
-                                            case foldTotpNotice withAttr message of
-                                                Just settled ->
-                                                    settled
+                                            case directoryNoticeBody withAttr message of
+                                                Just body ->
+                                                    foldDirectoryNotice withAttr body
 
                                                 Nothing ->
-                                                    case foldRecoveryCodesNotice withAttr message of
+                                                    case foldTotpNotice withAttr message of
                                                         Just settled ->
                                                             settled
 
                                                         Nothing ->
-                                                            case foldKeytransNotice withAttr message of
+                                                            case foldRecoveryCodesNotice withAttr message of
                                                                 Just settled ->
                                                                     settled
 
                                                                 Nothing ->
-                                                                    case foldCertNotice withAttr message of
-                                                                            Just settled ->
-                                                                                settled
+                                                                    case foldKeytransNotice withAttr message of
+                                                                        Just settled ->
+                                                                            settled
 
-                                                                            Nothing ->
-                                                                                case foldVhostNotice withAttr message of
-                                                                                    Just settled ->
-                                                                                        settled
+                                                                        Nothing ->
+                                                                            case foldCertNotice withAttr message of
+                                                                                Just settled ->
+                                                                                    settled
 
-                                                                                    Nothing ->
-                                                                                        case foldAccountInfoNotice withAttr message of
-                                                                                            Just settled ->
-                                                                                                settled
+                                                                                Nothing ->
+                                                                                    case foldVhostNotice withAttr message of
+                                                                                        Just settled ->
+                                                                                            settled
 
-                                                                                            Nothing ->
-                                                                                                case foldWebhookNotice withAttr message of
-                                                                                                    Just settled ->
-                                                                                                        settled
+                                                                                        Nothing ->
+                                                                                            case foldAccountInfoNotice withAttr message of
+                                                                                                Just settled ->
+                                                                                                    settled
 
-                                                                                                    Nothing ->
-                                                                                                        foldChat withAttr message True
+                                                                                                Nothing ->
+                                                                                                    case foldWebhookNotice withAttr message of
+                                                                                                        Just settled ->
+                                                                                                            settled
+
+                                                                                                        Nothing ->
+                                                                                                            if isPrivateServerControlNotice withAttr message then
+                                                                                                                ( withAttr, [] )
+
+                                                                                                            else
+                                                                                                                foldChat withAttr message True
             in
             ( folded, attrOut ++ out )
 
         "CHATHISTORY" ->
             -- TARGETS discovery rows collect into the open reply
-            -- batch; any other replay shape stays ahead with the
-            -- history-fetch infrastructure.
+            -- batch. Any other replay shape is dropped, matching
+            -- `src/lib/store/store.ts` (`case 'CHATHISTORY'` breaks
+            -- unless params[0] is TARGETS).
             ( collectHistoryTarget model message, [] )
 
         "332" ->
@@ -4415,7 +5077,7 @@ foldLine model message =
                             -- Voice/video is available to any registered
                             -- member with no cap to gate on, mirroring
                             -- the oracle.
-                            , mediaAvailable = True
+                            , mediaAvailable = runtimeFeatureReady model "onyx/media"
                             -- A new registration resets channel-registry
                             -- sync, mirroring the oracle.
                             , props = { priorProps | synced = Set.empty }
@@ -4536,9 +5198,12 @@ foldLine model message =
                 -- pending-deep-link JOIN on 001.
                 ( withLink, linkOutbound ) =
                     firePendingDeepLinkJoin withMonitor
+
+                ( withRuntimeCaps, runtimeCapOutbound ) =
+                    requestReadyRuntimeCaps withLink
             in
-            ( withLink
-            , baseOutbound ++ sessionOutbound ++ rejoinOutbound ++ targetsOutbound ++ profileOutbound ++ welcomeOut ++ banOutbound ++ recoveryOutbound ++ monitorOutbound ++ linkOutbound
+            ( withRuntimeCaps
+            , baseOutbound ++ sessionOutbound ++ rejoinOutbound ++ targetsOutbound ++ profileOutbound ++ welcomeOut ++ banOutbound ++ recoveryOutbound ++ monitorOutbound ++ linkOutbound ++ runtimeCapOutbound
             )
 
         "900" ->
@@ -4595,9 +5260,16 @@ foldLine model message =
                                 -- in storage (mirroring the oracle's
                                 -- scheduled purge on 900, which keys off
                                 -- the account-or-nick owner — including a
-                                -- guest-to-account login, where Elm's
-                                -- narrower `switched` stays false and the
-                                -- rest of that reset stays ahead).
+                                -- guest-to-account login). `ownerChanged`
+                                -- includes that login, so the scheduled
+                                -- purge and `quarantineOwnerChange` both
+                                -- run. The quarantine drops the previous
+                                -- owner's channel-navigation document;
+                                -- the return loads the new owner's key.
+                                -- Device slots (highlight, notify,
+                                -- auto-join, colors, ignore/mute) reload
+                                -- when the friends request announces the
+                                -- new owner and `DeviceSlotsLoaded` lands.
                                 ( unpurged, purgeOut ) =
                                     let
                                         outgoing =
@@ -4615,6 +5287,39 @@ foldLine model message =
                                 quarantined =
                                     quarantineOwnerChange unpurged
 
+                                controlledRecoveryContinuation =
+                                    case ( model.runtimeOwnerStamp, model.sessionRecoveryView, model.sessionRecoveryViewOwner ) of
+                                        ( Just owner, Just view, Just viewOwner ) ->
+                                            case ( model.sessionRecoveryExpectedAccount, model.serverPrefix, message.prefix ) of
+                                                ( Just intent, Just learnedPrefix, Just sourcePrefix ) ->
+                                                    viewOwner == owner
+                                                        && sourcePrefix == learnedPrefix
+                                                        && message.nick == Nothing
+                                                        && List.head message.params == Just model.ourNick
+                                                        && List.member view.status [ "redirecting", "awaiting-authentication" ]
+                                                        && view.requestId == intent.requestId
+                                                        && view.credentialRef == intent.credentialRef
+                                                        && intent.networkId == owner.networkId
+                                                        && String.toLower intent.accountId == String.toLower account
+                                                        && (model.accountName == Nothing || accountOwnerKey model.accountName == accountOwnerKey (Just account))
+
+                                                _ ->
+                                                    False
+
+                                        _ ->
+                                            False
+
+                                ownerQuarantine =
+                                    if controlledRecoveryContinuation then
+                                        { quarantined
+                                            | sessionRecoveryView = model.sessionRecoveryView
+                                            , sessionRecoveryViewOwner = model.sessionRecoveryViewOwner
+                                            , sessionRecoveryExpectedAccount = model.sessionRecoveryExpectedAccount
+                                        }
+
+                                    else
+                                        quarantined
+
                                 cleared =
                                     if switched then
                                         -- An account switch owns a new
@@ -4624,13 +5329,14 @@ foldLine model message =
                                         -- rotation, and everything else the
                                         -- oracle resets rides the
                                         -- quarantine).
-                                        { quarantined
-                                            | sessionTokens = { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing }
+                                        { ownerQuarantine
+                                            | sessionTokens = { credentials = [] }
                                             , sessionCommandsSent = False
+                                            , sessionTokenIssuanceRequested = False
                                         }
 
                                     else if loggedIn then
-                                        quarantined
+                                        ownerQuarantine
 
                                     else
                                         unpurged
@@ -4703,12 +5409,26 @@ foldLine model message =
                                 -- the oracle recovery effect).
                                 ( withPush, pushOut ) =
                                     requestWebPushCheck switchedMonitor
+
+                                -- Any login hides the claim affordance and
+                                -- forgets captured credentials, mirroring
+                                -- the prompt's sign-in effect. An owner
+                                -- change then loads that identity's
+                                -- navigation document; the account is
+                                -- already on the model, so the key is the
+                                -- new owner's.
+                                claimed =
+                                    resetGuestClaim withPush
+
+                                ( signedIn, navOut ) =
+                                    if ownerChanged then
+                                        takeNavigationLoad claimed
+
+                                    else
+                                        ( claimed, [] )
                             in
-                            -- Any login hides the claim affordance and
-                            -- forgets captured credentials, mirroring
-                            -- the prompt's sign-in effect.
-                            ( resetGuestClaim withPush
-                            , purgeOut ++ runPublisherEffects pubFx ++ attrOut ++ sessionOutbound ++ profileOutbound ++ reclaimOut ++ monitorOut ++ pushOut
+                            ( signedIn
+                            , purgeOut ++ runPublisherEffects pubFx ++ attrOut ++ sessionOutbound ++ profileOutbound ++ reclaimOut ++ monitorOut ++ pushOut ++ navOut
                             )
 
                     _ ->
@@ -4778,8 +5498,9 @@ foldLine model message =
                             , dropArmed = False
                             , e2eePublishBusy = False
                             , publisher = nextPublisher
-                            , sessionTokens = { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing }
+                            , sessionTokens = { credentials = [] }
                             , sessionCommandsSent = False
+                            , sessionTokenIssuanceRequested = False
                             , saslAuthenticated = False
                         }
                         |> clearLinkPreviews
@@ -4797,9 +5518,16 @@ foldLine model message =
 
                     else
                         ( withProfile, [] )
+
+                -- Logout already quarantined the old document.
+                -- Reload whatever identity remains (the nick, once
+                -- the account is gone) so a later star cannot write
+                -- the previous document under that key.
+                ( withNav, navOut ) =
+                    takeNavigationLoad loggedOut
             in
-            ( loggedOut
-            , purgeOut ++ runPublisherEffects pubFx ++ profileOutbound ++ logoutMonitorOut
+            ( withNav
+            , purgeOut ++ runPublisherEffects pubFx ++ profileOutbound ++ logoutMonitorOut ++ navOut
             )
 
         "432" ->
@@ -4822,7 +5550,12 @@ foldLine model message =
             -- flight: 903 is reused by the IRCX layer
             -- post-registration, so an idle 903 stays on the numeric
             -- log path like the oracle's pass-through.
-            if model.sasl /= SaslIdle then
+            if model.sasl == SaslPending Wire.SessionToken then
+                -- The private continuation owner settles this unlabelled
+                -- response with the exact auth-context stamp.
+                ( model, [] )
+
+            else if model.sasl /= SaslIdle then
                 let
                     ( ended, fx ) =
                         finishCapIfReady
@@ -4836,14 +5569,20 @@ foldLine model message =
         "904" ->
             -- ERR_SASLFAIL (and its 905 sibling) only while an
             -- exchange is in flight; otherwise ordinary numerics.
-            if model.sasl /= SaslIdle then
+            if model.sasl == SaslPending Wire.SessionToken then
+                ( model, [] )
+
+            else if model.sasl /= SaslIdle then
                 failSasl model "SASL authentication failed"
 
             else
                 ( logNumeric model message, [] )
 
         "905" ->
-            if model.sasl /= SaslIdle then
+            if model.sasl == SaslPending Wire.SessionToken then
+                ( model, [] )
+
+            else if model.sasl /= SaslIdle then
                 failSasl model "SASL authentication failed"
 
             else
@@ -4856,10 +5595,15 @@ foldLine model message =
             ( logNumeric model message, [] )
 
         "906" ->
-            -- RPL_SASLMECHS (mechanism list): no oracle path; the
-            -- offered mechanisms are capability-driven, so this
-            -- stays on the generic numeric log.
-            ( logNumeric model message, [] )
+            -- ERR_SASLABORTED: the server ended the exchange as aborted.
+            -- In flight (SESSION-TOKEN included, whose runtime owner does
+            -- not settle 906) that is a fail-closed end: no CAP END, no
+            -- guest fallback, disconnect. Idle it stays a log line.
+            if model.sasl /= SaslIdle then
+                failSasl { model | sessionTokenSaslRequestId = Nothing } "The server aborted SASL authentication."
+
+            else
+                ( logNumeric model message, [] )
 
         "462" ->
             -- ERR_ALREADYREGISTERED: no oracle path (verified: no
@@ -4933,10 +5677,11 @@ foldLine model message =
             ( foldContactOffline model message, [] )
 
         "730" ->
-            -- RPL_MONONLINE marks known friends online (the
-            -- DM-shell away write has no Elm surface yet — command
-            -- palette DM hints stay ahead — so only the friend
-            -- flags fold here).
+            -- RPL_MONONLINE marks known friends online and clears
+            -- `dmAway` on an existing DM shell (`store.ts` 13925).
+            -- The rail shows that away bit. Solid's Spotlight
+            -- catalogue (`src/chat/spotlight/commands.ts` `dmHint`)
+            -- reads the same flag; Elm does not host a second palette.
             ( foldMonitorOnline model message, [] )
 
         "731" ->
@@ -4965,9 +5710,9 @@ foldLine model message =
         "491" ->
             -- ERR_NOOPERHOST: the OPER attempt failed from this host —
             -- drop the oper badge (and admin) and say so in the inbox,
-            -- mirroring the oracle. No `operUsername` field exists yet
-            -- (the oper-login form stays ahead), so there is nothing
-            -- more to clear.
+            -- mirroring the oracle. There is no OPER password form:
+            -- `src/shell/OperDesk.tsx` grants operator status from the
+            -- signed-in account, so a failed 491 only clears the badge.
             ( addNotification { model | isOper = False, isNetworkAdmin = False }
                 { kind = NotifError
                 , text = "OPER not authorized from your host"
@@ -5151,13 +5896,23 @@ foldLine model message =
             ( foldEndOfBanList model message, [] )
 
         "818" ->
-            ( foldPropRow model message, [] )
+            ( settleEchoedPropWrite (foldPropRow model message) message, [] )
+
+        "913" ->
+            -- ERR_NOACCESS (IRCX): a refused PROP write never lands; its
+            -- pending desired value drops with the denial.
+            case message.params of
+                _ :: channel :: _ ->
+                    ( logNumeric (settlePropWrite model channel Nothing) message, [] )
+
+                _ ->
+                    ( logNumeric model message, [] )
 
         "819" ->
             ( { model | props = Ircx.foldPropLine model.isupport.chantypes model.props message }, [] )
 
         "PROP" ->
-            ( foldPropRow model message, [] )
+            ( settleEchoedPropWrite (foldPropRow model message) message, [] )
 
         "AWAY" ->
             ( foldAwayNotice model message, [] )
@@ -5213,33 +5968,25 @@ foldLine model message =
         "WALLOPS" ->
             foldWallops model message
 
-        "NOTE" ->
-            case foldSessionTokenNote model message of
-                Just captured ->
-                    captured
-
-                Nothing ->
-                    foldStandardReply model message
-
         "FAIL" ->
-            foldStandardReply model message
+            if isPrivateMediaControl message then ( model, [] ) else foldStandardReply model message
 
         "WARN" ->
-            foldStandardReply model message
+            if isPrivateMediaControl message then ( model, [] ) else foldStandardReply model message
 
         "ACK" ->
             -- Bare labeled-response ACK (a command with no natural
             -- reply). `CAP ACK` never reaches here — it folds in
             -- `foldCap`. Unknown or absent labels are consumed, never
-            -- group-delivered. A scheduled label admits its send.
+            -- group-delivered. A scheduled label is removed from this
+            -- response map without claiming durable admission.
             case labelOf message of
                 Just label ->
-                    case takeScheduledLabel model label of
-                        ( unlinked, Just link ) ->
-                            admitScheduledSend unlinked link
-
-                        ( _, Nothing ) ->
-                            ( promoteLabeledSend model label, [] )
+                    let
+                        ( unlinked, _ ) =
+                            takeScheduledLabel model label
+                    in
+                    ( markPendingEditUnknown label (markLabeledUnknown unlinked (Just label)), [] )
 
                 Nothing ->
                     ( model, [] )
@@ -5650,7 +6397,7 @@ pruneTypingUsers source now =
                                                         , Dict.insert nickKey { nick = nick, expiresAt = typist.expiresAt } users
                                                         , scanned + 1
                                                         )
-                                    )
+                                            )
                                     ( Set.empty, Dict.empty, 0 )
                                     rawUsers
                         in
@@ -5808,8 +6555,8 @@ activityNickToken raw =
 
 {-| Parse the typing subset of the ACTIVITY stream (mirroring
 `parseActivityStream`: sender nick token (64 max), channel target,
-`typing active|paused|done`; react verbs stay ahead with the
-reactions slice). -}
+`typing active|paused|done`). React verbs are `parseActivityReact` /
+`foldActivityReact`, not this parser. -}
 parseActivityTyping : Wire.IrcMessage -> Maybe { channel : String, nick : String, active : Bool }
 parseActivityTyping message =
     if String.toUpper message.command /= "ACTIVITY" then
@@ -5929,7 +6676,7 @@ foldTagmsgTyping model message =
 stops always send and re-arm the next start; invalid targets drop). -}
 sendTyping : Model -> String -> Bool -> ( Model, List Outbound )
 sendTyping model target start =
-    if not (List.member "draft/typing" model.caps) then
+    if not (Session.hasCapability model.caps "draft/typing") then
         ( model, [] )
 
     else
@@ -6144,28 +6891,29 @@ applyReactionAdd model target messageId emoji nick =
     updateReactionRow model target messageId (\rs -> addMessageReactor rs emoji nick)
 
 
-{-| Send our reaction (mirroring `addReaction`: `draft/react` must be
-negotiated or the reaction applies locally only; with `echo-message`
-the server echo folds back, otherwise we toggle locally as the
-optimistic update). -}
+{-| Send our reaction (mirroring `addReaction`: without `draft/react`
+the reaction applies locally only. With `draft/react`, the local row
+changes only after the server TAGMSG acceptance arrives, independent
+of `echo-message`). -}
 sendReaction : Model -> String -> String -> String -> ( Model, List Outbound )
 sendReaction model target messageId emoji =
-    if not (List.member "draft/react" model.caps) then
+    if not (Session.hasCapability model.caps "draft/react") then
         ( addLocalReaction model target messageId emoji, [] )
 
     else
         let
             tags =
                 Dict.fromList [ ( "+draft/react", emoji ), ( "+draft/reply", messageId ) ]
-
-            line =
-                Wire.formatTaggedLine tags "TAGMSG" [ target ]
         in
-        if List.member "echo-message" model.caps then
-            ( model, [ SendLine line ] )
+        case Wire.encodeTaggedLine tags "TAGMSG" [ target ] of
+            Ok line ->
+                -- The server's TAGMSG echo is the acceptance signal. Do not
+                -- toggle locally before it arrives; otherwise a no-echo cap
+                -- configuration could double-toggle the same reaction.
+                ( { model | composerError = Nothing }, [ SendLine line ] )
 
-        else
-            ( addLocalReaction model target messageId emoji, [ SendLine line ] )
+            Err _ ->
+                ( { model | composerError = Just "The reaction could not be safely sent." }, [] )
 
 
 {-| Validate an ACTIVITY msgid/reaction token (mirroring
@@ -6310,20 +7058,60 @@ foldTagmsgReact model message =
                                 let
                                     convo =
                                         dmMutateBucket model target nick
+
+                                    -- A TAGMSG event with a server msgid is one
+                                    -- toggle: a replay or duplicate delivery of
+                                    -- the same event msgid never toggles again.
+                                    eventId =
+                                        Dict.get "msgid" message.tags
+                                            |> Maybe.andThen
+                                                (\raw ->
+                                                    if validWireToken raw maxVaultMessageIdLength then
+                                                        Just (String.toLower convo ++ " " ++ raw)
+
+                                                    else
+                                                        Nothing
+                                                )
+
+                                    repeated =
+                                        case eventId of
+                                            Just id ->
+                                                List.member id model.seenReactionEventIds
+
+                                            Nothing ->
+                                                False
+
+                                    remembered =
+                                        case eventId of
+                                            Just id ->
+                                                { model | seenReactionEventIds = List.take maxSeenReactionEvents (id :: model.seenReactionEventIds) }
+
+                                            Nothing ->
+                                                model
                                 in
+                                if repeated then
+                                    model
+
+                                else
                                 case reactionRow model convo r of
                                     Nothing ->
                                         model
 
                                     Just row ->
                                         if hasReaction row.reactions e nick then
-                                            removeReactionAt model convo r e nick
+                                            removeReactionAt remembered convo r e nick
 
                                         else
-                                            applyReactionAdd model convo r e nick
+                                            applyReactionAdd remembered convo r e nick
 
                         _ ->
                             model
+
+
+{-| Bounded memory of applied TAGMSG reaction event msgids. -}
+maxSeenReactionEvents : Int
+maxSeenReactionEvents =
+    512
 
 
 {-| Fold an inbound REACT command (mirroring the oracle arm:
@@ -6459,7 +7247,9 @@ revisionsFor history messageId =
 `:nick REDACT <target> <msgid> [:reason]`; target and msgid
 required, the reason never renders; the row keeps its msgid but its
 body becomes the fixed redaction copy; no sender or encryption
-gate — the server enforces authorship).
+gate — the server enforces authorship). A REDACT for a msgid not yet
+in the buffer is remembered (bounded) and applied when the original
+arrives, live or replayed, so its text never files.
 -}
 foldRedact : Model -> Wire.IrcMessage -> Model
 foldRedact model message =
@@ -6478,22 +7268,17 @@ foldRedact model message =
                 in
                 case Dict.get key model.channels of
                     Nothing ->
-                        model
+                        rememberPendingRedaction model key msgid
 
                     Just ch ->
-                        let
-                            messages =
-                                List.map
-                                    (\m ->
-                                        if m.msgid == Just msgid then
-                                            { m | redacted = True, body = redactedBody }
+                        if List.any (\m -> m.msgid == Just msgid) ch.messages then
+                            markRowRedacted model ( key, msgid )
 
-                                        else
-                                            m
-                                    )
-                                    ch.messages
-                        in
-                        { model | channels = Dict.insert key { ch | messages = messages } model.channels }
+                        else
+                            -- The original has not arrived yet (or is still
+                            -- in an open history batch): remember the mark
+                            -- so it files redacted on arrival.
+                            rememberPendingRedaction model key msgid
 
         _ ->
             model
@@ -6792,6 +7577,8 @@ CLIENTINFO lists the four answered queries — everything else,
 including ACTION, is swallowed with no row and no notice, exactly
 like the oracle `break`). The NOTICE target is the validated sender;
 an unvalidatable sender drops the reply but still swallows the row.
+Channel mode +C is not consulted: `src/lib/store/store.ts` gates this
+arm on `ctcpEnabled` only.
 -}
 foldCtcpQuery : Model -> String -> String -> List Outbound
 foldCtcpQuery model sender body =
@@ -7001,21 +7788,27 @@ threadParentIds messages =
                 messages
                 |> Set.fromList
     in
-    List.filterMap
-        (\m ->
-            case m.msgid of
-                Just mid ->
-                    if Set.member mid tags then
-                        Just m.id
+    if Set.isEmpty tags then
+        -- The common chat-only feed has no reply refs. Its parent set is
+        -- already known, so avoid another full scan of the message buffer.
+        Set.empty
 
-                    else
+    else
+        List.filterMap
+            (\m ->
+                case m.msgid of
+                    Just mid ->
+                        if Set.member mid tags then
+                            Just m.id
+
+                        else
+                            Nothing
+
+                    Nothing ->
                         Nothing
-
-                Nothing ->
-                    Nothing
-        )
-        messages
-        |> Set.fromList
+            )
+            messages
+            |> Set.fromList
 
 
 {-| Arm a reply against the live row (fail-closed when it is gone);
@@ -7077,11 +7870,11 @@ editRowBody model target messageId =
                     Just row.body
 
 
-{-| The stored draft for one conversation (lowercased keys, like
-the channel buckets). -}
+{-| The stored draft for one conversation, keyed with the currently
+negotiated IRC CASEMAPPING rather than Unicode lowercase. -}
 storedDraftFor : String -> Model -> String
 storedDraftFor target model =
-    Maybe.withDefault "" (Dict.get (String.toLower target) model.composerDrafts)
+    Maybe.withDefault "" (Dict.get (ircCaseKey model target) model.composerDrafts)
 
 
 {-| Drop the stored draft for one conversation (used when a send
@@ -7090,7 +7883,7 @@ store on the next input or conversation switch, so refusal paths
 that keep the field can share this safely). -}
 dropStoredDraftFor : String -> Model -> Model
 dropStoredDraftFor target model =
-    { model | composerDrafts = Dict.remove (String.toLower target) model.composerDrafts }
+    { model | composerDrafts = Dict.remove (ircCaseKey model target) model.composerDrafts }
 
 
 {-| Swap the per-target composer draft on conversation switch
@@ -7103,7 +7896,7 @@ swapComposerDraft : Model -> String -> Model
 swapComposerDraft model name =
     let
         key =
-            String.toLower name
+            ircCaseKey model name
 
         stashed =
             case model.activeChannel of
@@ -7111,7 +7904,7 @@ swapComposerDraft model name =
                     model.composerDrafts
 
                 Just current ->
-                    if String.toLower current == key then
+                    if ircCaseKey model current == key then
                         model.composerDrafts
 
                     else
@@ -7124,7 +7917,7 @@ swapComposerDraft model name =
                                     Nothing ->
                                         model.composer
                         in
-                        Dict.insert (String.toLower current) saved model.composerDrafts
+                        Dict.insert (ircCaseKey model current) saved model.composerDrafts
 
         restored =
             case activeEditFor model name of
@@ -7134,7 +7927,21 @@ swapComposerDraft model name =
                 Nothing ->
                     Maybe.withDefault "" (Dict.get key stashed)
     in
-    { model | activeChannel = Just name, searchIndex = 0, composerAudience = Nothing, composerDrafts = stashed, composer = restored }
+    let
+        switched =
+            { model | activeChannel = Just name, searchIndex = 0, composerAudience = Nothing, composerDrafts = stashed, composer = restored }
+    in
+    case model.activeChannel of
+        Just previous ->
+            if ircCaseKey model previous == key then
+                switched
+
+            else
+                updateChannel switched previous
+                    (\channel -> { channel | messages = List.take keepMessages channel.messages })
+
+        Nothing ->
+            switched
 
 
 {-| The `+draft/reply` tag for a send (mirrors the `baseTags` merge:
@@ -7412,10 +8219,56 @@ canEditRow model target messageId =
         Just row ->
             not (String.isEmpty row.from)
                 && String.toLower row.from == String.toLower model.ourNick
+                -- A matching nick is not authorship: a guest nick is
+                -- reusable, so a replayed row is ours only when it was
+                -- authored under this owner (sent from this client, a
+                -- live own echo, or an account-tag match while signed in).
+                && Set.member row.id model.ownedRowIds
                 && row.msgType == "msg"
                 && not row.deleted
                 && not row.redacted
                 && not (messageLocked row)
+
+
+{-| Bounded set of locally authored row ids (ids only grow, so the
+oldest ids drop first past the cap). -}
+maxOwnedRowIds : Int
+maxOwnedRowIds =
+    4096
+
+
+markOwnedRow : Int -> Set Int -> Set Int
+markOwnedRow rowId owned =
+    let
+        next =
+            Set.insert rowId owned
+    in
+    if Set.size next > maxOwnedRowIds then
+        Set.fromList (List.drop (Set.size next - maxOwnedRowIds) (Set.toList next))
+
+    else
+        next
+
+
+{-| Whether an inbound chat line from our own nick was authored under
+the current owner: a live line on this connection is our own echo; a
+replayed history line counts only when its `account` tag matches the
+signed-in account. -}
+ownsInboundRow : Model -> Wire.IrcMessage -> String -> Bool
+ownsInboundRow model message sender =
+    if String.isEmpty sender || ircCaseKey model sender /= ircCaseKey model model.ourNick then
+        False
+
+    else if not model.historyMerging then
+        True
+
+    else
+        case ( model.accountName, Dict.get "account" message.tags ) of
+            ( Just account, Just tagged ) ->
+                not (String.isEmpty tagged) && String.toLower account == String.toLower tagged
+
+            _ ->
+                False
 
 
 {-| Whether our own message row may be redacted (mirroring the
@@ -7434,100 +8287,145 @@ canDeleteRow model target messageId =
 
 {-| Request an edit of our own message (mirroring `editMessage`:
 `draft/message-editing` must be negotiated and the row must pass
-`canEditRow`; the EDIT line goes out, the row updates
-optimistically, and the prior body files into the local audit
-trail — refusals change nothing and send nothing).
+`canEditRow`. The original stays visible until an exact labeled
+server echo confirms this request; without labeled-response the local
+outcome is explicitly unknown. Refusals preserve the editor and send
+nothing.
 -}
 requestEdit : Model -> String -> String -> String -> ( Model, List Outbound )
 requestEdit model target messageId newText =
-    if not (List.member "draft/message-editing" model.caps) then
-        ( model, [] )
+    if not (Session.hasCapability model.caps "draft/message-editing") then
+        ( { model | composerError = Just "Message editing is not available on this connection." }, [] )
 
     else if model.connection /= Live then
-        ( model, [] )
+        ( { model | composerError = Just "Reconnect before editing this message." }, [] )
+
+    else if String.isEmpty newText || String.length newText > maxEditBodyLength || Wire.validateSemanticMessage newText /= Ok () then
+        ( { model | composerError = Just "The replacement text contains unsupported characters or is too long." }, [] )
 
     else
         case reactionRow model target messageId of
             Nothing ->
-                ( model, [] )
+                ( { model | composerError = Just "That message is no longer available to edit." }, [] )
 
             Just row ->
                 if not (canEditRow model target messageId) then
-                    ( model, [] )
+                    ( { model | composerError = Just "That message can no longer be edited." }, [] )
 
                 else
                     let
                         key =
                             String.toLower target
+
+                        editKey =
+                            messageMutationKey target messageId
                     in
-                    case Dict.get key model.channels of
-                        Nothing ->
-                            ( model, [] )
+                    if Dict.member editKey model.pendingMessageEdits then
+                        ( { model | composerError = Just "This edit is still waiting for server confirmation." }, [] )
 
-                        Just ch ->
-                            let
-                                messages =
-                                    List.map
-                                        (\m ->
-                                            if m.msgid == Just messageId && String.toLower m.from == String.toLower model.ourNick then
-                                                { m | body = newText, edited = True }
+                    else if Dict.size model.pendingMessageEdits >= 64 then
+                        ( { model | composerError = Just "Too many message edits are awaiting server confirmation." }, [] )
 
-                                            else
-                                                m
+                    else
+                        case ( Dict.get key model.channels, model.runtimeOwnerStamp ) of
+                            ( Just _, Just owner ) ->
+                                let
+                                    usesLabel =
+                                        Session.hasCapability model.caps "labeled-response"
+
+                                    nextLabelCounter =
+                                        if usesLabel then model.labelCounter + 1 else model.labelCounter
+
+                                    maybeLabel =
+                                        if usesLabel then
+                                            Just (Labels.nextClientLabel (floor model.nowMs) nextLabelCounter)
+
+                                        else
+                                            Nothing
+
+                                    lineResult =
+                                        Wire.encodeIrcLineWithTrailing "EDIT" [ target, messageId ] newText
+                                            |> Result.andThen
+                                                (\line ->
+                                                    case maybeLabel of
+                                                        Just label ->
+                                                            Wire.validateClientLine ("@label=" ++ label ++ " " ++ line)
+
+                                                        Nothing ->
+                                                            Ok line
+                                                )
+                                in
+                                case lineResult of
+                                    Ok line ->
+                                        let
+                                            pending =
+                                                { target = target
+                                                , targetKey = key
+                                                , msgid = messageId
+                                                , desiredText = newText
+                                                , originalText = row.body
+                                                , owner = owner
+                                                , label = maybeLabel
+                                                , generation = model.physicalConnectionGeneration
+                                                , deadline = model.nowMs + historyBatchTimeoutMs
+                                                , outcomeUnknown = not usesLabel
+                                                , draftRevision = Dict.get (ircCaseKey model target) model.composerDraftVersions
+                                                }
+                                        in
+                                        ( { model
+                                            | pendingMessageEdits = Dict.insert editKey pending model.pendingMessageEdits
+                                            , labelCounter = nextLabelCounter
+                                            , composerError = Nothing
+                                          }
+                                        , [ SendLine line ]
                                         )
-                                        ch.messages
 
-                                edited =
-                                    { model
-                                        | channels = Dict.insert key { ch | messages = messages } model.channels
-                                        , editHistory = recordEdit model.editHistory messageId row.body (floor model.nowMs)
-                                    }
-                            in
-                            ( edited, [ SendLine (Wire.formatIrcLine "EDIT" [ target, messageId, newText ]) ] )
+                                    Err _ ->
+                                        ( { model | composerError = Just "The edit could not be safely sent. Your replacement text is still here." }, [] )
+
+                            ( Nothing, _ ) ->
+                                ( { model | composerError = Just "That message is no longer available to edit." }, [] )
+
+                            ( _, Nothing ) ->
+                                ( { model | composerError = Just "Editing is unavailable until private connection ownership is ready." }, [] )
+
+
+messageMutationKey : String -> String -> String
+messageMutationKey target messageId =
+    String.toLower (String.trim target) ++ "\u{001F}" ++ messageId
+
+
+editOutcomeUnknown : Model -> String -> String -> Bool
+editOutcomeUnknown model target messageId =
+    Dict.get (messageMutationKey target messageId) model.pendingMessageEdits
+        |> Maybe.map .outcomeUnknown
+        |> Maybe.withDefault False
 
 
 {-| Request a redaction of our own message (mirroring
 `deleteMessage`: `draft/message-redaction` must be negotiated —
 without it the row stays (a local-only hide would lie while other
-clients still see the message); the row must pass `canDeleteRow`;
-the REDACT line goes out and the row redacts optimistically).
+clients still see the message); the row must pass `canDeleteRow`.
+The original remains visible until the authoritative REDACT arrives.
 -}
 requestDelete : Model -> String -> String -> ( Model, List Outbound )
 requestDelete model target messageId =
-    if not (List.member "draft/message-redaction" model.caps) then
-        ( model, [] )
+    if not (Session.hasCapability model.caps "draft/message-redaction") then
+        ( { model | composerError = Just "Message removal is not available on this connection." }, [] )
 
     else if model.connection /= Live then
-        ( model, [] )
+        ( { model | composerError = Just "Reconnect before removing this message." }, [] )
 
     else if not (canDeleteRow model target messageId) then
-        ( model, [] )
+        ( { model | composerError = Just "That message can no longer be removed." }, [] )
 
     else
-        let
-            key =
-                String.toLower target
-        in
-        case Dict.get key model.channels of
-            Nothing ->
-                ( model, [] )
+        case Wire.encodeIrcLineWithTrailing "REDACT" [ target, messageId ] "Deleted" of
+            Ok line ->
+                ( { model | composerError = Nothing }, [ SendLine line ] )
 
-            Just ch ->
-                let
-                    messages =
-                        List.map
-                            (\m ->
-                                if m.msgid == Just messageId && String.toLower m.from == String.toLower model.ourNick then
-                                    { m | redacted = True, body = redactedBody }
-
-                                else
-                                    m
-                            )
-                            ch.messages
-                in
-                ( { model | channels = Dict.insert key { ch | messages = messages } model.channels }
-                , [ SendLine (Wire.formatIrcLine "REDACT" [ target, messageId, "Deleted" ]) ]
-                )
+            Err _ ->
+                ( { model | composerError = Just "The removal request could not be safely sent." }, [] )
 
 
 type alias BoostGroup =
@@ -7816,11 +8714,8 @@ foldWhisper model message =
             ( appendChat model channel from body True True "whisper", [] )
 
 
-{-| Raw `EVENT` lines re-dispatch MEDIA and WEBAUTHN. The MEDIA
-reshape already carries `['MEDIA', chan, verb, nick, ...]` so it
-re-enters as a NOTE for the media fold; WEBAUTHN drops the `<me>`
-target and re-enters as a NOTE for the passkey fold — exactly the
-oracle's re-dispatch.
+{-| Route current Event Spine families into their own reducers. No
+EVENT is rewritten as a retired command shape.
 -}
 foldEvent : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldEvent model message =
@@ -7828,27 +8723,64 @@ foldEvent model message =
         Spine.EventIgnored ->
             ( model, [] )
 
-        Spine.EventAsNote { params } ->
-            foldStandardReply model
-                { tags = message.tags
-                , prefix = message.prefix
-                , nick = message.nick
-                , host = message.host
-                , command = "NOTE"
-                , params = params
-                , raw = message.raw
+        Spine.EventAsMedia { params } ->
+            if not (eventFromTrustedServerToUs model message) then
+                -- Media presence is server state: a user-sourced, foreign
+                -- server, or misaddressed EVENT never moves it.
+                ( model, [] )
+
+            else
+            ( { model
+                | media =
+                    Media.foldMediaLine model.media
+                        (Set.fromList (Dict.keys model.channels))
+                        model.isupport.chantypes
+                        { message | params = params }
+                , mediaAvailable = runtimeFeatureReady model "onyx/media"
+              }
+            , []
+            )
+
+        Spine.EventAsWebAuthn { params } ->
+            foldPasskeyEvent model params
+
+
+{-| An Event Spine line from the 001-learned server prefix (never a
+user prefix) addressed to our own nick. -}
+eventFromTrustedServerToUs : Model -> Wire.IrcMessage -> Bool
+eventFromTrustedServerToUs model message =
+    case ( model.serverPrefix, message.prefix, message.params ) of
+        ( Just trusted, Just prefix, recipient :: _ ) ->
+            message.nick
+                == Nothing
+                && prefix
+                == trusted
+                && not (String.isEmpty model.ourNick)
+                && ircCaseKey model recipient
+                == ircCaseKey model model.ourNick
+
+        _ ->
+            False
+
+
+foldPasskeyEvent : Model -> List String -> ( Model, List Outbound )
+foldPasskeyEvent model params =
+    case params of
+        "WEBAUTHN" :: code :: fields ->
+            let
+                description = List.reverse fields |> List.head |> Maybe.withDefault ""
+                context = List.reverse fields |> List.drop 1 |> List.reverse
+            in
+            foldPasskeyReply model
+                { kind = Wire.Event
+                , command = "WEBAUTHN"
+                , code = String.toUpper code
+                , context = context
+                , description = description
                 }
 
-        Spine.EventAsPasskey { params } ->
-            foldStandardReply model
-                { tags = message.tags
-                , prefix = message.prefix
-                , nick = message.nick
-                , host = message.host
-                , command = "NOTE"
-                , params = params
-                , raw = message.raw
-                }
+        _ ->
+            ( model, [] )
 
 
 {-| True when a DM peer is designated for E2EE and must never fall
@@ -7948,9 +8880,11 @@ sendRequiredRoomSeal model target =
             String.trim model.composer
 
         sealed =
+            resumeLatestReading
             { model
                 | composer = ""
-                , composerDrafts = Dict.remove (String.toLower target) model.composerDrafts
+                , searchOpen = False
+                , composerDrafts = Dict.remove (ircCaseKey model target) model.composerDrafts
                 , messageSeq = model.messageSeq + 1
                 , roomSeals = Dict.insert (String.toLower target) text model.roomSeals
             }
@@ -8138,9 +9072,11 @@ sendDesignatedDm model target =
             else
                 let
                     sealed =
+                        resumeLatestReading
                         { model
                             | composer = ""
-                            , composerDrafts = Dict.remove (String.toLower target) model.composerDrafts
+                            , searchOpen = False
+                            , composerDrafts = Dict.remove (ircCaseKey model target) model.composerDrafts
                             , messageSeq = model.messageSeq + 1
                             , pendingSeals = Dict.insert key { text = String.trim model.composer, keys = keys } model.pendingSeals
                         }
@@ -8875,21 +9811,54 @@ quarantineOwnerChange model =
     resetGuestClaim
         { cleared
             | channels = shells
+            , retentionReadScopes = Dict.empty
             , activeChannel = active
             , typingUsers = Dict.empty
             , editHistory = Dict.empty
             , historyLoading = Set.empty
+            , pendingHistoryRequests = Dict.empty
             , historyExhausted = Set.empty
             , pendingPins = Dict.empty
             , firstUnreadId = Dict.empty
+            -- Read positions belong to the outgoing owner: a new
+            -- identity re-learns its own markers from the server.
+            , readMarkers = Dict.empty
+            , viewedReadMarkers = Dict.empty
+            , pendingRedactions = []
+            , ownedRowIds = Set.empty
+            , seenReactionEventIds = []
+            , pendingPropWrites = Dict.empty
             , lastReadAt = Dict.empty
             , viewUnreadDividerId = Dict.empty
             , composer = ""
             , composerDrafts = Dict.empty
+            , composerDraftVersions = Dict.empty
+            , retiredDraftOwner = Nothing
+            , vaultDirtyTargets = Dict.empty
+            , vaultDirtyOrder = []
+            , pendingScheduledCapture = Nothing
+            , pendingScheduledSave = Nothing
+            , pendingLabels = Dict.empty
+            , uncertainLabels = Dict.empty
+            , deliveryUnknownIds = Set.empty
+            , historyBatches = Dict.empty
+            , ownEchoBatches = Set.empty
+            , scheduleOpen = False
+            , scheduleError = Nothing
+            , schedulePresetEpochs = Dict.empty
+            , schedulePending = []
+            , scheduleWhen = ""
             , messageMenu = Nothing
             , reactionPicker = Nothing
             , composerError = Nothing
             , composerAudience = Nothing
+            , sessionRecoveryView = Nothing
+            , sessionRecoveryViewOwner = Nothing
+            , sessionRecoveryExpectedAccount = Nothing
+            , passkeyManagementView = Nothing
+            , sessionInventoryView = Nothing
+            , selectedContinuationRef = Nothing
+            , webAuthnObservationView = Nothing
     , attachments = []
     , linkPreviews = Dict.empty
     , linkPreviewInflight = Set.empty
@@ -8907,6 +9876,7 @@ quarantineOwnerChange model =
     , zone = Time.utc
     , replyingTo = Nothing
     , editingMessage = Nothing
+    , pendingMessageEdits = Dict.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -8945,6 +9915,7 @@ quarantineOwnerChange model =
     , topicReadOwner = Nothing
             , nickAliases = []
             , friends = Dict.empty
+            , dmAway = Dict.empty
             , watchList = []
             , monitoredNicks = Set.empty
             , ctcpVersionReply = defaultCtcpVersionReply
@@ -8964,7 +9935,42 @@ quarantineOwnerChange model =
             , pendingSeals = Dict.empty
             , roomSeals = Dict.empty
             , scheduledSeals = Dict.empty
+            -- The previous owner's channel navigation must not stay
+            -- ready. A later star would otherwise encode that document
+            -- under the new owner's `onyx:channel-navigation` key.
+            -- The caller requests the new document after the new
+            -- identity is on the model.
+            , starredChannels = Set.empty
+            , forumChannels = Set.empty
+            , channelNavigation = ChannelNavigation.empty
+            , navigationReady = False
+            , navigationRequested = False
+            , navigationStarAdds = []
+            , navigationStarRemoves = []
+            , navigationForumAdds = []
+            , navigationForumRemoves = []
         }
+
+
+historyResponseOwnerMatches : Model -> Maybe String -> Maybe Int -> Maybe Int -> Bool
+historyResponseOwnerMatches model ownerRef accountGeneration connectionGeneration =
+    case model.runtimeOwnerStamp of
+        Just stamp ->
+            ownerRef == Just stamp.ownerRef
+                && accountGeneration == Just stamp.accountGeneration
+                && connectionGeneration == Just stamp.connectionGeneration
+
+        Nothing ->
+            ownerRef == Nothing && accountGeneration == Nothing && connectionGeneration == Nothing
+
+
+retentionUnavailableMessage : RetentionReadScope -> String
+retentionUnavailableMessage scope =
+    if scope.kind == "unknown" then
+        "Local history is unavailable or incomplete because its retention policy is unknown."
+
+    else
+        "Local history is unavailable on this device."
 
 
 {-| The oracle's `default:` branch for unhandled server numerics
@@ -8993,9 +9999,348 @@ logNumeric model message =
 
 {-| Record advertised caps, keeping the first 256 like the oracle's
 `_recordAvailableCap` (later tokens are dropped, never grown). -}
-recordCaps : Model -> List String -> Model
-recordCaps model names =
-    { model | capAvailable = List.take Session.maxClientCapEntries (model.capAvailable ++ names) }
+recordCaps : Model -> String -> Model
+recordCaps model capsStr =
+    let
+        add parsed current =
+            let
+                key =
+                    String.toLower parsed.name
+
+                alreadyKnown =
+                    List.any (String.toLower >> (==) key) current.capAvailable
+
+                withinCapacity =
+                    alreadyKnown || List.length current.capAvailable < Session.maxClientCapEntries
+            in
+            if not withinCapacity then
+                current
+
+            else
+                { current
+                    | capAvailable =
+                        if alreadyKnown then
+                            current.capAvailable
+
+                        else
+                            current.capAvailable ++ [ parsed.name ]
+                    , capAvailableValues = Dict.insert key parsed.value current.capAvailableValues
+                }
+    in
+    String.words capsStr
+        |> List.filterMap Session.parseCapToken
+        |> List.foldl add model
+
+
+negotiatedMultilineLimits : Model -> Multiline.Limits
+negotiatedMultilineLimits model =
+    let
+        aliasValue alias =
+            if List.any (String.toLower >> (==) (String.toLower alias)) model.caps then
+                Dict.get (String.toLower alias) model.capAvailableValues
+
+            else
+                Nothing
+
+        values =
+            [ aliasValue "draft/multiline", aliasValue "multiline" ]
+                |> List.filterMap identity
+                |> List.map (Just >> Multiline.parseMultilineLimits)
+    in
+    case values of
+        [] ->
+            Multiline.defaultLimits
+
+        first :: rest ->
+            List.foldl
+                (\limits acc ->
+                    { maxBytes = min acc.maxBytes limits.maxBytes
+                    , maxLines = min acc.maxLines limits.maxLines
+                    }
+                )
+                first
+                rest
+
+
+syncCapRequestProjections : Model -> Model
+syncCapRequestProjections model =
+    let
+        pending =
+            List.filter (\group -> group.state == CapRequestPending) model.capRequestGroups
+    in
+    { model
+        | capReqPending = List.length pending
+        , capReqNames = pending |> List.concatMap .unresolved |> List.foldl (\name acc -> if List.member name acc then acc else acc ++ [ name ]) []
+    }
+
+
+appendCapRequestGroups : Model -> List (List String) -> ( Model, List Outbound )
+appendCapRequestGroups model chunks =
+    if List.isEmpty chunks then
+        ( model, [] )
+
+    else if not model.capNegotiating then
+        case model.runtimeFeatureRound of
+            Just round ->
+                let
+                    names = List.concat chunks
+                    wireBytes = List.sum (List.map String.length names) + List.length names
+                in
+                if List.isEmpty names || wireBytes > 360 then
+                    ( model, [] )
+
+                else
+                    appendRuntimeCapGroup model round.roundRef names
+
+            Nothing ->
+                ( model, [] )
+
+    else
+        let
+            groups =
+                List.indexedMap
+                    (\index names ->
+                        let
+                            groupId = model.capRequestGroupSeq + index
+                        in
+                        { id = groupId, requested = names, unresolved = names, state = CapRequestPending, purpose = InitialRegistration, roundRef = Nothing }
+                    )
+                    chunks
+
+            updated =
+                syncCapRequestProjections
+                    { model
+                        | capRequestGroups = model.capRequestGroups ++ groups
+                        , capRequestGroupSeq = model.capRequestGroupSeq + List.length chunks
+                    }
+        in
+        ( updated
+        , List.map (\chunk -> SendLine (Wire.formatIrcLine "CAP" [ "REQ", String.join " " chunk ])) chunks
+        )
+
+
+appendRuntimeCapGroup : Model -> String -> List String -> ( Model, List Outbound )
+appendRuntimeCapGroup model roundRef names =
+    if List.isEmpty names then
+        ( model, [] )
+
+    else
+        let
+            groupId = model.capRequestGroupSeq
+            group = { id = groupId, requested = names, unresolved = names, state = CapRequestPending, purpose = RuntimeFeatures, roundRef = Just roundRef }
+            updated = syncCapRequestProjections { model | capRequestGroups = model.capRequestGroups ++ [ group ], capRequestGroupSeq = groupId + 1 }
+        in
+        ( updated, [ RuntimeCapabilityRequest { roundRef = roundRef, names = names } ] )
+
+
+runtimeRoundGroupsSettled : Model -> String -> Bool
+runtimeRoundGroupsSettled model roundRef =
+    model.capRequestGroups
+        |> List.filter (\group -> group.purpose == RuntimeFeatures && group.roundRef == Just roundRef)
+        |> List.all (\group -> group.state /= CapRequestPending)
+
+
+runtimeCapChunk : List String -> List String
+runtimeCapChunk names =
+    let
+        step name ( used, acc ) =
+            let
+                next = used + String.length name + (if List.isEmpty acc then 0 else 1)
+            in
+            if next <= 360 then
+                ( next, acc ++ [ name ] )
+
+            else
+                ( used, acc )
+    in
+    List.foldl step ( 0, [] ) names |> Tuple.second
+
+
+endRuntimeCapabilityRound : Model -> String -> ( Model, List Outbound )
+endRuntimeCapabilityRound model roundRef =
+    case model.runtimeFeatureRound of
+        Just round ->
+            if round.roundRef == roundRef && not round.ended && not round.endRequested && runtimeRoundGroupsSettled model roundRef then
+                ( { model | runtimeFeatureRound = Just { round | endRequested = True } }, [ RuntimeCapabilityEnd { roundRef = roundRef } ] )
+
+            else
+                ( model, [] )
+
+        Nothing ->
+            ( model, [] )
+
+
+settleRuntimeCapabilityRounds : Model -> ( Model, List Outbound )
+settleRuntimeCapabilityRounds model =
+    case model.runtimeFeatureRound of
+        Just round ->
+            endRuntimeCapabilityRound model round.roundRef
+
+        Nothing ->
+            ( model, [] )
+
+
+requestReadyRuntimeCaps : Model -> ( Model, List Outbound )
+requestReadyRuntimeCaps model =
+    case model.runtimeFeatureRound of
+        Just round ->
+            if model.connection /= Live || model.capNegotiating || model.sasl /= SaslIdle || not (Maybe.withDefault False (Maybe.map (\stamp -> stamp.ownerRef == round.ownerRef && stamp.accountGeneration == round.accountGeneration && stamp.connectionGeneration == round.connectionGeneration) model.runtimeOwnerStamp)) then
+                ( model, [] )
+
+            else
+                let
+                    names =
+                        ( [ ( "onyx/e2ee", round.e2ee ), ( "onyx/media", round.media ) ]
+                            |> List.filter
+                                (\( name, ready ) ->
+                                    ready
+                                        && List.member name model.capAvailable
+                                        && not (List.member name model.caps)
+                                        && not (List.member name (capReqNamesFromGroups model))
+                                        && not (List.any (\group -> group.purpose == RuntimeFeatures && group.roundRef == Just round.roundRef && List.member name group.requested) model.capRequestGroups)
+                                )
+                            |> List.map Tuple.first
+                        )
+                            ++ (round.newCapabilities
+                                    |> List.filter (\name -> name /= "sasl" && name /= "onyx/e2ee" && name /= "onyx/media")
+                                    |> List.filter (\name -> List.member name (Session.wantedCaps False model.capAvailable))
+                                    |> List.filter
+                                        (\name ->
+                                            List.member name model.capAvailable
+                                                && not (List.member name model.caps)
+                                                && not (List.member name (capReqNamesFromGroups model))
+                                        )
+                               )
+
+                    boundedNames =
+                        runtimeCapChunk names
+                in
+                if List.isEmpty boundedNames then
+                    endRuntimeCapabilityRound model round.roundRef
+
+                else
+                    appendRuntimeCapGroup model round.roundRef boundedNames
+
+        Nothing ->
+            ( model, [] )
+
+
+capReqNamesFromGroups : Model -> List String
+capReqNamesFromGroups model =
+    model.capRequestGroups
+        |> List.filter (\group -> group.state == CapRequestPending)
+        |> List.concatMap .unresolved
+        |> List.foldl (\name acc -> if List.member name acc then acc else acc ++ [ name ]) []
+
+
+capAckEligible : Model -> String -> Bool
+capAckEligible model name =
+    model.capRequestGroups
+        |> List.any
+            (\group ->
+                group.state == CapRequestPending
+                    && List.member name group.unresolved
+                    && (case group.purpose of
+                            InitialRegistration ->
+                                True
+
+                            RuntimeFeatures ->
+                                case model.runtimeFeatureRound of
+                                    Just round ->
+                                        group.roundRef == Just round.roundRef
+                                            -- CAP replies describe the physical socket negotiation. An account
+                                            -- proof change on that same socket pauses feature use, but cannot
+                                            -- make an already emitted request reply belong to a new round.
+                                            && Maybe.withDefault False (Maybe.map (\stamp -> stamp.connectionGeneration == round.connectionGeneration) model.runtimeOwnerStamp)
+                                            && (if name == "onyx/e2ee" then round.e2ee else if name == "onyx/media" then round.media else List.member name round.newCapabilities)
+
+                                    Nothing ->
+                                        False
+                       )
+            )
+
+
+runtimeFeatureReady : Model -> String -> Bool
+runtimeFeatureReady model name =
+    case model.runtimeFeatureRound of
+        Just round ->
+            let
+                ownerMatches =
+                    Maybe.withDefault False (Maybe.map (\stamp -> stamp.ownerRef == round.ownerRef && stamp.accountGeneration == round.accountGeneration && stamp.connectionGeneration == round.connectionGeneration) model.runtimeOwnerStamp)
+
+                ready =
+                    if name == "onyx/e2ee" then round.e2ee else if name == "onyx/media" then round.media else False
+            in
+            ownerMatches && ready && List.member name model.caps
+
+        Nothing ->
+            False
+
+
+applyCapAck : Model -> List String -> Model
+applyCapAck model tokens =
+    let
+        -- This client only asks to enable capabilities. Negative ACK tokens
+        -- are therefore unsolicited and cannot retire negotiated state.
+        positives = List.filter (\name -> not (String.startsWith "-" name)) tokens
+        names = List.filter (capAckEligible model) positives
+        groups =
+            List.map
+                (\group ->
+                    if group.state /= CapRequestPending then
+                        group
+
+                    else
+                        let
+                            unresolved = List.filter (\name -> not (List.member name names)) group.unresolved
+                        in
+                        { group
+                            | unresolved = unresolved
+                            , state = if List.isEmpty unresolved then CapRequestAcked else CapRequestPending
+                        }
+                )
+                model.capRequestGroups
+
+        caps =
+            List.foldl
+                (\name acc -> if List.member name acc || List.length acc >= Session.maxClientCapEntries then acc else acc ++ [ name ])
+                model.caps names
+
+    in
+    syncCapRequestProjections
+        { model
+            | capRequestGroups = groups
+            , caps = caps
+            , mediaAvailable = runtimeFeatureReady { model | caps = caps } "onyx/media"
+        }
+
+
+applyCapNak : Model -> List String -> Model
+applyCapNak model tokens =
+    let
+        names = if List.any (String.startsWith "-") tokens then [] else List.sort tokens
+
+        exactGroup =
+            List.filter
+                (\group -> group.state == CapRequestPending && List.sort group.requested == names && List.all (capAckEligible model) names)
+                model.capRequestGroups
+                |> List.head
+
+        updated =
+            case exactGroup of
+                Nothing ->
+                    model
+
+                Just matched ->
+                    syncCapRequestProjections
+                        { model
+                            | capRequestGroups =
+                                List.map
+                                    (\group -> if group.id == matched.id then { group | state = CapRequestRejected, unresolved = [] } else group)
+                                    model.capRequestGroups
+                        }
+    in
+    updated
 
 
 capTokenNames : String -> List String
@@ -9051,8 +10396,12 @@ flight, mirroring `_finishCapIfReady` (a pending exchange holds the
 negotiation open until its 903 or failure). -}
 finishCapIfReady : Model -> ( Model, List Outbound )
 finishCapIfReady model =
-    if model.capReqPending == 0 && model.sasl == SaslIdle then
-        finishCap model
+    if List.all (\group -> group.state /= CapRequestPending) model.capRequestGroups && model.sasl == SaslIdle then
+        let
+            ( ended, endOut ) = finishCap model
+            ( withFeatures, featureOut ) = requestReadyRuntimeCaps ended
+        in
+        ( withFeatures, endOut ++ featureOut )
 
     else
         ( model, [] )
@@ -9063,7 +10412,7 @@ certificate) for this socket, mirroring the oracle's
 `opts.password || opts.hasClientCert` gate. -}
 hasSaslCredentials : Model -> Bool
 hasSaslCredentials model =
-    model.saslPasswordHeld || model.saslClientCert
+    model.saslPasswordHeld || model.saslClientCert || model.selectedContinuationRef /= Nothing
 
 
 {-| REQ every wanted cap not already negotiated or in flight,
@@ -9075,21 +10424,19 @@ requestWantedCaps model =
     let
         wanted =
             Session.wantedCaps (hasSaslCredentials model) model.capAvailable
-                |> List.filter (\cap -> not (List.member cap model.caps) && not (List.member cap model.capReqNames))
+                |> List.filter (\cap -> not (List.member cap model.caps) && not (List.member cap (capReqNamesFromGroups model)))
 
         chunks =
             Session.chunkCapReq wanted
     in
-    if List.isEmpty chunks then
-        finishCap model
+    if not model.capNegotiating && model.connection == Live then
+        ( model, [] )
+
+    else if List.isEmpty chunks then
+        finishCapIfReady model
 
     else
-        ( { model
-            | capReqPending = model.capReqPending + List.length chunks
-            , capReqNames = model.capReqNames ++ wanted
-          }
-        , List.map (\chunk -> SendLine (Wire.formatIrcLine "CAP" [ "REQ", chunk ])) chunks
-        )
+        appendCapRequestGroups model (List.map String.words chunks)
 
 
 {-| Abort an explicit SASL attempt without falling through to guest
@@ -9108,29 +10455,105 @@ failSasl model reason =
         )
 
 
-{-| Begin the SASL exchange once `sasl` is ACKed and a credential is
-held, mirroring the oracle's CAP ACK arm: prefer SCRAM-SHA-256, then
-PLAIN, then EXTERNAL. With no common mechanism the attempt fails
-closed (never a guest fallback). Without credentials the ACK just
-releases like any other cap. -}
+{-| Client-side end of an in-flight exchange (timeout or a local
+mechanism failure): tell the server with `AUTHENTICATE *` before the
+fail-closed disconnect, so the exchange is retired rather than left
+half-open. Idle, it only logs (like `failSasl`). -}
+abortSasl : Model -> String -> ( Model, List Outbound )
+abortSasl model reason =
+    if model.sasl == SaslIdle then
+        failSasl model reason
+
+    else
+        ( logService { model | sasl = SaslIdle, sessionTokenSaslRequestId = Nothing } reason
+        , [ SaslTimerCleared, SendLine (Wire.formatIrcLine "AUTHENTICATE" [ "*" ]), WsDisconnect ]
+        )
+
+
+{-| Begin SASL after its CAP acknowledgement. An explicitly selected
+account continuation takes the source-supported SESSION-TOKEN mechanism
+only; the private runtime owns its challenge and payload. Otherwise use the
+existing password/certificate preference. -}
 beginSasl : Model -> ( Model, List Outbound )
 beginSasl model =
-    if model.sasl /= SaslIdle || not (model.saslPasswordHeld || model.saslClientCert) then
+    if model.sasl /= SaslIdle then
         finishCapIfReady model
 
     else
-        case Wire.selectSaslMechanism model.saslMechs model.saslPasswordHeld model.saslClientCert of
-            Just mech ->
-                ( { model | sasl = SaslPending mech }
-                , [ SendLine (Wire.formatIrcLine "AUTHENTICATE" [ Wire.saslMechanismName mech ])
-                  , SaslTimerStarted
-                  ]
-                )
+        case model.selectedContinuationRef of
+            Just continuationRef ->
+                if List.member "SESSION-TOKEN" (List.map String.toUpper model.saslMechs) then
+                    case continuationUseCommand model continuationRef of
+                        Just command ->
+                            ( { model
+                                | sasl = SaslPending Wire.SessionToken
+                                , eventClock = model.eventClock + 1
+                                , runtimeDomainPending = Just command.requestId
+                                , runtimeDomainPendingAction = Just command.action
+                                , runtimeDomainResult = Nothing
+                                , sessionTokenSaslRequestId = Just (Ids.requestIdToRuntime command.requestId)
+                              }
+                            , [ RuntimeDomainCommand command, SaslTimerStarted ]
+                            )
+
+                        Nothing ->
+                            -- Fail closed like a refused mechanism: the
+                            -- connection ends instead of registering as a
+                            -- guest (no CAP END).
+                            failSasl { model | sasl = SaslPending Wire.SessionToken } "The selected account continuation is not available for this connection."
+
+                else
+                    failSasl { model | sasl = SaslPending Wire.SessionToken } "The selected account continuation requires the SESSION-TOKEN SASL mechanism; no fallback was attempted."
 
             Nothing ->
-                failSasl
-                    { model | sasl = SaslPending Wire.Plain }
-                    ("No supported SASL mechanism offered (" ++ (String.join ", " model.saslMechs |> (\s -> if String.isEmpty s then "none" else s)) ++ ")")
+                if model.saslPasswordHeld || model.saslClientCert then
+                    beginPasswordSasl model
+
+                else
+                    finishCapIfReady model
+
+
+continuationUseCommand : Model -> String -> Maybe RuntimeDomain.Command
+continuationUseCommand model continuationRef =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            Nothing
+
+        Just stamp ->
+            case (( Ids.requestIdFromRuntime ("continuationUse" ++ String.padLeft 10 '0' (String.fromInt (model.eventClock + 1)))
+                  , Ids.ownerRefFromRuntime stamp.ownerRef )
+                 , ( Ids.accountGenerationFromInt stamp.accountGeneration
+                   , Ids.connectionGenerationFromInt stamp.connectionGeneration
+                   )
+                 ) of
+                ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                    Just
+                        { requestId = requestId
+                        , ownerRef = ownerRef
+                        , accountGeneration = accountGeneration
+                        , connectionGeneration = connectionGeneration
+                        , action = RuntimeDomain.UseContinuation continuationRef
+                        }
+
+                _ ->
+                    Nothing
+
+
+beginPasswordSasl : Model -> ( Model, List Outbound )
+beginPasswordSasl model =
+    case Wire.selectSaslMechanism model.saslMechs model.saslPasswordHeld model.saslClientCert of
+        Just mech ->
+            ( { model | sasl = SaslPending mech }
+            , [ SendLine (Wire.formatIrcLine "AUTHENTICATE" [ Wire.saslMechanismName mech ])
+              , SaslTimerStarted
+              ]
+            )
+
+        Nothing ->
+            failSasl
+                { model | sasl = SaslPending Wire.Plain }
+                ("No supported SASL mechanism offered (" ++ (String.join ", " model.saslMechs |> (\s -> if String.isEmpty s then "none" else s)) ++ ")")
+
 
 
 {-| Fold a server `AUTHENTICATE` line inside an in-flight exchange,
@@ -9168,42 +10591,40 @@ foldAuthenticate model message =
                 Wire.ScramSha256 ->
                     ( model, [ SaslRespond { mech = "SCRAM-SHA-256", nick = model.connectNick, param = param } ] )
 
+                Wire.SessionToken ->
+                    -- The private runtime owns the selected continuation and
+                    -- consumes the challenge before this public fold.
+                    ( model, [] )
+
 
 {-| CAP `ACK` arm of `foldCap`: the acked tokens join the
 negotiated set (bounded), the request books them off, and a `sasl`
 ack opens the exchange — otherwise the negotiation may finish.
-Labeled-response bare ACKs never reach here (the `"ACK"` branch
-diverts label-tagged lines to `promoteLabeledSend` first). -}
+Labeled-response bare ACKs never reach here; their response
+correlation completes without claiming message delivery. -}
 ackCapLine : Model -> List String -> ( Model, List Outbound )
 ackCapLine model rest =
     let
-        acked =
-            capTokenNames (Maybe.withDefault "" (List.head rest))
-
-        negotiated =
-            List.foldl
-                (\name acc ->
-                    if List.member name acc || List.length acc >= Session.maxClientCapEntries then
-                        acc
-
-                    else
-                        acc ++ [ name ]
-                )
-                model.caps
-                acked
-
-        based =
-            { model
-                | caps = negotiated
-                , capReqNames = List.filter (\name -> not (List.member name acked)) model.capReqNames
-                , capReqPending = max 0 (model.capReqPending - 1)
-            }
+        tokens = String.words (Maybe.withDefault "" (List.head rest))
+        acked = List.filter (\name -> not (String.startsWith "-" name) && capAckEligible model name) tokens
+        based = applyCapAck model tokens
     in
-    if List.member "sasl" acked then
-        beginSasl based
+    if List.isEmpty acked then
+        ( model, [] )
+
+    else if List.member "sasl" acked then
+        let
+            ( saslModel, saslOut ) = beginSasl based
+            ( settled, roundOut ) = settleRuntimeCapabilityRounds saslModel
+        in
+        ( settled, saslOut ++ roundOut )
 
     else
-        finishCapIfReady based
+        let
+            ( capModel, capOut ) = finishCapIfReady based
+            ( settled, roundOut ) = settleRuntimeCapabilityRounds capModel
+        in
+        ( settled, capOut ++ roundOut )
 
 
 {-| IRCv3 capability negotiation, mirroring `client.ts`: multiline
@@ -9232,7 +10653,7 @@ foldCap model message =
                                 List.head rest
 
                         withCaps =
-                            recordCaps model (capTokenNames (Maybe.withDefault "" capsStr))
+                            recordCaps model (Maybe.withDefault "" capsStr)
 
                         withMechs =
                             trackSaslMechs withCaps (Maybe.withDefault "" capsStr)
@@ -9246,26 +10667,26 @@ foldCap model message =
                 "ACK" ->
                     case labelOf message of
                         Just label ->
-                            -- Labeled-response bare ACK: the command
-                            -- produced no natural reply, so the
-                            -- optimistic row is confirmed in place.
+                            -- A bare ACK completes response correlation
+                            -- only. Delivery remains unknown until an
+                            -- exact labeled self-echo carries a msgid.
                             -- Unknown labels are consumed without
                             -- touching CAP state, never the reverse.
-                            ( promoteLabeledSend model label, [] )
+                            ( markLabeledUnknown model (Just label), [] )
 
                         Nothing ->
                             ackCapLine model rest
 
                 "NAK" ->
                     let
-                        refused =
-                            String.words (Maybe.withDefault "" (List.head rest))
+                        tokens = String.words (Maybe.withDefault "" (List.head rest))
+                        rejected = applyCapNak model tokens
                     in
-                    finishCapIfReady
-                        { model
-                            | capReqNames = List.filter (\name -> not (List.member name refused)) model.capReqNames
-                            , capReqPending = max 0 (model.capReqPending - 1)
-                        }
+                    if rejected.capRequestGroups == model.capRequestGroups then
+                        ( model, [] )
+
+                    else
+                        finishCapIfReady rejected
 
                 "NEW" ->
                     let
@@ -9273,38 +10694,52 @@ foldCap model message =
                             capTokenNames (Maybe.withDefault "" (List.head rest))
 
                         withCaps =
-                            trackSaslMechs (recordCaps model fresh) (Maybe.withDefault "" (List.head rest))
+                            trackSaslMechs (recordCaps model (Maybe.withDefault "" (List.head rest))) (Maybe.withDefault "" (List.head rest))
 
                         wanted =
                             Session.wantedCaps (hasSaslCredentials withCaps) fresh
-                                |> List.filter (\cap -> not (List.member cap model.caps) && not (List.member cap withCaps.capReqNames))
+                                |> List.filter (\cap -> not (List.member cap withCaps.caps) && not (List.member cap (capReqNamesFromGroups withCaps)))
                     in
-                    if List.isEmpty wanted then
+                    if model.connection == Live && not model.capNegotiating then
+                        ( withCaps, [] )
+
+                    else if List.isEmpty wanted then
                         ( withCaps, [] )
 
                     else
-                        let
-                            chunks =
-                                Session.chunkCapReq wanted
-                        in
-                        ( { withCaps
-                            | capReqPending = withCaps.capReqPending + List.length chunks
-                            , capReqNames = withCaps.capReqNames ++ wanted
-                          }
-                        , List.map (\chunk -> SendLine (Wire.formatIrcLine "CAP" [ "REQ", chunk ])) chunks
-                        )
+                        appendCapRequestGroups withCaps (List.map String.words (Session.chunkCapReq wanted))
 
                 "DEL" ->
                     let
                         gone =
                             String.words (Maybe.withDefault "" (List.head rest))
+
+                        goneKeys =
+                            List.map String.toLower gone
+
+                        updated =
+                            { model
+                                | caps = List.filter (\cap -> not (List.member (String.toLower cap) goneKeys)) model.caps
+                                , capAvailable = List.filter (\cap -> not (List.member (String.toLower cap) goneKeys)) model.capAvailable
+                                , capAvailableValues =
+                                    Dict.filter
+                                        (\name _ -> not (List.member name goneKeys))
+                                        model.capAvailableValues
+                                , mediaAvailable = runtimeFeatureReady { model | caps = List.filter (\cap -> not (List.member cap gone)) model.caps } "onyx/media"
+                                , capRequestGroups =
+                                    List.map
+                                        (\group ->
+                                            if group.state /= CapRequestPending then group
+                                            else
+                                                let unresolved = List.filter (\name -> not (List.member name gone)) group.unresolved in
+                                                { group | unresolved = unresolved, state = if List.isEmpty unresolved then CapRequestRejected else CapRequestPending }
+                                        )
+                                        model.capRequestGroups
+                            }
+
+                        synced = syncCapRequestProjections updated
                     in
-                    ( { model
-                        | caps = List.filter (\cap -> not (List.member cap gone)) model.caps
-                        , capAvailable = List.filter (\cap -> not (List.member cap gone)) model.capAvailable
-                      }
-                    , []
-                    )
+                    settleRuntimeCapabilityRounds synced
 
                 _ ->
                     ( model, [] )
@@ -9457,6 +10892,24 @@ inbox only once the list is exhausted — pre- and post-registration
 alike. Post-registration numerics otherwise only log. -}
 foldNickError : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldNickError model message =
+    if model.connectionNickPending /= Nothing && Maybe.map String.toLower (secondParam message.params) == Maybe.map String.toLower model.connectionNickPending then
+        ( logNumeric
+            { model
+                | connectionNickPending = Nothing
+                , connectionNickNotice = Nothing
+                , connectionDialogError = Just
+                    (if message.command == "433" then "That chat name is already in use. Try another name." else if message.command == "437" then "That chat name is temporarily unavailable. Try another name." else "The network rejected that chat name. Try another name.")
+            }
+            message
+        , []
+        )
+
+    else
+        foldNickErrorFallback model message
+
+
+foldNickErrorFallback : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldNickErrorFallback model message =
     let
         -- Nick-error surfaces land in the inbox like the oracle's
         -- `addNotification` call sites, which are not
@@ -9909,9 +11362,202 @@ fireToastUndo id model =
 pre-send chain the slash dispatches skip: offline seal refusal,
 offline queueing, designated-DM and required-room sealing, then the
 plain labeled/echo send). -}
+queueRuntimeMessage : Model -> String -> String -> String -> ( Model, List Outbound )
+queueRuntimeMessage model target content messageKind =
+    let
+        wireTargetCheck =
+            Wire.encodeIrcLine "PRIVMSG" [ target, "" ]
+                |> Result.map (\_ -> ())
+
+        semanticCheck =
+            wireTargetCheck
+                |> Result.andThen (\_ -> Wire.validateSemanticMessage content)
+
+        unsupportedReason =
+            if utf8ByteLength content > 65536 then
+                Just "This message exceeds the protected journal limit; your draft was kept."
+
+            else if Result.toMaybe semanticCheck == Nothing then
+                Just "The message contains a character the client cannot send."
+
+            else if model.composerAudience /= Nothing && composerSendTarget model target == Nothing then
+                Just "The selected audience prefix is no longer valid here; the message was kept."
+
+            else
+                Nothing
+
+        replyTo =
+            Maybe.map .msgid (activeReplyParent model.replyingTo target)
+
+        ( stopped, stopOut ) =
+            sendTyping { model | composerError = Nothing } target False
+
+        queuedTarget =
+            target
+
+        ( queuedModel, queueRequest ) =
+            makeRuntimeDomainOutbound stopped (RuntimeDomain.QueueMessage queuedTarget "chat" content replyTo messageKind model.composerAudience)
+    in
+    case ( unsupportedReason, queueRequest ) of
+        ( Just reason, _ ) ->
+            ( { model | composerError = Just reason }, [] )
+
+        ( Nothing, Just request ) ->
+            ( queuedModel, request :: stopOut )
+
+        ( Nothing, Nothing ) ->
+            ( { stopped | composerError = Just "Select a local workspace before sending." }, stopOut )
+
+
 sendComposerText : Model -> String -> ( Model, List Outbound )
 sendComposerText model target =
-    if model.connection /= Live && offlineSealRefused model target then
+    if String.contains "\u{0000}" model.composer || String.contains "\r" model.composer then
+        ( { model | composerError = Just "The message contains a character the client cannot send." }, [] )
+
+    else if String.contains "\n" model.composer && model.runtimeOwnerStamp == Nothing && not (Session.hasCapability model.caps "draft/multiline") then
+        ( { model | composerError = Just "This server does not support multiline messages; your draft was kept." }, [] )
+
+    else
+        case preflightComposerFields model target of
+            Err _ ->
+                ( { model | composerError = Just "The message could not be sent because it exceeds the client wire limits." }, [] )
+
+            Ok () ->
+                let
+                    planned =
+                        sendComposerTextPlan model target
+                in
+                case validateComposerOutbounds (Tuple.second planned) of
+                    Ok () ->
+                        planned
+
+                    Err _ ->
+                        ( { model | composerError = Just "The message could not be sent because it exceeds the client wire limits." }, [] )
+
+
+{-| Validate the authored fields before any path can clear the composer,
+queue a journal request, or build an optimistic row. In particular, this
+must run before the legacy formatter can strip CR/NUL or flatten a field
+containing spaces into a different IRC message. Multiline text is accepted
+only when the negotiated planner can produce a complete valid batch.
+-}
+preflightComposerFields : Model -> String -> Result Wire.EncodeError ()
+preflightComposerFields model target =
+    let
+        sendTarget =
+            Maybe.withDefault target (composerSendTarget model target)
+
+        validateTarget candidate =
+            Wire.encodeIrcLine "PRIVMSG" [ candidate, "" ]
+                |> Result.map (\_ -> ())
+
+        validateJournalFields =
+            validateTarget target
+                |> Result.andThen (\_ -> validateTarget sendTarget)
+                |> Result.andThen (\_ -> Wire.validateSemanticMessage model.composer)
+    in
+    if model.runtimeOwnerStamp /= Nothing then
+        -- A journal send may become ciphertext or a negotiated multiline
+        -- batch after the runtime applies current policy. Validate the
+        -- semantic fields here without imposing the single-line 8191-byte
+        -- wire ceiling on the pre-encryption body.
+        validateJournalFields
+
+    else if String.contains "\n" model.composer then
+        case Multiline.planMultilineBatches model.composer (negotiatedMultilineLimits model) of
+            Nothing ->
+                Err Wire.LineTooLong
+
+            Just batches ->
+                validateTarget sendTarget
+                    |> Result.andThen
+                        (\_ ->
+                            case Multiline.buildMultilineLines sendTarget batches (uniqueClientBatchRefs model (List.length batches) model.messageSeq) [] of
+                                Nothing ->
+                                    Err Wire.InvalidFraming
+
+                                Just plan ->
+                                    List.foldl
+                                        (\line previous ->
+                                            Result.andThen (\_ -> Wire.validateClientLine line |> Result.map (\_ -> ())) previous
+                                        )
+                                        (Ok ())
+                                        plan.lines
+                        )
+
+    else
+        Wire.encodeIrcLine "PRIVMSG" [ sendTarget, model.composer ]
+            |> Result.map (\_ -> ())
+
+
+uniqueClientBatchRefs : Model -> Int -> Int -> List String
+uniqueClientBatchRefs model count firstSequence =
+    let
+        startSequence =
+            max firstSequence model.clientBatchSeq
+
+        gather remaining nextSequence found =
+            if remaining <= 0 then
+                List.reverse found
+
+            else
+                let
+                    candidate =
+                        "ml" ++ String.fromInt nextSequence
+                in
+                if Dict.member candidate model.historyBatches || Set.member candidate model.ownEchoBatches || List.member candidate found then
+                    gather remaining (nextSequence + 1) found
+
+                else
+                    gather (remaining - 1) (nextSequence + 1) (candidate :: found)
+    in
+    gather count startSequence []
+
+
+reserveClientBatchSequence : Model -> List String -> Int
+reserveClientBatchSequence model refs =
+    List.foldl
+        (\ref next ->
+            case String.dropLeft 2 ref |> String.toInt of
+                Just sequence ->
+                    max next (sequence + 1)
+
+                Nothing ->
+                    next
+        )
+        model.clientBatchSeq
+        refs
+
+
+validateComposerOutbounds : List Outbound -> Result Wire.EncodeError ()
+validateComposerOutbounds outbounds =
+    List.foldl
+        (\outbound previous ->
+            Result.andThen
+                (\_ ->
+                    case outbound of
+                        SendLine line ->
+                            Wire.validateClientOutboundLine line |> Result.map (\_ -> ())
+
+                        _ ->
+                            Ok ()
+                )
+                previous
+        )
+        (Ok ())
+        outbounds
+
+
+sendComposerTextPlan : Model -> String -> ( Model, List Outbound )
+sendComposerTextPlan model target =
+    if not (String.startsWith "/" model.composer) && model.runtimeOwnerStamp /= Nothing then
+        -- Every ordinary chat send enters the owner-scoped delivery journal.
+        -- The journal durably claims each attempt before transport admission,
+        -- applies current encryption/membership policy, and never retries an
+        -- ambiguous send automatically.
+        queueRuntimeMessage model target model.composer "message"
+
+    else if model.connection /= Live && offlineSealRefused model target then
         refuseOfflineSeal model target
 
     else if model.connection /= Live && not (String.startsWith "/" model.composer) then
@@ -9924,10 +11570,19 @@ sendComposerText model target =
         let
             ( stopped, stopOut ) =
                 sendTyping { model | composerError = Nothing } target False
+
+            queuedTarget =
+                Maybe.withDefault target (composerSendTarget model target)
+
+            ( queuedModel, queueRequest ) =
+                makeRuntimeDomainOutbound stopped (RuntimeDomain.QueueMessage queuedTarget "chat" model.composer Nothing "message" Nothing)
         in
-        ( stopped
-        , [ OutboxQueue { target = Maybe.withDefault target (composerSendTarget model target), text = model.composer } ] ++ stopOut
-        )
+        case queueRequest of
+            Just request ->
+                ( queuedModel, request :: stopOut )
+
+            Nothing ->
+                ( { stopped | composerError = Just "Open a local workspace before queuing this message." }, stopOut )
 
     else if not (isChannelName model target) && dmDesignated model target then
         sendDesignatedDm { model | composerError = Nothing } target
@@ -9946,22 +11601,31 @@ sendComposerText model target =
                 Maybe.withDefault target (composerSendTarget model target)
 
             single =
-                Wire.formatIrcLine "PRIVMSG" [ sendTarget, model.composer ]
+                Wire.encodeIrcLine "PRIVMSG" [ sendTarget, model.composer ]
+                    |> Result.withDefault ""
 
             planned =
                 if
                     String.contains "\n" model.composer
-                        && List.member "draft/multiline" model.caps
+                        && Session.hasCapability model.caps "draft/multiline"
                 then
-                    Multiline.planMultilineBatches model.composer Multiline.defaultLimits
+                    Multiline.planMultilineBatches model.composer (negotiatedMultilineLimits model)
 
                 else
                     Nothing
 
+            batchRefs =
+                case planned of
+                    Just batches ->
+                        uniqueClientBatchRefs model (List.length batches) model.messageSeq
+
+                    Nothing ->
+                        [ ref ]
+
             ( lines, texts ) =
                 case planned of
                     Just batches ->
-                        case Multiline.buildMultilineLines sendTarget batches [ ref ] [] of
+                        case Multiline.buildMultilineLines sendTarget batches batchRefs [] of
                             Just plan ->
                                 ( plan.lines
                                 , List.concatMap (List.map .text) batches
@@ -9977,7 +11641,21 @@ sendComposerText model target =
                 -- A dispatched send consumes the armed reply (mirroring
                 -- the oracle deliver clear); refusals keep it. The
                 -- stored per-target draft goes with the visible one.
-                { model | composer = "", composerDrafts = Dict.remove (String.toLower target) model.composerDrafts, composerAudience = Nothing, composerError = Nothing, replyingTo = Nothing }
+                resumeLatestReading
+                    { model
+                        | composer = ""
+                        , composerDrafts = Dict.remove (ircCaseKey model target) model.composerDrafts
+                        , composerAudience = Nothing
+                        , composerError = Nothing
+                        , replyingTo = Nothing
+                        , clientBatchSeq =
+                            case planned of
+                                Just _ ->
+                                    reserveClientBatchSequence model batchRefs
+
+                                Nothing ->
+                                    model.clientBatchSeq
+                    }
 
             useLabel =
                 List.member "labeled-response" model.caps
@@ -10021,7 +11699,8 @@ sendComposerText model target =
                             registerLabeledSend cleared target [ cleared.messageSeq ] model.composer
 
                         stamped =
-                            Wire.formatTaggedLine (Dict.union (Dict.singleton "label" label) (Dict.union (replyTagFor model sendTarget) (topicTagFor model sendTarget))) "PRIVMSG" [ sendTarget, model.composer ]
+                            Wire.encodeTaggedLine (Dict.union (Dict.singleton "label" label) (Dict.union (replyTagFor model sendTarget) (topicTagFor model sendTarget))) "PRIVMSG" [ sendTarget, model.composer ]
+                                |> Result.withDefault ""
                     in
                     renderOptimisticSend registered target texts [ SendLine stamped ] (Just label) model.composerAudience
 
@@ -10495,9 +12174,27 @@ sendRawSlashCommand : Model -> String -> String -> ( Model, List Outbound )
 sendRawSlashCommand model target text =
     case String.split " " (String.dropLeft 1 text) of
         cmd :: args ->
-            ( { model | composer = "", composerDrafts = Dict.remove (String.toLower target) model.composerDrafts, composerError = Nothing }
-            , [ SendLine (Wire.formatIrcLine (String.toUpper cmd) args) ]
-            )
+            let
+                unframedLine =
+                    String.toUpper cmd
+                        ++ (if List.isEmpty args then
+                                ""
+
+                            else
+                                " " ++ String.join " " args
+                           )
+
+                line =
+                    unframedLine ++ "\r\n"
+            in
+            case Wire.validateClientLine line of
+                Ok _ ->
+                    ( { model | composer = "", composerDrafts = Dict.remove (ircCaseKey model target) model.composerDrafts, composerError = Nothing }
+                    , [ SendLine line ]
+                    )
+
+                Err _ ->
+                    ( { model | composerError = Just "The command could not be sent because it exceeds the client wire limits." }, [] )
 
         [] ->
             -- `String.split` never yields this; kept total.
@@ -10756,14 +12453,13 @@ parseStarredChannels raws =
         raws
 
 
-{-| Persist the starred set after any change (mirroring the per-action
-saves; the port writes the `onyx:starred-channels` array, removing the
-key when empty like the highlight/notify rails — the oracle bundles
-stars into the whole owner-scoped navigation object instead, which
-stays ahead until Elm carries navigation memory; see docs/COVERAGE.md). -}
+{-| Persist the starred set after any change. The legacy
+`onyx:starred-channels` array stays so existing readers keep working.
+When the owner document has loaded, the same change is written into
+`onyx:channel-navigation` without dropping folders, order, or nsfw. -}
 starredSaveOut : Model -> List Outbound
 starredSaveOut model =
-    [ StarredSave { channels = Set.toList model.starredChannels } ]
+    StarredSave { channels = Set.toList model.starredChannels } :: navigationDocumentSave model
 
 
 maxForumChannels : Int
@@ -10797,14 +12493,11 @@ parseForumChannels raws =
         raws
 
 
-{-| Persist the forum set after any change (mirroring the per-action
-saves; the port writes the `onyx:forum-channels` array, removing the
-key when empty like the highlight/notify rails — the oracle bundles
-forum pins into the whole owner-scoped navigation object instead,
-which stays ahead until Elm carries navigation memory). -}
+{-| Persist forum pins. The legacy `onyx:forum-channels` array stays.
+A loaded owner document also receives the pin list. -}
 forumChannelsSaveOut : Model -> List Outbound
 forumChannelsSaveOut model =
-    [ ForumChannelsSave { channels = Set.toList model.forumChannels } ]
+    ForumChannelsSave { channels = Set.toList model.forumChannels } :: navigationDocumentSave model
 
 
 {-| Fold the star actions (mirroring `starChannel` / `unstarChannel`:
@@ -10822,9 +12515,9 @@ starChannel model raw =
     else
         let
             updated =
-                { model | starredChannels = Set.insert channel model.starredChannels }
+                queueNavigationStar True channel model
         in
-        ( updated, starredSaveOut updated )
+        ( updated, starredSaveOut updated ++ navigationLoadOut model )
 
 
 unstarChannel : Model -> String -> ( Model, List Outbound )
@@ -10839,9 +12532,243 @@ unstarChannel model raw =
     else
         let
             updated =
-                { model | starredChannels = Set.remove channel model.starredChannels }
+                queueNavigationStar False channel model
         in
-        ( updated, starredSaveOut updated )
+        ( updated, starredSaveOut updated ++ navigationLoadOut model )
+
+
+navigationStorageKey : Model -> Maybe String
+navigationStorageKey model =
+    Maybe.andThen (ChannelNavigation.storageKey "onyx:channel-navigation") (deviceMemoryOwner model)
+
+
+navigationDocumentSave : Model -> List Outbound
+navigationDocumentSave model =
+    if not model.navigationReady then
+        []
+
+    else
+        case navigationStorageKey model of
+            Just key ->
+                [ NavigationSave { key = key, json = ChannelNavigation.encode model.channelNavigation } ]
+
+            Nothing ->
+                []
+
+
+navigationLoadOut : Model -> List Outbound
+navigationLoadOut model =
+    if model.navigationReady || model.navigationRequested then
+        []
+
+    else
+        case navigationStorageKey model of
+            Just key ->
+                [ NavigationLoad { key = key } ]
+
+            Nothing ->
+                []
+
+
+{-| Mark a navigation load in flight and emit it. The model must
+already carry the identity whose document should load. No owner
+key means no outbound, so ownerless fixtures keep their lists. -}
+takeNavigationLoad : Model -> ( Model, List Outbound )
+takeNavigationLoad model =
+    case navigationLoadOut model of
+        [] ->
+            ( model, [] )
+
+        loads ->
+            ( { model | navigationRequested = True }, loads )
+
+
+queueNavigationStar : Bool -> String -> Model -> Model
+queueNavigationStar add channel model =
+    let
+        requested =
+            model.navigationRequested || navigationStorageKey model /= Nothing
+    in
+    if model.navigationReady then
+        let
+            nav =
+                model.channelNavigation
+        in
+        { model
+            | starredChannels = if add then Set.insert channel model.starredChannels else Set.remove channel model.starredChannels
+            , channelNavigation =
+                { nav
+                    | starred =
+                        if add then
+                            ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel nav.starred
+
+                        else
+                            ChannelNavigation.forgetChannel channel nav.starred
+                }
+        }
+
+    else
+        { model
+            | starredChannels = if add then Set.insert channel model.starredChannels else Set.remove channel model.starredChannels
+            , navigationRequested = requested
+            , navigationStarAdds =
+                if add then
+                    ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel model.navigationStarAdds
+
+                else
+                    ChannelNavigation.forgetChannel channel model.navigationStarAdds
+            , navigationStarRemoves =
+                if add then
+                    ChannelNavigation.forgetChannel channel model.navigationStarRemoves
+
+                else
+                    ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel model.navigationStarRemoves
+        }
+
+
+queueNavigationForum : String -> Model -> Model
+queueNavigationForum channel model =
+    let
+        add =
+            not (Set.member channel model.forumChannels)
+
+        requested =
+            model.navigationRequested || navigationStorageKey model /= Nothing
+    in
+    if model.navigationReady then
+        let
+            nav =
+                model.channelNavigation
+        in
+        { model
+            | forumChannels = if add then Set.insert channel model.forumChannels else Set.remove channel model.forumChannels
+            , channelNavigation =
+                { nav
+                    | forum =
+                        if add then
+                            ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel nav.forum
+
+                        else
+                            ChannelNavigation.forgetChannel channel nav.forum
+                }
+        }
+
+    else
+        { model
+            | forumChannels = if add then Set.insert channel model.forumChannels else Set.remove channel model.forumChannels
+            , navigationRequested = requested
+            , navigationForumAdds =
+                if add then
+                    ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel model.navigationForumAdds
+
+                else
+                    ChannelNavigation.forgetChannel channel model.navigationForumAdds
+            , navigationForumRemoves =
+                if add then
+                    ChannelNavigation.forgetChannel channel model.navigationForumRemoves
+
+                else
+                    ChannelNavigation.rememberChannel ChannelNavigation.maxChannels channel model.navigationForumRemoves
+        }
+
+
+{-| A port load is `{ key, value }`. A bare document (the elm-test
+path, and any payload without those fields) still applies. A keyed
+load for a different owner is ignored so a late reply cannot install
+the previous document and let the next star save it. -}
+absorbNavigation : Model -> Decode.Value -> ( Model, List Outbound )
+absorbNavigation model raw =
+    case decodeKeyedNavigation raw of
+        Just keyed ->
+            case navigationStorageKey model of
+                Just expected ->
+                    if keyed.key == expected then
+                        absorbNavigationDocument model keyed.value
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        Nothing ->
+            absorbNavigationDocument model raw
+
+
+decodeKeyedNavigation : Decode.Value -> Maybe { key : String, value : Decode.Value }
+decodeKeyedNavigation raw =
+    Decode.decodeValue
+        (Decode.map2 (\key value -> { key = key, value = value })
+            (Decode.field "key" Decode.string)
+            (Decode.field "value" (Decode.oneOf [ Decode.null Encode.null, Decode.value ]))
+        )
+        raw
+        |> Result.toMaybe
+
+
+absorbNavigationDocument : Model -> Decode.Value -> ( Model, List Outbound )
+absorbNavigationDocument model value =
+    let
+        parsed =
+            ChannelNavigation.parseValue value
+
+        starred =
+            ChannelNavigation.applyEdits ChannelNavigation.maxChannels model.navigationStarRemoves model.navigationStarAdds parsed.starred
+
+        forum =
+            ChannelNavigation.applyEdits ChannelNavigation.maxChannels model.navigationForumRemoves model.navigationForumAdds parsed.forum
+
+        dirty =
+            not (List.isEmpty model.navigationStarAdds)
+                || not (List.isEmpty model.navigationStarRemoves)
+                || not (List.isEmpty model.navigationForumAdds)
+                || not (List.isEmpty model.navigationForumRemoves)
+
+        merged =
+            { parsed | starred = starred, forum = forum }
+
+        ready =
+            { model
+                | channelNavigation = merged
+                , starredChannels = Set.fromList starred
+                , forumChannels = Set.fromList forum
+                , navigationReady = True
+                , navigationRequested = True
+                , navigationStarAdds = []
+                , navigationStarRemoves = []
+                , navigationForumAdds = []
+                , navigationForumRemoves = []
+            }
+    in
+    if dirty then
+        ( ready, navigationDocumentSave ready )
+
+    else
+        ( ready, [] )
+
+
+markFirstHourSeen : Model -> ( Model, List Outbound )
+markFirstHourSeen model =
+    if model.firstHourSeen then
+        ( model, [] )
+
+    else
+        ( { model | firstHourSeen = True }, [ FirstHourSeenSave ] )
+
+
+noteFirstHourFocus : Model -> ( Model, List Outbound )
+noteFirstHourFocus model =
+    if
+        FirstHour.shouldFocusComposer
+            { focused = model.firstHourComposerFocused
+            , handoff = model.firstHourHandoff
+            , activeChannel = model.activeChannel
+            }
+    then
+        ( { model | firstHourComposerFocused = True }, [ ComposerFocus ] )
+
+    else
+        ( model, [] )
 
 
 maxAutoJoinChannels : Int
@@ -10877,10 +12804,11 @@ parseAutoJoinChannels raws =
 
 {-| Persist the auto-join list after any change (mirroring the
 per-action saves; the port writes the `onyx:autojoin-channels` array,
-removing the key when empty exactly like `saveAutoJoinChannels` — on a
-plain device key, since the oracle's owner-suffixed slots stay ahead
-until Elm carries an owner; the plain `onyx:autojoin` key is avoided
-because the oracle purges ownerless reads; see docs/COVERAGE.md). -}
+removing the key when empty exactly like `saveAutoJoinChannels`).
+The plain `onyx:autojoin` key is never claimed: the bridge purges it
+and mirrors this list under `onyx:autojoin:owner:…` once an owner has
+been announced. `DeviceSlotsLoaded` replaces the live list from that
+owner document. -}
 autoJoinSaveOut : Model -> List Outbound
 autoJoinSaveOut model =
     [ AutoJoinSave { channels = model.autoJoinChannels } ]
@@ -10999,10 +12927,11 @@ parseChannelColorEntries entries =
 
 {-| Persist the channel-color map after any change (mirroring the
 per-action saves; the port writes the `{ [channel]: color }` object,
-removing the key when empty exactly like `saveChannelColors` — on a
-plain `onyx:channel-color-labels` device key, since the oracle purges
-the plain `onyx:channel-colors` key and its owner-suffixed slots stay
-ahead until Elm carries an owner; see docs/COVERAGE.md). -}
+removing the key when empty exactly like `saveChannelColors`, under
+the plain `onyx:channel-color-labels` key). The oracle's plain
+`onyx:channel-colors` key is purged rather than claimed; the bridge
+mirrors this map under `onyx:channel-colors:owner:…` once an owner has
+been announced, and `DeviceSlotsLoaded` replaces the live map. -}
 channelColorsSaveOut : Model -> List Outbound
 channelColorsSaveOut model =
     [ ChannelColorsSave
@@ -11104,9 +13033,8 @@ ownedScheduledMessageCount model =
 {-| Persist the queue projection (mirroring `_persistScheduledMessages`;
 the write result returns through `ScheduledPersisted`). -}
 scheduledSaveOut : Model -> List Outbound
-scheduledSaveOut model =
-    [ ScheduledSave { rows = Schedule.encodeScheduledMessages model.scheduledMessages } ]
-
+scheduledSaveOut _ =
+    []
 
 {-| Resolve one composer preset to its send epoch (mirroring the
 composer's preset clicks: relative presets lead from the Tick clock,
@@ -11129,13 +13057,17 @@ epoch and the datetime-local floor arrive from the clock answer,
 which is re-requested — and stale epochs cleared — on every open). -}
 openSchedulePopover : Model -> ( Model, List Outbound )
 openSchedulePopover model =
-    ( { model
-        | scheduleOpen = True
-        , scheduleError = Nothing
-        , schedulePresetEpochs = Dict.empty
-      }
-    , [ ScheduleClockRequest ]
-    )
+    if retainedDraftLocked model then
+        ( { model | scheduleError = Just "Clear or reauthorize the retained draft before scheduling a message." }, [] )
+
+    else
+        ( { model
+            | scheduleOpen = True
+            , scheduleError = Nothing
+            , schedulePresetEpochs = Dict.empty
+          }
+        , [ ScheduleClockRequest ]
+        )
 
 
 {-| Queue the current composer draft for `epoch` (mirroring
@@ -11146,11 +13078,14 @@ like the oracle's `admitted == false` path, keeping any refusal
 toast the core already queued). -}
 submitScheduleAt : Model -> Int -> ( Model, List Outbound )
 submitScheduleAt model epoch =
-    case model.activeChannel of
-        Nothing ->
+    case ( retainedDraftLocked model, model.activeChannel ) of
+        ( True, _ ) ->
+            ( { model | scheduleError = Just "Clear or reauthorize the retained draft before scheduling a message." }, [] )
+
+        ( False, Nothing ) ->
             ( model, [] )
 
-        Just target ->
+        ( False, Just target ) ->
             let
                 body =
                     String.trim model.composer
@@ -11264,75 +13199,95 @@ the enqueue duplicate-refuse keeps a cross-tab collision benign
 either way. -}
 requestScheduleMessage : Model -> { channel : String, text : String, sendAt : Int } -> ( Model, List Outbound )
 requestScheduleMessage model input =
-    if isChannelName model input.channel && roomEncryptionPolicy model input.channel == RequiredPolicy then
-        ( addToast
-            { variant = ToastError
-            , title = "Encrypted room messages can't be scheduled"
-            , description = Just "Protected room messages must be sealed by the live session at send time, so plaintext is never saved for later."
-            , duration = Nothing
-            , groupKey = Nothing
-            , undo = Nothing
-            }
-            model.nowMs
-            model
-        , []
-        )
+    case ( retainedDraftLocked model, model.runtimeOwnerStamp ) of
+        ( True, _ ) ->
+            ( { model | scheduleError = Just "Clear or reauthorize the retained draft before scheduling a message." }, [] )
 
-    else if not (isChannelName model input.channel) && dmDesignated model input.channel then
-        ( addToast
-            { variant = ToastError
-            , title = "Encrypted DMs can't be scheduled"
-            , description = Just "Encrypted DMs must be sealed by the live session at send time, so plaintext is never saved for later."
-            , duration = Nothing
-            , groupKey = Nothing
-            , undo = Nothing
-            }
-            model.nowMs
-            model
-        , []
-        )
+        ( False, Nothing ) ->
+            ( { model | scheduleError = Just "Private scheduled-message custody is unavailable. Your composer text was kept." }, [] )
 
-    else
-        case scheduleOwner model of
-            Nothing ->
+        ( False, Just stamp ) ->
+            let
+                minted = { model | scheduleSeq = model.scheduleSeq + 1, eventClock = model.eventClock + 1 }
+                operationId = "sched-" ++ String.fromInt (round model.nowMs) ++ "-" ++ String.fromInt minted.scheduleSeq
+                requestId = "scheduledForm" ++ String.padLeft 12 '0' (String.fromInt minted.eventClock)
+                replyTo = activeReplyParent model.replyingTo input.channel |> Maybe.map .msgid
+            in
+            if input.sendAt <= round model.nowMs || String.length operationId > 96 then
+                ( { minted | scheduleError = Just "Choose a future time. Your composer text was kept." }, [] )
+
+            else
+                ( { minted
+                    | pendingScheduledCapture = Just
+                        { requestId = requestId
+                        , operationId = operationId
+                        , scheduleRef = Nothing
+                        , expectedRevision = Nothing
+                        , channel = input.channel
+                        , dueAtMs = input.sendAt
+                        , ownerRef = stamp.ownerRef
+                        , accountGeneration = stamp.accountGeneration
+                        , connectionGeneration = stamp.connectionGeneration
+                        , messageKind = "message"
+                        , replyTo = replyTo
+                        , audiencePrefix = model.composerAudience
+                        , composerText = model.composer
+                        , composerRevision = Dict.get (ircCaseKey model input.channel) model.composerDraftVersions |> Maybe.withDefault 0
+                        }
+                    , scheduleError = Nothing
+                  }
+                , [ RuntimePrivateScheduledMessageRequest
+                        { requestId = requestId
+                        , operationId = operationId
+                        , ownerRef = stamp.ownerRef
+                        , accountGeneration = stamp.accountGeneration
+                        , connectionGeneration = stamp.connectionGeneration
+                        , kind = "create"
+                        , conversationId = input.channel
+                        , initialDueAtMs = input.sendAt
+                        , prefillFromComposer = True
+                        }
+                  ]
+                )
+
+
+settleScheduledComposerDraft : Model -> String -> ( Model, List Outbound )
+settleScheduledComposerDraft model requestId =
+    case model.pendingScheduledSave of
+        Just pending ->
+            if pending.requestId /= requestId then
                 ( model, [] )
 
-            Just owner ->
+            else
                 let
-                    minted =
-                        { model | scheduleSeq = model.scheduleSeq + 1 }
-
-                    id =
-                        "sched-" ++ String.fromInt (round model.nowMs) ++ "-" ++ String.fromInt minted.scheduleSeq
+                    key = ircCaseKey model pending.target
+                    currentRevision = Dict.get key model.composerDraftVersions |> Maybe.withDefault 0
+                    currentBody = Dict.get key model.composerDrafts |> Maybe.withDefault model.composer
+                    isExactSubmittedDraft = pending.prefilledComposer
+                        && model.activeChannel == Just pending.target
+                        && model.composer == pending.text
+                        && currentBody == pending.text
+                        && currentRevision == pending.revision
                 in
-                case Schedule.createScheduledSend { channel = input.channel, text = input.text, sendAt = input.sendAt, owner = Just owner, id = id } of
-                    Nothing ->
-                        ( minted, [] )
+                if not isExactSubmittedDraft then
+                    ( { model | pendingScheduledSave = Nothing }, [] )
 
-                    Just entry ->
-                        -- The durable cap refuses first in the oracle; the
-                        -- in-memory cap stands in until the add answers, so
-                        -- an already-full projection refuses without a
-                        -- ports round trip.
-                        if List.length minted.scheduledMessages >= Schedule.maxScheduledMessages then
-                            ( minted, [] )
+                else
+                    let
+                        ( fenced, discardOut ) = makeDraftDiscardOutbound model pending.target pending.revision
+                        cleared =
+                            { fenced
+                                | composer = ""
+                                , composerDrafts = Dict.remove key fenced.composerDrafts
+                                , pendingScheduledSave = Nothing
+                            }
 
-                        else if List.any (\row -> row.id == id) minted.scheduledMessages then
-                            ( minted, [] )
+                        ( stoppedTyping, typingOut ) = sendTyping cleared pending.target False
+                    in
+                    ( stoppedTyping, discardOut ++ typingOut )
 
-                        else
-                            let
-                                pending =
-                                    { id = id
-                                    , owner = owner
-                                    , row = entry
-                                    , epoch = Nothing
-                                    , generation = Nothing
-                                    }
-                            in
-                            ( { minted | scheduledInflight = minted.scheduledInflight ++ [ pending ] }
-                            , [ ScheduledFenceRequest { tag = id, owner = owner } ]
-                            )
+        Nothing ->
+            ( model, [] )
 
 
 {-| Fold one fence answer (mirroring the store's fenced admission: a
@@ -11555,74 +13510,8 @@ cadence; claims attach before the send so a reload sees a claim
 instead of a missing row). -}
 fireScheduledDispatch : Model -> ( Model, List Outbound )
 fireScheduledDispatch model =
-    if model.connection /= Live then
-        ( model, [] )
-
-    else if model.scheduledDispatchBusy then
-        ( model, [] )
-
-    else if round model.nowMs < model.scheduledDispatchNextAt then
-        ( model, [] )
-
-    else
-        case scheduleOwner model of
-            Nothing ->
-                ( model, [] )
-
-            Just owner ->
-                let
-                    now =
-                        round model.nowMs
-
-                    due =
-                        List.filter (dispatchableScheduledRow model)
-                            (Schedule.claimableRows model.scheduledMessages (Just owner) now)
-                in
-                if List.isEmpty due then
-                    ( model, [] )
-
-                else
-                    let
-                        ( minted, tokens ) =
-                            mintScheduledClaimTokens model due now
-
-                        claimed =
-                            List.map
-                                (\row ->
-                                    case List.filter (\( candidate, _ ) -> candidate.id == row.id) tokens of
-                                        ( _, token ) :: _ ->
-                                            { row | claim = Just { token = token, claimedAt = now } }
-
-                                        [] ->
-                                            row
-                                )
-                                minted.scheduledMessages
-
-                        encoded =
-                            Schedule.encodeScheduledMessages claimed
-
-                        next =
-                            { minted
-                                | scheduledMessages = claimed
-                                , scheduledDispatchBusy = True
-                                , scheduledDispatchNextAt = now + Schedule.scheduledDispatchIntervalMs
-                                , scheduledDispatching =
-                                    List.map (\( candidate, token ) -> { id = candidate.id, token = token }) tokens
-                            }
-                    in
-                    ( next
-                    , [ ScheduledDispatchRequest
-                            { rows = encoded
-                            , owner = owner
-                            , candidates =
-                                List.map
-                                    (\( candidate, token ) -> { id = candidate.id, token = token, claimedAt = now })
-                                    tokens
-                            }
-                      , ScheduledSave { rows = encoded }
-                      ]
-                    )
-
+    -- Private scheduled custody owns due claims and journal handoff.
+    ( model, [] )
 
 {-| Mint one claim token per candidate (mirroring
 `` `claim-${Date.now()}-${++seq}` ``). -}
@@ -11825,93 +13714,15 @@ sendGrantedClaims model owner granted =
                     List.filter (\link -> not (List.member link.id abandonedIds)) model.scheduledDispatching
             }
 
-        useLabel =
-            List.member "labeled-response" model.caps
     in
-    sendValidClaims released owner valid useLabel abandonedSettles
+    sendValidClaims released owner valid abandonedSettles
 
 
 {-| Emit one send per valid claim. -}
-sendValidClaims : Model -> Schedule.ScheduledMessageOwner -> List ( String, String ) -> Bool -> List Outbound -> ( Model, List Outbound )
-sendValidClaims model owner valid useLabel abandonedSettles =
-    case valid of
-        [] ->
-            ( model, abandonedSettles ++ scheduledSaveOut model )
-
-        _ :: _ ->
-            let
-                step ( id, token ) ( acc, outs ) =
-                    case List.filter (\row -> row.id == id) acc.scheduledMessages of
-                        [ row ] ->
-                            if dmDesignated acc row.channel then
-                                -- Designated rows seal at dispatch through
-                                -- the live send path (never raw plaintext).
-                                let
-                                    ( sealed, sealOuts ) =
-                                        requestScheduledSeal acc row owner token
-                                in
-                                ( sealed, outs ++ sealOuts )
-
-                            else if useLabel then
-                                let
-                                    seq =
-                                        acc.labelCounter + 1
-
-                                    label =
-                                        Labels.nextClientLabel (floor acc.nowMs) seq
-
-                                    stamped =
-                                        Wire.formatTaggedLine (Dict.union (Dict.singleton "label" label) (Dict.union (replyTagFor acc row.channel) (topicTagFor acc row.channel))) "PRIVMSG" [ row.channel, row.text ]
-                                in
-                                ( { acc
-                                    | labelCounter = seq
-                                    , scheduledLabels = Dict.insert label { id = id, token = token } acc.scheduledLabels
-                                    , replyingTo = Nothing
-                                  }
-                                , outs ++ [ SendLine stamped ]
-                                )
-
-                            else
-                                let
-                                    cleared =
-                                        { acc | scheduledMessages = Schedule.cancelScheduled acc.scheduledMessages id }
-                                in
-                                ( { cleared
-                                    | scheduledDispatching =
-                                        List.filter (\link -> link.id /= id) cleared.scheduledDispatching
-                                    , replyingTo = Nothing
-                                  }
-                                , outs
-                                    ++ [ SendLine (Wire.formatTaggedLine (replyTagFor acc row.channel) "PRIVMSG" [ row.channel, row.text ])
-                                       , ScheduledSettle { id = id, owner = owner, token = token, admitted = True }
-                                       ]
-                                )
-
-                        _ ->
-                            ( acc
-                            , outs
-                                ++ [ ScheduledSettle { id = id, owner = owner, token = token, admitted = False } ]
-                            )
-
-                ( sending, sendOuts ) =
-                    List.foldl step ( model, [] ) valid
-
-                admittedCount =
-                    List.length
-                        (List.filter
-                            (\( id, _ ) -> not (List.member id (List.map .id sending.scheduledDispatching)))
-                            valid
-                        )
-
-                toasted =
-                    if admittedCount == 0 then
-                        sending
-
-                    else
-                        addToast (scheduledSentToast admittedCount) sending.nowMs sending
-            in
-            ( toasted, abandonedSettles ++ sendOuts ++ scheduledSaveOut toasted )
-
+sendValidClaims : Model -> Schedule.ScheduledMessageOwner -> List ( String, String ) -> List Outbound -> ( Model, List Outbound )
+sendValidClaims model _ _ _ =
+    -- Never re-emit plaintext or pre-sealed legacy schedule rows.
+    ( model, [] )
 
 {-| Take one scheduled label link (ACK/FAIL verdicts consume it;
 echoes never see this registry). -}
@@ -12032,7 +13843,7 @@ admitScheduledSeal model sid target envelope =
                                             Labels.nextClientLabel (floor unsealed.nowMs) seq
 
                                         tags =
-                                            (if List.member "onyx/e2ee" unsealed.caps then
+                                            (if runtimeFeatureReady unsealed "onyx/e2ee" then
                                                 Dict.singleton "+onyx/e2ee" "mls"
 
                                              else
@@ -12250,8 +14061,7 @@ type alias SlashCommand =
 
 
 {-| The composer slash-command registry (mirroring `SLASH_COMMANDS`,
-same order and copy; the suggestion query layer stays ahead — only the
-`/help` lookup ships here). -}
+same order and copy). `SlashSuggest` queries this list. -}
 slashCommands : List SlashCommand
 slashCommands =
     [ { name = "me", usage = "/me <action>", description = "Send an action message.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
@@ -12359,6 +14169,68 @@ localSlashCommandList =
 
     else
         listed
+
+
+slashSuggestCommand : SlashCommand -> SlashSuggest.Command
+slashSuggestCommand command =
+    { name = command.name
+    , usage = command.usage
+    , description = command.description
+    , aliases = command.aliases
+    , insertText = command.insertText
+    , oper = command.oper
+    , textCommand = command.kind == SlashText
+    }
+
+
+slashSuggestionCommands : Model -> List SlashCommand
+slashSuggestionCommands model =
+    if model.slashDismissed then
+        []
+
+    else
+        SlashSuggest.suggestions (List.map slashSuggestCommand slashCommands) model.composer 8 model.isOper
+            |> List.filterMap (\suggested -> List.filter (\command -> command.name == suggested.name) slashCommands |> List.head)
+
+
+nickSuggestionMatches : Model -> List String
+nickSuggestionMatches model =
+    if model.nickDismissed then
+        []
+
+    else
+        case NickComplete.nickTokenAt model.composer (String.length model.composer) of
+            Nothing ->
+                []
+
+            Just token ->
+                if not token.at && String.isEmpty token.query then
+                    []
+
+                else if not (List.isEmpty (slashSuggestionCommands model)) then
+                    []
+
+                else
+                    NickComplete.rankNickCompletions token.query (composerNickCandidates model) 8
+
+
+composerNickCandidates : Model -> List String
+composerNickCandidates model =
+    case model.activeChannel of
+        Nothing ->
+            []
+
+        Just name ->
+            if isChannelName model name then
+                case Dict.get (String.toLower name) model.channels of
+                    Just channel ->
+                        List.map .nick (Dict.values channel.members)
+
+                    Nothing ->
+                        []
+
+            else
+                name :: [ model.ourNick ]
 
 
 maxEventTitleChars : Int
@@ -12818,19 +14690,24 @@ channelPins model channel =
                     []
 
                 Just raw ->
-                    List.filterMap
-                        (\id ->
-                            let
-                                clean =
-                                    String.trim id
-                            in
-                            if String.isEmpty clean then
-                                Nothing
+                    parsePinList raw
 
-                            else
-                                Just clean
-                        )
-                        (String.split "," raw)
+
+parsePinList : String -> List String
+parsePinList raw =
+    List.filterMap
+        (\id ->
+            let
+                clean =
+                    String.trim id
+            in
+            if String.isEmpty clean then
+                Nothing
+
+            else
+                Just clean
+        )
+        (String.split "," raw)
 
 
 {-| Rewrite a channel's `PINS` prop locally and publish it
@@ -12839,18 +14716,54 @@ publishes as one `PROP SET`, with the optimistic local update the
 drawer reacts to). -}
 writePins : Model -> String -> List String -> ( Model, List Outbound )
 writePins model channel msgids =
-    let
-        updated =
-            { model | props = writeChannelProp channel "PINS" (String.join "," msgids) model.props }
+    requestPropWrite model channel "PINS" (String.join "," msgids)
 
-        wire =
-            if model.connection == Live && model.isupport.ircx then
-                [ SendLine (Wire.formatIrcLine "PROP" [ channel, "PINS", String.join "," msgids ]) ]
 
-            else
-                []
-    in
-    ( updated, wire )
+{-| Key of one pending channel PROP write. -}
+propWriteKey : String -> String -> String
+propWriteKey channel name =
+    String.toLower channel ++ "\n" ++ String.toLower name
+
+
+{-| Ask the server to store a channel PROP. The committed `props` view
+never changes here: the desired value waits in `pendingPropWrites`
+until the server echo (`PROP`/818) writes it, and a `FAIL PROP` or 913
+drops it. Offline or on a non-IRCX link nothing is sent and nothing is
+recorded, so no local value can masquerade as server state. -}
+requestPropWrite : Model -> String -> String -> String -> ( Model, List Outbound )
+requestPropWrite model channel name value =
+    if model.connection == Live && model.isupport.ircx then
+        ( { model | pendingPropWrites = Dict.insert (propWriteKey channel name) value model.pendingPropWrites }
+        , [ SendLine (Wire.formatIrcLine "PROP" [ channel, name, value ]) ]
+        )
+
+    else
+        ( model, [] )
+
+
+{-| Drop pending PROP writes the server answered (echo) or refused. A
+refusal without a property name clears every pending write for the
+channel. -}
+settlePropWrite : Model -> String -> Maybe String -> Model
+settlePropWrite model channel name =
+    case name of
+        Just prop ->
+            { model | pendingPropWrites = Dict.remove (propWriteKey channel prop) model.pendingPropWrites }
+
+        Nothing ->
+            { model | pendingPropWrites = Dict.filter (\key _ -> not (String.startsWith (String.toLower channel ++ "\n") key)) model.pendingPropWrites }
+
+
+{-| Pins the next write builds on: the pending desired list while a
+write is in flight, else the committed server list. -}
+desiredPins : Model -> String -> List String
+desiredPins model channel =
+    case Dict.get (propWriteKey channel "PINS") model.pendingPropWrites of
+        Just raw ->
+            parsePinList raw
+
+        Nothing ->
+            channelPins model channel
 
 
 {-| Pin a message (mirrors `pinMessage`: dup pins no-op, newest
@@ -12859,7 +14772,7 @@ pinMessage : Model -> String -> String -> ( Model, List Outbound )
 pinMessage model channel msgid =
     let
         current =
-            channelPins model channel
+            desiredPins model channel
     in
     if List.member msgid current then
         ( model, [] )
@@ -12872,7 +14785,7 @@ pinMessage model channel msgid =
 rewrite). -}
 unpinMessage : Model -> String -> String -> ( Model, List Outbound )
 unpinMessage model channel msgid =
-    writePins model channel (List.filter (\id -> id /= msgid) (channelPins model channel))
+    writePins model channel (List.filter (\id -> id /= msgid) (desiredPins model channel))
 
 
 type PinnedMessageState
@@ -12914,7 +14827,7 @@ pinnedMessageStateLabel state =
 whatever id sits here is what the thread scrolls to). -}
 focusMessage : Model -> String -> Model
 focusMessage model messageId =
-    { model | historyLanding = Just messageId }
+    invalidateVaultSearch { model | historyLanding = Just messageId, searchOpen = False }
 
 
 {-| Jump to a pinned message (mirrors the drawer `jumpTo`: a loaded
@@ -13083,21 +14996,7 @@ scheduleChannelEvent model channel unix rawTitle =
         ( model, [] )
 
     else
-        let
-            value =
-                String.fromInt unix ++ "|" ++ clean
-
-            updated =
-                { model | props = writeChannelProp channel "ocean.event" value model.props }
-
-            wire =
-                if model.connection == Live && model.isupport.ircx then
-                    [ SendLine (Wire.formatIrcLine "PROP" [ channel, "ocean.event", value ]) ]
-
-                else
-                    []
-        in
-        ( updated, wire )
+        requestPropWrite model channel "ocean.event" (String.fromInt unix ++ "|" ++ clean)
 
 
 {-| Clear a channel event (mirroring `clearChannelEvent`: the prop
@@ -13105,18 +15004,7 @@ deletes locally and publishes the empty trailing value on a live IRCX
 link — `PROP <channel> ocean.event :`). -}
 clearChannelEvent : Model -> String -> ( Model, List Outbound )
 clearChannelEvent model channel =
-    let
-        updated =
-            { model | props = writeChannelProp channel "ocean.event" "" model.props }
-
-        wire =
-            if model.connection == Live && model.isupport.ircx then
-                [ SendLine (Wire.formatIrcLine "PROP" [ channel, "ocean.event", "" ]) ]
-
-            else
-                []
-    in
-    ( updated, wire )
+    requestPropWrite model channel "ocean.event" ""
 
 
 {-| Run `/event` (mirroring the oracle arm: offline the dispatch never
@@ -13457,101 +15345,134 @@ parseOperSlashCommand name args =
 sends). -}
 planOperAction : OperDeskIntent -> Result (List String) OperDeskCommand
 planOperAction intent =
-    case intent of
-        OperBroadcast text ->
-            case normalizeOperFreeText text maxBroadcastLength "broadcast" of
-                Nothing ->
-                    Err [ "Write the announcement first." ]
-
-                Just (Err message) ->
-                    Err [ message ]
-
-                Just (Ok clean) ->
-                    Ok { command = "EVENT", params = [ "BROADCAST", clean ], summary = "Announce to operators subscribed to ANNOUNCE: \u{201C}" ++ clean ++ "\u{201D}.", destructive = True }
-
-        OperEventSubscribe category ->
-            case normalizeOperCategory category of
-                Nothing ->
-                    Err [ "Pick a category from the Event Spine list." ]
-
-                Just known ->
-                    Ok { command = "EVENT", params = [ "ADD", known ], summary = "Receive " ++ known ++ " events from every node on the network.", destructive = False }
-
-        OperEventUnsubscribe category ->
-            case normalizeOperCategory category of
-                Nothing ->
-                    Err [ "Pick a category from the Event Spine list." ]
-
-                Just known ->
-                    Ok { command = "EVENT", params = [ "DEL", known ], summary = "Stop receiving " ++ known ++ " events.", destructive = False }
-
-        OperEventList ->
-            Ok { command = "EVENT", params = [ "LIST" ], summary = "List the Event Spine categories this session is subscribed to.", destructive = False }
-
-        OperObserve { mask, actions } ->
-            case normalizeObserveMask mask of
-                Nothing ->
-                    Err [ "Enter a nick!user@host mask, wildcards allowed." ]
-
-                Just clean ->
-                    case normalizeObserveActions actions of
-                        Nothing ->
-                            Err [ "Pick from connect, quit, nick, join, part, host, or oper." ]
-
-                        Just ordered ->
-                            Ok
-                                { command = "EVENT"
-                                , params = [ "OBSERVE", clean ] ++ ordered
-                                , summary =
-                                    if List.isEmpty ordered then
-                                        "Watch " ++ clean ++ " network-wide. Their real host is revealed to you."
-
-                                    else
-                                        "Watch " ++ clean ++ " network-wide for " ++ String.join ", " ordered ++ ". Their real host is revealed to you."
-                                , destructive = False
-                                }
-
-        OperObserveList ->
-            Ok { command = "EVENT", params = [ "OBSERVE", "LIST" ], summary = "List the standing OBSERVE masks on this session.", destructive = False }
-
-        OperObserveOff ->
-            Ok { command = "EVENT", params = [ "OBSERVE", "OFF" ], summary = "Clear every standing OBSERVE mask on this session.", destructive = False }
-
-        OperRehash ->
-            Ok { command = "REHASH", params = [], summary = "Ask this node to reload its configuration (382 confirms).", destructive = True }
-
-        OperPrivs ->
-            Ok { command = "PRIVS", params = [], summary = "Show the operator privileges this session holds (270).", destructive = False }
-
-        OperKill { target, reason } ->
-            let
-                errors =
-                    case normalizeOperNick target of
-                        Nothing ->
-                            [ "Enter the nickname to disconnect." ]
-
-                        Just _ ->
-                            []
-            in
-            case normalizeOperFreeText reason maxKillReasonLength "reason" of
-                Just (Err message) ->
-                    Err (errors ++ [ message ])
-
-                Just (Ok clean) ->
-                    case normalizeOperNick target of
-                        Nothing ->
-                            Err errors
-
-                        Just nick ->
-                            Ok { command = "KILL", params = [ nick, clean ], summary = "Disconnect " ++ nick ++ " from the network with the reason \u{201C}" ++ clean ++ "\u{201D}.", destructive = True }
-
-                Nothing ->
-                    if List.isEmpty errors then
-                        Err [ "A reason is required — it is recorded network-wide." ]
+    let
+        planned =
+            case intent of
+                OperBroadcast text ->
+                    if hasControlChars text then
+                        Err [ "The broadcast cannot include line breaks or control characters." ]
 
                     else
-                        Err errors
+                        case normalizeOperFreeText text maxBroadcastLength "broadcast" of
+                            Nothing ->
+                                Err [ "Write the announcement first." ]
 
+                            Just (Err message) ->
+                                Err [ message ]
+
+                            Just (Ok clean) ->
+                                Ok { command = "EVENT", params = [ "BROADCAST", clean ], summary = "Announce to operators subscribed to ANNOUNCE: \u{201C}" ++ clean ++ "\u{201D}.", destructive = True }
+
+                OperEventSubscribe category ->
+                    if hasControlChars category then
+                        Err [ "Pick a category from the Event Spine list." ]
+
+                    else
+                        case normalizeOperCategory category of
+                            Nothing ->
+                                Err [ "Pick a category from the Event Spine list." ]
+
+                            Just known ->
+                                Ok { command = "EVENT", params = [ "ADD", known ], summary = "Receive " ++ known ++ " events from every node on the network.", destructive = False }
+
+                OperEventUnsubscribe category ->
+                    if hasControlChars category then
+                        Err [ "Pick a category from the Event Spine list." ]
+
+                    else
+                        case normalizeOperCategory category of
+                            Nothing ->
+                                Err [ "Pick a category from the Event Spine list." ]
+
+                            Just known ->
+                                Ok { command = "EVENT", params = [ "DEL", known ], summary = "Stop receiving " ++ known ++ " events.", destructive = False }
+
+                OperEventList ->
+                    Ok { command = "EVENT", params = [ "LIST" ], summary = "List the Event Spine categories this session is subscribed to.", destructive = False }
+
+                OperObserve { mask, actions } ->
+                    if hasControlChars mask || List.any hasControlChars actions then
+                        Err [ "The OBSERVE mask and actions cannot include control characters." ]
+
+                    else
+                        case normalizeObserveMask mask of
+                            Nothing ->
+                                Err [ "Enter a nick!user@host mask, wildcards allowed." ]
+
+                            Just clean ->
+                                case normalizeObserveActions actions of
+                                    Nothing ->
+                                        Err [ "Pick from connect, quit, nick, join, part, host, or oper." ]
+
+                                    Just ordered ->
+                                        Ok
+                                            { command = "EVENT"
+                                            , params = [ "OBSERVE", clean ] ++ ordered
+                                            , summary =
+                                                if List.isEmpty ordered then
+                                                    "Watch " ++ clean ++ " network-wide. Their real host is revealed to you."
+
+                                                else
+                                                    "Watch " ++ clean ++ " network-wide for " ++ String.join ", " ordered ++ ". Their real host is revealed to you."
+                                            , destructive = False
+                                            }
+
+                OperObserveList ->
+                    Ok { command = "EVENT", params = [ "OBSERVE", "LIST" ], summary = "List the standing OBSERVE masks on this session.", destructive = False }
+
+                OperObserveOff ->
+                    Ok { command = "EVENT", params = [ "OBSERVE", "OFF" ], summary = "Clear every standing OBSERVE mask on this session.", destructive = False }
+
+                OperRehash ->
+                    Ok { command = "REHASH", params = [], summary = "Ask this node to reload its configuration (382 confirms).", destructive = True }
+
+                OperPrivs ->
+                    Ok { command = "PRIVS", params = [], summary = "Show the operator privileges this session holds (270).", destructive = False }
+
+                OperKill { target, reason } ->
+                    let
+                        errors =
+                            if hasControlChars target then
+                                [ "Enter the nickname to disconnect." ]
+
+                            else
+                                case normalizeOperNick target of
+                                    Nothing ->
+                                        [ "Enter the nickname to disconnect." ]
+
+                                    Just _ ->
+                                        []
+                    in
+                    case normalizeOperFreeText reason maxKillReasonLength "reason" of
+                        Just (Err message) ->
+                            Err (errors ++ [ message ])
+
+                        Just (Ok clean) ->
+                            if not (List.isEmpty errors) then
+                                Err errors
+
+                            else
+                                case normalizeOperNick target of
+                                    Nothing ->
+                                        Err errors
+
+                                    Just nick ->
+                                        Ok { command = "KILL", params = [ nick, clean ], summary = "Disconnect " ++ nick ++ " from the network with the reason \u{201C}" ++ clean ++ "\u{201D}.", destructive = True }
+
+                        Nothing ->
+                            if List.isEmpty errors then
+                                Err [ "A reason is required — it is recorded network-wide." ]
+
+                            else
+                                Err errors
+    in
+    planned
+        |> Result.andThen
+            (\command ->
+                Wire.encodeIrcLine command.command command.params
+                    |> Result.map (always command)
+                    |> Result.mapError (always [ "The operator command could not be encoded safely." ])
+            )
 
 {-| Run an operator slash verb (mirroring the oracle arm plus the shared
 `operAction` choke point: offline the dispatch never runs so only the
@@ -13560,6 +15481,20 @@ status the session refuses instead of leaking intent; otherwise the
 planned line sends. Success is silent. The admission-queue nuance
 (`uncertain`/`refused` toasts) has no Elm port — a `Live` link sends;
 see docs/COVERAGE.md). -}
+operAccessRequired : Model -> Model
+operAccessRequired model =
+    addToast
+        { variant = ToastError
+        , title = "Operator access required"
+        , description = Just "This network grants operator status from the signed-in account."
+        , duration = Nothing
+        , groupKey = Nothing
+        , undo = Nothing
+        }
+        model.nowMs
+        model
+
+
 runSlashOper : Model -> String -> ( Model, List Outbound )
 runSlashOper model verb =
     if model.connection /= Live then
@@ -13577,7 +15512,18 @@ runSlashOper model verb =
         in
         case parseOperSlashCommand verb args of
             Nothing ->
-                ( { model | composer = "" }, [ SendLine (Wire.formatIrcLine (String.toUpper verb) args) ] )
+                if not model.isOper then
+                    -- The raw fallback is still an operator verb: it never
+                    -- leaves without operator status.
+                    ( operAccessRequired model, [] )
+
+                else
+                case Wire.encodeIrcLine (String.toUpper verb) args of
+                    Ok line ->
+                        ( { model | composer = "", composerError = Nothing }, [ SendLine line ] )
+
+                    Err _ ->
+                        ( { model | composerError = Just "The command could not be encoded safely; your draft was kept." }, [] )
 
             Just intent ->
                 case planOperAction intent of
@@ -13591,27 +15537,21 @@ runSlashOper model verb =
                             , undo = Nothing
                             }
                             model.nowMs
-                            { model | composer = "" }
+                            model
                         , []
                         )
 
                     Ok command ->
                         if not model.isOper then
-                            ( addToast
-                                { variant = ToastError
-                                , title = "Operator access required"
-                                , description = Just "This network grants operator status from the signed-in account."
-                                , duration = Nothing
-                                , groupKey = Nothing
-                                , undo = Nothing
-                                }
-                                model.nowMs
-                                { model | composer = "" }
-                            , []
-                            )
+                            ( operAccessRequired model, [] )
 
                         else
-                            ( { model | composer = "" }, [ SendLine (Wire.formatIrcLine command.command command.params) ] )
+                            case Wire.encodeIrcLine command.command command.params of
+                                Ok line ->
+                                    ( { model | composer = "", composerError = Nothing }, [ SendLine line ] )
+
+                                Err _ ->
+                                    ( { model | composerError = Just "The operator command could not be encoded safely; your draft was kept." }, [] )
 
 
 {-| Run `/star` / `/unstar` (mirroring the oracle arm: the room resolves
@@ -14327,9 +16267,8 @@ ports): on expiry the generation turns, the socket quarantines (late
 rows drop until its `323` releases it), and the visible list falls back
 to the last committed directory. `_resetChannelListTransport` (connect
 / reconnect / ownership change) maps to `resetChannelListTransport`:
-generation turns, the deadline clears, quarantine releases. The browser
-sheet itself (search/sort/join machine, room formation) stays ahead —
-this slice is the directory data plane it will read.
+generation turns, the deadline clears, quarantine releases. The browser sheet (`View.Browser` / `openBrowser`) and room formation
+(`View.Formation`) read this directory.
 -}
 type alias ChannelListEntry =
     { name : String
@@ -15876,8 +17815,8 @@ Name ordering reuses `Modes.compareNicks` (the same deterministic
 case-folded codepoint order as the roster locale-sort slice —
 `String.localeCompare` collation is undefinable in Elm). The status
 copy is verbatim, curly quotes included. The join machine
-(pending/uncertain/rejected + 8s timer), the sheet chrome, and room
-formation stay ahead — Elm has no join/browser surface yet.
+(pending/uncertain/rejected + 8s timer) is `enterBrowserRoom`; the
+sheet is `View.Browser` and room formation is `View.Formation`.
 -}
 softLaunchMemberMax : Int
 softLaunchMemberMax =
@@ -16260,7 +18199,7 @@ failLabeledSend model message describe =
             model
 
         Just label ->
-            case Dict.get label model.pendingLabels of
+            case pendingLabelFor model label of
                 Nothing ->
                     model
 
@@ -16268,7 +18207,11 @@ failLabeledSend model message describe =
                     let
                         removed =
                             updateChannel
-                                { model | pendingLabels = Dict.remove label model.pendingLabels }
+                                { model
+                                    | pendingLabels = Dict.remove label model.pendingLabels
+                                    , uncertainLabels = Dict.remove label model.uncertainLabels
+                                    , deliveryUnknownIds = List.foldl Set.remove model.deliveryUnknownIds pending.messageIds
+                                }
                                 pending.target
                                 (\c ->
                                     { c
@@ -16581,56 +18524,25 @@ holdings (merge, never clobber — mirroring `updateResumeTokens`).
 `expiresAt` arrives as unix seconds off the wire; the mesh
 deadline is kept as epoch ms like the oracle's client field. -}
 storeSessionCredential : Model -> String -> Wire.SessionCredential -> ( Model, List Outbound )
-storeSessionCredential model kind cred =
-    if not (sessionTokenGate model) then
-        ( model, [] )
-
-    else
-        let
-            slot =
-                credentialSlot model
-
-            outbound =
-                SessionTokenStored
-                    { kind = kind
-                    , token = cred.token
-                    , expiresAt = cred.expiresAt
-                    , server = slot.server
-                    , nick = slot.nick
-                    }
-
-            holdings =
-                model.sessionTokens
-        in
-        if kind == "mtoken" then
-            ( { model
-                | sessionTokens =
-                    { holdings
-                        | meshToken = Just cred.token
-                        , meshTokenExpiresAt = Maybe.map (\s -> toFloat s * 1000) cred.expiresAt
-                    }
-              }
-            , [ outbound ]
-            )
-
-        else
-            ( { model | sessionTokens = { holdings | sessionToken = Just cred.token } }
-            , [ outbound ]
-            )
+storeSessionCredential model _ _ =
+    -- Secret-bearing server records are consumed by the private runtime
+    -- before they reach Elm; direct reducer calls remain fail-closed.
+    ( model, [] )
 
 
-{-| Run the once-per-socket post-authentication session commands,
-mirroring `_sendSessionCommandsAfterAuthentication`: needs a
-registered socket (`Live`) plus account proof. Sends
-`SESSION RESUME <bearer>` when the planner offers one, then always
-`SESSION TOKEN` to rotate, and projects the decision into the
-reclaim banner. A malformed peer can send 001 more than once — never
-replay on the same connection.
+{-| Run the once-per-socket post-authentication recovery plan after a
+registered socket and account proof. The private runtime performs resume
+and token rotation; Elm keeps only the opaque reference and typed status.
+A malformed peer can send 001 more than once — never replay on the same
+connection.
 -}
 maybeSendSessionCommands : Model -> ( Model, List Outbound )
 maybeSendSessionCommands model =
     if model.sessionCommandsSent then
         ( model, [] )
+
+    else if sessionRecoveryOwnsAutomaticResume model then
+        ( { model | sessionCommandsSent = True }, [] )
 
     else if model.connection /= Live then
         ( model, [] )
@@ -16639,24 +18551,13 @@ maybeSendSessionCommands model =
         ( model, [] )
 
     else
-        let
-            plan =
-                Session.planSessionReclaim model.sessionTokens { now = model.nowMs, authenticated = True }
-
-            rotation =
-                SendLine (Wire.formatIrcLine "SESSION" [ "TOKEN" ])
-        in
-        case plan of
+        case Session.planSessionReclaim model.sessionTokens { now = model.nowMs, authenticated = True } of
             Session.Attempt attempt ->
-                ( { model
-                    | sessionCommandsSent = True
-                    , sessionReclaim = Just { phase = Restoring, kind = Just attempt.kind }
-                  }
-                , [ SendLine (Wire.buildSessionResumeLine attempt.token)
-                  , rotation
-                  , ReclaimTimerStarted { stage = "confirm" }
-                  ]
-                )
+                let
+                    prepared = { model | sessionCommandsSent = True, sessionReclaim = Just { phase = Restoring, kind = Just attempt.kind, credentialKind = Just attempt.credentialKind, credentialRef = Just attempt.credentialRef, outcome = Session.ResumePending } }
+                    ( requested, commandOut ) = startSessionRecovery prepared (Ids.credentialRefToRuntime attempt.credentialRef) (RuntimeDomain.ResumeSession (Ids.credentialRefToRuntime attempt.credentialRef) False)
+                in
+                ( requested, commandOut ++ [ ReclaimTimerStarted { stage = "confirm" } ] )
 
             Session.Skip skipped ->
                 ( { model
@@ -16664,40 +18565,106 @@ maybeSendSessionCommands model =
                     , sessionReclaim =
                         case skipped.reason of
                             Session.Expired ->
-                                Just { phase = SignInAgain, kind = Nothing }
+                                Just { phase = SignInAgain, kind = Nothing, credentialKind = Nothing, credentialRef = Nothing, outcome = Session.ResumeUnknown }
 
                             _ ->
                                 model.sessionReclaim
                   }
-                , [ rotation ]
+                , []
                 )
 
 
-{-| Terminal `FAIL SESSION INVALID_TOKEN/NO_SESSION` answer to the
-`SESSION RESUME` this socket just sent: fail the banner closed, wipe
-the durable plus live bearers, and keep accepting freshly-queued
-tokens only for a proven account (a guest stays revoked). Mirrors the
-oracle's terminal-resume-failure arm.
+sessionRecoveryOwnsAutomaticResume : Model -> Bool
+sessionRecoveryOwnsAutomaticResume model =
+    case ( model.sessionRecoveryView, model.sessionRecoveryExpectedAccount, model.runtimeOwnerStamp ) of
+        ( Just view, Just intent, Just stamp ) ->
+            view.requestId == intent.requestId
+                && view.credentialRef == intent.credentialRef
+                && intent.networkId == stamp.networkId
+                && (stamp.accountId == Nothing || accountOwnerKey stamp.accountId == accountOwnerKey (Just intent.accountId))
+                && List.member view.status [ "pending", "transport-admitted", "redirecting", "awaiting-authentication", "blocked", "rejected", "unknown" ]
+
+        _ ->
+            False
+
+
+startSessionRecovery : Model -> String -> RuntimeDomain.Action -> ( Model, List Outbound )
+startSessionRecovery model credentialRef action =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            ( { model | composerError = Just "Session recovery is unavailable until private custody is ready." }, [] )
+
+        Just stamp ->
+            case
+                ( ( Ids.requestIdFromRuntime ("recoveryRequest" ++ String.padLeft 12 '0' (String.fromInt (model.eventClock + 1)))
+                  , Ids.ownerRefFromRuntime stamp.ownerRef
+                  )
+                , ( Ids.accountGenerationFromInt stamp.accountGeneration
+                  , Ids.connectionGenerationFromInt stamp.connectionGeneration
+                  )
+                )
+            of
+                ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                    let
+                        command = { requestId = requestId, ownerRef = ownerRef, accountGeneration = accountGeneration, connectionGeneration = connectionGeneration, action = action }
+                    in
+                    ( { model
+                        | eventClock = model.eventClock + 1
+                        , runtimeDomainPending = Just requestId
+                        , runtimeDomainPendingAction = Just action
+                        , runtimeDomainResult = Nothing
+                        , sessionRecoveryView = Just { requestId = Ids.requestIdToRuntime requestId, credentialRef = credentialRef, status = "pending", outcome = Nothing, reason = Nothing, redirectNode = Nothing, hopCount = 0, transferFrom = Nothing }
+                        , sessionRecoveryViewOwner = Just stamp
+                        , sessionRecoveryExpectedAccount = sessionRecoveryIntentFor stamp (Ids.requestIdToRuntime requestId) credentialRef
+                      }
+                    , [ RuntimeDomainCommand command ]
+                    )
+
+                _ ->
+                    ( { model | composerError = Just "Session recovery is unavailable until private custody is ready." }, [] )
+
+
+sessionRecoveryIntentFor : RuntimeOwnerStamp -> String -> String -> Maybe SessionRecoveryIntent
+sessionRecoveryIntentFor stamp requestId credentialRef =
+    case stamp.accountId of
+        Just accountId ->
+            Just
+                { networkId = stamp.networkId
+                , accountId = accountId
+                , requestId = requestId
+                , credentialRef = credentialRef
+                }
+
+        Nothing ->
+            Nothing
+
+
+{-| Terminal rejection of the in-flight `SESSION RESUME`: retire only the
+opaque credential selected by this attempt. Sibling credentials are separate
+authority and remain available.
 -}
 revokeSessionTokens : Model -> ( Model, List Outbound )
 revokeSessionTokens model =
-    ( { model
-        | sessionTokens = { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing }
-        , sessionReclaim = Just { phase = ReclaimFailed, kind = Nothing }
-        , sessionTokenWritesAllowed = model.accountName /= Nothing
-        , credentialCanonicalOnly = True
-      }
-    , [ SessionTokensCleared { server = Maybe.withDefault "" model.endpoint, nick = String.toLower model.ourNick }
-      , ReclaimTimersCleared
-      ]
-    )
+    case model.sessionReclaim of
+        Just attempt ->
+            let
+                commands =
+                    attempt.credentialRef
+                        |> Maybe.map (\credentialRef -> CredentialForgetRequested { credentialRef = credentialRef })
+                        |> Maybe.map List.singleton
+                        |> Maybe.withDefault []
+            in
+            ( { model | sessionReclaim = Just { phase = ReclaimFailed, kind = attempt.kind, credentialKind = attempt.credentialKind, credentialRef = Nothing, outcome = Session.ResumeInvalid } }
+            , ReclaimTimersCleared :: commands
+            )
+
+        Nothing ->
+            ( model, [] )
 
 
-{-| `FAIL SESSION …` folds. Only `INVALID_TOKEN` / `NO_SESSION` are
-terminal RESUME rejections (LIST/DROP failures must never erase the
-bearer); every FAIL SESSION still surfaces its error, mirroring the
-oracle. NOTE capture runs ahead of `foldStandardReply`, and WARN
-conditions are retryable, so neither needs a fold here.
+{-| Session failures are applied to an in-flight RESUME only. Other session
+commands are held while that attempt is pending because these replies do not
+carry a request label. Retryable outcomes preserve the selected credential.
 -}
 foldSessionReply : Model -> Wire.IrcMessage -> Wire.StandardReply -> ( Model, List Outbound )
 foldSessionReply model message reply =
@@ -16712,19 +18679,11 @@ foldSessionReply model message reply =
 
                 else
                     reply.description
-
-            logged =
-                logService model (boundSystemEventText errText)
         in
-        if reply.code == "INVALID_TOKEN" || reply.code == "NO_SESSION" then
-            let
-                ( revoked, outbound ) =
-                    revokeSessionTokens logged
-            in
-            ( revoked, outbound )
-
-        else
-            ( logged, [] )
+        -- Recovery outcomes are consumed by the private runtime and arrive as
+        -- owner-stamped typed domain events. A raw NOTICE/FAIL without that
+        -- request correlation cannot revoke a credential or report success.
+        ( logService model (boundSystemEventText errText), [] )
 
 
 {-| Current-server NOTICE credential envelopes
@@ -16737,19 +18696,19 @@ foldSessionTokenNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outboun
 foldSessionTokenNotice model message =
     case message.params of
         target :: _ ->
-            if message.nick /= Nothing || isChannelName model target then
+            if not (isTrustedPrivateServerNotice model message) || isChannelName model target then
                 Nothing
 
             else if String.startsWith "\u{0001}" (trailingParam message.params) then
                 Nothing
 
             else
-                case Wire.parseSessionTokenNote message of
+                case Wire.parseSessionTokenNotice message of
                     Just cred ->
                         Just (storeSessionCredential model "token" cred)
 
                     Nothing ->
-                        case Wire.parseSessionMeshTokenNote message of
+                        case Wire.parseSessionMeshTokenNotice message of
                             Just cred ->
                                 Just (storeSessionCredential model "mtoken" cred)
 
@@ -16760,21 +18719,156 @@ foldSessionTokenNotice model message =
             Nothing
 
 
-{-| Legacy NOTE credential envelopes (`NOTE SESSION TOKEN/MTOKEN`),
-same capture rules as the NOTICE path. -}
-foldSessionTokenNote : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
-foldSessionTokenNote model message =
-    case Wire.parseSessionTokenNote message of
-        Just cred ->
-            Just (storeSessionCredential model "token" cred)
+{-| Resume notices are consumed by the private runtime and cannot settle
+Elm's request without the correlated owner-stamped recovery projection.
+-}
+foldSessionResumeNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldSessionResumeNotice _ _ =
+    -- Resume confirmation is delivered only through the private runtime's
+    -- request- and owner-stamped session-recovery projection.
+    Nothing
+
+
+recoveryOutcome : Model -> RuntimeDomain.SessionRecoveryView -> Session.ResumeOutcome
+recoveryOutcome model view =
+    case view.outcome of
+        Just "exact-restored" ->
+            Session.ExactRestored
+
+        Just "logical-attached" ->
+            Session.LogicalRestored
+
+        Just "legacy-new-attachment" ->
+            let
+                explicitlyAccepted =
+                    case model.runtimeDomainPendingAction of
+                        Just (RuntimeDomain.ResumeSession _ True) ->
+                            True
+
+                        Just (RuntimeDomain.RetrySession _ True) ->
+                            True
+
+                        _ ->
+                            False
+            in
+            if explicitlyAccepted then
+                Session.NewLegacyAttachment
+
+            else
+                Session.ResumeUnknown
+
+        Just "attachment-in-use" ->
+            Session.AttachmentBusy
+
+        Just "missing" ->
+            Session.MissingAttachment
+
+        Just "revoked" ->
+            Session.ResumeRevoked
+
+        Just "invalid" ->
+            Session.ResumeInvalid
+
+        Just "retryable" ->
+            Session.ResumeRetryable
+
+        _ ->
+            case view.reason of
+                Just "busy" ->
+                    Session.AttachmentBusy
+
+                Just "credential-unavailable" ->
+                    Session.MissingAttachment
+
+                Just "credential-expired" ->
+                    Session.MissingAttachment
+
+                Just "backpressure" ->
+                    Session.ResumeRetryable
+
+                Just "offline" ->
+                    Session.ResumeRetryable
+
+                Just "transport-error" ->
+                    Session.ResumeRetryable
+
+                Just "response-timeout" ->
+                    Session.ResumeUnknown
+
+                _ ->
+                    Session.ResumeUnknown
+
+
+sessionReclaimAfterRecoveryView : Model -> RuntimeDomain.SessionRecoveryView -> Maybe SessionReclaimNotice
+sessionReclaimAfterRecoveryView model view =
+    case model.sessionReclaim of
+        Just notice ->
+            if notice.phase /= Restoring || (Maybe.map Ids.credentialRefToRuntime notice.credentialRef) /= Just view.credentialRef then
+                model.sessionReclaim
+
+            else
+                let
+                    outcome =
+                        recoveryOutcome model view
+                in
+                case view.status of
+                    "pending" ->
+                        Just { notice | outcome = Session.ResumePending }
+
+                    "transport-admitted" ->
+                        Just { notice | outcome = Session.ResumePending }
+
+                    "redirecting" ->
+                        Just { notice | outcome = Session.ResumePending }
+
+                    "awaiting-authentication" ->
+                        Just { notice | outcome = Session.ResumePending }
+
+                    "accepted" ->
+                        if List.member outcome [ Session.ExactRestored, Session.LogicalRestored, Session.NewLegacyAttachment ] then
+                            Just { notice | phase = Reclaimed, outcome = outcome }
+
+                        else
+                            Just { notice | phase = ReclaimFailed, outcome = Session.ResumeUnknown }
+
+                    "blocked" ->
+                        Just { notice | phase = ReclaimFailed, outcome = outcome }
+
+                    "rejected" ->
+                        Just { notice | phase = ReclaimFailed, outcome = outcome }
+
+                    "unknown" ->
+                        Just { notice | phase = ReclaimFailed, outcome = Session.ResumeUnknown }
+
+                    _ ->
+                        model.sessionReclaim
 
         Nothing ->
-            case Wire.parseSessionMeshTokenNote message of
-                Just cred ->
-                    Just (storeSessionCredential model "mtoken" cred)
+            Nothing
 
-                Nothing ->
-                    Nothing
+
+recoveryViewSettlesRequest : RuntimeDomain.SessionRecoveryView -> Bool
+recoveryViewSettlesRequest view =
+    not (List.member view.status [ "pending", "transport-admitted" ])
+
+
+recoveryViewClearsTimer : RuntimeDomain.SessionRecoveryView -> Bool
+recoveryViewClearsTimer view =
+    recoveryViewSettlesRequest view
+
+
+updateResumeFailure : Model -> Session.ResumeOutcome -> ( Model, List Outbound )
+updateResumeFailure model outcome =
+    case model.sessionReclaim of
+        Just notice ->
+            if notice.phase == Restoring then
+                ( { model | sessionReclaim = Just { notice | phase = ReclaimFailed, outcome = outcome } }, [] )
+
+            else
+                ( model, [] )
+
+        Nothing ->
+            ( model, [] )
 
 
 {-| `SESSION LIST` / `DROP` account-roster replies live in the same
@@ -16829,7 +18923,7 @@ foldAccountSessionBody model body =
                                 , accountSessionsPending = False
                                 , accountSessionsError = Nothing
                               }
-                            , [ SendLine (Wire.formatIrcLine "SESSION" [ "LIST" ]) ]
+                            , []
                             )
 
                     Nothing ->
@@ -16839,7 +18933,7 @@ foldAccountSessionBody model body =
                                     | accountSessionsPending = False
                                     , accountSessionsError = Nothing
                                   }
-                                , [ SendLine (Wire.formatIrcLine "SESSION" [ "LIST" ]) ]
+                                , []
                                 )
 
                         else if isFailSessionText body || isSessionColonText body then
@@ -17051,10 +19145,10 @@ foldWhoReply model message =
         _ :: chan :: _ :: _ :: _ :: nick :: flags :: _ ->
             let
                 chanKey =
-                    String.toLower chan
+                    ircCaseKey model chan
 
                 nickKey =
-                    String.toLower nick
+                    ircCaseKey model nick
 
                 isAway =
                     String.startsWith "G" flags
@@ -17169,7 +19263,7 @@ boundInboundMessageText value =
         sliced
 
 
-{-| Split a `NOTE MEMO` trailing body (`from <nick> :<text>`) into
+{-| Split a NOTICE MEMO body (`from <nick> :<text>`) into
 sender and text — mirroring the oracle's two regex alternatives
 (colon form first, bare form second; either may carry empty text,
 but the nick must be non-empty). -}
@@ -17728,8 +19822,8 @@ markAllNotificationsRead model =
 only from the current record — a queued click on a removed row drops;
 the row marks read and the inbox closes; a mention/follow target opens
 its room, a DM target opens the peer conversation, anything else just
-closes. Follow-topic jumps stay ahead: the room opens without the
-topic pin). -}
+closes. A follow row opens the room and then applies its topic
+(`openChannelConversation`); a stale topic falls back to the whole room. -}
 activateNotification : Model -> String -> ( Model, List Outbound )
 activateNotification model id =
     case List.filter (\note -> note.id == id) model.notifications of
@@ -17759,7 +19853,18 @@ activateNotification model id =
                     ( marked, [] )
 
                 Just name ->
-                    update (ChannelSelect name) marked
+                    let
+                        ( opened, openOuts ) =
+                            update (ChannelSelect name) marked
+
+                        ( settled, topicOuts ) =
+                            if note.kind == NotifFollow && note.channel /= Nothing then
+                                update (ChannelTopicSelect { channel = name, topic = note.topic }) opened
+
+                            else
+                                ( opened, [] )
+                    in
+                    ( settled, openOuts ++ topicOuts )
 
 
 {-| Attention unread count for the bell badge (mirroring the oracle
@@ -17809,21 +19914,46 @@ network operators always; otherwise our own status modes must rank at
 `o` or above on the shared `statusRank` scale). -}
 isChannelOp : Model -> String -> Bool
 isChannelOp model channel =
-    if model.isOper then
-        True
+    -- Ranks come from the learned 005 PREFIX order (highest first):
+    -- a mode the server never advertised ranks nothing, and a network
+    -- without `o` grants no moderator rank. Operator status still
+    -- needs the room: an oper outside a joined room gets no desk.
+    case Dict.get (String.toLower channel) model.channels of
+        Nothing ->
+            False
 
-    else
-        case Dict.get (String.toLower channel) model.channels of
-            Nothing ->
-                False
+        Just ch ->
+            case Dict.get (String.toLower model.ourNick) ch.members of
+                Nothing ->
+                    False
 
-            Just ch ->
-                case Dict.get (String.toLower model.ourNick) ch.members of
-                    Nothing ->
-                        False
+                Just me ->
+                    model.isOper
+                        || (case learnedRankIndex model 'o' of
+                                Just opIndex ->
+                                    List.any
+                                        (\mode ->
+                                            case learnedRankIndex model mode of
+                                                Just index ->
+                                                    index <= opIndex
 
-                    Just me ->
-                        List.any (\mode -> Modes.statusRank mode >= Modes.statusRank 'o') (Set.toList me.modes)
+                                                Nothing ->
+                                                    False
+                                        )
+                                        (Set.toList me.modes)
+
+                                Nothing ->
+                                    False
+                           )
+
+
+{-| Position of a status mode in the learned PREFIX order (0 = highest). -}
+learnedRankIndex : Model -> Char -> Maybe Int
+learnedRankIndex model mode =
+    List.indexedMap Tuple.pair model.isupport.prefixOrder
+        |> List.filter (\( _, candidate ) -> candidate == mode)
+        |> List.head
+        |> Maybe.map Tuple.first
 
 
 {-| A pending review-first unban, with the authority it was captured
@@ -19013,8 +21143,28 @@ deviceMemoryOwner model =
         serverUrl =
             String.trim (Maybe.withDefault "" model.endpoint)
 
+        -- An account owns its memory by name. A guest nick proves
+        -- nothing (anyone can take a released guest nick), so guest
+        -- memory is keyed by the physical runtime owner plus the nick:
+        -- a reused nick on another owner never inherits topic-read,
+        -- aliases, or contacts, and no owner stamp means no guest
+        -- memory at all (fail closed).
         identity =
-            String.toLower (String.trim (Maybe.withDefault model.ourNick model.accountName))
+            case model.accountName of
+                Just account ->
+                    String.toLower (String.trim account)
+
+                Nothing ->
+                    case model.runtimeOwnerStamp of
+                        Just stamp ->
+                            if String.isEmpty (String.trim model.ourNick) || String.isEmpty (String.trim stamp.ownerRef) then
+                                ""
+
+                            else
+                                "guest:" ++ String.trim stamp.ownerRef ++ ":" ++ String.toLower (String.trim model.ourNick)
+
+                        Nothing ->
+                            ""
     in
     if String.isEmpty serverUrl || String.isEmpty identity then
         Nothing
@@ -19389,6 +21539,26 @@ propActivity name target value =
         Just ( String.toLower target, parseActivity value )
 
 
+{-| The server echo of a PROP write (live `PROP` or 818) settles the
+matching pending write; the fold above already stored the value. -}
+settleEchoedPropWrite : Model -> Wire.IrcMessage -> Model
+settleEchoedPropWrite model message =
+    let
+        offset =
+            if message.command == "818" then
+                1
+
+            else
+                0
+    in
+    case ( Ircx.paramAt offset message.params, Ircx.paramAt (offset + 1) message.params ) of
+        ( Just channel, Just name ) ->
+            settlePropWrite model channel (Just name)
+
+        _ ->
+            model
+
+
 {-| Fold one property row — the 818 registry shape (`:server 818 me
 target name :value`, value at index 3) and the live PROP shape
 (`target name :value`, value at index 2); the trailing colon param
@@ -19720,29 +21890,71 @@ clearBanTransport model =
     { model | banBuffer = Dict.empty, banListMeta = settled, banEpoch = model.banEpoch + 1 }
 
 
-{-| Fold one `NOTE MEMO` delivery (mirroring the oracle MEMO arm:
+{-| Fold one server NOTICE MEMO delivery (mirroring the oracle MEMO arm:
 sender validated fail-closed, text bounded, DM row with the highlight
 flag, unread/highlights counted unless the DM is open, muted, or the
 sender ignored, then the aggregate folds with LRU refresh — and the
 aggregate stays aligned with what the user can open, so a saturated
 working set that refuses the shell records nothing). -}
-foldOfflineMemo : Model -> Wire.IrcMessage -> ( Model, List Outbound )
-foldOfflineMemo model message =
+foldMemoNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldMemoNotice model message =
     case List.head (List.drop 1 message.params) of
         Nothing ->
-            ( model, [] )
+            Nothing
 
-        Just body ->
-            case parseMemoBody body of
-                Nothing ->
-                    ( model, [] )
-
-                Just ( memoFrom, memoText ) ->
-                    if not (validWireToken memoFrom 256) then
-                        ( model, [] )
+        Just rawBody ->
+            let
+                body =
+                    if String.startsWith "MEMO " rawBody then
+                        String.dropLeft 5 rawBody
 
                     else
-                        deliverOfflineMemo model message memoFrom (boundInboundMessageText memoText)
+                        ""
+
+                target =
+                    List.head message.params |> Maybe.withDefault ""
+            in
+            case parseMemoBody body of
+                Nothing ->
+                    Nothing
+
+                Just ( memoFrom, memoText ) ->
+                    if message.command /= "NOTICE" || not (isTrustedPrivateServerNotice model message) || String.toLower target /= String.toLower model.ourNick || not (validWireToken memoFrom 256) then
+                        Nothing
+
+                    else
+                        Just (deliverOfflineMemo model message memoFrom (boundInboundMessageText memoText))
+
+
+{-| Private server notices that belong to typed runtime control or MEMO
+delivery are consumed at the boundary. Only the first-wins 001 server
+prefix and an exact self target qualify; peer NOTICE remains ordinary chat.
+The Elm fold never treats these records as authority. -}
+isPrivateServerControlNotice : Model -> Wire.IrcMessage -> Bool
+isPrivateServerControlNotice model message =
+    let
+        body =
+            trailingParam message.params
+    in
+    isTrustedPrivateServerNotice model message
+        && (String.startsWith "SESSION " body
+                || String.startsWith "SESSION:" body
+                || String.startsWith "MEMO " body
+                || String.startsWith "MEMO:" body
+           )
+
+
+isTrustedPrivateServerNotice : Model -> Wire.IrcMessage -> Bool
+isTrustedPrivateServerNotice model message =
+    case ( model.serverPrefix, message.prefix, message.params ) of
+        ( Just trusted, Just source, target :: _ ) ->
+            message.command == "NOTICE"
+                && message.nick == Nothing
+                && source == trusted
+                && String.toLower target == String.toLower model.ourNick
+
+        _ ->
+            False
 
 
 deliverOfflineMemo : Model -> Wire.IrcMessage -> String -> String -> ( Model, List Outbound )
@@ -19801,7 +22013,7 @@ deliverOfflineMemo model message memoFrom memoText =
 
             stored =
                 updateChannel { room | messageSeq = rowId + 1 } memoFrom
-                    (\c -> { c | messages = List.take keepMessages (row :: c.messages) })
+                    (\c -> { c | messages = List.take (messageRetentionFor room memoFrom) (row :: c.messages) })
 
             counted =
                 case stored.activeChannel of
@@ -19955,16 +22167,15 @@ foldStandardReply model message =
                         foldSessionReply model message reply
 
                     else if reply.command == "MEDIA" then
-                        -- The oracle folds MEDIA on every standard-reply kind
-                        -- (NOTE/FAIL/WARN share the branch) and marks the plane
-                        -- available even for lines that validate nothing.
+                        -- Preserve source-supported FAIL/WARN MEDIA handling;
+                        -- successful presence arrives through the typed EVENT fold.
                         ( { model
                             | media =
                                 Media.foldMediaLine model.media
                                     (Set.fromList (Dict.keys model.channels))
                                     model.isupport.chantypes
                                     message
-                            , mediaAvailable = True
+                            , mediaAvailable = runtimeFeatureReady model "onyx/media"
                           }
                         , []
                         )
@@ -19981,9 +22192,6 @@ foldStandardReply model message =
                     else if reply.command == "CHATHISTORY" && reply.kind == Wire.Fail then
                         foldChathistoryFail model reply
 
-                    else if reply.command == "MEMO" && reply.kind == Wire.Note then
-                        foldOfflineMemo model message
-
                     else if reply.command == "IDENTIFY" && (reply.kind == Wire.Fail || reply.kind == Wire.Warn) then
                         foldIdentifyReply model reply
 
@@ -19995,12 +22203,6 @@ foldStandardReply model message =
 
                     else if reply.command == "RECOVERYCODES" && reply.kind == Wire.Fail then
                         foldRecoveryCodesFail model reply
-
-                    else if reply.command == "ACCOUNTINFO" && reply.kind == Wire.Note then
-                        foldAccountInfoNote model (String.join " " (List.drop 1 message.params))
-
-                    else if reply.command == "ACCOUNTSET" && reply.kind == Wire.Note then
-                        foldAccountSetNote model (String.join " " (List.drop 1 message.params))
 
                     else if reply.command == "ACCOUNTINFO" && reply.kind == Wire.Fail then
                         -- Terminal `FAIL ACCOUNTINFO`: the context dies
@@ -20019,6 +22221,16 @@ foldStandardReply model message =
                                   }
                                 , []
                                 )
+
+                    else if reply.command == "PROP" && reply.kind == Wire.Fail then
+                        -- A refused PROP write drops its pending desired value;
+                        -- the committed props stay as the server last said.
+                        case reply.context of
+                            channel :: rest ->
+                                ( settlePropWrite model channel (List.head rest), [] )
+
+                            [] ->
+                                ( { model | pendingPropWrites = Dict.empty }, [] )
 
                     else if reply.command == "RENAME" && reply.kind == Wire.Fail then
                         -- A failed channel rename surfaces in the inbox
@@ -20213,6 +22425,12 @@ clearUnclaimedStale model =
                 (\_ collector keys ->
                     case collector.kind of
                         PlainHistory ->
+                            keys
+
+                        GenericBatch ->
+                            keys
+
+                        LabeledResponse ->
                             keys
 
                         _ ->
@@ -20588,6 +22806,7 @@ requestStewardDeclineTransfer model channel =
                 channel
                 model.roomTransfers
         , stewardStatus = ""
+        , stewardTransferAttempts = Dict.remove (Stewardship.channelKey channel) model.stewardTransferAttempts
       }
     , []
     )
@@ -20598,26 +22817,330 @@ requestStewardDeclineTransfer model channel =
 `grantRoomOwnership` over `transferModeCommands`). -}
 requestStewardGrantTransfer : Model -> String -> ( Model, List Outbound )
 requestStewardGrantTransfer model channel =
-    case stewardOwnerMembers model channel of
-        Err reason ->
+    case ( ( stewardOwnerMembers model channel, stewardOfferFor model channel ), ( model.runtimeOwnerStamp, Dict.get (Stewardship.channelKey channel) model.stewardTransferAttempts ) ) of
+        ( ( Err reason, _ ), _ ) ->
             stewardRefused model reason
 
-        Ok members ->
-            case Stewardship.transferModeCommands (stewardOfferFor model channel) members of
-                Nothing ->
-                    stewardRefused model Stewardship.stewardshipCopy.transferWait
+        ( ( _, Nothing ), _ ) ->
+            stewardRefused model Stewardship.stewardshipCopy.transferWait
 
-                Just plan ->
-                    ( { model
-                        | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
-                        , stewardStatus = ""
-                      }
-                    , List.map
-                        (\command ->
-                            SendLine (Wire.formatIrcLine "MODE" [ stewardRoomName model channel, command.modes, command.nick ])
+        ( ( _, Just _ ), ( Nothing, _ ) ) ->
+            stewardRefused model "Reconnect before completing this ownership transfer."
+
+        ( ( Ok members, Just offer ), ( Just owner, previous ) ) ->
+            let
+                retryAllowed =
+                    case previous of
+                        Just attempt ->
+                            attempt.owner == owner
+                                && List.member attempt.status [ "reconciled", "observed" ]
+                                && Stewardship.channelKey attempt.channel == Stewardship.channelKey channel
+                                && Stewardship.nickKey attempt.from == Stewardship.nickKey offer.from
+                                && Stewardship.nickKey attempt.to == Stewardship.nickKey offer.to
+
+                        Nothing ->
+                            True
+
+                stillNeeded command =
+                    case Stewardship.findMember members command.nick of
+                        Nothing ->
+                            command.modes == "+q"
+
+                        Just member ->
+                            if command.modes == "+q" then
+                                not (List.member "q" member.modes)
+
+                            else if command.modes == "-q" then
+                                List.member "q" member.modes
+
+                            else
+                                False
+            in
+            if Stewardship.nickKey offer.from /= Stewardship.nickKey model.ourNick then
+                stewardRefused model "Reconnect as the original transfer owner before completing this handover."
+
+            else if not offer.accepted then
+                stewardRefused model Stewardship.stewardshipCopy.transferWait
+
+            else if not retryAllowed then
+                stewardRefused model "Refresh the room roster before retrying an incomplete handover."
+
+            else
+                case Stewardship.transferModeCommands (Just offer) members of
+                    Nothing ->
+                        stewardRefused model Stewardship.stewardshipCopy.transferWait
+
+                    Just plan ->
+                        let
+                            needed =
+                                List.filter stillNeeded plan.commands
+
+                            newlyExpected =
+                                List.map (\command -> { adding = command.modes == "+q", nick = command.nick }) needed
+
+                            expected =
+                                case previous of
+                                    Just oldAttempt ->
+                                        List.foldl
+                                            (\delta acc ->
+                                                if List.any (\present -> present.adding == delta.adding && Stewardship.nickKey present.nick == Stewardship.nickKey delta.nick) acc then
+                                                    acc
+
+                                                else
+                                                    acc ++ [ delta ]
+                                            )
+                                            oldAttempt.expected
+                                            newlyExpected
+
+                                    Nothing ->
+                                        newlyExpected
+
+                            previouslyAccepted =
+                                previous |> Maybe.map .accepted |> Maybe.withDefault []
+
+                            attempt =
+                                { owner = owner
+                                , channel = stewardRoomName model channel
+                                , from = offer.from
+                                , to = offer.to
+                                , expected = expected
+                                , accepted = previouslyAccepted
+                                , status = if List.isEmpty needed then "observed" else "pending"
+                                , deadline = model.nowMs + 30000
+                                , reconcileAt = Nothing
+                                , reconcileSawNames = False
+                                }
+
+                            next =
+                                { model
+                                    | stewardTransferAttempts = Dict.insert (Stewardship.channelKey channel) attempt model.stewardTransferAttempts
+                                    , stewardStatus =
+                                        if List.isEmpty needed then
+                                            "The requested ranks are visible in the current roster. The earlier command outcome is not confirmed."
+
+                                        else
+                                            "Waiting for the server to confirm the owner rank changes."
+                                }
+                        in
+                        ( next
+                        , List.map
+                            (\command ->
+                                SendLine (Wire.formatIrcLine "MODE" [ stewardRoomName model channel, command.modes, command.nick ])
+                            )
+                            needed
                         )
-                        plan.commands
-                    )
+
+
+requestStewardReconcileTransfer : Model -> String -> ( Model, List Outbound )
+requestStewardReconcileTransfer model channel =
+    case ( model.runtimeOwnerStamp, Dict.get (Stewardship.channelKey channel) model.stewardTransferAttempts, Dict.get (String.toLower channel) model.channels ) of
+        ( Just owner, Just attempt, Just room ) ->
+            if attempt.owner /= owner
+                || Stewardship.channelKey attempt.channel /= Stewardship.channelKey channel
+                || Stewardship.nickKey attempt.from /= Stewardship.nickKey model.ourNick
+                || model.connection /= Live
+                || not (List.member attempt.status [ "unknown", "partial", "reconciling", "observed" ]) then
+                stewardRefused model "This handover cannot be refreshed under the current owner."
+
+            else
+                let
+                    refreshed =
+                        beginNamesBurst model room.name
+
+                    nextAttempt =
+                        { attempt
+                            | status = "reconciling"
+                            , reconcileAt = Just model.nowMs
+                            , reconcileSawNames = False
+                            , deadline = model.nowMs + 30000
+                        }
+                in
+                ( { refreshed
+                    | stewardTransferAttempts = Dict.insert (Stewardship.channelKey channel) nextAttempt refreshed.stewardTransferAttempts
+                    , stewardStatus = "Requesting a roster refresh. No ownership command has been resent."
+                  }
+                , [ SendLine (Wire.formatIrcLine "NAMES" [ room.name ]) ]
+                )
+
+        _ ->
+            stewardRefused model "There is no incomplete handover to refresh."
+
+
+stewardTransferDeltaKey : Bool -> String -> String
+stewardTransferDeltaKey adding nick =
+    (if adding then
+        "+q:"
+
+     else
+        "-q:"
+    )
+        ++ Stewardship.nickKey nick
+
+
+settleStewardTransferRoster : Model -> Wire.IrcMessage -> Model
+settleStewardTransferRoster model message =
+    case message.params of
+        _ :: channel :: _ ->
+            let
+                key =
+                    Stewardship.channelKey channel
+            in
+            case ( Dict.get key model.stewardTransferAttempts, model.runtimeOwnerStamp, Dict.get (String.toLower channel) model.channels ) of
+                ( Just attempt, Just owner, Just _ ) ->
+                    case attempt.status of
+                        "reconciling" ->
+                            if attempt.owner == owner && Stewardship.channelKey attempt.channel == key && attempt.reconcileSawNames then
+                                let
+                                    ranksObserved =
+                                        stewardTransferDesiredStateObserved model attempt
+
+                                in
+                                { model
+                                    | stewardTransferAttempts = Dict.insert key { attempt | status = "observed", reconcileAt = Nothing, reconcileSawNames = False } model.stewardTransferAttempts
+                                    , stewardStatus =
+                                        if ranksObserved then
+                                            "The requested ranks are visible in the current roster. The earlier command outcome remains unknown; review and explicitly confirm any remaining change."
+
+                                        else
+                                            "A roster reply was received, but this protocol does not correlate it to the refresh request. Review the visible ranks; any remaining change needs your explicit confirmation. Nothing was resent."
+                                }
+
+                            else
+                                model
+
+                        _ ->
+                            model
+
+                _ ->
+                    model
+
+        _ ->
+            model
+
+
+stewardTransferDesiredStateObserved : Model -> StewardTransferAttempt -> Bool
+stewardTransferDesiredStateObserved model attempt =
+    let
+        hasOwnerRank nick =
+            Stewardship.findMember (stewardMembersOf model attempt.channel) nick
+                |> Maybe.map (\member -> List.member "q" member.modes)
+                |> Maybe.withDefault False
+
+        priorReleased =
+            if List.any (\delta -> not delta.adding && Stewardship.nickKey delta.nick == Stewardship.nickKey attempt.from) attempt.expected then
+                not (hasOwnerRank attempt.from)
+
+            else
+                True
+    in
+    hasOwnerRank attempt.to && priorReleased
+
+
+markStewardReconcileNamesSeen : Model -> Wire.IrcMessage -> Model
+markStewardReconcileNamesSeen model message =
+    case namesTarget message.params of
+        Just ( channel, _ ) ->
+            let
+                key =
+                    Stewardship.channelKey channel
+            in
+            case ( Dict.get key model.stewardTransferAttempts, model.runtimeOwnerStamp ) of
+                ( Just attempt, Just owner ) ->
+                    if attempt.owner == owner && attempt.status == "reconciling" && Stewardship.channelKey attempt.channel == key then
+                        { model | stewardTransferAttempts = Dict.insert key { attempt | reconcileSawNames = True } model.stewardTransferAttempts }
+
+                    else
+                        model
+
+                _ ->
+                    model
+
+        Nothing ->
+            model
+
+
+settleStewardTransferModeEcho : Model -> Wire.IrcMessage -> String -> String -> List String -> Model
+settleStewardTransferModeEcho model message channel modeStr modeArgs =
+    let
+        key =
+            Stewardship.channelKey channel
+
+        expectedDelta =
+            case ( modeStr, List.head modeArgs ) of
+                ( "+q", Just nick ) ->
+                    Just ( True, nick )
+
+                ( "-q", Just nick ) ->
+                    Just ( False, nick )
+
+                _ ->
+                    Nothing
+
+        selfAuthored =
+            Maybe.withDefault False (Maybe.map (\nick -> Stewardship.nickKey nick == Stewardship.nickKey model.ourNick) message.nick)
+    in
+    case ( Dict.get key model.stewardTransferAttempts, model.runtimeOwnerStamp, expectedDelta ) of
+        ( Just attempt, Just owner, Just ( adding, nick ) ) ->
+            let
+                deltaKey =
+                    stewardTransferDeltaKey adding nick
+
+                isExpected =
+                    List.any
+                        (\delta -> delta.adding == adding && Stewardship.nickKey delta.nick == Stewardship.nickKey nick)
+                        attempt.expected
+
+                rankObserved =
+                    Stewardship.findMember (stewardMembersOf model channel) nick
+                        |> Maybe.map (\member -> List.member "q" member.modes == adding)
+                        |> Maybe.withDefault False
+
+                channelMatches =
+                    Stewardship.channelKey attempt.channel == Stewardship.channelKey channel
+
+                authorized =
+                    attempt.owner == owner
+                        && channelMatches
+                        && Stewardship.nickKey attempt.from == Stewardship.nickKey model.ourNick
+                        && selfAuthored
+                        && isExpected
+                        && rankObserved
+                        && List.member attempt.status [ "pending", "partial", "unknown", "reconciled", "observed" ]
+            in
+            if not authorized then
+                model
+
+            else
+                let
+                    accepted =
+                        if List.member deltaKey attempt.accepted then
+                            attempt.accepted
+
+                        else
+                            deltaKey :: attempt.accepted
+
+                    allAccepted =
+                        not (List.isEmpty attempt.expected)
+                            && List.all (\delta -> List.member (stewardTransferDeltaKey delta.adding delta.nick) accepted) attempt.expected
+
+                    updatedAttempt =
+                        { attempt | accepted = accepted, status = if allAccepted then "complete" else "partial", reconcileAt = Nothing }
+
+                    withAttempt =
+                        { model | stewardTransferAttempts = Dict.insert key updatedAttempt model.stewardTransferAttempts }
+                in
+                if allAccepted then
+                    { withAttempt
+                        | stewardTransferAttempts = Dict.remove key withAttempt.stewardTransferAttempts
+                        , roomTransfers = Stewardship.writeTransfer Nothing channel withAttempt.roomTransfers
+                        , stewardStatus = "The server confirmed both ownership rank changes."
+                    }
+
+                else
+                    { withAttempt | stewardStatus = "The server confirmed part of the handover. Review the roster before continuing." }
+
+        _ ->
+            model
 
 
 {-| Owner locks the room: the existing secret + invite-only flags
@@ -20780,7 +23303,15 @@ requestWebPushCheck model =
         owner =
             webPushOwner model
     in
-    if String.isEmpty owner.account then
+    if model.runtimeOwnerStamp /= Nothing then
+        case makeRuntimeDomainOutbound model RuntimeDomain.PushReconcile of
+            ( updated, Just command ) ->
+                ( updated, [ command ] )
+
+            ( updated, Nothing ) ->
+                ( updated, [] )
+
+    else if String.isEmpty owner.account then
         ( { model | webPushOn = False }, [] )
 
     else if not model.webPushOn then
@@ -20797,6 +23328,38 @@ toggleWebPush : Model -> ( Model, List Outbound )
 toggleWebPush model =
     if model.webPushBusy then
         ( model, [] )
+
+    else if model.runtimeOwnerStamp /= Nothing then
+        if model.webPushOn then
+            case makeRuntimeDomainOutbound { model | webPushBusy = True, webPushError = Nothing } RuntimeDomain.PushDisable of
+                ( updated, Just command ) -> ( updated, [ command ] )
+                ( updated, Nothing ) -> ( { updated | webPushBusy = False, webPushError = Just "The current local owner is unavailable." }, [] )
+
+        else
+            let
+                consentRef =
+                    model.runtimeDomainResult
+                        |> Maybe.andThen
+                            (\result ->
+                                if result.domain == "platform" && result.action == "push-inspect" then
+                                    result.items |> List.filter (\item -> String.startsWith "push:" item.state && not (String.endsWith "registered" item.state)) |> List.head
+
+                                else
+                                    Nothing
+                            )
+                        |> Maybe.map .ref
+                        |> Maybe.andThen (\ref -> if String.isEmpty ref then Nothing else Just ref)
+            in
+            case consentRef of
+                Just ref ->
+                    case makeRuntimeDomainOutbound { model | webPushBusy = True, webPushError = Nothing } (RuntimeDomain.PushEnable ref) of
+                        ( updated, Just command ) -> ( updated, [ command ] )
+                        ( updated, Nothing ) -> ( { updated | webPushBusy = False, webPushError = Just "The current local owner is unavailable." }, [] )
+
+                Nothing ->
+                    case makeRuntimeDomainOutbound { model | webPushBusy = True, webPushError = Nothing } RuntimeDomain.InspectPush of
+                        ( updated, Just command ) -> ( updated, [ command ] )
+                        ( updated, Nothing ) -> ( { updated | webPushBusy = False, webPushError = Just "The current local owner is unavailable." }, [] )
 
     else if model.webPushOn then
         ( { model | webPushBusy = True, webPushError = Nothing }
@@ -21290,8 +23853,9 @@ requestGroupInstall model delivery =
 
 {-| Admit one signature-verified room against the marked directory. A
 by-signer admission advances it to `RoomControlApplied` and clears the
-pending intent; anything else leaves it parked. Pure: trust marking
-arrives from ports, first-use pinning is a later slice.
+pending intent; anything else leaves it parked. The port pins a
+first-use signer before it reports the trust verdict, so this fold
+only consumes `pinned` and `first-use`.
 -}
 tryAdmitPending : Model -> String -> ( Model, List Outbound )
 tryAdmitPending model room =
@@ -22033,7 +24597,7 @@ appendChat model target from body whisper countUnread msgType =
                                 (\c ->
                                     { c
                                         | messages =
-                                            List.take keepMessages
+                                            List.take (messageRetentionFor admitted target)
                                                 ({ id = model.messageSeq
                                                  , from = from
                                                  , body = effectiveBody
@@ -22176,7 +24740,7 @@ it anyway.
 -}
 namesAfterSelfJoin : Model -> String -> List Outbound
 namesAfterSelfJoin model channel =
-    if List.member "draft/no-implicit-names" model.caps || List.member "no-implicit-names" model.caps then
+    if Session.hasCapability model.caps "no-implicit-names" then
         [ SendLine (Wire.formatIrcLine "NAMES" [ channel ]) ]
 
     else
@@ -22254,7 +24818,7 @@ rejoinLiveChannels model =
 open or its 366 was lost past the TTL. -}
 recentNamesBurst : Model -> String -> Maybe NamesBurst
 recentNamesBurst model channel =
-    case Dict.get (String.toLower channel) model.namesBursts of
+    case Dict.get (ircCaseKey model channel) model.namesBursts of
         Just burst ->
             if model.nowMs - burst.at >= namesBurstTtlMs then
                 Nothing
@@ -22275,7 +24839,7 @@ beginNamesBurst : Model -> String -> Model
 beginNamesBurst model channel =
     let
         key =
-            String.toLower channel
+            ircCaseKey model channel
     in
     case recentNamesBurst model key of
         Just burst ->
@@ -22307,13 +24871,16 @@ excludeBurstNick model channel nick =
     else
         let
             key =
-                String.toLower channel
+                ircCaseKey model channel
+
+            nickKey =
+                ircCaseKey model nick
         in
         case recentNamesBurst model key of
             Just burst ->
                 { model
                     | namesBursts =
-                        Dict.insert key { burst | excluded = Set.insert (String.toLower nick) burst.excluded } model.namesBursts
+                        Dict.insert key { burst | excluded = Set.insert nickKey burst.excluded } model.namesBursts
                 }
 
             Nothing ->
@@ -22329,13 +24896,16 @@ includeBurstNick model channel nick =
     else
         let
             key =
-                String.toLower channel
+                ircCaseKey model channel
+
+            nickKey =
+                ircCaseKey model nick
         in
         case recentNamesBurst model key of
             Just burst ->
                 { model
                     | namesBursts =
-                        Dict.insert key { burst | excluded = Set.remove (String.toLower nick) burst.excluded } model.namesBursts
+                        Dict.insert key { burst | excluded = Set.remove nickKey burst.excluded } model.namesBursts
                 }
 
             Nothing ->
@@ -22436,6 +25006,15 @@ maxNamesTokenLength =
     512
 
 
+{-| Canonical keys for IRC nick and target identity follow the active
+server CASEMAPPING. This is deliberately separate from account IDs,
+display text, and arbitrary search strings.
+-}
+ircCaseKey : Model -> String -> String
+ircCaseKey model value =
+    Wire.normalizeCase value model.isupport.casemapping
+
+
 {-| Tokenize one 353 names trailing (mirroring
 `_boundedNamesTokens`: space-split — a tab stays inside its token
 for the per-nick gate to reject — overlong tokens drop, at most
@@ -22492,7 +25071,7 @@ foldNames model message =
             else
                 let
                     key =
-                        String.toLower chan
+                        ircCaseKey model chan
                 in
                 case Dict.get key model.channels of
                     Nothing ->
@@ -22534,7 +25113,7 @@ foldNames model message =
                                         Wire.parseNamesPrefix rawNick prefixMap
 
                                     memberKey =
-                                        String.toLower parsed.nick
+                                        ircCaseKey model parsed.nick
                                 in
                                 if not (validWireToken parsed.nick 256) || Set.member memberKey excluded then
                                     -- Hostile roster tokens (`:lead`,
@@ -22567,7 +25146,7 @@ appendLiveRow model channel body message =
         (\c ->
             { c
                 | messages =
-                    List.take keepMessages
+                    List.take (messageRetentionFor model channel)
                         ({ id = model.messageSeq
                          , from = ""
                          , body = body
@@ -22608,7 +25187,7 @@ foldJoin model message =
                 -- rooms.
                 model
 
-            else if String.toLower nick == String.toLower model.ourNick then
+            else if ircCaseKey model nick == ircCaseKey model model.ourNick then
                 -- Our own JOIN creates the room but writes no row and
                 -- logs no event (mirroring the oracle self branch) —
                 -- the buffer stays empty so join backfill still fires.
@@ -22619,15 +25198,15 @@ foldJoin model message =
                     joined =
                         updateChannel model chan
                             (\c ->
-                                if Dict.member (String.toLower nick) c.members then
+                                if Dict.member (ircCaseKey model nick) c.members then
                                     c
 
                                 else
-                                    { c | members = Dict.insert (String.toLower nick) { nick = nick, modes = Set.empty, away = False } c.members }
+                                    { c | members = Dict.insert (ircCaseKey model nick) { nick = nick, modes = Set.empty, away = False } c.members }
                             )
 
                     key =
-                        String.toLower chan
+                        ircCaseKey model chan
 
                     generation =
                         case recentNamesBurst joined key of
@@ -22644,22 +25223,22 @@ foldJoin model message =
                 beginNamesBurst generation chan
 
             else
-                case Dict.get (String.toLower chan) model.channels of
+                case Dict.get (ircCaseKey model chan) model.channels of
                     Nothing ->
                         -- A stranger's JOIN for a room outside the live
                         -- session seeds nothing.
                         model
 
                     Just channel ->
-                        if Dict.member (String.toLower nick) channel.members then
+                        if Dict.member (ircCaseKey model nick) channel.members then
                             includeBurstNick model chan nick
 
                         else
                             includeBurstNick
                                 (addChannelEvent
                                     (appendLiveRow
-                                        (updateChannel model chan
-                                            (\c -> { c | members = Dict.insert (String.toLower nick) { nick = nick, modes = Set.empty, away = False } c.members })
+                                            (updateChannel model chan
+                                            (\c -> { c | members = Dict.insert (ircCaseKey model nick) { nick = nick, modes = Set.empty, away = False } c.members })
                                         )
                                         chan
                                         (nick ++ " joined")
@@ -22689,7 +25268,7 @@ requestJoinHistory : Model -> String -> ( Model, List Outbound )
 requestJoinHistory model target =
     let
         key =
-            String.toLower target
+            ircCaseKey model target
     in
     if not (hasChatHistoryCap model) then
         ( { model | historyExhausted = Set.insert key model.historyExhausted }, [] )
@@ -22709,13 +25288,16 @@ fetchJoinHistory model target key =
     else
         let
             markRead =
-                if List.member "draft/read-marker" model.caps then
+                if Session.hasCapability model.caps "draft/read-marker" then
                     [ SendLine (Wire.formatIrcLine "MARKREAD" [ target ]) ]
 
                 else
                     []
         in
-        ( { model | historyLoading = Set.insert key model.historyLoading }
+        ( { model
+            | historyLoading = Set.insert key model.historyLoading
+            , pendingHistoryRequests = Dict.insert (String.toLower target) { direction = HistoryLatestRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
+          }
         , markRead ++ [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "LATEST", target, "*", String.fromInt historyPageSize ]) ]
         )
 
@@ -22724,7 +25306,7 @@ fetchJoinHistory model target key =
 `activeChannelTopics`: the validated registry label). -}
 activeChannelTopic : Model -> String -> Maybe String
 activeChannelTopic model channel =
-    Dict.get (String.toLower channel) model.activeChannelTopics
+    Dict.get (ircCaseKey model channel) model.activeChannelTopics
 
 
 {-| Whether the forum stays open for a room (mirroring oracle
@@ -22732,7 +25314,7 @@ activeChannelTopic model channel =
 forum set). -}
 forumPinnedFor : Model -> String -> Bool
 forumPinnedFor model channel =
-    Set.member (String.toLower channel) model.forumChannels
+    Set.member (ircCaseKey model channel) model.forumChannels
 
 
 {-| Whether the follow toggle reads active (mirroring oracle
@@ -22882,7 +25464,7 @@ requestRewindHistory model target =
         key =
             String.toLower target
     in
-    if serverSearchOwnsTarget model target || Set.member key model.historyLoading || Set.member key model.historyExhausted then
+    if model.connection /= Live || serverSearchOwnsTarget model target || Set.member key model.historyLoading || Set.member key model.historyExhausted then
         ( model, [] )
 
     else if not (hasChatHistoryCap model) then
@@ -22899,9 +25481,71 @@ requestRewindHistory model target =
                         ( model, [] )
 
                     Just oldest ->
-                        ( { model | historyLoading = Set.insert key model.historyLoading }
+                        ( { model
+                            | historyLoading = Set.insert key model.historyLoading
+                            , pendingHistoryRequests = Dict.insert key { direction = HistoryBeforeRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
+                          }
                         , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "BEFORE", target, historyReferenceRow oldest, String.fromInt historyPageSize ]) ]
                         )
+
+
+{-| Fetch history after the newest locally accepted row. This is an explicit
+catch-up path distinct from LATEST and BEFORE; the server's timestamp paging
+may still omit equal-time rows, so the UI does not describe this as a complete
+reconciliation proof.
+-}
+requestCatchUpHistory : Model -> String -> ( Model, List Outbound )
+requestCatchUpHistory model target =
+    let
+        key = String.toLower target
+    in
+    if model.connection /= Live || not (hasChatHistoryCap model) || serverSearchOwnsTarget model target || Set.member key model.historyLoading || historyBatchOpenFor model key then
+        ( model, [] )
+    else
+        case Dict.get key model.channels |> Maybe.andThen (.messages >> List.head) of
+            Nothing ->
+                requestJoinHistory model target
+
+            Just newest ->
+                ( { model
+                    | historyLoading = Set.insert key model.historyLoading
+                    , pendingHistoryRequests = Dict.insert key { direction = HistoryAfterRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
+                  }
+                , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "AFTER", target, historyReferenceRow newest, String.fromInt historyPageSize ]) ]
+                )
+
+
+{-| Request the interval between the oldest and newest loaded message. The
+server may still return an incomplete interval for equal-time pagination; the
+caller keeps that limitation visible and does not claim a closed gap.
+-}
+requestHistoryBetween : Model -> String -> ( Model, List Outbound )
+requestHistoryBetween model target =
+    let
+        key = String.toLower target
+    in
+    if model.connection /= Live || not (hasChatHistoryCap model) || serverSearchOwnsTarget model target || Set.member key model.historyLoading || historyBatchOpenFor model key then
+        ( model, [] )
+    else
+        case Dict.get key model.channels of
+            Nothing ->
+                ( model, [] )
+
+            Just channel ->
+                case ( List.head channel.messages, List.reverse channel.messages |> List.head ) of
+                    ( Just oldest, Just newest ) ->
+                        if oldest.msgid == newest.msgid && oldest.at == newest.at then
+                            ( model, [] )
+                        else
+                            ( { model
+                                | historyLoading = Set.insert key model.historyLoading
+                                , pendingHistoryRequests = Dict.insert key { direction = HistoryBetweenRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
+                              }
+                            , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "BETWEEN", target, historyReferenceRow oldest, historyReferenceRow newest, String.fromInt historyPageSize ]) ]
+                            )
+
+                    _ ->
+                        ( model, [] )
 
 
 {-| Fetch one pinned message's window (mirrors `requestPinnedMessage`.
@@ -22943,6 +25587,7 @@ requestPinnedMessage model channel messageId =
         ( { model
             | pendingPins = Dict.insert key pinId model.pendingPins
             , historyLoading = Set.insert key model.historyLoading
+            , pendingHistoryRequests = Dict.insert key { direction = HistoryAroundRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
           }
         , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "AROUND", target, "msgid=" ++ pinId, String.fromInt historyPageSize ]) ]
         )
@@ -23343,8 +25988,9 @@ or identifying) refuses sheet dismiss, mirroring the Sheet guard.
 
 Chip dismissal persists per owner through the `guest-claim-dismissed`
 ports slot (`onyx:guest-claim-dismissed` + owner suffix, mirroring the
-oracle key); the first-hour handoff suppress (`shouldSuppressGuestClaim`)
-has no Elm first-hour state behind it and stays ahead.
+oracle key). A guest first-hour handoff hides the chip until that
+session is finished (`shouldSuppressGuestClaim` in
+`src/lib/firstHour/firstHour.ts`).
 -}
 type GuestClaimPhase
     = ClaimIdle
@@ -23365,7 +26011,10 @@ isGuestClaimBusy model =
 
 guestClaimVisible : Model -> Bool
 guestClaimVisible model =
-    model.accountName == Nothing && not model.guestClaimDismissed && not (String.isEmpty (String.trim model.ourNick))
+    model.accountName == Nothing
+        && not model.guestClaimDismissed
+        && not (String.isEmpty (String.trim model.ourNick))
+        && not (FirstHour.shouldSuppressGuestClaim model.firstHourSeen model.firstHourHandoff)
 
 
 resetGuestClaim : Model -> Model
@@ -24351,10 +27000,38 @@ foldContactOffline model message =
             model
 
 
+{-| DM-shell away bit for a nick that already has a conversation.
+Unknown nicks and channel names are ignored, matching `store.ts`
+which only updates `dms.get`. Online removes the bit.
+-}
+setDmShellAway : Model -> String -> Bool -> Model
+setDmShellAway model nick away =
+    let
+        key =
+            String.toLower (String.trim nick)
+    in
+    if String.isEmpty key || isChannelName model nick then
+        model
+
+    else
+        case Dict.get key model.channels of
+            Nothing ->
+                model
+
+            Just _ ->
+                { model
+                    | dmAway =
+                        if away then
+                            Dict.insert key True model.dmAway
+
+                        else
+                            Dict.remove key model.dmAway
+                }
+
+
 {-| Fold `730 RPL_MONONLINE`: every target's nick half clears to
-online for known friends (the DM-shell away write has no Elm
-surface yet — command-palette DM hints stay ahead — so only the
-friend flags fold here).
+online for known friends, and an existing DM shell drops its away
+bit (`store.ts` sets `dm.away = false`).
 -}
 foldMonitorOnline : Model -> Wire.IrcMessage -> Model
 foldMonitorOnline model message =
@@ -24362,7 +27039,11 @@ foldMonitorOnline model message =
         _ :: rawTargets :: _ ->
             List.foldl
                 (\fullhost acc ->
-                    setFriendOnline acc (firstOfBang fullhost) True
+                    let
+                        nick =
+                            firstOfBang fullhost
+                    in
+                    setDmShellAway (setFriendOnline acc nick True) nick False
                 )
                 model
                 (parseMonitorTargets rawTargets)
@@ -24371,7 +27052,8 @@ foldMonitorOnline model message =
             model
 
 
-{-| Fold `731 RPL_MONOFFLINE` the same way, clearing presence.
+{-| Fold `731 RPL_MONOFFLINE` the same way, clearing presence and
+marking an existing DM shell away (`store.ts` sets `dm.away = true`).
 -}
 foldMonitorOffline : Model -> Wire.IrcMessage -> Model
 foldMonitorOffline model message =
@@ -24379,7 +27061,7 @@ foldMonitorOffline model message =
         _ :: rawTargets :: _ ->
             List.foldl
                 (\monNick acc ->
-                    setFriendOnline acc monNick False
+                    setDmShellAway (setFriendOnline acc monNick False) monNick True
                 )
                 model
                 (parseMonitorTargets rawTargets)
@@ -25125,24 +27807,6 @@ requestAccountInfo model account =
                         )
 
 
-{-| Fold a `NOTE ACCOUNTINFO …` reply body (state-only; the oracle's
-NOTE arm surfaces nothing itself).
--}
-foldAccountInfoNote : Model -> String -> ( Model, List Outbound )
-foldAccountInfoNote model body =
-    case parseAccountInfo body of
-        Just fields ->
-            case applyAccountInfo model fields of
-                Just settled ->
-                    ( settled, [] )
-
-                Nothing ->
-                    ( model, [] )
-
-        Nothing ->
-            ( model, [] )
-
-
 {-| Fold a server `account=…` notice (`:server NOTICE me
 :account=kai flags=…`, mirrors the oracle NOTICE arm: attributed
 through the live request context, consumed into the service log as
@@ -25185,40 +27849,16 @@ foldWebhookNotice model message =
                 Nothing
 
             else if Webhook.containsWebhookWord text then
-                Just ( logService model ("Webhook: " ++ text), [] )
+                -- Create replies may contain a one-time bearer URL. Keep the
+                -- entire server body out of Elm logs and history; the private
+                -- runtime owns any correlated secret presentation.
+                Just ( logService model "Webhook service replied; secret values are shown only in the private one-time presentation.", [] )
 
             else
                 Nothing
 
         _ ->
             Nothing
-
-
-{-| Fold a payload-less `NOTE ACCOUNTSET` (mirrors the oracle: clear
-the error and, while authed, re-fetch so the panel reflects the
-change).
--}
-foldAccountSetNote : Model -> String -> ( Model, List Outbound )
-foldAccountSetNote model body =
-    case parseAccountInfo body of
-        Just _ ->
-            ( model, [] )
-
-        Nothing ->
-            let
-                cleared =
-                    { model | accountActionError = Nothing }
-            in
-            case model.accountName of
-                Nothing ->
-                    ( cleared, [] )
-
-                Just _ ->
-                    let
-                        ( refetched, outs ) =
-                            requestAccountInfo cleared Nothing
-                    in
-                    ( refetched, outs )
 
 
 {-| `LOGOUT` (mirrors `logout`: silent unless live; the 901 fold
@@ -25240,22 +27880,17 @@ it with `SessionListRequested` (mirrors `refreshAccountSessions`).
 -}
 requestSessionList : Model -> ( Model, List Outbound )
 requestSessionList model =
-    if model.connection == Live && model.accountName /= Nothing then
-        ( { model
-            | accountSessions = []
-            , accountSessionsPending = True
-            , accountSessionsError = Nothing
-          }
-        , [ SendLine (Wire.formatIrcLine "SESSION" [ "LIST" ]) ]
-        )
+    update SessionListRequested model
 
-    else
-        ( { model
-            | accountSessionsPending = False
-            , accountSessionsError = Just "Sign in to list sessions."
-          }
-        , []
-        )
+
+sessionResumePending : Model -> Bool
+sessionResumePending model =
+    case model.sessionReclaim of
+        Just notice ->
+            notice.phase == Restoring
+
+        Nothing ->
+            False
 
 
 {-| Open the Account panel with a fresh refresh (mirrors the panel
@@ -25272,16 +27907,13 @@ openAccountPanel model =
             ( withInfo, infoOut ) =
                 requestAccountInfo model Nothing
 
-            ( withSessions, sessOut ) =
-                requestSessionList withInfo
-
             -- Mirror the oracle's open-refresh (`accountInfo_fetch`
             -- + `totpStatus` + `keyTransparencyStatus` +
-            -- `recoveryCodesStatus` + `listPasskeys` + `vhostList`):
+            -- `recoveryCodesStatus` + `vhostList`):
             -- every leg self-gates on signed-in + live, so guests and
             -- dead sockets stay silent.
             ( withTotp, totpOut ) =
-                requestTotpStatus withSessions
+                requestTotpStatus withInfo
 
             ( withKeytrans, keytransOut ) =
                 requestKeytransStatus withTotp
@@ -25289,8 +27921,14 @@ openAccountPanel model =
             ( withRecovery, recoveryOut ) =
                 requestRecoveryCodesStatus withKeytrans
 
-            ( withPasskeys, passkeyListOut ) =
-                requestPasskeyList withRecovery
+            -- Passkey inventory is private runtime metadata. It is
+            -- refreshed through the explicit PasskeyListRequested
+            -- action so it cannot race the account-open session lease.
+            withPasskeys =
+                withRecovery
+
+            passkeyListOut =
+                []
 
             ( withE2ee, e2eeOut ) =
                 requestE2eeKeyStatus withPasskeys
@@ -25299,7 +27937,7 @@ openAccountPanel model =
                 requestVhostList withE2ee
         in
         ( { withVhost | accountOpen = True, accountEmail = seedAccountEmail withVhost }
-        , infoOut ++ sessOut ++ totpOut ++ keytransOut ++ recoveryOut ++ passkeyListOut ++ e2eeOut ++ vhostOut
+        , infoOut ++ totpOut ++ keytransOut ++ recoveryOut ++ passkeyListOut ++ e2eeOut ++ vhostOut
         )
 
 
@@ -25474,13 +28112,7 @@ requestPasskeyList model =
                 ( model, [] )
 
             else
-                let
-                    listed =
-                        Passkey.beginList model.passkey
-                in
-                ( { model | passkey = { listed | error = Nothing } }
-                , [ SendLine Passkey.webauthnList ]
-                )
+                update (RuntimeDomainActionRequested RuntimeDomain.PasskeyList) model
 
 
 {-| `WEBAUTHN REGISTER [label]` (mirrors `registerPasskey`: arms
@@ -26954,9 +29586,8 @@ requestIdentify model account password =
 that belongs to the caller's account (password-verified server-side;
 `server.zig handleGhost`: success replies as a NOTICE, failure as numerics,
 both surfacing through the normal message path). Mirrors the oracle
-`ghost`: silent unless live (the `!client` guard). The connect-screen
-reclaim dialog that supplies the password (`Connect.tsx handleReclaim`)
-has no Elm surface yet, so this constructor waits for it.
+`ghost`: silent unless live (the `!client` guard). The in-session
+reclaim dialog is `View.Topbar.reclaimDialog` (`submitReclaim`).
 -}
 ghostNick : Model -> String -> String -> List Outbound
 ghostNick model nick password =
@@ -26971,7 +29602,8 @@ ghostNick model nick password =
 the oracle `reclaimNick`: trims, refuses a blank target (no lines, same as
 the `false` return), otherwise emits GHOST immediately followed by NICK so
 the periodic reclaim timer only has to cover the zombie-drain delay. The
-password is intentionally never stored — the caller supplies it per attempt.
+password is intentionally never stored — `View.Topbar.reclaimDialog`
+supplies it per attempt.
 -}
 reclaimNickWithPassword : Model -> String -> String -> List Outbound
 reclaimNickWithPassword model nick password =
@@ -26995,8 +29627,8 @@ reclaimNickWithPassword model nick password =
 connection to the logged-in account (`server.zig handleCertAdd`), enabling
 future password-less SASL EXTERNAL logins. Takes no params; the server
 fails (`FAIL CERTADD NO_CLIENT_CERT`) when the connection presented none.
-Mirrors the oracle `certAdd` minus its reply-context capture (TS-side
-`accountActionError` routing with no Elm counterpart yet).
+Mirrors the oracle `certAdd`. `FAIL CERTADD` folds into
+`accountActionError` with the other account commands.
 -}
 certAddLine : Model -> List Outbound
 certAddLine model =
@@ -27027,6 +29659,107 @@ accountOwnerKey value =
                 Just normalized
 
 
+retainedDraftLocked : Model -> Bool
+retainedDraftLocked model =
+    model.retiredDraftOwner /= Nothing
+
+
+retainedDraftBlocksRuntimeAction : RuntimeDomain.Action -> Bool
+retainedDraftBlocksRuntimeAction action =
+    case action of
+        RuntimeDomain.LoadDraft _ ->
+            True
+
+        RuntimeDomain.SaveDraft _ _ _ ->
+            True
+
+        RuntimeDomain.QueueMessage _ _ _ _ _ _ ->
+            True
+
+        RuntimeDomain.ScheduledCreate _ _ _ _ _ _ _ _ ->
+            True
+
+        RuntimeDomain.ScheduledEdit _ _ _ _ _ _ _ ->
+            True
+
+        RuntimeDomain.DraftDiscard _ _ ->
+            True
+
+        RuntimeDomain.DraftRecover _ ->
+            True
+
+        RuntimeDomain.DraftRecoveryList ->
+            True
+
+        _ ->
+            False
+
+
+draftRecoveryActionMatches : RuntimeDomain.Action -> Model -> Bool
+draftRecoveryActionMatches action model =
+    case action of
+        RuntimeDomain.DraftRecover ref ->
+            case ( model.activeChannel, model.draftRecoveryView ) of
+                ( Just target, Just view ) ->
+                    List.any (\item -> item.draftRef == ref && item.conversationId == target) view.items
+
+                _ ->
+                    False
+
+        _ ->
+            True
+
+
+armRetainedDraftAutosaves : Model -> ( Model, List Outbound )
+armRetainedDraftAutosaves model =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            ( model, [] )
+
+        Just stamp ->
+            let
+                revisions =
+                    Dict.foldl
+                        (\key _ current ->
+                            if Dict.member key current then
+                                current
+
+                            else
+                                Dict.insert key 1 current
+                        )
+                        model.composerDraftVersions
+                        model.composerDrafts
+
+                targetFor key =
+                    model.channels
+                        |> Dict.values
+                        |> List.filter (\channel -> ircCaseKey model channel.name == key)
+                        |> List.head
+                        |> Maybe.map .name
+                        |> Maybe.withDefault key
+
+                autosaves =
+                    model.composerDrafts
+                        |> Dict.keys
+                        |> List.filterMap
+                            (\key ->
+                                Dict.get key revisions
+                                    |> Maybe.map
+                                        (\revision ->
+                                            RuntimeDraftAutosaveTimerStarted
+                                                { target = targetFor key
+                                                , revision = revision
+                                                , delayMs = 100
+                                                , ownerRef = stamp.ownerRef
+                                                , accountGeneration = stamp.accountGeneration
+                                                , connectionGeneration = stamp.connectionGeneration
+                                                }
+                                        )
+                            )
+            in
+            ( { model | composerDraftVersions = revisions }, autosaves )
+
+
 {-| Fold an `ACCOUNT` notify (mirroring the oracle arm: only our own
 ACCOUNT describes the top-bar identity — a peer's, including a peer's
 `ACCOUNT *` logout, is ignored so another user's logout can never flip
@@ -27037,10 +29770,10 @@ budget, channel buffers, DM shells, typing, edits, history cursors,
 outgoing scheduled rows),
 points SASL at the new account, reloads the new owner's identity
 profile, re-projects our activity, and either reclaims an aliased nick
-(`NICK` now plus retry) or stops a stale reclaim. Owned-map reloads
-beyond the identity profile, monitor-contact replacement, and the
-group-control authenticated-account handoff stay ahead: Elm has no
-watch-list/monitor store yet). -}
+(`NICK` now plus retry) or stops a stale reclaim. Owned contact loads, the identity profile, and
+`GroupPublisher.setAccount` (the `setAuthenticatedAccount` handoff)
+run on this fold. Owner-scoped device slots reload when the friends
+request announces the new owner and `DeviceSlotsLoaded` lands. -}
 foldAccount : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldAccount model message =
     case ( message.nick, message.params ) of
@@ -27063,8 +29796,9 @@ foldAccount model message =
                     -- An owner change retires the outgoing identity's
                     -- scheduled rows so their plaintext bodies never
                     -- linger in storage (mirroring the
-                    -- `_resetAccountPrivateMessageState` purge; the
-                    -- vault sweep joins in a later slice).
+                    -- `_resetAccountPrivateMessageState` purge). The
+                    -- history vault stays owner-namespaced, matching
+                    -- the oracle, which does not delete it here.
                     ( unpurged, purgeOut ) =
                         if ownerChanged then
                             purgeScheduledForOwner model (scheduleOwner model)
@@ -27126,20 +29860,33 @@ foldAccount model message =
                         else
                             ( synced, [] )
                 in
-                if withMonitor.currentNickIsAlias then
-                    case next of
-                        Just account ->
-                            let
-                                ( reclaimed, reclaimOut ) =
-                                    startNickReclaim withMonitor account
-                            in
-                            ( reclaimed, purgeOut ++ profileOutbound ++ reclaimOut ++ monitorOut )
+                let
+                    ( handed, handOut ) =
+                        if withMonitor.currentNickIsAlias then
+                            case next of
+                                Just account ->
+                                    let
+                                        ( reclaimed, reclaimOut ) =
+                                            startNickReclaim withMonitor account
+                                    in
+                                    ( reclaimed, purgeOut ++ profileOutbound ++ reclaimOut ++ monitorOut )
 
-                        Nothing ->
+                                Nothing ->
+                                    ( stopNickReclaim withMonitor, purgeOut ++ profileOutbound ++ monitorOut )
+
+                        else
                             ( stopNickReclaim withMonitor, purgeOut ++ profileOutbound ++ monitorOut )
 
-                else
-                    ( stopNickReclaim withMonitor, purgeOut ++ profileOutbound ++ monitorOut )
+                    -- Load after the new account is installed, so the
+                    -- storage key is not still the previous owner.
+                    ( withNav, navOut ) =
+                        if ownerChanged then
+                            takeNavigationLoad handed
+
+                        else
+                            ( handed, [] )
+                in
+                ( withNav, handOut ++ navOut )
 
         _ ->
             ( model, [] )
@@ -27159,7 +29906,7 @@ foldNick model message =
             else
                 let
                     selfChanged =
-                        String.toLower oldNick == String.toLower model.ourNick
+                        ircCaseKey model oldNick == ircCaseKey model model.ourNick
 
                     withSelf =
                         if selfChanged then
@@ -27190,7 +29937,15 @@ foldNick model message =
                                 renamed =
                                     stopNickReclaim
                                         (syncOwnCustomStatusActivity
-                                            { model | ourNick = newNick, currentNickIsAlias = aliased }
+                                            { model
+                                                | ourNick = newNick
+                                                , currentNickIsAlias = aliased
+                                                , connectionNickDraft = newNick
+                                                , connectionNickPending = Nothing
+                                                , connectionNickNotice =
+                                                    if Maybe.map String.toLower model.connectionNickPending == Just (String.toLower newNick) then Just ("Your chat name is now " ++ newNick ++ ".") else Nothing
+                                                , connectionDialogError = Nothing
+                                            }
                                             (Just oldNick)
                                         )
 
@@ -27226,7 +29981,7 @@ foldNick model message =
                     rename key acc =
                         case Dict.get key acc.channels of
                             Just channel ->
-                                case Dict.get (String.toLower oldNick) channel.members of
+                                case Dict.get (ircCaseKey acc oldNick) channel.members of
                                     Just member ->
                                         includeBurstNick
                                             (excludeBurstNick
@@ -27237,9 +29992,9 @@ foldNick model message =
                                                                 Dict.insert key
                                                                     { channel
                                                                         | members =
-                                                                            Dict.insert (String.toLower newNick)
+                                                                            Dict.insert (ircCaseKey acc newNick)
                                                                                 { member | nick = newNick }
-                                                                                (Dict.remove (String.toLower oldNick) channel.members)
+                                                                                (Dict.remove (ircCaseKey acc oldNick) channel.members)
                                                                     }
                                                                     acc.channels
                                                         }
@@ -27309,8 +30064,15 @@ foldNick model message =
 
                             else
                                 ( withProfile, [] )
+
+                        ( withNav, navOut ) =
+                            if ownerChanged then
+                                takeNavigationLoad withMonitor
+
+                            else
+                                ( withMonitor, [] )
                     in
-                    ( withMonitor, purgeOut ++ profileOut ++ monitorOut )
+                    ( withNav, purgeOut ++ profileOut ++ monitorOut ++ navOut )
 
                 else
                     ( renamed, [] )
@@ -27547,6 +30309,7 @@ foldRename model message =
                                     , typingUsers = moveEntry noted.typingUsers
                                     , readMarkers = moveEntry noted.readMarkers
                                     , historyLoading = moveMember noted.historyLoading
+                                    , pendingHistoryRequests = moveEntry noted.pendingHistoryRequests
                                     , historyExhausted = moveMember noted.historyExhausted
                                     , props = { props | channelProps = moveEntry props.channelProps }
                                 }
@@ -27617,11 +30380,12 @@ foldMode model message =
                                                 model.isupport.chanGroups
                                                 (Set.fromList (Dict.keys model.isupport.modeToPrefix))
                                         , members = foldStatusModes model c modeStr modeArgs
-                                        , messages = List.take keepMessages (row :: c.messages)
+                                        , messages = List.take (messageRetentionFor model target) (row :: c.messages)
                                     }
                                 )
                     in
                     foldModeEntries folded target modeStr modeArgs actor modeText
+                        |> (\withAudit -> settleStewardTransferModeEcho withAudit message target modeStr modeArgs)
 
                 else
                     -- A delayed or unsolicited MODE for a room outside
@@ -27852,8 +30616,7 @@ the oracle second walk: ban masks log `ban`/`unban` audits plus
 `BAN`/`UNBAN` moderation rows; status grants on present members log
 `GRANT`/`TAKE`; `z` and other status letters log a `MODE` action;
 any non-ban change logs one `mode` audit; and the change lands a
-`mode` channel event. The ban-list itself stays a later slice, like
-the ban-list numerics.). -}
+`mode` channel event. Ban rows themselves arrive on 367/368.). -}
 foldModeEntries : Model -> String -> String -> List String -> String -> String -> Model
 foldModeEntries model target modeStr modeArgs actor modeText =
     let
@@ -28079,6 +30842,9 @@ flight; the echoed `seq` drops stale arrivals). -}
 vaultSearchFire : Model -> ( Model, List Outbound )
 vaultSearchFire model =
     if model.searchOpen && model.vaultStatus == VaultSearchPending && model.vaultSearchDueAt > 0 && model.nowMs >= model.vaultSearchDueAt then
+        let
+            fields = runtimeOwnerFields model
+        in
         ( { model | vaultSearchDueAt = 0 }
         , [ VaultSearch
                 { query = model.vaultSearchQuery
@@ -28088,6 +30854,9 @@ vaultSearchFire model =
                 , activeTarget = model.activeChannel
                 , selfNick = model.ourNick
                 , nowMs = model.nowMs
+                , ownerRef = fields.ownerRef
+                , accountGeneration = fields.accountGeneration
+                , connectionGeneration = fields.connectionGeneration
                 }
           ]
         )
@@ -28221,6 +30990,9 @@ vaultStatusLabel model =
             VaultSearchError ->
                 "Device-memory search could not be completed."
 
+            VaultSearchIncomplete ->
+                "Device-memory search is incomplete because a target’s retention policy is unknown."
+
             VaultSearchDone ->
                 let
                     count =
@@ -28269,10 +31041,22 @@ opens may use the unread anchor again). -}
 resetThreadWindow : Model -> Model
 resetThreadWindow model =
     { model
-        | threadWindowSize = MessageWindow.defaultWindowSize
+        | threadFollowing = True
+        , threadWindowSize = MessageWindow.defaultWindowSize
         , threadPageStart = Nothing
         , ignoreUnreadAnchor = False
+        , forceUnreadNav = False
+        , historyLanding = Nothing
     }
+
+
+{-| Explicitly sending or returning to latest overrides old reading anchors. -}
+resumeLatestReading : Model -> Model
+resumeLatestReading model =
+    let
+        trailed = resetThreadWindow model
+    in
+    invalidateVaultSearch { trailed | ignoreUnreadAnchor = True, searchOpen = False }
 
 
 {-| Chronological position of one row id (Elm buffers newest-first;
@@ -28298,11 +31082,32 @@ threadRowIndex newestFirst rowId =
     go 0 newestFirst
 
 
+threadChronologicalRowIndex : List ChatMessage -> Int -> Maybe Int
+threadChronologicalRowIndex chronological rowId =
+    let
+        go pos found remaining =
+            case remaining of
+                [] ->
+                    found
+
+                row :: rest ->
+                    go
+                        (pos + 1)
+                        (if row.id == rowId then
+                            Just pos
+
+                         else
+                            found
+                        )
+                        rest
+    in
+    go 0 Nothing chronological
+
+
 {-| The single must-show row for a conversation window (mirroring
-the anchor memo: active search hit, then the unread divider while
-the feed is in live-tail mode or freshly opened — never a stale
-divider over a historical page the user chose. Time-travel
-landings stay ahead: vault row ids do not map onto chat rows). -}
+the anchor memo: active search hit, then a time-travel landing whose
+msgid is already a chat row, then the unread divider while the feed
+is in live-tail mode or an explicit New jump set `forceUnreadNav`). -}
 threadAnchorIndex : Model -> Channel -> Maybe Int
 threadAnchorIndex model channel =
     let
@@ -28311,6 +31116,11 @@ threadAnchorIndex model channel =
 
         searchIdx =
             Maybe.andThen indexOfRow (searchActiveId model)
+
+        landingIdx =
+            model.historyLanding
+                |> Maybe.andThen (\wanted -> List.filter (\row -> row.msgid == Just wanted) channel.messages |> List.head)
+                |> Maybe.andThen (\row -> indexOfRow row.id)
 
         unreadIdx =
             if model.ignoreUnreadAnchor then
@@ -28323,8 +31133,7 @@ threadAnchorIndex model channel =
 
                     Just active ->
                         -- The captured divider wins over the live
-                        -- first-unread id (mirroring the
-                        -- `unreadDividerId() ?? firstUnreadId` boundary).
+                        -- first-unread id.
                         case Dict.get (String.toLower active) model.viewUnreadDividerId of
                             Just dividerId ->
                                 indexOfRow dividerId
@@ -28334,28 +31143,110 @@ threadAnchorIndex model channel =
     in
     MessageWindow.selectMessageAnchorIndex
         { searchIndex = Maybe.map toFloat searchIdx
-        , landingIndex = Nothing
+        , landingIndex = Maybe.map toFloat landingIdx
         , unreadIndex = Maybe.map toFloat unreadIdx
         , pageStart = Maybe.map toFloat model.threadPageStart
-        , forceUnread = False
+        , forceUnread = model.forceUnreadNav
         }
 
 
-{-| Bounded render window for one conversation (mirroring the
-`messageWindow` memo over the full buffer). -}
+threadAnchorIndexForChronological : Model -> List ChatMessage -> Maybe Int
+threadAnchorIndexForChronological model chronological =
+    let
+        indexOfRow =
+            threadChronologicalRowIndex chronological
+
+        searchIdx =
+            Maybe.andThen indexOfRow (searchActiveId model)
+
+        landingIdx =
+            model.historyLanding
+                |> Maybe.andThen
+                    (\wanted ->
+                        List.foldl
+                            (\row found ->
+                                if row.msgid == Just wanted then
+                                    Just row
+
+                                else
+                                    found
+                            )
+                            Nothing
+                            chronological
+                    )
+                |> Maybe.andThen (\row -> indexOfRow row.id)
+
+        unreadIdx =
+            if model.ignoreUnreadAnchor then
+                Nothing
+
+            else
+                case model.activeChannel of
+                    Nothing ->
+                        Nothing
+
+                    Just active ->
+                        case Dict.get (String.toLower active) model.viewUnreadDividerId of
+                            Just dividerId ->
+                                indexOfRow dividerId
+
+                            Nothing ->
+                                Maybe.andThen indexOfRow (Dict.get (String.toLower active) model.firstUnreadId)
+    in
+    MessageWindow.selectMessageAnchorIndex
+        { searchIndex = Maybe.map toFloat searchIdx
+        , landingIndex = Maybe.map toFloat landingIdx
+        , unreadIndex = Maybe.map toFloat unreadIdx
+        , pageStart = Maybe.map toFloat model.threadPageStart
+        , forceUnread = model.forceUnreadNav
+        }
+
+
+{-| Reuse the chronological projection already prepared by the view.
+-}
 threadWindowFor : Model -> Channel -> MessageWindow.MessageWindow
 threadWindowFor model channel =
+    threadWindowForRows model (threadVisibleRows model channel)
+
+
+threadWindowForRows : Model -> List ChatMessage -> MessageWindow.MessageWindow
+threadWindowForRows model chronological =
     MessageWindow.computeMessageWindow
-        { total = toFloat (List.length channel.messages)
+        { total = toFloat (List.length chronological)
         , windowSize = toFloat model.threadWindowSize
-        , anchorIndex = Maybe.map toFloat (threadAnchorIndex model channel)
+        , anchorIndex = Maybe.map toFloat (threadAnchorIndexForChronological model chronological)
         , anchorContext = Nothing
         , pageStart = Maybe.map toFloat model.threadPageStart
         }
 
 
-{-| Panel scope line (mirroring `targetLabel`; DMs have no Elm
-surface yet, so the fallback covers the no-channel case). -}
+{-| The same chronological rows drive window math and rendering, so a
+filtered conversation never inherits offsets from hidden messages.
+Avoid a full collapse filter allocation when no senders are collapsed.
+-}
+threadVisibleRows : Model -> Channel -> List ChatMessage
+threadVisibleRows model channel =
+    let
+        chronological =
+            List.reverse channel.messages
+
+        topicVisible =
+            topicVisibleRows model channel.name chronological
+    in
+    if Set.isEmpty model.collapsedNicks then
+        topicVisible
+
+    else
+        List.filter
+            (\row ->
+                String.isEmpty (String.trim row.from)
+                    || not (Set.member (String.toLower (String.trim row.from)) model.collapsedNicks)
+            )
+            topicVisible
+
+
+{-| Panel scope line (mirroring `targetLabel`: a channel name, a DM
+`@nick`, or every remembered conversation when nothing is open). -}
 searchTargetLabel : Model -> String
 searchTargetLabel model =
     case model.activeChannel of
@@ -28363,12 +31254,20 @@ searchTargetLabel model =
             "all remembered conversations"
 
         Just name ->
-            case Dict.get (String.toLower name) model.channels of
-                Just channel ->
-                    channel.name
+            let
+                label =
+                    case Dict.get (String.toLower name) model.channels of
+                        Just channel ->
+                            channel.name
 
-                Nothing ->
-                    name
+                        Nothing ->
+                            name
+            in
+            if isChannelName model label then
+                label
+
+            else
+                "@" ++ label
 
 
 {-| A live self-echo: our own nick on an inbound PRIVMSG while the
@@ -28530,7 +31429,8 @@ labelOf message =
 
 {-| Mint + register a labeled correlation for one single-part send,
 evicting the oldest first past `Labels.maxPendingLabeledSends`
-(promoting its row, mirroring `_registerPendingLabeledSend`). The
+(retiring response correlation into delivery-unknown, mirroring the
+bounded registration policy). The
 counter keeps running across reconnects like the oracle's module
 counter, so a label is never re-minted within a session. -}
 registerLabeledSend : Model -> String -> List Int -> String -> ( Model, String )
@@ -28548,6 +31448,9 @@ registerLabeledSend model target messageIds text =
             , targetKey = String.toLower target
             , text = text
             , seq = seq
+            , generation = model.physicalConnectionGeneration
+            , deadline = model.nowMs + historyBatchTimeoutMs
+            , ownerStamp = model.runtimeOwnerStamp
             }
     in
     ( insertPendingLabel { model | labelCounter = seq } label entry, label )
@@ -28559,14 +31462,31 @@ registerLabeledSend model target messageIds text =
 insertPendingLabel : Model -> String -> PendingLabeledSend -> Model
 insertPendingLabel model label entry =
     let
-        withEntry =
-            { model | pendingLabels = Dict.insert label entry model.pendingLabels }
-    in
-    if Dict.size withEntry.pendingLabels <= Labels.maxPendingLabeledSends then
-        withEntry
+        total =
+            Dict.size model.pendingLabels + Dict.size model.uncertainLabels
 
-    else
-        evictOldestLabel withEntry
+        withRoom =
+            if total < Labels.maxPendingLabeledSends then
+                model
+
+            else
+                case oldestPendingLabel model.uncertainLabels of
+                    Just oldestUncertain ->
+                        { model | uncertainLabels = Dict.remove oldestUncertain model.uncertainLabels }
+
+                    Nothing ->
+                        case oldestPendingLabel model.pendingLabels of
+                            Nothing ->
+                                model
+
+                            Just oldestActive ->
+                                let
+                                    unknown =
+                                        markLabeledUnknown model (Just oldestActive)
+                                in
+                                { unknown | uncertainLabels = Dict.remove oldestActive unknown.uncertainLabels }
+    in
+    { withRoom | pendingLabels = Dict.insert label entry withRoom.pendingLabels }
 
 
 {-| Ask ports to walk the durable queue. `labeled` is decided
@@ -28575,7 +31495,16 @@ row carries a ports-minted `@label=`, reported back under
 `sentLabels` for correlation. -}
 flushRequest : Model -> Outbound
 flushRequest model =
-    OutboxFlush { labeled = List.member "labeled-response" model.caps }
+    case model.runtimeOwnerStamp of
+        Just stamp ->
+            let
+                requestId =
+                    "journalFlush" ++ String.padLeft 12 '0' (String.fromInt (model.eventClock + floor model.nowMs))
+            in
+            RuntimeJournalFlush { ownerRef = stamp.ownerRef, accountGeneration = stamp.accountGeneration, connectionGeneration = stamp.connectionGeneration, requestId = requestId }
+
+        Nothing ->
+            OutboxFlush { labeled = List.member "labeled-response" model.caps }
 
 
 {-| Locate an outbox placeholder row by its durable id. -}
@@ -28642,6 +31571,9 @@ registerFlushedLabels model pairs =
                                 , targetKey = found.targetKey
                                 , text = found.text
                                 , seq = flagged.labelCounter
+                                , generation = flagged.physicalConnectionGeneration
+                                , deadline = flagged.nowMs + historyBatchTimeoutMs
+                                , ownerStamp = flagged.runtimeOwnerStamp
                                 }
                         in
                         insertPendingLabel flagged pair.label entry
@@ -28650,9 +31582,9 @@ registerFlushedLabels model pairs =
         pairs
 
 
-{-| Promote the oldest in-flight label (smallest mint seq): its row is
-confirmed in place so a flood of sends cannot leave stuck pending
-rows, mirroring the eviction arm of `_registerPendingLabeledSend`. -}
+{-| Retire the oldest in-flight response label (smallest mint seq).
+Its row remains pending with an explicit delivery-unknown state so a
+bounded registry never turns missing evidence into acceptance. -}
 evictOldestLabel : Model -> Model
 evictOldestLabel model =
     case oldestPendingLabel model.pendingLabels of
@@ -28691,7 +31623,7 @@ Online rows never carry an outbox id, so the unlink is a no-op for
 them. -}
 clearPendingRows : Model -> String -> List Int -> Model
 clearPendingRows model target messageIds =
-    updateChannel model
+    updateChannel { model | deliveryUnknownIds = List.foldl Set.remove model.deliveryUnknownIds messageIds }
         target
         (\c ->
             { c
@@ -28709,41 +31641,80 @@ clearPendingRows model target messageIds =
         )
 
 
-{-| Confirm one in-flight send in place (bare ACK / eviction /
-disconnect path), mirroring `_promoteLabeledPending`: the row keeps
-its id and text, only the pending flag clears. Unknown labels leave
-the model untouched. -}
+{-| Move one response label into delivery-unknown state. The row keeps
+its id and pending marker; only a later exact self-echo with a real
+msgid can settle acceptance. -}
 promoteLabeledSend : Model -> String -> Model
 promoteLabeledSend model label =
-    case Dict.get label model.pendingLabels of
+    markLabeledUnknown model (Just label)
+
+
+markLabeledUnknown : Model -> Maybe String -> Model
+markLabeledUnknown model maybeLabel =
+    case maybeLabel |> Maybe.andThen (\label -> Dict.get label model.pendingLabels |> Maybe.map (Tuple.pair label)) of
         Nothing ->
             model
 
-        Just pending ->
-            clearPendingRows
-                { model | pendingLabels = Dict.remove label model.pendingLabels }
-                pending.target
-                pending.messageIds
+        Just ( label, pending ) ->
+            let
+                keepEchoCorrelation =
+                    pending.generation == model.physicalConnectionGeneration
+                        && pending.ownerStamp == model.runtimeOwnerStamp
+                        && Dict.size model.uncertainLabels < Labels.maxPendingLabeledSends
+
+                flagged =
+                    updateChannel
+                        { model
+                            | pendingLabels = Dict.remove label model.pendingLabels
+                            , uncertainLabels =
+                                if keepEchoCorrelation then
+                                    Dict.insert label pending model.uncertainLabels
+
+                                else
+                                    model.uncertainLabels
+                            , deliveryUnknownIds = List.foldl Set.insert model.deliveryUnknownIds pending.messageIds
+                        }
+                        pending.target
+                        (\channel ->
+                            { channel
+                                | messages =
+                                    List.map
+                                        (\row -> if List.member row.id pending.messageIds then { row | pending = True } else row)
+                                        channel.messages
+                            }
+                        )
+            in
+            pruneDeliveryUnknown flagged
 
 
-{-| Confirm every in-flight row in place and drop the registry, so a
-disconnect never strands pending rows that could never resolve —
-mirroring `_clearPendingLabeledSends` on connection loss. Only
-registered rows are touched (never-sent queued placeholders keep
-their outbox chrome); resolution unlinks the outbox id, so a
-confirmed flush row becomes an ordinary row. -}
+markAllLabeledUnknown : Model -> Model
+markAllLabeledUnknown model =
+    List.foldl (\( label, _ ) acc -> markLabeledUnknown acc (Just label)) model (Dict.toList model.pendingLabels)
+
+
+isDeliveryUnknown : Model -> ChatMessage -> Bool
+isDeliveryUnknown model message =
+    Set.member message.id model.deliveryUnknownIds
+
+
+pruneDeliveryUnknown : Model -> Model
+pruneDeliveryUnknown model =
+    let
+        retainedIds =
+            model.channels
+                |> Dict.values
+                |> List.concatMap (\channel -> List.map .id channel.messages)
+                |> Set.fromList
+    in
+    { model | deliveryUnknownIds = Set.filter (\id -> Set.member id retainedIds) model.deliveryUnknownIds }
+
+
+{-| Retire every in-flight response label on disconnect. Rows remain
+pending and explicitly delivery-unknown; old-generation correlation
+is fenced before the next socket opens. -}
 promoteAllLabeled : Model -> Model
 promoteAllLabeled model =
-    let
-        unlinked =
-            List.foldl
-                (\( _, pending ) acc ->
-                    clearPendingRows acc pending.target pending.messageIds
-                )
-                model
-                (Dict.toList model.pendingLabels)
-    in
-    { unlinked | pendingLabels = Dict.empty }
+    markAllLabeledUnknown model
 
 
 {-| Live labeled self-echo: our own nick on PRIVMSG/NOTICE carrying a
@@ -28776,26 +31747,52 @@ resolveLabeledEcho model message =
                             Nothing
 
                         Just label ->
-                            case Dict.get label model.pendingLabels of
+                            case pendingLabelFor model label of
                                 Nothing ->
                                     Nothing
 
                                 Just pending ->
                                     case message.params of
-                                        _ :: body :: _ ->
-                                            let
-                                                without =
-                                                    { model | pendingLabels = Dict.remove label model.pendingLabels }
+                                        target :: body :: _ ->
+                                            if
+                                                pending.generation /= model.physicalConnectionGeneration
+                                                    || pending.ownerStamp /= model.runtimeOwnerStamp
+                                                    || String.toLower target /= pending.targetKey
+                                                    || String.isEmpty (Maybe.withDefault "" (Dict.get "msgid" message.tags))
+                                            then
+                                                Nothing
 
-                                                confirmed =
-                                                    updateChannel without
-                                                        pending.target
-                                                        (collapseEchoRows pending.messageIds body)
-                                            in
-                                            Just (rememberDelivery confirmed message)
+                                            else
+                                                let
+                                                    without =
+                                                        { model
+                                                            | pendingLabels = Dict.remove label model.pendingLabels
+                                                            , uncertainLabels = Dict.remove label model.uncertainLabels
+                                                            , deliveryUnknownIds = List.foldl Set.remove model.deliveryUnknownIds pending.messageIds
+                                                        }
+
+                                                    confirmed =
+                                                        updateChannel without
+                                                            pending.target
+                                                            (collapseEchoRows pending.messageIds body)
+
+                                                    accepted =
+                                                        rememberDelivery confirmed message
+                                                in
+                                                Just accepted
 
                                         _ ->
                                             Nothing
+
+
+pendingLabelFor : Model -> String -> Maybe PendingLabeledSend
+pendingLabelFor model label =
+    case Dict.get label model.pendingLabels of
+        Just active ->
+            Just active
+
+        Nothing ->
+            Dict.get label model.uncertainLabels
 
 
 {-| Confirm one logical send's optimistic rows with the echo body:
@@ -29073,7 +32070,22 @@ applyReadMarker model target iso =
 
         marked =
             { model | readMarkers = Dict.insert key iso model.readMarkers }
+
+        -- Account read markers only move forward: a marker older than
+        -- the stored one (a stale relay or a reordered GET reply) is
+        -- ignored, leaving the stored marker and unread counts alone.
+        regresses =
+            case ( Maybe.andThen Wire.parseServerTime (Dict.get key model.readMarkers), Wire.parseServerTime iso ) of
+                ( Just storedMs, Just incomingMs ) ->
+                    incomingMs < storedMs
+
+                _ ->
+                    False
     in
+    if regresses then
+        model
+
+    else
     case Wire.parseServerTime iso of
         Nothing ->
             marked
@@ -29239,18 +32251,132 @@ recordLocalReadMarker model name =
                 marked =
                     { cleared
                         | readMarkers = Dict.insert (String.toLower name) iso cleared.readMarkers
+                        , viewedReadMarkers = Dict.insert (String.toLower name) iso cleared.viewedReadMarkers
                         , lastReadAt = Dict.insert (String.toLower name) (round model.nowMs) cleared.lastReadAt
                         , firstUnreadId = Dict.remove (String.toLower name) cleared.firstUnreadId
                     }
 
+                newestVisibleId =
+                    Dict.get (String.toLower name) model.channels
+                        |> Maybe.andThen (.messages >> List.head >> Maybe.map .id)
+
+                ( markedWithRequest, anchorRequest ) =
+                    makeRuntimeDomainOutbound marked (RuntimeDomain.AnchorViewed name (Maybe.map String.fromInt newestVisibleId) (Just iso))
+
                 sync =
-                    if List.member "draft/read-marker" marked.caps then
+                    if Session.hasCapability marked.caps "draft/read-marker" then
                         [ SendLine (Wire.formatIrcLine "MARKREAD" [ name, "timestamp=" ++ iso ]) ]
 
                     else
                         []
             in
-            ( marked, sync )
+            ( markedWithRequest, sync ++ Maybe.withDefault [] (Maybe.map List.singleton anchorRequest) )
+
+
+makeRuntimeDomainOutbound : Model -> RuntimeDomain.Action -> ( Model, Maybe Outbound )
+makeRuntimeDomainOutbound model action =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            ( model, Nothing )
+
+        Just stamp ->
+            let
+                nextClock =
+                    model.eventClock + 1
+            in
+            case (( Ids.requestIdFromRuntime ("domainRequest" ++ String.padLeft 12 '0' (String.fromInt nextClock)), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                    let
+                        capturedQueueDraft =
+                            case action of
+                                RuntimeDomain.QueueMessage target _ content _ _ _ ->
+                                    if model.composer == content && Maybe.map (ircCaseKey model) model.activeChannel == Just (ircCaseKey model target) then
+                                        Dict.insert (Ids.requestIdToRuntime requestId)
+                                            { target = target
+                                            , revision = Maybe.withDefault 0 (Dict.get (ircCaseKey model target) model.composerDraftVersions)
+                                            , text = content
+                                            }
+                                            model.queuedDraftRevisions
+
+                                    else
+                                        model.queuedDraftRevisions
+
+                                _ ->
+                                    model.queuedDraftRevisions
+                    in
+                    ( { model
+                        | eventClock = nextClock
+                        , runtimeDomainPending = Just requestId
+                        , runtimeDomainPendingAction = Just action
+                        , runtimeDomainResult = Nothing
+                        , queuedDraftRevisions = capturedQueueDraft
+                      }
+                    , Just
+                        (RuntimeDomainCommand
+                            { requestId = requestId
+                            , ownerRef = ownerRef
+                            , accountGeneration = accountGeneration
+                            , connectionGeneration = connectionGeneration
+                            , action = action
+                            }
+                        )
+                    )
+
+                _ ->
+                    ( model, Nothing )
+
+
+makeDraftDiscardOutbound : Model -> String -> Int -> ( Model, List Outbound )
+makeDraftDiscardOutbound model target revision =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            ( model, [] )
+
+        Just stamp ->
+            let
+                nextClock = model.eventClock + 1
+            in
+            case (( Ids.requestIdFromRuntime ("draftClear" ++ String.padLeft 12 '0' (String.fromInt nextClock)), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                    ( { model | eventClock = nextClock }
+                    , [ RuntimeDraftAutosaveTimerCancelled
+                            { target = target
+                            , revision = revision
+                            , ownerRef = stamp.ownerRef
+                            , accountGeneration = stamp.accountGeneration
+                            , connectionGeneration = stamp.connectionGeneration
+                            }
+                      ,
+                        (RuntimeDomainCommand
+                            { requestId = requestId
+                            , ownerRef = ownerRef
+                            , accountGeneration = accountGeneration
+                            , connectionGeneration = connectionGeneration
+                            , action = RuntimeDomain.DraftDiscard target revision
+                            }
+                        )
+                      ]
+                    )
+
+                _ ->
+                    ( model, [] )
+
+
+normalizePublicBackupRoom : String -> Maybe String
+normalizePublicBackupRoom candidate =
+    let
+        trimmed = String.trim candidate
+    in
+    if trimmed /= candidate
+        || String.length candidate < 2
+        || String.length candidate > 512
+        || not (String.startsWith "#" candidate)
+        || String.any (\char -> Char.toCode char <= 32 || Char.toCode char == 127) candidate
+        || Ids.conversationIdFromWire candidate == Nothing then
+        Nothing
+
+    else
+        Just candidate
 
 
 {-| Normalize an untrusted persisted nick blocklist (mirroring
@@ -29280,7 +32406,8 @@ parseNameBlocklist maxCount maxNick raw =
 
 {-| Persist both blocklists after any ignore/mute change (mirroring
 the per-action saves; the port writes the `onyx:ignored-users` /
-`onyx:muted-dms` keys). -}
+`onyx:muted-dms` keys and, once an owner is known, the matching
+`…:owner:…` documents). -}
 blocklistsSaveOut : Model -> List Outbound
 blocklistsSaveOut model =
     [ BlocklistsSave { ignored = Set.toList model.ignoredUsers, muted = Set.toList model.mutedDMs } ]
@@ -29606,6 +32733,35 @@ parseFollowedKeys raw =
         raw
 
 
+{-| Replace the session copies of owner-scoped device lists from one
+loaded document. A missing or malformed field becomes empty, matching
+the oracle loaders (they do not keep the previous account's rows). -}
+applyDeviceSlots : Decode.Value -> Model -> Model
+applyDeviceSlots value model =
+    let
+        strings key =
+            Decode.decodeValue (Decode.field key (Decode.list Decode.string)) value
+                |> Result.withDefault []
+
+        pairs key =
+            Decode.decodeValue (Decode.field key (Decode.keyValuePairs Decode.string)) value
+                |> Result.withDefault []
+    in
+    { model
+        | ignoredUsers = parseNameBlocklist 512 128 (strings "ignored")
+        , mutedDMs = parseNameBlocklist 512 128 (strings "muted")
+        , highlightWords = parseHighlightWords (strings "highlight")
+        , channelNotify =
+            parseChannelNotifyEntries
+                (List.map (\( channel, level ) -> { channel = channel, level = level }) (pairs "notify"))
+        , autoJoinChannels = parseAutoJoinChannels (strings "autoJoin")
+        , channelColors =
+            parseChannelColorEntries
+                (List.map (\( channel, color ) -> { channel = channel, color = color }) (pairs "colors"))
+        , followed = parseFollowedKeys (strings "followed")
+    }
+
+
 {-| Server named-conversation tag (`TOPIC_TAG`): the `onyx/topic`
 label carried on channel traffic. -}
 topicTagName : String
@@ -29900,9 +33056,10 @@ parseNotifyPermission raw =
             Notify.Default
 
 
-{-| Whether quiet mode suppresses alerts (mirroring the DND axes minus
-the standing quiet-hours schedule, which stays ahead:
-manual `dndEnabled` or a live `dndUntil` stamp). -}
+{-| Whether quiet mode suppresses alerts. Manual DND, a live snooze,
+and the standing local quiet-hours window are separate axes. The
+window follows `isDndActive` (`src/lib/store/store.ts`): it does not
+consult `dndEnabled`. -}
 notifyDndActive : Model -> Bool
 notifyDndActive model =
     model.dndEnabled
@@ -29913,6 +33070,12 @@ notifyDndActive model =
                 Nothing ->
                     False
            )
+        || QuietHours.isQuietHoursActive
+            { enabled = True
+            , startMinute = model.dndQuietStart * 60
+            , endMinute = model.dndQuietEnd * 60
+            }
+            (QuietHours.localMinuteOfDay model.zone (Time.millisToPosix (floor model.nowMs)))
 
 
 {-| OS-alert body (mirroring `notificationBodyFor`): envelopes fail
@@ -30123,7 +33286,10 @@ toast) while letting the normal fold continue. Returns `Just` only
 when the line is fully consumed. -}
 foldLabeledFail : Model -> Wire.IrcMessage -> Wire.StandardReply -> Maybe ( Model, List Outbound )
 foldLabeledFail model message reply =
-    if message.command /= "FAIL" then
+    if reply.command == "EDIT" && message.command == "FAIL" && reply.kind == Wire.Fail then
+        foldLabeledEditFail model message
+
+    else if message.command /= "FAIL" then
         Nothing
 
     else
@@ -30181,6 +33347,33 @@ foldLabeledFail model message reply =
                                     )
 
 
+foldLabeledEditFail : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldLabeledEditFail model message =
+    case ( labelOf message, model.runtimeOwnerStamp ) of
+        ( Just label, Just owner ) ->
+            model.pendingMessageEdits
+                |> Dict.toList
+                |> List.filter
+                    (\( _, pending ) ->
+                        pending.label == Just label
+                            && pending.owner == owner
+                            && pending.generation == model.physicalConnectionGeneration
+                    )
+                |> List.head
+                |> Maybe.map
+                    (\( key, _ ) ->
+                        ( { model
+                            | pendingMessageEdits = Dict.remove key model.pendingMessageEdits
+                            , composerError = Just "The server rejected this edit. Your replacement text and original message were kept."
+                          }
+                        , []
+                        )
+                    )
+
+        _ ->
+            Nothing
+
+
 {-| Cap on tracked own-echo batch refs. Past the cap a newly
 opened echo batch still resolves its rows, but its inner lines are
 not suppressed (they fold as live lines) — a deliberate ceiling for
@@ -30230,7 +33423,23 @@ type HistoryBatchKind
     | SearchHistory { generation : Int }
     | MultilineHistory
     | TargetsHistory
+    | LabeledResponse
+    | GenericBatch
     | Quarantined
+
+
+type HistoryRequestDirection
+    = HistoryLatestRequest
+    | HistoryBeforeRequest
+    | HistoryAfterRequest
+    | HistoryBetweenRequest
+    | HistoryAroundRequest
+
+
+type alias PendingHistoryRequest =
+    { direction : HistoryRequestDirection
+    , connectionGeneration : Int
+    }
 
 
 {-| First inner line's provenance, reused for the assembled synthetic
@@ -30246,6 +33455,13 @@ type alias MultilineSrc =
 type alias HistoryBatch =
     { target : String
     , kind : HistoryBatchKind
+    , parentRef : Maybe String
+    , depth : Int
+    , openedAt : Float
+    , deadline : Float
+    , connectionGeneration : Int
+    , requestDirection : Maybe HistoryRequestDirection
+    , incomplete : Bool
     , query : String
     , raws : List Wire.IrcMessage
     , hits : List VaultHit
@@ -30306,10 +33522,26 @@ compositeReplayKey maybeTarget at body =
         ++ body
 
 
+messageAccessibleLabelFor : Model -> ChatMessage -> String
+messageAccessibleLabelFor model message =
+    if isDeliveryUnknown model message then
+        "Delivery outcome unknown. " ++ messageAccessibleLabel { message | pending = False }
+
+    else
+        messageAccessibleLabel message
+
+
 blankHistoryBatch : String -> HistoryBatch
 blankHistoryBatch target =
     { target = target
     , kind = PlainHistory
+    , parentRef = Nothing
+    , depth = 0
+    , openedAt = 0
+    , deadline = 0
+    , connectionGeneration = 0
+    , requestDirection = Nothing
+    , incomplete = False
     , query = ""
     , raws = []
     , hits = []
@@ -30486,6 +33718,7 @@ divertReplayEvent model message =
                 _ ->
                     Nothing
 
+
         "PART" ->
             case ( message.nick, message.params ) of
                 ( Just parter, chan :: rest ) ->
@@ -30656,7 +33889,7 @@ mergeReplayEvents model target events =
                         events
 
                 withRows =
-                    updateChannel model target (\c -> { c | messages = List.take keepMessages (rows ++ c.messages) })
+                    updateChannel model target (\c -> { c | messages = List.take (messageRetentionFor model target) (rows ++ c.messages) })
             in
             sortChannelByStamp
                 { withRows | messageSeq = model.messageSeq + List.length events }
@@ -30878,6 +34111,163 @@ expireServerSearch model =
                 }
 
 
+expirePendingLabelRequests : Model -> Model
+expirePendingLabelRequests model =
+    Dict.toList model.pendingLabels
+        |> List.filter (\( _, pending ) -> pending.generation == model.physicalConnectionGeneration && model.nowMs >= pending.deadline)
+        |> List.foldl (\( label, _ ) current -> markLabeledUnknown current (Just label)) model
+
+
+expirePendingMessageEdits : Model -> Model
+expirePendingMessageEdits model =
+    { model
+        | pendingMessageEdits =
+            Dict.map
+                (\_ pending ->
+                    if pending.deadline <= model.nowMs then
+                        { pending | outcomeUnknown = True }
+
+                    else
+                        pending
+                )
+                model.pendingMessageEdits
+    }
+
+
+markPendingEditUnknown : String -> Model -> Model
+markPendingEditUnknown label model =
+    { model
+        | pendingMessageEdits =
+            Dict.map
+                (\_ pending ->
+                    if pending.label == Just label then
+                        { pending | outcomeUnknown = True }
+
+                    else
+                        pending
+                )
+                model.pendingMessageEdits
+    }
+
+
+expireHistoryBatches : Model -> ( Model, List Outbound )
+expireHistoryBatches model =
+    let
+        due =
+            model.historyBatches
+                |> Dict.toList
+                |> List.filter (\( _, batch ) -> batch.connectionGeneration == model.physicalConnectionGeneration && batch.deadline > 0 && model.nowMs >= batch.deadline)
+                |> List.sortBy (\( _, batch ) -> batch.openedAt)
+    in
+    List.foldl
+        (\( ref, _ ) ( current, outs ) ->
+            case Dict.get ref current.historyBatches of
+                Nothing ->
+                    ( current, outs )
+
+                Just collector ->
+                    let
+                        ( next, nextOuts ) =
+                            expireOneHistoryBatch current ref collector
+                    in
+                    ( next, outs ++ nextOuts )
+        )
+        ( model, [] )
+        due
+
+
+retireOpenHistoryBatches : Model -> ( Model, List Outbound )
+retireOpenHistoryBatches model =
+    model.historyBatches
+        |> Dict.toList
+        |> List.sortBy (\( _, batch ) -> batch.openedAt)
+        |> List.foldl
+            (\( ref, _ ) ( current, outs ) ->
+                case Dict.get ref current.historyBatches of
+                    Just collector ->
+                        let
+                            ( next, nextOuts ) =
+                                expireOneHistoryBatch current ref collector
+                        in
+                        ( next, outs ++ nextOuts )
+
+                    Nothing ->
+                        ( current, outs )
+            )
+            ( model, [] )
+
+
+expireOneHistoryBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
+expireOneHistoryBatch model ref collector =
+    let
+        retiredRefs =
+            model.historyBatches
+                |> Dict.toList
+                |> List.filter (\( candidate, _ ) -> isNestedBatch model ref candidate)
+                |> List.map Tuple.first
+
+        withoutDescendants =
+            { model
+                | historyBatches = List.foldl Dict.remove model.historyBatches retiredRefs
+                , ownEchoBatches = List.foldl Set.remove model.ownEchoBatches retiredRefs
+            }
+
+        base =
+            case collector.responseLabel of
+                Just label ->
+                    markLabeledUnknown withoutDescendants (Just label)
+
+                Nothing ->
+                    withoutDescendants
+    in
+    case collector.kind of
+        PlainHistory ->
+            let
+                timed =
+                    { collector | incomplete = True }
+
+                withTimedParent =
+                    case collector.parentRef |> Maybe.andThen (\parent -> Dict.get parent base.historyBatches) of
+                        Just parent ->
+                            { base | historyBatches = Dict.insert (Maybe.withDefault "" collector.parentRef) { parent | incomplete = True } base.historyBatches }
+
+                        Nothing ->
+                            base
+            in
+            closeHistoryBatch { withTimedParent | historyBatches = Dict.insert ref timed withTimedParent.historyBatches } ref
+
+        _ ->
+            let
+                dropped =
+                    { base
+                        | historyBatches = Dict.remove ref base.historyBatches
+                        , historyLoading = Set.remove (String.toLower collector.target) base.historyLoading
+                    }
+            in
+            ( addToast
+                { variant = ToastError
+                , title = "History response incomplete"
+                , description = Just "The server did not finish this history batch. Incomplete messages were discarded."
+                , duration = Nothing
+                , groupKey = Just ("history-incomplete:" ++ String.toLower collector.target)
+                , undo = Nothing
+                }
+                dropped.nowMs
+                dropped
+            , []
+            )
+
+
+isNestedBatch : Model -> String -> String -> Bool
+isNestedBatch model parentRef candidate =
+    case Dict.get candidate model.historyBatches |> Maybe.andThen .parentRef of
+        Just parent ->
+            parent == parentRef || isNestedBatch model parentRef parent
+
+        Nothing ->
+            False
+
+
 {-| Whether the settled server results belong to the live panel
 context (mirrors `serverSearchMatchesContext`: pending always
 shows; done/error only under the same target and query). -}
@@ -30988,6 +34378,16 @@ type alias PendingServerSearch =
 maxHistoryBatches : Int
 maxHistoryBatches =
     64
+
+
+maxBatchDepth : Int
+maxBatchDepth =
+    8
+
+
+historyBatchTimeoutMs : Float
+historyBatchTimeoutMs =
+    30000
 
 
 {-| Cap on collected server results per search (mirroring
@@ -31149,17 +34549,14 @@ trackEchoBatch model message ref =
             ( model, [] )
 
         Just label ->
-            if Dict.member label model.pendingLabels then
+            if Dict.member label model.pendingLabels || Dict.member label model.uncertainLabels then
                 let
-                    promoted =
-                        promoteLabeledSend model label
-
                     tracked =
-                        if Set.size promoted.ownEchoBatches >= maxOwnEchoBatches then
-                            promoted
+                        if Set.size model.ownEchoBatches >= maxOwnEchoBatches then
+                            model
 
                         else
-                            { promoted | ownEchoBatches = Set.insert ref promoted.ownEchoBatches }
+                            { model | ownEchoBatches = Set.insert ref model.ownEchoBatches }
                 in
                 ( tracked, [] )
 
@@ -31203,30 +34600,163 @@ can preserve the correlation label (mirroring the `label` read on
 the `draft/multiline` open). -}
 openHistoryBatch : Model -> Wire.IrcMessage -> String -> Maybe String -> Maybe String -> ( Model, List Outbound )
 openHistoryBatch model message ref maybeType maybeTarget =
-    case maybeType of
-        Just "draft/chathistory-targets" ->
-            openHistoryTargetsBatch model ref
+    let
+        parentRef =
+            Dict.get "batch" message.tags
 
-        _ ->
-            case ( maybeType, maybeTarget ) of
-                ( Just batchType, Just target ) ->
-                    if not (validBatchEnvelope ref target) then
-                        ( model, [] )
+        parentDepth =
+            parentRef
+                |> Maybe.andThen (\parent -> Dict.get parent model.historyBatches)
+                |> Maybe.map .depth
+                |> Maybe.withDefault -1
 
-                    else if Dict.member ref model.historyBatches || Dict.size model.historyBatches >= maxHistoryBatches then
-                        ( model, [] )
+        allowed =
+            validBatchRef ref
+                && not (Dict.member ref model.historyBatches)
+                && Dict.size model.historyBatches < maxHistoryBatches
+                && (parentRef == Nothing || parentDepth >= 0 && parentDepth < maxBatchDepth - 1)
 
-                    else if batchType == "draft/chathistory" || batchType == "chathistory" then
-                        openBatchCollector model ref target
+        opened =
+            if not allowed then
+                ( model, [] )
 
-                    else if batchType == "draft/multiline" then
-                        insertMultilineBatch model message ref target
+            else
+                case maybeType of
+                    Just "draft/chathistory-targets" ->
+                        if parentRef == Nothing then
+                            openHistoryTargetsBatch model ref
 
-                    else
-                        ( model, [] )
+                        else
+                            insertWrapperBatch model message ref (inheritedWrapperKind model parentRef)
+
+                    Just "labeled-response" ->
+                        insertWrapperBatch model message ref (inheritedLabeledResponseKind model parentRef)
+
+                    _ ->
+                        case ( maybeType, maybeTarget ) of
+                            ( Just batchType, Just target ) ->
+                                if not (validBatchEnvelope ref target) then
+                                    insertWrapperBatch model message ref (inheritedWrapperKind model parentRef)
+
+                                else if batchType == "draft/chathistory" || batchType == "chathistory" then
+                                    case parentRef |> Maybe.andThen (\parent -> Dict.get parent model.historyBatches) of
+                                        Just parent ->
+                                            case parent.kind of
+                                                PlainHistory ->
+                                                    if String.toLower parent.target == String.toLower target then
+                                                        insertPlainBatch model ref parent.target
+
+                                                    else
+                                                        insertQuarantinedBatch model ref target
+
+                                                Quarantined ->
+                                                    insertQuarantinedBatch model ref target
+
+                                                _ ->
+                                                    openBatchCollector model ref target
+
+                                        Nothing ->
+                                            openBatchCollector model ref target
+
+                                else if batchType == "draft/multiline" then
+                                    insertMultilineBatch model message ref target
+
+                                else
+                                    insertWrapperBatch model message ref (inheritedWrapperKind model parentRef)
+
+                            _ ->
+                                insertWrapperBatch model message ref (inheritedWrapperKind model parentRef)
+    in
+    if not allowed then
+        ( model, [] )
+
+    else
+        case Dict.get ref (Tuple.first opened).historyBatches of
+            Nothing ->
+                opened
+
+            Just collector ->
+                let
+                    decorated =
+                        { collector
+                            | parentRef = parentRef
+                            , depth = parentDepth + 1
+                            , openedAt = model.nowMs
+                            , deadline = model.nowMs + historyBatchTimeoutMs
+                            , connectionGeneration = model.physicalConnectionGeneration
+                        }
+
+                    openedModel =
+                        Tuple.first opened
+                in
+                ( { openedModel | historyBatches = Dict.insert ref decorated openedModel.historyBatches }, Tuple.second opened )
+
+
+insertWrapperBatch : Model -> Wire.IrcMessage -> String -> HistoryBatchKind -> ( Model, List Outbound )
+insertWrapperBatch model message ref kind =
+    let
+        target =
+            case Dict.get "batch" message.tags |> Maybe.andThen (\parent -> Dict.get parent model.historyBatches) of
+                Just parent ->
+                    parent.target
+
+                Nothing ->
+                    ""
+
+        base =
+            blankHistoryBatch target
+
+        responseLabel =
+            Dict.get "label" message.tags
+                |> Maybe.andThen (\label -> if Labels.isValidLabel label then Just label else Nothing)
+    in
+    ( { model
+        | historyBatches = Dict.insert ref { base | kind = kind, responseLabel = responseLabel } model.historyBatches
+      }
+    , []
+    )
+
+
+inheritedWrapperKind : Model -> Maybe String -> HistoryBatchKind
+inheritedWrapperKind model parentRef =
+    case parentRef |> Maybe.andThen (\parent -> Dict.get parent model.historyBatches) of
+        Just parent ->
+            case parent.kind of
+                PlainHistory ->
+                    PlainHistory
+
+                Quarantined ->
+                    Quarantined
+
+                SearchHistory _ ->
+                    Quarantined
 
                 _ ->
-                    ( model, [] )
+                    GenericBatch
+
+        Nothing ->
+            GenericBatch
+
+
+inheritedLabeledResponseKind : Model -> Maybe String -> HistoryBatchKind
+inheritedLabeledResponseKind model parentRef =
+    case parentRef |> Maybe.andThen (\parent -> Dict.get parent model.historyBatches) of
+        Just parent ->
+            case parent.kind of
+                PlainHistory ->
+                    PlainHistory
+
+                Quarantined ->
+                    Quarantined
+
+                SearchHistory _ ->
+                    Quarantined
+
+                _ ->
+                    LabeledResponse
+
+        Nothing ->
+            LabeledResponse
 
 
 {-| Register one validated multiline batch: the inner PRIVMSGs
@@ -31328,6 +34858,26 @@ insertPlainBatch model ref target =
         key =
             String.toLower target
 
+        capturedRequest =
+            case Dict.get key model.pendingHistoryRequests of
+                Just request ->
+                    if request.connectionGeneration == model.physicalConnectionGeneration && Set.member key model.historyLoading then
+                        Just request.direction
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+        pendingRequests =
+            -- A matching-target collector is the terminal query boundary
+            -- for this single-flight request, even when its saved
+            -- generation/loading fence is stale. It receives direction
+            -- authority only through `capturedRequest`; stale provenance
+            -- is retired instead of being left available to a later batch.
+            Dict.remove key model.pendingHistoryRequests
+
         ( discovery, discoveries ) =
             case Dict.get key model.pendingDiscoveries of
                 Just row ->
@@ -31337,7 +34887,8 @@ insertPlainBatch model ref target =
                     ( Nothing, model.pendingDiscoveries )
     in
     ( { model
-        | historyBatches = Dict.insert ref { base | discovery = discovery } model.historyBatches
+        | historyBatches = Dict.insert ref { base | discovery = discovery, requestDirection = capturedRequest } model.historyBatches
+        , pendingHistoryRequests = pendingRequests
         , pendingDiscoveries = discoveries
       }
     , []
@@ -31414,7 +34965,48 @@ closeHistoryBatch model ref =
             ( model, [] )
 
         Just collector ->
-            case collector.kind of
+            let
+                descendants =
+                    model.historyBatches
+                        |> Dict.toList
+                        |> List.filter (\( candidate, _ ) -> isNestedBatch model ref candidate)
+                        |> List.map Tuple.first
+
+                withoutOpenChildren =
+                    { model | historyBatches = List.foldl Dict.remove model.historyBatches descendants }
+
+                closing =
+                    if List.isEmpty descendants then
+                        collector
+
+                    else
+                        { collector | incomplete = True }
+            in
+            case collector.parentRef |> Maybe.andThen (\parentRef -> Dict.get parentRef withoutOpenChildren.historyBatches) of
+                Just parent ->
+                    let
+                        parentRef =
+                            Maybe.withDefault "" collector.parentRef
+
+                        parentWithStatus =
+                            if List.isEmpty descendants then
+                                parent
+
+                            else
+                                { parent | incomplete = True }
+
+                        parentUpdated =
+                            { withoutOpenChildren | historyBatches = Dict.insert parentRef parentWithStatus withoutOpenChildren.historyBatches }
+                    in
+                    closeNestedHistoryBatch parentUpdated ref closing parentWithStatus
+
+                Nothing ->
+                    closeUnparentedHistoryBatch withoutOpenChildren ref closing
+
+
+closeUnparentedHistoryBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
+closeUnparentedHistoryBatch model ref collector =
+    case collector.kind of
                 PlainHistory ->
                     closePlainBatch model ref collector
 
@@ -31427,8 +35019,175 @@ closeHistoryBatch model ref =
                 TargetsHistory ->
                     closeHistoryTargetsBatch model ref collector
 
+                LabeledResponse ->
+                    closeWrapperBatch model ref collector
+
+                GenericBatch ->
+                    closeWrapperBatch model ref collector
+
                 Quarantined ->
                     ( forgetQuarantinedBatch model ref collector, [] )
+
+
+closeNestedHistoryBatch : Model -> String -> HistoryBatch -> HistoryBatch -> ( Model, List Outbound )
+closeNestedHistoryBatch model ref collector parent =
+    if parent.kind == Quarantined then
+        ( forgetQuarantinedBatch model ref collector, [] )
+
+    else if parent.kind == PlainHistory then
+        let
+            removed =
+                { model | historyBatches = Dict.remove ref model.historyBatches }
+
+            nestedRows =
+                case collector.kind of
+                    MultilineHistory ->
+                        case ( collector.multilineRejected, collector.parts, collector.multilineSrc ) of
+                            ( False, _ :: _, Just src ) ->
+                                if collector.incomplete then
+                                    []
+
+                                else
+                                    [ assembledMultilineMessage collector src ]
+
+                            _ ->
+                                []
+
+                    _ ->
+                        collector.raws
+
+            appended =
+                appendCappedBatchRows parent.raws nestedRows
+
+            parentRef =
+                Maybe.withDefault "" collector.parentRef
+        in
+        ( { removed | historyBatches = Dict.insert parentRef { parent | raws = appended } removed.historyBatches }, [] )
+
+    else if collector.kind == LabeledResponse then
+        -- A labeled wrapper nested in another nonhistorical wrapper
+        -- still carries its own exact response correlation. It may
+        -- settle only through the exact self-echo resolver; wrapper
+        -- ancestry never sends children through live reducers.
+        settleLabeledResponse (forgetQuarantinedBatch model ref collector) collector
+
+    else
+        ( forgetQuarantinedBatch model ref collector, [] )
+
+
+closeWrapperBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
+closeWrapperBatch model ref collector =
+    let
+        removed =
+            { model | historyBatches = Dict.remove ref model.historyBatches }
+
+        marked =
+            if collector.incomplete then
+                addToast
+                    { variant = ToastError
+                    , title = "History response incomplete"
+                    , description = Just "The server closed a wrapper before its nested batches finished. Incomplete messages were discarded."
+                    , duration = Nothing
+                    , groupKey = Just "history-incomplete:wrapper"
+                    , undo = Nothing
+                    }
+                    removed.nowMs
+                    removed
+
+            else
+                removed
+    in
+    case collector.parentRef |> Maybe.andThen (\parent -> Dict.get parent marked.historyBatches) of
+        Just parent ->
+            let
+                appended =
+                    appendCappedBatchRows parent.raws collector.raws
+            in
+            ( { marked | historyBatches = Dict.insert (Maybe.withDefault "" collector.parentRef) { parent | raws = appended } marked.historyBatches }, [] )
+
+        Nothing ->
+            case ( collector.kind, collector.responseLabel ) of
+                ( LabeledResponse, Just label ) ->
+                    -- Labeled-response children are buffered so the
+                    -- batch tag cannot send them through live folds.
+                    -- At close, only the existing exact self-echo
+                    -- resolver may settle the captured label; the
+                    -- wrapper itself never confirms delivery. Any
+                    -- response still outstanding when the wrapper
+                    -- completes becomes explicitly delivery-unknown.
+                    settleLabeledResponse marked collector
+
+                _ ->
+                    -- An unparented generic wrapper has no historical
+                    -- or delivery authority. Its children remain
+                    -- consumed.
+                    ( marked, [] )
+
+
+settleLabeledResponse : Model -> HistoryBatch -> ( Model, List Outbound )
+settleLabeledResponse model collector =
+    case collector.responseLabel of
+        Just label ->
+            let
+                ( resolved, outs ) =
+                    List.foldl (resolveLabeledWrapperChild label) ( model, [] ) collector.raws
+
+                completed =
+                    markPendingEditUnknown label (markLabeledUnknown resolved (Just label))
+            in
+            ( completed, outs )
+
+        Nothing ->
+            ( model, [] )
+
+
+resolveLabeledWrapperChild : String -> Wire.IrcMessage -> ( Model, List Outbound ) -> ( Model, List Outbound )
+resolveLabeledWrapperChild label raw ( model, outs ) =
+    let
+        correlated =
+            { raw
+                | tags = raw.tags |> Dict.remove "batch" |> Dict.insert "label" label
+            }
+    in
+    case Wire.parseStandardReply correlated of
+        Just reply ->
+            if correlated.command == "FAIL" && reply.kind == Wire.Fail && reply.command == "EDIT" then
+                case foldLabeledEditFail model correlated of
+                    Just ( rejected, failOuts ) ->
+                        ( rejected, outs ++ failOuts )
+
+                    Nothing ->
+                        ( model, outs )
+
+            else
+                resolveLabeledEditOrMessage model correlated outs
+
+        Nothing ->
+            resolveLabeledEditOrMessage model correlated outs
+
+
+resolveLabeledEditOrMessage : Model -> Wire.IrcMessage -> List Outbound -> ( Model, List Outbound )
+resolveLabeledEditOrMessage model correlated outs =
+    case settlePendingEditEcho model correlated of
+        Just ( settled, target ) ->
+            let
+                ( flushed, flushOuts ) =
+                    flushVaultBuffer settled target
+            in
+            ( flushed, outs ++ flushOuts )
+
+        Nothing ->
+            ( resolveLabeledEcho model correlated |> Maybe.withDefault model, outs )
+
+
+appendCappedBatchRows : List Wire.IrcMessage -> List Wire.IrcMessage -> List Wire.IrcMessage
+appendCappedBatchRows existing incoming =
+    List.take maxHistoryBatchRows (existing ++ incoming)
+
+
+removeBatchTag : Wire.IrcMessage -> Wire.IrcMessage
+removeBatchTag message =
+    { message | tags = Dict.remove "batch" message.tags }
 
 
 closePlainBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
@@ -31444,7 +35203,7 @@ closePlainBatch model ref collector =
         step raw ( m, outs ) =
             let
                 ( m2, o2 ) =
-                    foldParsed m raw
+                    foldParsed m (removeBatchTag raw)
             in
             ( m2, outs ++ o2 )
 
@@ -31459,12 +35218,11 @@ closePlainBatch model ref collector =
 
         seen =
             case collector.discovery of
-                Just row ->
-                    if isChannelName model row.target then
-                        sorted
-
-                    else
-                        updateChannel sorted row.target (\c -> { c | lastSeen = Just row.latestAt })
+                Just _ ->
+                    -- Replaying history does not mean the user viewed
+                    -- the newest DM. Only an explicit view action may
+                    -- advance this read boundary.
+                    sorted
 
                 Nothing ->
                     sorted
@@ -31510,26 +35268,16 @@ closePlainBatch model ref collector =
                 Nothing ->
                     seen
 
-        -- A stored server marker re-derives unread from the merged
-        -- replay (mirroring the post-merge re-derive arm); an open
-        -- named conversation persists its consumed boundary first
-        -- (mirroring the batch-close arm).
-        ( remarked, remarkOuts ) =
+        -- Replay may re-derive counts from an existing server marker,
+        -- but closing a history collector is not a user view and must
+        -- never create or persist a new read boundary.
+        remarked =
             case Dict.get key counted.readMarkers of
                 Just iso ->
-                    case activeMarkerTopic counted collector.target of
-                        Just topic ->
-                            let
-                                ( marked, markOuts ) =
-                                    markLatestChannelTopicRead counted collector.target topic
-                            in
-                            ( applyReadMarker marked collector.target iso, markOuts )
-
-                        Nothing ->
-                            ( applyReadMarker counted collector.target iso, [] )
+                    applyReadMarker counted collector.target iso
 
                 Nothing ->
-                    ( counted, [] )
+                    counted
 
         -- Replayed membership lines merge into the buffer at
         -- their historical stamps (mirroring the `sysMsg`
@@ -31537,13 +35285,11 @@ closePlainBatch model ref collector =
         replayed =
             mergeReplayEvents remarked collector.target collector.replayEvents
 
-        -- A short plain close proves the top of history (mirroring
-        -- the `< HISTORY_PAGE_SIZE` arm: plain backfills are always
-        -- LATEST fetches, never AROUND time-travel, so a short
-        -- answer ends the line — sticky, like the oracle). A
-        -- travel close never exhausts: an AROUND window is a
-        -- middle slice, and its landing clears the pending
-        -- travel.
+        -- Only a completed, locally owned LATEST or BEFORE request
+        -- can prove older-history exhaustion from a short page. AFTER
+        -- and BETWEEN describe newer/ bounded intervals; unsolicited
+        -- or mismatched batches carry no completion authority. A
+        -- travel close is a middle slice and never exhausts history.
         traveling =
             case model.pendingTravel of
                 Just pending ->
@@ -31552,8 +35298,25 @@ closePlainBatch model ref collector =
                 Nothing ->
                     False
 
+        provesOlderHistoryExhaustion =
+            case collector.requestDirection of
+                Just HistoryLatestRequest ->
+                    True
+
+                Just HistoryBeforeRequest ->
+                    True
+
+                _ ->
+                    False
+
         exhausted =
-            if traveling then
+            if collector.incomplete then
+                replayed
+
+            else if traveling then
+                replayed
+
+            else if not provesOlderHistoryExhaustion then
                 replayed
 
             else if List.length collector.raws + List.length collector.replayEvents < historyPageSize then
@@ -31561,14 +35324,59 @@ closePlainBatch model ref collector =
 
             else
                 replayed
-    in
-    ( if traveling then
-        { exhausted | pendingTravel = Nothing }
+        traveled =
+            if traveling then
+                { exhausted | pendingTravel = Nothing }
 
-      else
-        exhausted
-    , out ++ remarkOuts
-    )
+            else
+                exhausted
+
+        -- The collector answering a pin jump's AROUND request settles
+        -- that pin: it lands on the row when the batch brought it, and
+        -- otherwise reports it unavailable. Either way the pending pin
+        -- clears so a later jump can retry; rows, pins, and exhaustion
+        -- stay as merged above.
+        settled =
+            case ( collector.requestDirection, Dict.get key traveled.pendingPins ) of
+                ( Just HistoryAroundRequest, Just pinId ) ->
+                    let
+                        cleared =
+                            { traveled | pendingPins = Dict.remove key traveled.pendingPins }
+
+                        landed =
+                            case Dict.get key cleared.channels of
+                                Just channel ->
+                                    List.any (\row -> row.msgid == Just pinId) channel.messages
+
+                                Nothing ->
+                                    False
+                    in
+                    if landed then
+                        { cleared | historyLanding = Just pinId, pinsLoadFeedback = "" }
+
+                    else
+                        { cleared | pinsLoadFeedback = "Pinned message could not be loaded from history. Try again." }
+
+                _ ->
+                    traveled
+
+        withNotice =
+            if collector.incomplete then
+                addToast
+                    { variant = ToastError
+                    , title = "History response incomplete"
+                    , description = Just "The server did not finish this history batch. Received messages were kept."
+                    , duration = Nothing
+                    , groupKey = Just ("history-incomplete:" ++ String.toLower collector.target)
+                    , undo = Nothing
+                    }
+                    settled.nowMs
+                    settled
+
+            else
+                settled
+    in
+    ( withNotice, out )
 
 
 {-| Settle a search batch: time-ordered results plus the limit/drop
@@ -31674,8 +35482,8 @@ PRIVMSG re-dispatched through the full delivery path (highlights,
 unread, DM routing, labeled-echo resolution, vault) exactly like a
 plain message, mirroring the close arm. The batch framing tags come
 off and the opening-BATCH label goes on as the correlation id. A
-rejected or empty batch still clears a pending label (mirroring the
-null-echo promotion) so optimistic rows never strand. -}
+rejected or empty batch retires its response label as delivery
+unknown; it never implies acceptance. -}
 closeMultilineBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
 closeMultilineBatch model ref collector =
     let
@@ -31684,39 +35492,41 @@ closeMultilineBatch model ref collector =
     in
     case ( collector.multilineRejected, collector.parts, collector.multilineSrc ) of
         ( False, _ :: _, Just src ) ->
-            let
-                untagged =
-                    src.tags
-                        |> Dict.remove "batch"
-                        |> Dict.remove "draft/multiline-concat"
-
-                assembledTags =
-                    case collector.responseLabel of
-                        Just label ->
-                            Dict.insert "label" label untagged
-
-                        Nothing ->
-                            untagged
-
-                synthetic =
-                    { tags = assembledTags
-                    , prefix = src.prefix
-                    , nick = src.nick
-                    , host = src.host
-                    , command = "PRIVMSG"
-                    , params = [ collector.target, Multiline.assembleMultilineText collector.parts ]
-                    , raw = ""
-                    }
-            in
-            foldParsed unbatched synthetic
+            foldParsed unbatched (assembledMultilineMessage collector src)
 
         _ ->
             case collector.responseLabel of
-                Just label ->
-                    ( promoteLabeledSend unbatched label, [] )
+                Just _ ->
+                    ( markLabeledUnknown unbatched collector.responseLabel, [] )
 
                 Nothing ->
                     ( unbatched, [] )
+
+
+assembledMultilineMessage : HistoryBatch -> MultilineSrc -> Wire.IrcMessage
+assembledMultilineMessage collector src =
+    let
+        untagged =
+            src.tags
+                |> Dict.remove "batch"
+                |> Dict.remove "draft/multiline-concat"
+
+        assembledTags =
+            case collector.responseLabel of
+                Just label ->
+                    Dict.insert "label" label untagged
+
+                Nothing ->
+                    untagged
+    in
+    { tags = assembledTags
+    , prefix = src.prefix
+    , nick = src.nick
+    , host = src.host
+    , command = "PRIVMSG"
+    , params = [ collector.target, Multiline.assembleMultilineText collector.parts ]
+    , raw = ""
+    }
 
 
 {-| Archived-results notice from the collector flags (mirroring
@@ -32337,7 +36147,7 @@ requestTargetBackfill model target maybeLatest row outs =
                     "timestamp=" ++ millisToIso (toFloat (max 0 (latest - historyTargetFuzzMs)))
 
         markRead =
-            if List.member "draft/read-marker" model.caps then
+            if Session.hasCapability model.caps "draft/read-marker" then
                 [ SendLine (Wire.formatIrcLine "MARKREAD" [ target ]) ]
 
             else
@@ -32348,6 +36158,7 @@ requestTargetBackfill model target maybeLatest row outs =
     in
     ( { model
         | historyLoading = Set.insert (String.toLower target) model.historyLoading
+        , pendingHistoryRequests = Dict.insert (String.toLower target) { direction = HistoryLatestRequest, connectionGeneration = model.physicalConnectionGeneration } model.pendingHistoryRequests
         , pendingDiscoveries = Dict.insert (String.toLower target) row model.pendingDiscoveries
       }
     , outs ++ markRead ++ [ fetch ]
@@ -32357,8 +36168,9 @@ requestTargetBackfill model target maybeLatest row outs =
 {-| Settle a TARGETS batch: the sweep boundary commits, every row
 fans out to a backfill fetch, and the rows merge into the discovery
 ledger (newest stamp wins; the ledger holds the newest 64,
-mirroring the per-reply work bound). Unread bumps stay ahead with
-the unread subsystem. -}
+mirroring the per-reply work bound). Discovery unread bumps land
+when the following plain LATEST batch closes (`closePlainBatch`),
+not in this transport close. -}
 closeHistoryTargetsBatch : Model -> String -> HistoryBatch -> ( Model, List Outbound )
 closeHistoryTargetsBatch model ref collector =
     let
@@ -32432,7 +36244,10 @@ foldChathistoryFail model reply =
                     String.toLower channel
 
                 unloaded =
-                    { model | historyLoading = Set.remove key model.historyLoading }
+                    { model
+                        | historyLoading = Set.remove key model.historyLoading
+                        , pendingHistoryRequests = Dict.remove key model.pendingHistoryRequests
+                    }
             in
             if Dict.member key model.pendingPins then
                 ( { unloaded | pendingPins = Dict.remove key unloaded.pendingPins }, [] )
@@ -32516,20 +36331,41 @@ children accumulate reassembly parts under the 64-part / 64k-char
 ceilings; quarantined children divert-and-drop. -}
 divertHistoryBatch : Model -> Wire.IrcMessage -> Maybe Model
 divertHistoryBatch model message =
-    if message.command /= "PRIVMSG" && message.command /= "NOTICE" then
+    if message.command == "BATCH" then
         Nothing
 
     else
         case Dict.get "batch" message.tags of
-            Nothing ->
-                Nothing
+        Nothing ->
+            Nothing
 
-            Just ref ->
-                case Dict.get ref model.historyBatches of
-                    Nothing ->
-                        Nothing
+        Just ref ->
+            case Dict.get ref model.historyBatches of
+                Nothing ->
+                    -- Unknown or retired @batch references are
+                    -- consumed before any live reducer sees them.
+                    Just model
 
-                    Just collector ->
+                Just collector ->
+                    if message.command /= "PRIVMSG" && message.command /= "NOTICE" then
+                        if collector.kind == LabeledResponse
+                            && List.member message.command [ "FAIL", "WARN" ]
+                            && Wire.parseStandardReply message /= Nothing
+                            && List.length collector.raws < maxHistoryBatchRows then
+                            Just { model | historyBatches = Dict.insert ref { collector | raws = appendCappedBatchRows collector.raws [ message ] } model.historyBatches }
+
+                        else if collector.kind == TargetsHistory && message.command == "CHATHISTORY" then
+                            Just (collectHistoryTarget model message)
+
+                        else
+                            case divertReplayEvent model message of
+                                Just replayed ->
+                                    Just replayed
+
+                                Nothing ->
+                                    Just model
+
+                    else
                         case collector.kind of
                             PlainHistory ->
                                 if List.length collector.raws >= maxHistoryBatchRows then
@@ -32550,6 +36386,12 @@ divertHistoryBatch model message =
                                 -- like quarantine (mirroring the
                                 -- `history-targets` arm).
                                 Just model
+
+                            LabeledResponse ->
+                                Just { model | historyBatches = Dict.insert ref { collector | raws = appendCappedBatchRows collector.raws [ message ] } model.historyBatches }
+
+                            GenericBatch ->
+                                Just { model | historyBatches = Dict.insert ref { collector | raws = appendCappedBatchRows collector.raws [ message ] } model.historyBatches }
 
                             Quarantined ->
                                 Just model
@@ -32690,6 +36532,7 @@ renderOptimisticSend model target texts outgoing label audience =
 
                 vaultRow =
                     { id = key ++ ":" ++ String.fromInt messageId
+                    , wireMessageId = Nothing
                     , target = key
                     , from = rendered.ourNick
                     , body = text
@@ -32700,9 +36543,9 @@ renderOptimisticSend model target texts outgoing label audience =
                     , replyTo = Nothing
                     }
             in
-            ( updateChannel { rendered | messageSeq = messageId + 1 } target
+            ( updateChannel { rendered | messageSeq = messageId + 1, ownedRowIds = markOwnedRow messageId rendered.ownedRowIds } target
                 (\c ->
-                    { c | messages = List.take keepMessages (chatMessage :: c.messages) }
+                    { c | messages = List.take (messageRetentionFor rendered target) (chatMessage :: c.messages) }
                 )
             , rows ++ [ vaultRow ]
             )
@@ -32722,7 +36565,7 @@ renderOptimisticSend model target texts outgoing label audience =
             sendTyping (rememberVaultIds previewed vaultRows) target False
     in
     ( stopped
-    , outgoing ++ [ VaultPersist { target = key, rows = vaultRows } ] ++ previewOuts ++ stopOut
+    , outgoing ++ [ vaultPersistOutbound model key vaultRows ] ++ previewOuts ++ stopOut
     )
 
 
@@ -32971,6 +36814,91 @@ dmMutateBucket model target actor =
 
 foldChat : Model -> Wire.IrcMessage -> Bool -> ( Model, List Outbound )
 foldChat model message isNotice =
+    -- A REDACT that outran its original (live or replayed) left a
+    -- pending (bucket, msgid) mark: the original files with the fixed
+    -- redaction copy in place of its body, so the secret text never
+    -- reaches a row, a notification, or the vault.
+    case pendingRedactionFor model message of
+        Just mark ->
+            let
+                cleared =
+                    { model | pendingRedactions = List.filter ((/=) mark) model.pendingRedactions }
+
+                scrubbed =
+                    case message.params of
+                        target :: _ :: rest ->
+                            { message | params = target :: redactedBody :: rest }
+
+                        _ ->
+                            message
+
+                ( folded, outs ) =
+                    foldChatRow cleared scrubbed isNotice
+            in
+            ( markRowRedacted folded mark, outs )
+
+        Nothing ->
+            foldChatRow model message isNotice
+
+
+{-| The pending redaction mark an inbound chat line answers, if any. -}
+pendingRedactionFor : Model -> Wire.IrcMessage -> Maybe ( String, String )
+pendingRedactionFor model message =
+    case ( msgidOf message, message.params ) of
+        ( Just msgid, target :: _ :: _ ) ->
+            let
+                mark =
+                    ( String.toLower (dmFileBucket model (stripStatusmsgTarget model target) (Maybe.withDefault "" message.nick)), msgid )
+            in
+            if List.member mark model.pendingRedactions then
+                Just mark
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+markRowRedacted : Model -> ( String, String ) -> Model
+markRowRedacted model ( key, msgid ) =
+    case Dict.get key model.channels of
+        Nothing ->
+            model
+
+        Just ch ->
+            { model
+                | channels =
+                    Dict.insert key
+                        { ch
+                            | messages =
+                                List.map
+                                    (\m ->
+                                        if m.msgid == Just msgid then
+                                            { m | redacted = True, body = redactedBody }
+
+                                        else
+                                            m
+                                    )
+                                    ch.messages
+                        }
+                        model.channels
+            }
+
+
+{-| Bounded memory of redactions whose original has not arrived yet. -}
+maxPendingRedactions : Int
+maxPendingRedactions =
+    256
+
+
+rememberPendingRedaction : Model -> String -> String -> Model
+rememberPendingRedaction model key msgid =
+    { model | pendingRedactions = List.take maxPendingRedactions (( key, msgid ) :: List.filter ((/=) ( key, msgid )) model.pendingRedactions) }
+
+
+foldChatRow : Model -> Wire.IrcMessage -> Bool -> ( Model, List Outbound )
+foldChatRow model message isNotice =
     case resolveLabeledEcho model message of
         Just resolved ->
             ( resolved, [] )
@@ -33096,7 +37024,7 @@ foldChat model message isNotice =
                                                                 (\c ->
                                                                     { c
                                                                         | messages =
-                                                                            List.take keepMessages
+                                                                            List.take (messageRetentionFor admitted bucket)
                                                                                 ({ id = model.messageSeq
                                                                                  , from = sender
                                                                                  , body = effectiveBody
@@ -33125,7 +37053,7 @@ foldChat model message isNotice =
                                                                                 )
                                                                     }
                                                                 )
-                                                                |> (\m -> { m | messageSeq = m.messageSeq + 1 })
+                                                                |> (\m -> { m | messageSeq = m.messageSeq + 1, ownedRowIds = if ownsInboundRow model message sender then markOwnedRow model.messageSeq m.ownedRowIds else m.ownedRowIds })
 
                                                         -- A pinned forum re-opens on topic arrival
                                                         -- (mirroring the forum effect: a pinned
@@ -33247,7 +37175,7 @@ openForEnvelope model target body messageId message =
                     []
 
                 Just presented ->
-                    [ DmOpenRequested { peer = peerKey, presentedKey = presented, messageId = messageId, envelope = body, owner = deviceMemoryOwner model } ]
+                    [ DmOpenRequested { peer = peerKey, presentedKey = presented, messageId = messageId, envelope = body, owner = deviceMemoryOwner model, runtimeOwnerRef = Maybe.map .ownerRef model.runtimeOwnerStamp, accountGeneration = Maybe.map .accountGeneration model.runtimeOwnerStamp, connectionGeneration = Maybe.map .connectionGeneration model.runtimeOwnerStamp } ]
 
 
 {-| Open requests for every still-locked envelope stored for one peer
@@ -33273,7 +37201,7 @@ pendingOpensFor model nickKey =
                     List.filterMap
                         (\m ->
                             if m.plaintext == Nothing && DmCipher.isEnvelope m.body then
-                                Just (DmOpenRequested { peer = nickKey, presentedKey = presented, messageId = m.id, envelope = m.body, owner = deviceMemoryOwner model })
+                                Just (DmOpenRequested { peer = nickKey, presentedKey = presented, messageId = m.id, envelope = m.body, owner = deviceMemoryOwner model, runtimeOwnerRef = Maybe.map .ownerRef model.runtimeOwnerStamp, accountGeneration = Maybe.map .accountGeneration model.runtimeOwnerStamp, connectionGeneration = Maybe.map .connectionGeneration model.runtimeOwnerStamp })
 
                             else
                                 Nothing
@@ -33565,14 +37493,14 @@ ensureChannel : Model -> String -> Channel
 ensureChannel model name =
     Maybe.withDefault
         { name = name, topic = "", members = Dict.empty, modes = "", messages = [], lastSeen = Nothing, unread = 0, highlights = 0, createdAt = Nothing }
-        (Dict.get (String.toLower name) model.channels)
+        (Dict.get (ircCaseKey model name) model.channels)
 
 
 updateChannel : Model -> String -> (Channel -> Channel) -> Model
 updateChannel model name fn =
     let
         key =
-            String.toLower name
+            ircCaseKey model name
     in
     { model | channels = Dict.insert key (fn (ensureChannel model name)) model.channels }
 
@@ -33929,7 +37857,7 @@ selectChannel model name =
             case Dict.get (String.toLower name) model.channels of
                 Just channel ->
                     if List.isEmpty channel.messages then
-                        [ VaultFetch { target = String.toLower name, limit = keepMessages } ]
+                        [ vaultFetchOutbound model (String.toLower name) keepMessages ]
 
                     else
                         []
@@ -33996,9 +37924,89 @@ selectChannel model name =
     in
     -- The tail also swaps the per-target composer draft (the swap
     -- sets the channel, so the record update lives inside it).
-    ( resetThreadWindow (clearOfflineMemo (swapComposerDraft watched name) name)
-    , fetch ++ keyFetch ++ markOut ++ navOut ++ banOut ++ watchOut
+    let
+        openedChannel =
+            resetThreadWindow (clearOfflineMemo (swapComposerDraft watched name) name)
+
+        ( focused, focusOut ) =
+            noteFirstHourFocus openedChannel
+
+        ( draftModel, draftOut ) =
+            makeDraftLoadOutbound focused name False
+
+        ( anchorModel, anchorOut ) =
+            makeAnchorLoadOutbound draftModel name
+    in
+    ( anchorModel
+    , fetch ++ keyFetch ++ markOut ++ navOut ++ banOut ++ watchOut ++ focusOut ++ Maybe.withDefault [] (Maybe.map List.singleton draftOut) ++ Maybe.withDefault [] (Maybe.map List.singleton anchorOut)
     )
+
+
+makeDraftLoadOutbound : Model -> String -> Bool -> ( Model, Maybe Outbound )
+makeDraftLoadOutbound model conversationId force =
+    case ( retainedDraftLocked model, model.runtimeOwnerStamp ) of
+        ( True, _ ) ->
+            ( model, Nothing )
+
+        ( False, Nothing ) ->
+            ( model, Nothing )
+
+        ( False, Just stamp ) ->
+            let
+                key = ircCaseKey model conversationId
+                version = Maybe.withDefault 0 (Dict.get key model.composerDraftVersions)
+                hasCurrentDraft = Dict.member key model.composerDrafts
+            in
+            if (not force && Set.member key model.hydratedDraftTargets) || hasCurrentDraft || activeEditFor model conversationId /= Nothing then
+                ( model, Nothing )
+            else
+                let
+                    nextClock = model.eventClock + 1
+                in
+                case (( Ids.requestIdFromRuntime ("draftLoad" ++ String.padLeft 13 '0' (String.fromInt nextClock)), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                    ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                        ( { model | eventClock = nextClock, draftLoadPending = Just { requestId = requestId, target = conversationId, version = version } }
+                        , Just
+                            (RuntimeDomainCommand
+                                { requestId = requestId
+                                , ownerRef = ownerRef
+                                , accountGeneration = accountGeneration
+                                , connectionGeneration = connectionGeneration
+                                , action = RuntimeDomain.LoadDraft conversationId
+                                }
+                            )
+                        )
+
+                    _ ->
+                        ( model, Nothing )
+
+
+makeAnchorLoadOutbound : Model -> String -> ( Model, Maybe Outbound )
+makeAnchorLoadOutbound model conversationId =
+    case model.runtimeOwnerStamp of
+        Nothing ->
+            ( model, Nothing )
+
+        Just stamp ->
+            let
+                nextClock = model.eventClock + 1
+            in
+            case (( Ids.requestIdFromRuntime ("anchorLoad" ++ String.padLeft 12 '0' (String.fromInt nextClock)), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                    ( { model | eventClock = nextClock, anchorLoadPending = Just { requestId = requestId, conversationId = conversationId } }
+                    , Just
+                        (RuntimeDomainCommand
+                            { requestId = requestId
+                            , ownerRef = ownerRef
+                            , accountGeneration = accountGeneration
+                            , connectionGeneration = connectionGeneration
+                            , action = RuntimeDomain.AnchorLoad conversationId
+                            }
+                        )
+                    )
+
+                _ ->
+                    ( model, Nothing )
 
 
 {-| Drop the pending deep-link triple outright. -}
@@ -34049,7 +38057,7 @@ requestTravelTo model target at =
     else
         let
             vaultOut =
-                [ VaultFetchAround { target = String.toLower target, at = round at, limit = keepMessages } ]
+                [ vaultFetchAroundOutbound model (String.toLower target) (round at) keepMessages ]
 
             serverOut =
                 if hasChatHistoryCap model then
@@ -34146,6 +38154,9 @@ sendWithAttachments model target =
     if isBlockedDmTarget model target then
         refuseBlockedDm model target
 
+    else if Result.toMaybe (Wire.validateSemanticMessage model.composer) == Nothing then
+        ( { model | composerError = Just "The attachment caption contains a character the client cannot send; your caption and attachments were kept." }, [] )
+
     else if model.connection /= Live then
         ( { model | composerError = Just offlineAttachmentBlocked }, [] )
 
@@ -34164,6 +38175,16 @@ sendWithAttachments model target =
                 in
                 if List.isEmpty ready && List.isEmpty model.attachments then
                     sendComposerText model target
+
+                else if not (List.isEmpty model.attachments) && List.all (\item ->
+                    case item.status of
+                        StagedUploaded _ ->
+                            True
+
+                        _ ->
+                            False
+                ) model.attachments then
+                    finishUploadedAttachments model target model.composer
 
                 else
                     let
@@ -34384,42 +38405,516 @@ settleAttachmentUpload model done =
 
             Just pending ->
                 if List.all (\item -> item.status /= StagedReady && item.status /= StagedUploading) settled then
-                    let
-                        receipts =
-                            List.filterMap
-                                (\item ->
-                                    case item.status of
-                                        StagedUploaded url ->
-                                            Upload.buildAttachmentMessage
-                                                { url = url
-                                                , name = Just item.name
-                                                , mime = Just item.mime
-                                                , sizeBytes = Just item.size
-                                                , caption = Nothing
-                                                }
-
-                                        _ ->
-                                            Nothing
-                                )
-                                settled
-
-                        body =
-                            if String.isEmpty (String.trim pending.caption) then
-                                String.join "\n" receipts
-
-                            else
-                                String.trim pending.caption ++ "\n" ++ String.join "\n" receipts
-                    in
-                    sendComposerText
-                        { model | attachments = [], pendingAttachmentSend = Nothing, composer = body }
-                        pending.target
+                    finishUploadedAttachments { model | attachments = settled } pending.target pending.caption
 
                 else
                     ( { model | attachments = settled }, [] )
 
 
+finishUploadedAttachments : Model -> String -> String -> ( Model, List Outbound )
+finishUploadedAttachments model target caption =
+    let
+        receiptCandidates =
+            List.filterMap
+                (\item ->
+                    case item.status of
+                        StagedUploaded url ->
+                            Just
+                                (Upload.buildAttachmentMessage
+                                    { url = url
+                                    , name = Just item.name
+                                    , mime = Just item.mime
+                                    , sizeBytes = Just item.size
+                                    , caption = Nothing
+                                    }
+                                )
+
+                        _ ->
+                            Nothing
+                )
+                model.attachments
+
+        receipts =
+            List.filterMap identity receiptCandidates
+
+        receiptBuildFailed =
+            List.any ((==) Nothing) receiptCandidates
+
+        captionIsValid =
+            Result.toMaybe (Wire.validateSemanticMessage caption) /= Nothing
+
+        trimmedCaption =
+            String.trim caption
+
+        bodyParts =
+            (if String.isEmpty trimmedCaption then
+                []
+
+             else
+                [ trimmedCaption ]
+            )
+                ++ receipts
+
+        body =
+            String.join "\n" bodyParts
+
+        legacySeparateMessages =
+            model.runtimeOwnerStamp == Nothing
+                && not (Session.hasCapability model.caps "draft/multiline")
+
+        deniedAudience =
+            model.composerAudience /= Nothing && composerSendTarget model target == Nothing
+
+        refusal current =
+            ( { current
+                | composer = caption
+                , pendingAttachmentSend = Nothing
+                , composerError = Just "The attachment message could not be sent; your caption and attachments were kept."
+              }
+            , []
+            )
+
+        hasMessageIntent outbounds =
+            List.any
+                (\outbound ->
+                    case outbound of
+                        SendLine _ ->
+                            True
+
+                        RuntimeDomainCommand _ ->
+                            True
+
+                        _ ->
+                            False
+                )
+                outbounds
+
+        planParts parts =
+            let
+                planPart part accumulated =
+                    Maybe.andThen
+                        (\( current, outbounds ) ->
+                            let
+                                prepared =
+                                    { current
+                                        | composer = part
+                                        , composerAudience = model.composerAudience
+                                        , composerError = Nothing
+                                    }
+
+                                ( plannedModel, plannedOutbounds ) =
+                                    sendComposerText prepared target
+
+                                safeOutbounds =
+                                    Result.toMaybe (validateComposerOutbounds plannedOutbounds) /= Nothing
+
+                                admittedIntent =
+                                    hasMessageIntent plannedOutbounds
+                            in
+                            if plannedModel.composerError /= Nothing || not safeOutbounds || not admittedIntent then
+                                Nothing
+
+                            else
+                                Just ( plannedModel, outbounds ++ plannedOutbounds )
+                        )
+                        accumulated
+            in
+            List.foldl planPart (Just ( model, [] )) parts
+    in
+    if not captionIsValid || receiptBuildFailed then
+        refusal model
+
+    else if List.isEmpty bodyParts then
+        ( { model | pendingAttachmentSend = Nothing, composerError = Just Upload.attachmentSendFailed }, [] )
+
+    else if deniedAudience then
+        ( { model | composerError = Just "Status audience unavailable here — message not sent." }, [] )
+
+    else if legacySeparateMessages then
+        case planParts bodyParts of
+            Nothing ->
+                refusal model
+
+            Just ( plannedModel, plannedOutbounds ) ->
+                ( { plannedModel
+                    | attachments = []
+                    , pendingAttachmentSend = Nothing
+                    , composerAudience = Nothing
+                    , composerError = Nothing
+                  }
+                , plannedOutbounds
+                )
+
+    else
+        let
+            ( plannedModel, plannedOutbounds ) =
+                sendComposerText { model | composer = body, composerError = Nothing } target
+        in
+        if plannedModel.composerError /= Nothing || Result.toMaybe (validateComposerOutbounds plannedOutbounds) == Nothing || not (hasMessageIntent plannedOutbounds) then
+            refusal model
+
+        else
+            ( { plannedModel | attachments = [], pendingAttachmentSend = Nothing }, plannedOutbounds )
+
+
+composerSendUpdate : Model -> ( Model, List Outbound )
+composerSendUpdate model =
+    case ( retainedDraftLocked model, model.activeChannel ) of
+        ( True, _ ) ->
+            ( { model | composerError = Just "This retained draft is locked to its previous owner. Reauthorize it or clear it before sending." }, [] )
+
+        ( False, Nothing ) ->
+            ( model, [] )
+
+        ( False, Just target ) ->
+            case activeEditFor model target of
+                Just edit ->
+                    -- Edit mode: send becomes save (mirror the
+                    -- oracle `handleSend` edit branch; edit
+                    -- mode never carries staged attachments —
+                    -- the send button is disabled there, and an
+                    -- empty draft cannot save).
+                    if String.isEmpty (String.trim model.composer) then
+                        ( model, [] )
+
+                    else
+                        let
+                            ( edited, out ) =
+                                requestEdit model target edit.msgid model.composer
+                        in
+                        if List.isEmpty out then
+                            -- Refused (cap, transport, or the row
+                            -- changed under us): like the oracle
+                            -- `editMessage` refused path, the arm
+                            -- and the draft stay for retry and the
+                            -- refusal copy coaches (Elm has no
+                            -- admit-uncertain tier — every refusal
+                            -- here is a pre-send gate).
+                            ( { edited | composerError = Just "Edit was refused. Your replacement text is still here." }, [] )
+
+                        else
+                            if Dict.member (messageMutationKey target edit.msgid) edited.pendingMessageEdits then
+                                ( edited, out )
+
+                            else
+                                ( { edited | editingMessage = Nothing, composer = "", composerDrafts = Dict.remove (ircCaseKey edited target) edited.composerDrafts }, out )
+
+                Nothing ->
+                    if not (List.isEmpty model.attachments) then
+                        sendWithAttachments model target
+
+                    else if String.isEmpty (String.trim model.composer) then
+                        ( model, [] )
+
+                    else
+                        let
+                            trimmed =
+                                String.trim model.composer
+
+                    -- Text-only conveniences (`/shrug` family)
+                    -- expand to ordinary text first, mirroring the
+                    -- oracle composer (`expandSlashTextCommand`
+                    -- over the trimmed draft); anything else
+                        -- passes through byte-identical.
+                            outgoing =
+                                if String.startsWith "/" trimmed then
+                                    expandSlashTextCommand trimmed
+
+                                else
+                                    model.composer
+
+                            sending =
+                                { model | composer = outgoing }
+                        in
+                        if isBlockedDmTarget sending target then
+                            -- A DM to a locally blocked nick refuses before
+                            -- anything else (mirroring the oracle composer
+                            -- gate): the draft stays for unblock-and-send.
+                            refuseBlockedDm sending target
+
+                        else if sending.composerAudience /= Nothing && composerSendTarget sending target == Nothing then
+                            -- A set audience that can no longer be honored
+                            -- (room left, prefix withdrawn) refuses instead of
+                            -- widening an ops-only message to everyone.
+                            ( logService sending "Status audience unavailable here — message not sent.", [] )
+
+                        else if String.startsWith "/" outgoing && sending.connection /= Live then
+                            -- Real commands never queue from the offline
+                            -- outbox (mirroring the oracle composer
+                            -- guard): the draft stays, the inline error
+                            -- coaches, nothing emits.
+                            ( { model | composerError = Just "Commands can't be queued. Reconnect to run this command." }, [] )
+
+                        else
+                            case parseSlashLocal outgoing of
+                                Just ( verb, nickArg ) ->
+                                    -- Local slash commands never hit the wire
+                                    -- (online or offline, sealed or not —
+                                    -- mirroring the oracle slash dispatch,
+                                    -- which runs ahead of delivery). The
+                                    -- stored draft drops with the dispatch
+                                    -- (a kept visible draft re-seeds it on
+                                    -- the next input or switch).
+                                    Tuple.mapFirst (dropStoredDraftFor target) (runSlashLocal sending target verb nickArg)
+
+                                Nothing ->
+                                    if model.runtimeOwnerStamp /= Nothing && String.startsWith "/me " outgoing then
+                                        queueRuntimeMessage sending target (String.dropLeft 4 outgoing) "action"
+
+                                    else if String.startsWith "/" outgoing then
+                                        -- Unhandled verbs go out as raw
+                                        -- uppercase IRC (mirroring the
+                                        -- oracle `sendRaw` fallthrough).
+                                        sendRawSlashCommand sending target outgoing
+
+                                    else
+                                        sendComposerText sending target
+
+
+runtimeVerifiedGroupHead : Model -> String -> Maybe ( Int, String )
+runtimeVerifiedGroupHead model conversationId =
+    model.runtimeDomainResult
+        |> Maybe.andThen
+            (\result ->
+                if result.domain /= "group" then
+                    Nothing
+
+                else
+                    result.items
+                        |> List.filter (\item -> item.ref == conversationId && item.state == "author-ready")
+                        |> List.head
+                        |> Maybe.andThen
+                            (\item ->
+                                case item.extra of
+                                    epochText :: hash :: _ ->
+                                        case String.toInt epochText of
+                                            Just epoch ->
+                                                if epoch >= 0 && String.length hash == 64 && String.all isLowerHex hash then
+                                                    Just ( epoch, hash )
+                                                else
+                                                    Nothing
+
+                                            Nothing ->
+                                                Nothing
+
+                                    _ ->
+                                        Nothing
+                            )
+            )
+
+
+openNotificationConversation : Model -> String -> Maybe ( Model, List Outbound )
+openNotificationConversation model conversationId =
+    let
+        key =
+            ircCaseKey model conversationId
+    in
+    if Dict.member key model.channels then
+        Just (selectChannel model conversationId)
+
+    else
+        Nothing
+
+
+openNotificationDm : Model -> String -> Maybe ( Model, List Outbound )
+openNotificationDm model conversationId =
+    let
+        key =
+            ircCaseKey model conversationId
+    in
+    if Dict.member key model.channels then
+        Just (selectChannel model conversationId)
+
+    else if isChannelName model conversationId then
+        -- A DM notification cannot synthesize an unjoined channel.
+        Nothing
+
+    else
+        case normalizeContactNick conversationId of
+            Nothing ->
+                Nothing
+
+            Just peer ->
+                let
+                    ( roomCapacity, canOpen ) =
+                        ensureDmShellCapacity model peer
+                in
+                if canOpen then
+                    -- Cold-tab DM notification navigation may create a
+                    -- local conversation shell and hydrate it through the
+                    -- ordinary selection path. This does not send JOIN,
+                    -- answer a call, or establish any new network route.
+                    Just (selectChannel (updateChannel roomCapacity peer identity) peer)
+
+                else
+                    Nothing
+
+
+emptyServiceIntegrationView : String -> String -> RuntimeDomain.ServiceIntegrationView
+emptyServiceIntegrationView requestId feature =
+    { requestId = requestId
+    , feature = feature
+    , operation = Nothing
+    , phase = "idle"
+    , registry = "unknown"
+    , effectiveFeature = "unknown"
+    , accountProof = "unknown"
+    , authorization = "unknown"
+    , reason = Nothing
+    , rows = []
+    , inputRef = Nothing
+    }
+
+
+updateServiceIntegrationForm : String -> String -> ServiceIntegrationForm -> ServiceIntegrationForm
+updateServiceIntegrationForm field raw form =
+    let
+        bounded limit =
+            String.left limit raw
+    in
+    case field of
+        "account" -> { form | account = bounded 64 }
+        "grantKind" -> { form | grantKind = bounded 16 }
+        "channel" -> { form | channel = bounded 128 }
+        "ttlSeconds" -> { form | ttlSeconds = bounded 10 }
+        "botCommandName" -> { form | botCommandName = bounded 32 }
+        "botCommandArgc" -> { form | botCommandArgc = bounded 3 }
+        "botCommandHelp" -> { form | botCommandHelp = bounded 256 }
+        "botCommandArgs" -> { form | botCommandArgs = bounded 512 }
+        "deferUnixMs" -> { form | deferUnixMs = bounded 20 }
+        "cronMinute" -> { form | cronMinute = bounded 64 }
+        "cronHour" -> { form | cronHour = bounded 64 }
+        "cronDayOfMonth" -> { form | cronDayOfMonth = bounded 64 }
+        "cronMonth" -> { form | cronMonth = bounded 64 }
+        "cronDayOfWeek" -> { form | cronDayOfWeek = bounded 64 }
+        "operatorMode" -> { form | operatorMode = bounded 1 }
+        "text" -> { form | text = bounded 4096 }
+        "unfurlUrl" -> { form | unfurlUrl = bounded 2048 }
+        "memoForwardAccount" -> { form | memoForwardAccount = bounded 64 }
+        _ -> form
+
+
+serviceIntegrationActionInfo : RuntimeDomain.Action -> Maybe { feature : String, operation : Maybe String }
+serviceIntegrationActionInfo action =
+    case action of
+        RuntimeDomain.ServiceRefresh feature ->
+            Just { feature = feature, operation = Nothing }
+
+        RuntimeDomain.ServiceBotGrantList _ -> Just { feature = "botgrant", operation = Just "list" }
+        RuntimeDomain.ServiceBotGrantAdd _ _ _ _ -> Just { feature = "botgrant", operation = Just "add" }
+        RuntimeDomain.ServiceBotGrantRemove _ _ _ -> Just { feature = "botgrant", operation = Just "remove" }
+        RuntimeDomain.ServiceBotCommandList -> Just { feature = "botcmd", operation = Just "list" }
+        RuntimeDomain.ServiceBotCommandAdd _ _ _ -> Just { feature = "botcmd", operation = Just "add" }
+        RuntimeDomain.ServiceBotCommandRun _ _ -> Just { feature = "botcmd", operation = Just "run" }
+        RuntimeDomain.ServiceDeferAt _ _ _ -> Just { feature = "defer", operation = Just "at" }
+        RuntimeDomain.ServiceDeferCron _ _ _ _ _ _ _ -> Just { feature = "defer", operation = Just "cron" }
+        RuntimeDomain.ServiceDeferOperAt _ _ _ -> Just { feature = "defer", operation = Just "oper-at" }
+        RuntimeDomain.ServiceDeferOperCron _ _ _ _ _ _ _ -> Just { feature = "defer", operation = Just "oper-cron" }
+        RuntimeDomain.ServiceOutHookInput -> Just { feature = "outhook", operation = Just "input" }
+        RuntimeDomain.ServiceOutHookAdd _ -> Just { feature = "outhook", operation = Just "add" }
+        RuntimeDomain.ServiceOutHookList -> Just { feature = "outhook", operation = Just "list" }
+        RuntimeDomain.ServiceOutHookInspect _ -> Just { feature = "outhook", operation = Just "inspect" }
+        RuntimeDomain.ServiceOutHookRemove _ -> Just { feature = "outhook", operation = Just "remove" }
+        RuntimeDomain.ServiceUnfurlOff -> Just { feature = "unfurl", operation = Just "off" }
+        RuntimeDomain.ServiceUnfurlOn -> Just { feature = "unfurl", operation = Just "on" }
+        RuntimeDomain.ServiceUnfurlPreview _ -> Just { feature = "unfurl", operation = Just "preview" }
+        RuntimeDomain.ServiceMemoSend _ _ -> Just { feature = "memo", operation = Just "send" }
+        RuntimeDomain.ServiceMemoList -> Just { feature = "memo", operation = Just "list" }
+        RuntimeDomain.ServiceMemoClear -> Just { feature = "memo", operation = Just "clear" }
+        RuntimeDomain.ServiceMemoForward _ -> Just { feature = "memo", operation = Just "forward" }
+        RuntimeDomain.ServiceMemoIgnoreList -> Just { feature = "memo", operation = Just "ignore-list" }
+        RuntimeDomain.ServiceMemoIgnoreAdd _ -> Just { feature = "memo", operation = Just "ignore-add" }
+        RuntimeDomain.ServiceMemoIgnoreRemove _ -> Just { feature = "memo", operation = Just "ignore-remove" }
+
+        _ ->
+            Nothing
+
+
+serviceIntegrationActionSubmitsForm : RuntimeDomain.Action -> Bool
+serviceIntegrationActionSubmitsForm action =
+    case action of
+        RuntimeDomain.ServiceBotGrantAdd _ _ _ _ -> True
+        RuntimeDomain.ServiceBotGrantRemove _ _ _ -> True
+        RuntimeDomain.ServiceBotCommandAdd _ _ _ -> True
+        RuntimeDomain.ServiceBotCommandRun _ _ -> True
+        RuntimeDomain.ServiceDeferAt _ _ _ -> True
+        RuntimeDomain.ServiceDeferCron _ _ _ _ _ _ _ -> True
+        RuntimeDomain.ServiceDeferOperAt _ _ _ -> True
+        RuntimeDomain.ServiceDeferOperCron _ _ _ _ _ _ _ -> True
+        RuntimeDomain.ServiceUnfurlPreview _ -> True
+        RuntimeDomain.ServiceMemoSend _ _ -> True
+        RuntimeDomain.ServiceMemoForward _ -> True
+        RuntimeDomain.ServiceMemoIgnoreAdd _ -> True
+        RuntimeDomain.ServiceMemoIgnoreRemove _ -> True
+        _ -> False
+
+
+runtimeDomainActionIsAuthoring : RuntimeDomain.Action -> Bool
+runtimeDomainActionIsAuthoring action =
+    case action of
+        RuntimeDomain.WorkerActivate _ ->
+            False
+
+        RuntimeDomain.WorkerCancel _ ->
+            False
+
+        _ ->
+            True
+
+
+mediaConsentScope : RuntimeOwnerStamp -> Maybe { conversationId : String, callRef : String } -> Maybe String
+mediaConsentScope stamp maybeCall =
+    maybeCall
+        |> Maybe.map
+            (\call ->
+                stamp.ownerRef ++ ":" ++ String.fromInt stamp.accountGeneration ++ ":" ++ String.fromInt stamp.connectionGeneration
+                    ++ ":" ++ call.conversationId ++ ":" ++ call.callRef
+            )
+
+
 update : Msg -> Model -> ( Model, List Outbound )
-update msg model =
+update msg initialModel =
+    let
+        ( next, outbounds ) =
+            updateRaw msg initialModel
+
+        ( safeOutbounds, rejected ) =
+            validateOutboundEffects outbounds
+    in
+    if rejected then
+        ( { next | composerError = Just "The command could not be sent because it exceeds the client wire limits." }, safeOutbounds )
+
+    else
+        ( next, safeOutbounds )
+
+
+validateOutboundEffects : List Outbound -> ( List Outbound, Bool )
+validateOutboundEffects outbounds =
+    List.foldl
+        (\outbound ( kept, rejected ) ->
+            case outbound of
+                SendLine line ->
+                    case Wire.validateClientOutboundLine line of
+                        Ok _ ->
+                            ( outbound :: kept, rejected )
+
+                        Err _ ->
+                            ( kept, True )
+
+                _ ->
+                    ( outbound :: kept, rejected )
+        )
+        ( [], False )
+        outbounds
+        |> Tuple.mapFirst List.reverse
+
+
+updateRaw : Msg -> Model -> ( Model, List Outbound )
+updateRaw msg initialModel =
+    let
+        model =
+            prepareVaultDirtyModel msg initialModel
+    in
     case msg of
         LinkClicked urlRequest ->
             case urlRequest of
@@ -34526,27 +39021,2234 @@ update msg model =
         WsLineReceived line ->
             foldParsed model (Wire.parseIrcMessage line)
 
-        NodesProbed { wss, sessionToken, meshToken, meshExpiresAtMs } ->
-            -- Node-probe winner (mirrors `selectBestNode` falling
-            -- through to `initialNode`): connect to the winner and
-            -- adopt its stored resume holdings, but only when the
-            -- flag-provided holdings are empty — live tokens are
-            -- never overwritten by a stale probe response.
-            let
-                holdings =
-                    model.sessionTokens
+        NodesProbed { wss } ->
+            ( model, [ WsConnect { url = wss } ] )
 
-                adopted =
-                    if holdings.sessionToken == Nothing && holdings.meshToken == Nothing then
-                        { sessionToken = sessionToken
-                        , meshToken = meshToken
-                        , meshTokenExpiresAt = meshExpiresAtMs
+        SessionCredentialsReceived credentials ->
+            ( { model | sessionTokens = { credentials = credentials } }, [] )
+
+        SessionCredentialStateReceived state ->
+            ( { model
+                | sessionTokens = { credentials = state.credentials }
+                , sessionCredentialIssuance = state.issuance
+                , sessionCredentialsRemembered = state.remembered
+                , sessionTokenIssuanceRequested = state.issuance == Session.CredentialPending
+              }
+            , []
+            )
+
+        RuntimeOwnerStateReceived stamp ->
+            if model.runtimeOwnerStamp == Just stamp then
+                ( model, [] )
+
+            else
+                let
+                    previousStamp =
+                        model.runtimeOwnerStamp
+
+                    identityChanged =
+                        case previousStamp of
+                            Just previous ->
+                                previous.ownerRef /= stamp.ownerRef
+                                    || previous.networkId /= stamp.networkId
+                                    || previous.accountId /= stamp.accountId
+                                    || previous.accountGeneration /= stamp.accountGeneration
+                                    || previous.connectionGeneration /= stamp.connectionGeneration
+
+                            Nothing ->
+                                model.accountName /= stamp.accountId
+
+                    hasRetainedDraftText =
+                        not (String.isEmpty model.composer)
+                            || (Dict.values model.composerDrafts
+                                    |> List.any (not << String.isEmpty)
+                               )
+
+                    physicalDraftRetirement =
+                        case previousStamp of
+                            Just previous ->
+                                previous.networkId == stamp.networkId
+                                    && hasRetainedDraftText
+                                    && stamp.connectionGeneration > previous.connectionGeneration
+
+                            Nothing ->
+                                False
+
+                    retainedOrigin =
+                        case ( previousStamp, model.retiredDraftOwner ) of
+                            ( Nothing, Nothing ) ->
+                                Nothing
+
+                            ( Just previous, Nothing ) ->
+                                if physicalDraftRetirement then
+                                    Just { networkId = previous.networkId, accountId = previous.accountId, ownerRef = previous.ownerRef, connectionGeneration = previous.connectionGeneration }
+
+                                else
+                                    Nothing
+
+                            ( _, Just origin ) ->
+                                if origin.networkId == stamp.networkId
+                                    && (stamp.accountId == Nothing || accountOwnerKey origin.accountId == accountOwnerKey stamp.accountId) then
+                                    Just origin
+
+                                else
+                                    Nothing
+
+                    unlockRetainedDraft =
+                        case retainedOrigin of
+                            Just origin ->
+                                origin.networkId == stamp.networkId
+                                    && origin.accountId /= Nothing
+                                    && accountOwnerKey origin.accountId == accountOwnerKey stamp.accountId
+
+                            Nothing ->
+                                False
+
+                    preserveRetainedDraft =
+                        retainedOrigin /= Nothing && (stamp.accountId == Nothing || unlockRetainedDraft)
+
+                    draftContent =
+                        { composer = model.composer
+                        , drafts = model.composerDrafts
+                        , versions = model.composerDraftVersions
                         }
 
-                    else
-                        holdings
+                    controlledRecovery =
+                        case ( model.sessionRecoveryView, ( model.sessionRecoveryViewOwner, model.sessionRecoveryExpectedAccount ) ) of
+                            ( Just view, ( Just recoveryOwner, Just intent ) ) ->
+                                if List.member view.status [ "redirecting", "awaiting-authentication" ]
+                                    && previousStamp == Just recoveryOwner
+                                    && view.requestId /= ""
+                                    && view.credentialRef /= ""
+                                    && view.requestId == intent.requestId
+                                    && view.credentialRef == intent.credentialRef
+                                    && intent.networkId == stamp.networkId
+                                    && (stamp.accountId == Nothing || accountOwnerKey stamp.accountId == accountOwnerKey (Just intent.accountId))
+                                    && (view.status == "redirecting"
+                                        || (recoveryOwner.networkId == stamp.networkId
+                                                && recoveryOwner.connectionGeneration == stamp.connectionGeneration
+                                           )
+                                       ) then
+                                    Just ( view, recoveryOwner )
+
+                                else
+                                    Nothing
+
+                            _ ->
+                                Nothing
+
+                    base =
+                        if identityChanged then
+                            let
+                                quarantined = quarantineOwnerChange model
+                                recoveryPreserved =
+                                    case controlledRecovery of
+                                        Just ( view, recoveryOwner ) ->
+                                            { quarantined
+                                                | sessionRecoveryView = Just view
+                                                , sessionRecoveryViewOwner = Just recoveryOwner
+                                                , sessionRecoveryExpectedAccount = model.sessionRecoveryExpectedAccount
+                                            }
+
+                                        Nothing ->
+                                            quarantined
+                            in
+                            if preserveRetainedDraft then
+                                { recoveryPreserved
+                                    | composer = draftContent.composer
+                                    , composerDrafts = draftContent.drafts
+                                    , composerDraftVersions = draftContent.versions
+                                    , retiredDraftOwner = if unlockRetainedDraft then Nothing else retainedOrigin
+                                    , composerError = Nothing
+                                }
+
+                            else
+                                { recoveryPreserved | retiredDraftOwner = Nothing }
+
+                        else
+                            model
+
+                    next =
+                        { base
+                            | runtimeOwnerStamp = Just stamp
+                            , accountName = stamp.accountId
+                            , identifyReplyAccount = stamp.accountId
+                            , anchorLoadPending = Nothing
+                            , draftLoadPending = Nothing
+                            , draftSavePending = Dict.empty
+                            , queuedDraftRevisions = Dict.empty
+                            , hydratedDraftTargets = Set.empty
+                            , viewedReadMarkers = Dict.empty
+                            , mediaAvailable = False
+                            , runtimeDomainPending = Nothing
+                            , runtimeDomainPendingAction = Nothing
+                            , runtimeDomainResult = Nothing
+                            , runtimeDomainObservation = Dict.empty
+                            , sessionInventoryView = if identityChanged then Nothing else model.sessionInventoryView
+                            , sessionRevocationView = if identityChanged then Nothing else model.sessionRevocationView
+                            , accountCommunityView = if identityChanged then Nothing else model.accountCommunityView
+                            , serviceIntegrationView = if identityChanged then Nothing else model.serviceIntegrationView
+                            , serviceIntegrationForm = if identityChanged then emptyServiceIntegrationForm else model.serviceIntegrationForm
+                            , serviceIntegrationFormRevision = if identityChanged then model.serviceIntegrationFormRevision + 1 else model.serviceIntegrationFormRevision
+                            , serviceIntegrationFormCleanRevision = if identityChanged then model.serviceIntegrationFormRevision + 1 else model.serviceIntegrationFormCleanRevision
+                            , serviceIntegrationPendingFormRevision = if identityChanged then Nothing else model.serviceIntegrationPendingFormRevision
+                            , draftRecoveryView = if identityChanged then Nothing else model.draftRecoveryView
+                            , mediaQualityView = if identityChanged then Nothing else model.mediaQualityView
+                            , mediaQualityViewOwner = if identityChanged then Nothing else model.mediaQualityViewOwner
+                            , mediaControlView = if identityChanged then Nothing else model.mediaControlView
+                            , mediaControlViewOwner = if identityChanged then Nothing else model.mediaControlViewOwner
+                            , mediaBrowserAudioConsent = if identityChanged then False else model.mediaBrowserAudioConsent
+                            , mediaBrowserAudioConsentCall = if identityChanged then Nothing else model.mediaBrowserAudioConsentCall
+                            , mediaGestureResult = if identityChanged then Nothing else model.mediaGestureResult
+                            , draftRecoveryPreview = Nothing
+                            , draftRecoveryCapture = Nothing
+                            , sessionReclaim =
+                                if identityChanged && controlledRecovery == Nothing && model.sessionRecoveryExpectedAccount /= Nothing then
+                                    Nothing
+
+                                else
+                                    base.sessionReclaim
+                            , sessionCommandsSent =
+                                if identityChanged && controlledRecovery == Nothing && model.sessionRecoveryExpectedAccount /= Nothing then
+                                    False
+
+                                else
+                                    base.sessionCommandsSent
+                            , scheduledObservationView = Nothing
+                            , privateAccountStatus = Nothing
+                            , pendingGroupBackupInput = Nothing
+                            , pendingGroupBackupSelection = Nothing
+                            , pendingGroupBackupOutput = Nothing
+                            , groupBackupRoomInput = ""
+                            , pendingSecurityFormRequest = Nothing
+                            , sessionTokenSaslRequestId = Nothing
+                            , totp = blankTotp
+                            , recoveryCodes = blankRecoveryCodes
+                            , recoveryPassword = ""
+                          }
+                    ( restored, autosaveOut ) =
+                        if unlockRetainedDraft then
+                            armRetainedDraftAutosaves next
+
+                        else
+                            ( next, [] )
+                in
+                ( restored
+                , autosaveOut
+                    ++ (if identityChanged && controlledRecovery == Nothing && model.sessionRecoveryExpectedAccount /= Nothing then
+                            [ ReclaimTimersCleared ]
+
+                        else
+                            []
+                       )
+                )
+
+        RuntimePrivateWebhookResult event ->
+            let
+                ownerMatches =
+                    Maybe.withDefault False
+                        (Maybe.map
+                            (\stamp -> stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration && stamp.connectionGeneration == event.connectionGeneration)
+                            model.runtimeOwnerStamp
+                        )
+
+                validStatus =
+                    List.member event.status [ "created", "blocked" ]
+                    && String.length event.room > 0
+                    && String.length event.room <= 512
             in
-            ( { model | sessionTokens = adopted }, [ WsConnect { url = wss } ] )
+            if ownerMatches && validStatus then
+                ( { model | privateWebhookStatus = Just { room = event.room, status = event.status } }, [] )
+
+            else
+                ( model, [] )
+
+        RuntimeDomainActionRequested action ->
+            case ( retainedDraftLocked model && retainedDraftBlocksRuntimeAction action, model.runtimeOwnerStamp, draftRecoveryActionMatches action model ) of
+                ( True, _, _ ) ->
+                    ( { model | composerError = Just "This retained draft cannot be loaded, saved, sent, or scheduled under the current owner." }, [] )
+
+                ( False, _, False ) ->
+                    ( { model | composerError = Just "Open the conversation that matches this saved draft before recovering it." }, [] )
+
+                ( False, Nothing, True ) ->
+                    ( { model | composerError = Just "The browser runtime is not ready for this action." }, [] )
+
+                ( False, Just stamp, True ) ->
+                    case (( Ids.requestIdFromRuntime ("domainRequest" ++ String.padLeft 12 '0' (String.fromInt (model.eventClock + 1))), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                        ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                            let
+                                command = { requestId = requestId, ownerRef = ownerRef, accountGeneration = accountGeneration, connectionGeneration = connectionGeneration, action = action }
+                                requestIdText = Ids.requestIdToRuntime requestId
+                                pendingRecovery =
+                                    case action of
+                                        RuntimeDomain.ResumeSession ref _ ->
+                                            Just { requestId = requestIdText, credentialRef = ref, status = "pending", outcome = Nothing, reason = Nothing, redirectNode = Nothing, hopCount = 0, transferFrom = Nothing }
+
+                                        RuntimeDomain.RetrySession ref _ ->
+                                            Just { requestId = requestIdText, credentialRef = ref, status = "pending", outcome = Nothing, reason = Nothing, redirectNode = Nothing, hopCount = 0, transferFrom = Nothing }
+
+                                        _ ->
+                                            Nothing
+                                recoveryIntent =
+                                    case action of
+                                        RuntimeDomain.ResumeSession ref _ ->
+                                            sessionRecoveryIntentFor stamp requestIdText ref
+
+                                        RuntimeDomain.RetrySession ref _ ->
+                                            sessionRecoveryIntentFor stamp requestIdText ref
+
+                                        _ ->
+                                            model.sessionRecoveryExpectedAccount
+                                pendingPasskey =
+                                    case action of
+                                        RuntimeDomain.PasskeyList ->
+                                            Just { requestId = requestIdText, status = "pending", operation = Just "list", rows = [], reason = Nothing }
+
+                                        RuntimeDomain.PasskeyRename _ _ ->
+                                            Just { requestId = requestIdText, status = "pending", operation = Just "rename", rows = Maybe.withDefault [] (Maybe.map .rows model.passkeyManagementView), reason = Nothing }
+
+                                        RuntimeDomain.PasskeyRemove _ ->
+                                            Just { requestId = requestIdText, status = "pending", operation = Just "remove", rows = Maybe.withDefault [] (Maybe.map .rows model.passkeyManagementView), reason = Nothing }
+
+                                        _ ->
+                                            Nothing
+                                pendingDraftRecovery =
+                                    case action of
+                                        RuntimeDomain.DraftRecover ref ->
+                                            case model.activeChannel of
+                                                Just target ->
+                                                    Just
+                                                        { requestId = requestIdText
+                                                        , draftRef = ref
+                                                        , target = target
+                                                        , composerRevision = Maybe.withDefault 0 (Dict.get (ircCaseKey model target) model.composerDraftVersions)
+                                                        , ownerRef = stamp.ownerRef
+                                                        , accountGeneration = stamp.accountGeneration
+                                                        , connectionGeneration = stamp.connectionGeneration
+                                                        }
+
+                                                Nothing ->
+                                                    Nothing
+
+                                        _ ->
+                                            Nothing
+                                pendingServiceIntegration =
+                                    serviceIntegrationActionInfo action
+                                        |> Maybe.map
+                                            (\info ->
+                                                let
+                                                    previous =
+                                                        case model.serviceIntegrationView of
+                                                            Just view ->
+                                                                if view.feature == info.feature then view else emptyServiceIntegrationView requestIdText info.feature
+
+                                                            Nothing ->
+                                                                emptyServiceIntegrationView requestIdText info.feature
+                                                in
+                                                { previous
+                                                    | requestId = requestIdText
+                                                    , operation = info.operation
+                                                    , phase = "pending"
+                                                    , reason = Nothing
+                                                    , inputRef = if info.feature == "outhook" && info.operation == Just "input" then Nothing else previous.inputRef
+                                                }
+                                            )
+                            in
+                            ( { model
+                                | runtimeDomainPending = Just requestId
+                                , runtimeDomainPendingAction = Just action
+                                , runtimeDomainResult = Nothing
+                                , sessionRecoveryView =
+                                    case pendingRecovery of
+                                        Just view ->
+                                            Just view
+
+                                        Nothing ->
+                                            model.sessionRecoveryView
+                                , sessionRecoveryViewOwner = if pendingRecovery /= Nothing then model.runtimeOwnerStamp else model.sessionRecoveryViewOwner
+                                , sessionRecoveryExpectedAccount = recoveryIntent
+                                , passkeyManagementView =
+                                    case pendingPasskey of
+                                        Just view ->
+                                            Just view
+
+                                        Nothing ->
+                                            model.passkeyManagementView
+                                , draftRecoveryCapture =
+                                    case pendingDraftRecovery of
+                                        Just capture -> Just capture
+                                        Nothing -> model.draftRecoveryCapture
+                                , serviceIntegrationView =
+                                    case pendingServiceIntegration of
+                                        Just view ->
+                                            Just view
+
+                                        Nothing ->
+                                            model.serviceIntegrationView
+                                , serviceIntegrationPendingFormRevision =
+                                    if serviceIntegrationActionSubmitsForm action then
+                                        Just model.serviceIntegrationFormRevision
+
+                                    else
+                                        model.serviceIntegrationPendingFormRevision
+                                , eventClock = model.eventClock + 1
+                              }
+                            , [ RuntimeDomainCommand command ]
+                            )
+
+                        _ ->
+                            ( { model | composerError = Just "The browser runtime identity is invalid; reconnect before retrying." }, [] )
+
+        EditRuntimeScheduledMessage edit ->
+            case ( retainedDraftLocked model, model.runtimeOwnerStamp ) of
+                ( True, _ ) ->
+                    ( { model | scheduleError = Just "Clear or reauthorize the retained draft before editing scheduled messages." }, [] )
+
+                ( False, Nothing ) ->
+                    ( { model | scheduleError = Just "Scheduled-message editing is unavailable until private custody is ready." }, [] )
+
+                ( False, Just stamp ) ->
+                    if edit.revision <= 0 || edit.dueAtMs < round model.nowMs || String.isEmpty edit.scheduleRef || String.isEmpty edit.target || not (List.member edit.messageKind [ "message", "action" ]) then
+                        ( { model | scheduleError = Just "Choose a valid future time before editing this scheduled message." }, [] )
+
+                    else
+                        let
+                            minted = { model | eventClock = model.eventClock + 1 }
+                            requestId = "scheduledEdit" ++ String.padLeft 12 '0' (String.fromInt minted.eventClock)
+                        in
+                        ( { minted
+                            | pendingScheduledCapture = Just
+                                { requestId = requestId
+                                , operationId = edit.scheduleRef
+                                , scheduleRef = Just edit.scheduleRef
+                                , expectedRevision = Just edit.revision
+                                , channel = edit.target
+                                , dueAtMs = edit.dueAtMs
+                                , ownerRef = stamp.ownerRef
+                                , accountGeneration = stamp.accountGeneration
+                                , connectionGeneration = stamp.connectionGeneration
+                                , messageKind = edit.messageKind
+                                , replyTo = edit.replyTo
+                                , audiencePrefix = edit.audiencePrefix
+                                , composerText = ""
+                                , composerRevision = 0
+                                }
+                            , scheduleError = Nothing
+                          }
+                        , [ RuntimePrivateScheduledMessageRequest
+                                { requestId = requestId
+                                , operationId = edit.scheduleRef
+                                , ownerRef = stamp.ownerRef
+                                , accountGeneration = stamp.accountGeneration
+                                , connectionGeneration = stamp.connectionGeneration
+                                , kind = "edit"
+                                , conversationId = edit.target
+                                , initialDueAtMs = edit.dueAtMs
+                                , prefillFromComposer = False
+                                }
+                          ]
+                        )
+
+        CheckRuntimeScheduledMessageStatus check ->
+            update (RuntimeDomainActionRequested (RuntimeDomain.ScheduledReconcile check.scheduleRef check.revision)) model
+
+        DraftLoadRequested target ->
+            let
+                key = ircCaseKey model target
+            in
+            makeDraftLoadOutbound { model | hydratedDraftTargets = Set.remove key model.hydratedDraftTargets } target True
+                |> (\( next, outbound ) -> ( next, Maybe.withDefault [] (Maybe.map List.singleton outbound) ))
+
+        RuntimePrivateAccountFormRequested request ->
+            case model.runtimeOwnerStamp of
+                Nothing ->
+                    ( { model | composerError = Just "The private account form is unavailable until this connection is ready." }, [] )
+
+                Just stamp ->
+                    let
+                        expectedKind =
+                            case request.action of
+                                "totp-confirm" -> Just "totp-code"
+                                "recovery-login" -> Just "recovery-code"
+                                "recovery-generate" -> Just "recovery-password"
+                                "recovery-clear" -> Just "recovery-password"
+                                "account-email" -> Just "account-email"
+                                "account-password" -> Just "account-password"
+                                "account-certificate-reset" -> Just "account-certificate-reset"
+                                "account-drop" -> Just "account-drop"
+                                "password-reset-confirm" -> Just "password-reset-confirm"
+                                "account-register" -> Just "account-register"
+                                "account-verify" -> Just "account-verify"
+                                _ -> Nothing
+
+                        requestId =
+                            "securityForm" ++ String.padLeft 12 '0' (String.fromInt (model.eventClock + 1))
+                    in
+                    if expectedKind /= Just request.kind then
+                        ( { model | composerError = Just "That private account form does not match its operation." }, [] )
+
+                    else
+                        ( { model | eventClock = model.eventClock + 1, pendingSecurityFormRequest = Just { requestId = requestId, kind = request.kind, action = request.action } }
+                        , [ RuntimePrivateAccountFormRequest
+                                { requestId = requestId
+                                , kind = request.kind
+                                , action = request.action
+                                , account = request.account
+                                , ownerRef = stamp.ownerRef
+                                , accountGeneration = stamp.accountGeneration
+                                , connectionGeneration = stamp.connectionGeneration
+                                }
+                          ]
+                        )
+
+        RuntimePrivateFilePickRequested purpose ->
+            if List.member purpose [ "operator-import", "settings-import" ] then
+                ( { model | pendingGroupBackupSelection = Nothing }, [ RuntimePrivateFilePick purpose ] )
+            else if purpose == "group-backup-import" then
+                let
+                    requestedRoom =
+                        if String.isEmpty (String.trim model.groupBackupRoomInput) then
+                            model.activeChannel
+
+                        else
+                            Just model.groupBackupRoomInput
+
+                    publicRoom =
+                        requestedRoom |> Maybe.andThen normalizePublicBackupRoom
+                in
+                case ( publicRoom, model.runtimeOwnerStamp ) of
+                    ( Just conversationId, Just stamp ) ->
+                        ( { model
+                            | pendingGroupBackupSelection = Just
+                                { conversationId = conversationId
+                                , configuredNetworkId = stamp.networkId
+                                , ownerRef = stamp.ownerRef
+                                , accountGeneration = stamp.accountGeneration
+                                , connectionGeneration = stamp.connectionGeneration
+                                }
+                            , pendingGroupBackupInput = Nothing
+                          }
+                        , [ RuntimePrivateFilePick purpose ]
+                        )
+
+                    ( Nothing, _ ) ->
+                        ( { model | composerError = Just "Enter a public #room name for this recovery backup. The import is history-only and will not join the room." }, [] )
+
+                    ( _, Nothing ) ->
+                        ( { model | composerError = Just "The configured network is unavailable; reconnect or select its local workspace before importing." }, [] )
+
+            else
+                ( { model | composerError = Just "That private file purpose is unavailable." }, [] )
+
+        GroupBackupRoomInputChanged value ->
+            ( { model | groupBackupRoomInput = String.left 512 value }, [] )
+
+        RuntimePrivateFileSelected { purpose, inputRef } ->
+            if String.length inputRef <= 128 && not (String.isEmpty inputRef) then
+                case purpose of
+                    "operator-import" ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.OperatorImportPreview inputRef)) model
+
+                    "settings-import" ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.SettingsPreview inputRef)) model
+
+                    "group-backup-import" ->
+                        case ( model.pendingGroupBackupSelection, model.runtimeOwnerStamp ) of
+                            ( Just selection, Just stamp ) ->
+                                if selection.ownerRef /= stamp.ownerRef || selection.accountGeneration /= stamp.accountGeneration
+                                    || selection.connectionGeneration /= stamp.connectionGeneration || selection.configuredNetworkId /= stamp.networkId then
+                                    ( { model | pendingGroupBackupSelection = Nothing, composerError = Just "The configured network changed while the file picker was open. Choose the backup again." }, [] )
+
+                                else
+                                    ( { model
+                                        | pendingGroupBackupSelection = Nothing
+                                        , pendingGroupBackupInput = Just
+                                            { inputRef = inputRef
+                                            , conversationId = selection.conversationId
+                                            , configuredNetworkId = selection.configuredNetworkId
+                                            }
+                                      }
+                                    , [ RuntimePrivatePasswordRequest { purpose = purpose, ownerRef = stamp.ownerRef, accountGeneration = stamp.accountGeneration, connectionGeneration = stamp.connectionGeneration } ]
+                                    )
+
+                            ( Nothing, _ ) ->
+                                ( { model | composerError = Just "Choose the backup destination room and network before opening a recovery file." }, [] )
+
+                            ( _, Nothing ) ->
+                                ( { model | pendingGroupBackupSelection = Nothing, composerError = Just "The configured network is unavailable; reconnect or select its local workspace before importing." }, [] )
+
+                    _ ->
+                        ( { model | composerError = Just "The private file selection purpose is invalid." }, [] )
+            else
+                ( { model
+                    | composerError = Just "The private file selection is no longer available."
+                    , pendingGroupBackupSelection = if purpose == "group-backup-import" then Nothing else model.pendingGroupBackupSelection
+                  }
+                , []
+                )
+
+        RuntimePrivateOutputPickRequested purpose ->
+            if List.member purpose [ "settings-export", "storage-export", "group-backup-export" ] then
+                ( model, [ RuntimePrivateOutputPick purpose ] )
+            else
+                ( { model | composerError = Just "That private output purpose is unavailable." }, [] )
+
+        RuntimeStorageExportPickRequested selectionRef ->
+            if String.isEmpty selectionRef || String.length selectionRef > 128 then
+                ( { model | composerError = Just "That history selection is no longer available." }, [] )
+            else
+                ( { model | pendingStorageExportSelection = Just selectionRef }, [ RuntimePrivateOutputPick "storage-export" ] )
+
+        RuntimePrivateOutputSelected { purpose, outputRef } ->
+            if String.isEmpty outputRef || String.length outputRef > 128 then
+                ( { model | composerError = Just "The private output destination was not granted." }, [] )
+            else
+                case purpose of
+                    "settings-export" ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.SettingsExport outputRef)) model
+
+                    "storage-export" ->
+                        case model.pendingStorageExportSelection of
+                            Just selectionRef ->
+                                update (RuntimeDomainActionRequested (RuntimeDomain.StorageExport selectionRef outputRef)) { model | pendingStorageExportSelection = Nothing }
+
+                            Nothing ->
+                                ( { model | composerError = Just "Select the records to export before choosing a destination." }, [] )
+
+                    "group-backup-export" ->
+                        case ( model.activeChannel, model.runtimeOwnerStamp ) of
+                            ( Just conversationId, Just stamp ) ->
+                                case runtimeVerifiedGroupHead model conversationId of
+                                    Just ( epoch, commitHashHex ) ->
+                                        ( { model | pendingGroupBackupOutput = Just { outputRef = outputRef, conversationId = conversationId, epoch = epoch, commitHashHex = commitHashHex } }
+                                        , [ RuntimePrivatePasswordRequest { purpose = purpose, ownerRef = stamp.ownerRef, accountGeneration = stamp.accountGeneration, connectionGeneration = stamp.connectionGeneration } ]
+                                        )
+
+                                    Nothing ->
+                                        ( { model | composerError = Just "Refresh this room's verified encryption head before exporting its recovery backup." }, [] )
+
+                            _ ->
+                                ( { model | composerError = Just "Choose a room and open its local workspace before exporting a backup." }, [] )
+
+                    _ ->
+                        ( { model | composerError = Just "The private output purpose is invalid." }, [] )
+
+        RuntimePrivatePasswordSelected event ->
+            let
+                isCurrent =
+                    Maybe.withDefault False
+                        (Maybe.map
+                            (\stamp -> stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration && stamp.connectionGeneration == event.connectionGeneration)
+                            model.runtimeOwnerStamp
+                        )
+            in
+            if not isCurrent || String.isEmpty event.passwordRef || String.length event.passwordRef > 128 then
+                ( { model | pendingGroupBackupInput = Nothing, pendingGroupBackupOutput = Nothing, composerError = Just "The private password form expired; retry with the current room." }, [] )
+
+            else if event.purpose == "group-backup-import" then
+                case model.pendingGroupBackupInput of
+                    Just pending ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.GroupBackupImport pending.conversationId pending.inputRef event.passwordRef pending.configuredNetworkId))
+                            { model | pendingGroupBackupInput = Nothing }
+
+                    Nothing ->
+                        ( { model | composerError = Just "No encrypted backup import is awaiting a password." }, [] )
+
+            else if event.purpose == "group-backup-export" then
+                case model.pendingGroupBackupOutput of
+                    Just pending ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.GroupBackupExport pending.conversationId pending.epoch pending.commitHashHex pending.outputRef event.passwordRef))
+                            { model | pendingGroupBackupOutput = Nothing }
+
+                    Nothing ->
+                        ( { model | composerError = Just "No encrypted backup export is awaiting a password." }, [] )
+
+            else
+                ( model, [] )
+
+        RuntimePrivateAccountFormReady event ->
+            let
+                current =
+                    Maybe.withDefault False
+                        (Maybe.map
+                            (\stamp -> stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration && stamp.connectionGeneration == event.connectionGeneration)
+                            model.runtimeOwnerStamp
+                        )
+
+                expectedKind =
+                    case event.action of
+                        "totp-confirm" -> Just "totp-code"
+                        "recovery-login" -> Just "recovery-code"
+                        "recovery-generate" -> Just "recovery-password"
+                        "recovery-clear" -> Just "recovery-password"
+                        "account-email" -> Just "account-email"
+                        "account-password" -> Just "account-password"
+                        "account-certificate-reset" -> Just "account-certificate-reset"
+                        "account-drop" -> Just "account-drop"
+                        "password-reset-confirm" -> Just "password-reset-confirm"
+                        "account-register" -> Just "account-register"
+                        "account-verify" -> Just "account-verify"
+                        _ -> Nothing
+            in
+            if not current || expectedKind /= Just event.kind || String.isEmpty event.formRef || String.length event.formRef > 128 then
+                ( model, [] )
+
+            else if Maybe.map (\pending -> pending.requestId == event.requestId && pending.kind == event.kind && pending.action == event.action) model.pendingSecurityFormRequest /= Just True then
+                ( model, [] )
+
+            else
+                case ( ( Ids.requestIdFromRuntime event.requestId, Ids.ownerRefFromRuntime event.ownerRef ), ( Ids.accountGenerationFromInt event.accountGeneration, Ids.connectionGenerationFromInt event.connectionGeneration ) ) of
+                    ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                        let
+                            command =
+                                { requestId = requestId
+                                , ownerRef = ownerRef
+                                , accountGeneration = accountGeneration
+                                , connectionGeneration = connectionGeneration
+                                , action = RuntimeDomain.AccountSecurityBegin event.action (Just event.formRef) event.account
+                                }
+                        in
+                        ( { model | runtimeDomainPending = Just requestId, runtimeDomainPendingAction = Just command.action, runtimeDomainResult = Nothing, pendingSecurityFormRequest = Nothing }
+                        , [ RuntimeDomainCommand command ]
+                        )
+
+                    _ ->
+                        ( { model | composerError = Just "The private account form expired; request a new form." }, [] )
+
+        RuntimePrivateScheduledMessageReady event ->
+            case ( retainedDraftLocked model, model.pendingScheduledCapture, model.runtimeOwnerStamp ) of
+                ( True, _, _ ) ->
+                    ( { model | pendingScheduledCapture = Nothing, pendingScheduledSave = Nothing }, [] )
+
+                ( False, Just pending, Just stamp ) ->
+                    let
+                        current =
+                            pending.requestId == event.requestId
+                                && pending.operationId == event.operationId
+                                && pending.ownerRef == event.ownerRef
+                                && pending.accountGeneration == event.accountGeneration
+                                && pending.connectionGeneration == event.connectionGeneration
+                                && stamp.ownerRef == event.ownerRef
+                                && stamp.accountGeneration == event.accountGeneration
+                                && stamp.connectionGeneration == event.connectionGeneration
+                                && event.kind == (if pending.scheduleRef == Nothing then "create" else "edit")
+
+                        operationNonce =
+                            Base64Url.encode (Base64Url.utf8Bytes ("scheduled-v1:" ++ pending.operationId))
+                    in
+                    if not current || String.isEmpty event.inputRef || String.length event.inputRef > 128 || event.dueAtMs <= round model.nowMs then
+                        ( { model | pendingScheduledCapture = Nothing, scheduleError = Just "The private scheduled-message editor expired. Your composer text was kept." }, [] )
+
+                    else
+                        case ( ( Ids.requestIdFromRuntime event.requestId, Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration ) ) of
+                            ( ( Just requestId, Just ownerRef ), ( Just accountGeneration, Just connectionGeneration ) ) ->
+                                let
+                                    maybeAction =
+                                        case ( pending.scheduleRef, pending.expectedRevision ) of
+                                            ( Nothing, Nothing ) ->
+                                                Ids.requestIdFromRuntime operationNonce
+                                                    |> Maybe.map (\clientIntentId -> RuntimeDomain.ScheduledCreate event.inputRef pending.operationId clientIntentId pending.channel event.dueAtMs pending.messageKind pending.replyTo pending.audiencePrefix)
+
+                                            ( Just scheduleRef, Just expectedRevision ) ->
+                                                Just (RuntimeDomain.ScheduledEdit event.inputRef scheduleRef expectedRevision event.dueAtMs pending.messageKind pending.replyTo pending.audiencePrefix)
+
+                                            _ ->
+                                                Nothing
+                                in
+                                case maybeAction of
+                                    Just action ->
+                                        let
+                                            command = { requestId = requestId, ownerRef = ownerRef, accountGeneration = accountGeneration, connectionGeneration = connectionGeneration, action = action }
+                                        in
+                                        ( { model
+                                            | pendingScheduledCapture = Nothing
+                                            , pendingScheduledSave =
+                                                if pending.scheduleRef == Nothing then
+                                                    Just { requestId = event.requestId, target = pending.channel, text = pending.composerText, revision = pending.composerRevision, prefilledComposer = event.prefilledComposer }
+
+                                                else
+                                                    Nothing
+                                            , runtimeDomainPending = Just requestId
+                                            , runtimeDomainPendingAction = Just action
+                                            , runtimeDomainResult = Nothing
+                                          }
+                                        , [ RuntimeDomainCommand command ]
+                                        )
+
+                                    Nothing ->
+                                        ( { model | pendingScheduledCapture = Nothing, scheduleError = Just "The scheduled message could not be securely staged. Your composer text was kept." }, [] )
+
+                            _ ->
+                                ( { model | pendingScheduledCapture = Nothing, scheduleError = Just "The scheduled message could not be securely staged. Your composer text was kept." }, [] )
+
+                _ ->
+                    ( model, [] )
+
+        RuntimePrivateScheduledMessageFailed event ->
+            case ( model.pendingScheduledCapture, model.runtimeOwnerStamp ) of
+                ( Just pending, Just stamp ) ->
+                    if pending.requestId == event.requestId && pending.ownerRef == event.ownerRef
+                        && pending.accountGeneration == event.accountGeneration && pending.connectionGeneration == event.connectionGeneration
+                        && stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration && stamp.connectionGeneration == event.connectionGeneration then
+                        ( { model | pendingScheduledCapture = Nothing, scheduleError = Just (if event.reason == "cancelled" then "Scheduled-message editing was cancelled. No changes were saved." else "The private scheduled-message editor is unavailable. No changes were saved.") }, [] )
+                    else
+                        ( model, [] )
+
+                _ ->
+                    ( model, [] )
+
+        RuntimeCapturePrepared result ->
+            let
+                current =
+                    Maybe.withDefault False
+                        (Maybe.map
+                            (\stamp -> stamp.ownerRef == result.ownerRef && stamp.accountGeneration == result.accountGeneration && stamp.connectionGeneration == result.connectionGeneration)
+                            model.runtimeOwnerStamp
+                        )
+            in
+            if not current || not result.available || String.isEmpty result.captureRef then
+                ( { model | composerError = Just (Maybe.withDefault "Microphone permission or media capture is unavailable." result.reason) }, [] )
+            else
+                case result.kind of
+                    "soundcheck" ->
+                        if result.conversationId == "soundcheck" then
+                            update (RuntimeDomainActionRequested (RuntimeDomain.MediaSoundcheck result.captureRef 1500)) model
+
+                        else
+                            ( model, [] )
+
+                    "input-switch" ->
+                        case model.mediaControlView of
+                            Just mediaView ->
+                                case mediaView.call of
+                                    Just call ->
+                                        if call.conversationId == result.conversationId
+                                            && result.callRef == Just call.callRef
+                                            && model.mediaControlViewOwner == model.runtimeOwnerStamp
+                                            && model.activeChannel == Just call.conversationId
+                                            && result.deviceRef /= Nothing then
+                                            update
+                                                (RuntimeDomainActionRequested
+                                                    (RuntimeDomain.MediaInput
+                                                        { deviceRef = result.deviceRef
+                                                        , conversationId = Just call.conversationId
+                                                        , callRef = Just call.callRef
+                                                        , captureRef = Just result.captureRef
+                                                        }
+                                                    )
+                                                )
+                                                model
+
+                                        else
+                                            ( model, [] )
+
+                                    Nothing ->
+                                        ( model, [] )
+
+                            Nothing ->
+                                ( model, [] )
+
+                    "voice" ->
+                        if model.activeChannel == Just result.conversationId then
+                            update (RuntimeDomainActionRequested (RuntimeDomain.MediaJoin result.conversationId "voice" result.captureRef)) model
+                        else
+                            ( model, [] )
+
+                    "video" ->
+                        if model.activeChannel == Just result.conversationId then
+                            update (RuntimeDomainActionRequested (RuntimeDomain.MediaJoin result.conversationId "video" result.captureRef)) model
+                        else
+                            ( model, [] )
+
+                    "camera-preview" ->
+                        if model.activeChannel == Just result.conversationId then
+                            update (RuntimeDomainActionRequested (RuntimeDomain.MediaCameraPreview result.conversationId result.captureRef)) model
+                        else
+                            ( model, [] )
+
+                    "screen" ->
+                        case model.mediaControlView of
+                            Just mediaView ->
+                                case mediaView.call of
+                                    Just call ->
+                                        if call.conversationId == result.conversationId
+                                            && result.callRef == Just call.callRef
+                                            && model.mediaControlViewOwner == model.runtimeOwnerStamp
+                                            && model.activeChannel == Just call.conversationId then
+                                            update (RuntimeDomainActionRequested (RuntimeDomain.MediaScreenStart call.conversationId result.captureRef)) model
+
+                                        else
+                                            ( model, [] )
+
+                                    Nothing ->
+                                        ( model, [] )
+
+                            Nothing ->
+                                ( model, [] )
+
+                    "webrtc-voice" ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.MediaWebRtcRun result.captureRef "voice")) model
+
+                    "webrtc-video" ->
+                        update (RuntimeDomainActionRequested (RuntimeDomain.MediaWebRtcRun result.captureRef "video")) model
+
+                    _ ->
+                        ( model, [] )
+
+        RuntimeMediaGestureResult result ->
+            let
+                exactCurrentCall =
+                    case model.mediaControlView of
+                        Just view ->
+                            case view.call of
+                                Just call ->
+                                    model.mediaControlViewOwner == model.runtimeOwnerStamp
+                                        && call.conversationId == result.conversationId
+                                        && call.callRef == result.callRef
+                                        && (if result.gesture == "output-select" && String.isEmpty result.callRef then True else model.activeChannel == Just call.conversationId)
+
+                                Nothing ->
+                                    False
+
+                        Nothing ->
+                            False
+
+                exactOwner =
+                    Maybe.withDefault False
+                        (Maybe.map (\stamp -> stamp.ownerRef == result.ownerRef && stamp.accountGeneration == result.accountGeneration && stamp.connectionGeneration == result.connectionGeneration) model.runtimeOwnerStamp)
+            in
+            if exactOwner && (exactCurrentCall || (result.gesture == "output-select" && String.isEmpty result.conversationId && String.isEmpty result.callRef)) && List.member result.gesture [ "caption-prepare", "audio-recover", "output-select" ] then
+                ( { model | mediaGestureResult = Just { gesture = result.gesture, state = result.state, reason = result.reason, conversationId = result.conversationId, callRef = result.callRef } }, [] )
+
+            else
+                ( model, [] )
+
+        RuntimeSessionTokenSaslStatus event ->
+            let
+                currentOwner =
+                    Maybe.withDefault False
+                        (Maybe.map
+                            (\stamp -> stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration && stamp.connectionGeneration == event.connectionGeneration)
+                            model.runtimeOwnerStamp
+                        )
+            in
+            if not currentOwner || model.sessionTokenSaslRequestId /= Just event.requestId then
+                ( model, [] )
+
+            else
+                case ( event.status, model.sasl ) of
+                    ( "accepted", SaslPending Wire.SessionToken ) ->
+                        let
+                            ( ended, effects ) = finishCapIfReady { model | sasl = SaslIdle, saslAuthenticated = True, sessionTokenSaslRequestId = Nothing }
+                        in
+                        ( ended, SaslTimerCleared :: effects )
+
+                    ( "rejected", SaslPending Wire.SessionToken ) ->
+                        failSasl { model | sessionTokenSaslRequestId = Nothing } "The server rejected the selected SESSION-TOKEN continuation."
+
+                    ( "unknown", SaslPending Wire.SessionToken ) ->
+                        failSasl { model | sessionTokenSaslRequestId = Nothing } "The SESSION-TOKEN outcome is unknown; reconnect before retrying."
+
+                    ( "aborted", SaslPending Wire.SessionToken ) ->
+                        failSasl { model | sessionTokenSaslRequestId = Nothing } "The SESSION-TOKEN exchange was interrupted."
+
+                    _ ->
+                        ( model, [] )
+
+        RuntimeDomainResultReceived result ->
+            let
+                requestMatches = model.runtimeDomainPending == Just result.requestId
+                ownerMatches = Maybe.withDefault False (Maybe.map (\stamp -> stamp.ownerRef == Ids.ownerRefToRuntime result.ownerRef && stamp.accountGeneration == Ids.accountGenerationToInt result.accountGeneration && stamp.connectionGeneration == Ids.connectionGenerationToInt result.connectionGeneration) model.runtimeOwnerStamp)
+                anchorLoadMatches = Maybe.map (.requestId >> (==) result.requestId) model.anchorLoadPending == Just True
+                draftLoadMatches = Maybe.map (.requestId >> (==) result.requestId) model.draftLoadPending == Just True
+                draftSaveKey =
+                    model.draftSavePending
+                        |> Dict.toList
+                        |> List.filter (\( _, pending ) -> pending.requestId == result.requestId)
+                        |> List.head
+                        |> Maybe.map Tuple.first
+            in
+            if ownerMatches && requestMatches && result.domain == "media" && result.mediaControl /= Nothing then
+                case result.mediaControl of
+                    Just view ->
+                        ( { model
+                            | mediaControlView =
+                                if view.sequence > Maybe.withDefault -1 (Maybe.map .sequence model.mediaControlView) then
+                                    Just view
+
+                                else
+                                    model.mediaControlView
+                            , mediaControlViewOwner = model.runtimeOwnerStamp
+                            , runtimeDomainResult = Just result
+                            , runtimeDomainPending = if result.status == RuntimeDomain.Pending then Just result.requestId else Nothing
+                            , runtimeDomainPendingAction = if result.status == RuntimeDomain.Pending then model.runtimeDomainPendingAction else Nothing
+                          }
+                        , []
+                        )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "media" && result.action == "quality" && result.mediaQuality /= Nothing then
+                case result.mediaQuality of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId
+                            || model.activeChannel /= Just view.conversationId
+                            || model.calls.lifecycle /= Media.InCall then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | mediaQualityView = Just view
+                                , mediaQualityViewOwner = model.runtimeOwnerStamp
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if List.member result.status [ RuntimeDomain.Pending, RuntimeDomain.TransportAdmitted ] then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if List.member result.status [ RuntimeDomain.Pending, RuntimeDomain.TransportAdmitted ] then model.runtimeDomainPendingAction else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "session" && result.sessionInventory /= Nothing then
+                case result.sessionInventory of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | sessionInventoryView = Just view
+                                , sessionRevocationView = if view.mode == "mesh" then model.sessionRevocationView else Nothing
+                                , accountSessionsPending = List.member view.status [ "pending", "partial" ]
+                                , accountSessionsError =
+                                    if List.member view.status [ "failed", "unknown", "unsupported", "stale" ] then
+                                        Just (Maybe.withDefault "The session inventory is not complete." view.reason)
+                                    else
+                                        Nothing
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if List.member result.status [ RuntimeDomain.Pending, RuntimeDomain.TransportAdmitted ] then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if List.member result.status [ RuntimeDomain.Pending, RuntimeDomain.TransportAdmitted ] then model.runtimeDomainPendingAction else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "session" && result.sessionRevocation /= Nothing then
+                case result.sessionRevocation of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | sessionRevocationView = Just view
+                                , accountSessionsPending = List.member view.status [ "requesting", "preflight-pending" ]
+                                , accountSessionsError = if view.status == "rejected" then Just (Maybe.withDefault "The session revoke was rejected." view.reason) else Nothing
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if result.status == RuntimeDomain.Pending then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if result.status == RuntimeDomain.Pending then model.runtimeDomainPendingAction else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "account-community" && result.accountCommunity /= Nothing then
+                case result.accountCommunity of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | accountCommunityView = Just view
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if view.status == "pending" then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if view.status == "pending" then model.runtimeDomainPendingAction else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "service-integration" && result.serviceIntegration /= Nothing then
+                case result.serviceIntegration of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | serviceIntegrationView = Just view
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if view.phase == "pending" then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if view.phase == "pending" then model.runtimeDomainPendingAction else Nothing
+                                , serviceIntegrationFormCleanRevision =
+                                    if view.phase == "accepted" && model.serviceIntegrationPendingFormRevision == Just model.serviceIntegrationFormRevision then
+                                        model.serviceIntegrationFormRevision
+
+                                    else
+                                        model.serviceIntegrationFormCleanRevision
+                                , serviceIntegrationPendingFormRevision = if view.phase == "pending" then model.serviceIntegrationPendingFormRevision else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "draft" && result.action == "recovery-list" && result.draftRecovery /= Nothing then
+                case result.draftRecovery of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | draftRecoveryView = Just view
+                                , runtimeDomainResult = Just result
+                                , runtimeDomainPending = if view.status == "pending" then Just result.requestId else Nothing
+                                , runtimeDomainPendingAction = if view.status == "pending" then model.runtimeDomainPendingAction else Nothing
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && result.domain == "session" && result.sessionRecovery /= Nothing then
+                case result.sessionRecovery of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId || view.credentialRef == ""
+                            || Maybe.map .requestId model.sessionRecoveryView /= Just view.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | sessionRecoveryView = Just view
+                                , sessionRecoveryViewOwner = model.runtimeOwnerStamp
+                                , sessionReclaim = sessionReclaimAfterRecoveryView model view
+                                , sessionCommandsSent = True
+                                , sessionRecoveryExpectedAccount = if view.status == "accepted" then Nothing else model.sessionRecoveryExpectedAccount
+                                , runtimeDomainPending = if requestMatches && not (recoveryViewSettlesRequest view) then Just result.requestId else if requestMatches then Nothing else model.runtimeDomainPending
+                                , runtimeDomainPendingAction = if requestMatches && not (recoveryViewSettlesRequest view) then model.runtimeDomainPendingAction else if requestMatches then Nothing else model.runtimeDomainPendingAction
+                                , runtimeDomainResult = Just result
+                                , autoReconnect = if view.status == "redirecting" then False else model.autoReconnect
+                                , reconnectIn = if view.status == "redirecting" then 0 else model.reconnectIn
+                                , reconnectDueMs = if view.status == "redirecting" then 0 else model.reconnectDueMs
+                              }
+                            , if recoveryViewClearsTimer view then [ ReclaimTimersCleared ] else []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if ownerMatches && requestMatches && result.domain == "draft" && result.action == "recover" && result.draftRecovery /= Nothing then
+                case ( model.draftRecoveryCapture, result.draftRecovery ) of
+                    ( Just capture, Just view ) ->
+                        let
+                            stampMatches =
+                                Maybe.map
+                                    (\stamp -> stamp.ownerRef == capture.ownerRef && stamp.accountGeneration == capture.accountGeneration && stamp.connectionGeneration == capture.connectionGeneration)
+                                    model.runtimeOwnerStamp
+                                    == Just True
+
+                            composerStillCurrent =
+                                Maybe.withDefault 0 (Dict.get (ircCaseKey model capture.target) model.composerDraftVersions) == capture.composerRevision
+                                    && Maybe.map (ircCaseKey model >> (==) (ircCaseKey model capture.target)) model.activeChannel == Just True
+                        in
+                        if capture.requestId == Ids.requestIdToRuntime result.requestId
+                            && view.requestId == capture.requestId
+                            && result.status == RuntimeDomain.Accepted
+                            && view.status == "ready"
+                            && stampMatches
+                            && composerStillCurrent
+                            && Maybe.map (\recovered -> recovered.draftRef == capture.draftRef && recovered.conversationId == capture.target) view.recovered == Just True then
+                            ( { model | draftRecoveryView = Just view, draftRecoveryPreview = view.recovered, runtimeDomainResult = Just result }, [] )
+
+                        else
+                            ( { model | draftRecoveryCapture = Nothing, composerError = Just "The saved draft changed or its conversation is no longer active. Review the draft list and try again." }, [] )
+
+                    _ ->
+                        ( model, [] )
+
+            else if ownerMatches && result.domain == "account-security" && result.passkeyManagement /= Nothing then
+                case result.passkeyManagement of
+                    Just view ->
+                        if view.requestId /= Ids.requestIdToRuntime result.requestId
+                            || Maybe.map .requestId model.passkeyManagementView /= Just view.requestId then
+                            ( model, [] )
+
+                        else
+                            ( { model
+                                | passkeyManagementView = Just view
+                                , passkeyRenamingId = if result.status == RuntimeDomain.Accepted then Nothing else model.passkeyRenamingId
+                                , passkeyRenameValue = if result.status == RuntimeDomain.Accepted then "" else model.passkeyRenameValue
+                                , passkeyRemoveArmed = if result.status == RuntimeDomain.Accepted then Nothing else model.passkeyRemoveArmed
+                                , runtimeDomainPending = if requestMatches && result.status == RuntimeDomain.Pending then Just result.requestId else if requestMatches then Nothing else model.runtimeDomainPending
+                                , runtimeDomainPendingAction = if requestMatches && result.status == RuntimeDomain.Pending then model.runtimeDomainPendingAction else if requestMatches then Nothing else model.runtimeDomainPendingAction
+                                , runtimeDomainResult = Just result
+                              }
+                            , []
+                            )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if not (retainedDraftLocked model) && ownerMatches && result.domain == "draft" && result.action == "save" && draftSaveKey /= Nothing then
+                case draftSaveKey of
+                    Just key ->
+                        let
+                            remaining = Dict.remove key model.draftSavePending
+                            revision = Dict.get key model.composerDraftVersions
+                            currentVersion = Maybe.withDefault -1 revision
+                            saveStillCurrent = Maybe.map .revision (Dict.get key model.draftSavePending) == revision
+                            failure =
+                                if result.status == RuntimeDomain.Accepted && result.completionScope == "local" then
+                                    model.composerError
+
+                                else if saveStillCurrent then
+                                    Just
+                                        (case result.reason of
+                                            Just "memory-only-unsaved" ->
+                                                "This draft is only in this tab's memory and will not survive closing or reloading. Keep it open or copy it before leaving."
+
+                                            Just "quota-failed" ->
+                                                "This device ran out of storage space. The current draft remains in memory; free space or copy it before leaving."
+
+                                            _ ->
+                                                "This draft could not be saved durably. The current text remains in memory; keep it open or copy it before leaving."
+                                        )
+
+                                else
+                                    model.composerError
+                        in
+                        if currentVersion < 0 then
+                            ( { model | draftSavePending = remaining }, [] )
+
+                        else
+                            ( { model | draftSavePending = remaining, composerError = failure }, [] )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if not (retainedDraftLocked model) && draftLoadMatches then
+                case model.draftLoadPending of
+                    Just pending ->
+                        let
+                            key = ircCaseKey model pending.target
+                            versionMatches = Maybe.withDefault 0 (Dict.get key model.composerDraftVersions) == pending.version
+                            targetStillActive = Maybe.map (ircCaseKey model >> (==) key) model.activeChannel == Just True
+                        in
+                        if ownerMatches && result.domain == "draft" && result.action == "load" && result.draftTarget == Just pending.target
+                            && result.status == RuntimeDomain.Accepted && result.completionScope == "local" && versionMatches && targetStillActive then
+                            let
+                                loaded =
+                                    case result.draftText of
+                                        Just draftText ->
+                                            { model
+                                                | composer = draftText
+                                                , composerDrafts = Dict.insert key draftText model.composerDrafts
+                                                , composerDraftVersions = Maybe.map (\revision -> Dict.insert key revision model.composerDraftVersions) result.draftRevision |> Maybe.withDefault model.composerDraftVersions
+                                                , hydratedDraftTargets = Set.insert key model.hydratedDraftTargets
+                                            }
+
+                                        Nothing ->
+                                            { model
+                                                | composerDraftVersions = Maybe.map (\revision -> Dict.insert key revision model.composerDraftVersions) result.draftRevision |> Maybe.withDefault model.composerDraftVersions
+                                                , hydratedDraftTargets = Set.insert key model.hydratedDraftTargets
+                                            }
+                            in
+                            ( { loaded | draftLoadPending = Nothing }, [] )
+
+                        else if ownerMatches && result.domain == "draft" && result.action == "load" && result.draftTarget == Just pending.target
+                            && result.status == RuntimeDomain.Accepted && result.completionScope == "local" && not versionMatches then
+                            let
+                                pendingKey = ircCaseKey model pending.target
+                                localRevision = Maybe.withDefault 0 (Dict.get pendingKey model.composerDraftVersions)
+                                localDraft = Dict.get pendingKey model.composerDrafts
+                                storedRevision = result.draftRevision
+                                nextRevision = max localRevision (Maybe.withDefault 0 storedRevision) + 1
+                                preserved =
+                                    { model
+                                        | draftLoadPending = Nothing
+                                        , hydratedDraftTargets = Set.insert pendingKey model.hydratedDraftTargets
+                                        , composerDraftVersions =
+                                            case localDraft of
+                                                Just _ -> Dict.insert pendingKey nextRevision model.composerDraftVersions
+                                                Nothing -> model.composerDraftVersions
+                                    }
+                            in
+                            case ( localDraft, model.runtimeOwnerStamp ) of
+                                ( Just _, Just stamp ) ->
+                                    ( preserved
+                                    , [ RuntimeDraftAutosaveTimerStarted
+                                            { target = pending.target
+                                            , revision = nextRevision
+                                            , delayMs = 100
+                                            , ownerRef = stamp.ownerRef
+                                            , accountGeneration = stamp.accountGeneration
+                                            , connectionGeneration = stamp.connectionGeneration
+                                            }
+                                      ]
+                                    )
+
+                                _ ->
+                                    ( preserved, [] )
+
+                        else
+                            ( { model | draftLoadPending = Nothing }, [] )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if anchorLoadMatches && ownerMatches && result.domain == "anchor" && result.action == "load" then
+                case model.anchorLoadPending of
+                    Just pending ->
+                        if Just pending.conversationId /= result.anchorTarget then
+                            ( { model | anchorLoadPending = Nothing }, [] )
+
+                        else if result.status == RuntimeDomain.Accepted && result.completionScope == "local" then
+                            let
+                                key = String.toLower pending.conversationId
+                                restored =
+                                    case result.anchorAcceptedTimestamp of
+                                        Just timestamp -> applyReadMarker model pending.conversationId timestamp
+                                        Nothing -> { model | readMarkers = Dict.remove key model.readMarkers }
+                                viewed =
+                                    case result.anchorViewedCandidate of
+                                        Just timestamp -> Dict.insert key timestamp restored.viewedReadMarkers
+                                        Nothing -> Dict.remove key restored.viewedReadMarkers
+                            in
+                            ( { restored | anchorLoadPending = Nothing, viewedReadMarkers = viewed }, [] )
+
+                        else
+                            ( { model | anchorLoadPending = Nothing }, [] )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if requestMatches && ownerMatches then
+                let
+                    queueUiResult =
+                        if result.domain == "journal" && result.action == "queue"
+                            && ((result.status == RuntimeDomain.TransportAdmitted && result.completionScope == "transport")
+                                || (result.status == RuntimeDomain.Accepted && result.completionScope == "server")) then
+                            { result | status = RuntimeDomain.Accepted, completionScope = "local" }
+
+                        else
+                            result
+
+                    ( rowModel, rowEffects ) =
+                        case ( ( model.runtimeDomainPendingAction, queueUiResult.domain, queueUiResult.action ), ( queueUiResult.status, queueUiResult.completionScope ) ) of
+                            ( ( Just (RuntimeDomain.UseContinuation _), "continuation", "use" ), ( RuntimeDomain.Blocked, _ ) ) ->
+                                failSasl model "The selected SESSION-TOKEN continuation could not be started."
+
+                            ( ( Just (RuntimeDomain.UseContinuation _), "continuation", "use" ), ( RuntimeDomain.Failed, _ ) ) ->
+                                failSasl model "The selected SESSION-TOKEN continuation failed before authentication completed."
+
+                            ( ( Just (RuntimeDomain.UseContinuation _), "continuation", "use" ), ( RuntimeDomain.Unknown, _ ) ) ->
+                                failSasl model "The SESSION-TOKEN exchange outcome is unknown; reconnect before retrying."
+
+                            ( ( Just (RuntimeDomain.UseContinuation _), "continuation", "use" ), ( RuntimeDomain.Held, _ ) ) ->
+                                failSasl model "The selected SESSION-TOKEN continuation is not ready for this connection."
+
+                            ( ( Just (RuntimeDomain.QueueMessage target _ content replyTo messageKind audiencePrefix), "journal", "queue" ), ( RuntimeDomain.Accepted, "local" ) ) ->
+                                let
+                                    draftSnapshot = Dict.get (Ids.requestIdToRuntime result.requestId) model.queuedDraftRevisions
+
+                                    discardRevision =
+                                        draftSnapshot
+                                            |> Maybe.andThen
+                                                (\snapshot ->
+                                                    let
+                                                        key = ircCaseKey model snapshot.target
+                                                        currentRevision = Dict.get key model.composerDraftVersions
+                                                    in
+                                                    if ircCaseKey model snapshot.target == ircCaseKey model target && snapshot.text == content && snapshot.text == model.composer
+                                                        && Dict.get key model.composerDrafts == Just content && currentRevision == Just snapshot.revision then
+                                                        Just snapshot.revision
+
+                                                    else
+                                                        Nothing
+                                                )
+
+                                    ( queued, queuedEffects ) =
+                                        update (OutboxQueued { id = Ids.requestIdToRuntime result.requestId, target = target, text = content, queuedAt = model.nowMs, revision = Maybe.map .revision (Dict.get (Ids.requestIdToRuntime result.requestId) model.queuedDraftRevisions) }) model
+
+                                    queuedWithDeliveryState =
+                                        if result.status == RuntimeDomain.TransportAdmitted && result.completionScope == "transport" then
+                                            let
+                                                markedPending =
+                                                    updateChannel queued target
+                                                        (\channel ->
+                                                            { channel
+                                                                | messages =
+                                                                    List.map
+                                                                        (\row ->
+                                                                            if row.outboxId == Just (Ids.requestIdToRuntime result.requestId) then
+                                                                                { row | pending = True }
+
+                                                                            else
+                                                                                row
+                                                                        )
+                                                                        channel.messages
+                                                            }
+                                                        )
+                                            in
+                                            { markedPending | outbox = List.filter (\entry -> entry.id /= Ids.requestIdToRuntime result.requestId) markedPending.outbox }
+
+                                        else if result.status == RuntimeDomain.Accepted && result.completionScope == "server" then
+                                            let
+                                                confirmed =
+                                                    updateChannel queued target
+                                                        (\channel ->
+                                                            { channel
+                                                                | messages =
+                                                                    List.map
+                                                                        (\row ->
+                                                                            if row.outboxId == Just (Ids.requestIdToRuntime result.requestId) then
+                                                                                { row | pending = False, outboxId = Nothing }
+
+                                                                            else
+                                                                                row
+                                                                        )
+                                                                        channel.messages
+                                                            }
+                                                        )
+                                            in
+                                            { confirmed | outbox = List.filter (\entry -> entry.id /= Ids.requestIdToRuntime result.requestId) confirmed.outbox }
+
+                                        else
+                                            queued
+
+                                    ( discardModel, discardOutbounds ) =
+                                        case discardRevision of
+                                            Just revision -> makeDraftDiscardOutbound queuedWithDeliveryState target revision
+                                            Nothing -> ( queuedWithDeliveryState, [] )
+
+                                    replyParent =
+                                        case ( replyTo, activeReplyParent model.replyingTo target ) of
+                                            ( Just id, Just parent ) ->
+                                                if parent.msgid == id then Just parent else Nothing
+
+                                            _ ->
+                                                Nothing
+
+                                    decorated =
+                                        updateChannel discardModel target
+                                            (\channel ->
+                                                { channel
+                                                    | messages =
+                                                        List.map
+                                                            (\row ->
+                                                                if row.outboxId == Just (Ids.requestIdToRuntime result.requestId) then
+                                                                    { row
+                                                                        | msgType = if messageKind == "action" then "action" else "msg"
+                                                                        , audience = audiencePrefix
+                                                                        , replyTo = Maybe.map (\parent -> { id = parent.msgid, from = parent.from, text = parent.preview }) replyParent
+                                                                    }
+
+                                                                else
+                                                                    row
+                                                            )
+                                                            channel.messages
+                                                }
+                                            )
+
+                                    consumedReply =
+                                        case ( replyTo, activeReplyParent model.replyingTo target ) of
+                                            ( Just queuedId, Just currentParent ) ->
+                                                if currentParent.msgid == queuedId then Nothing else decorated.replyingTo
+
+                                            _ ->
+                                                decorated.replyingTo
+
+                                    consumedAudience =
+                                        if model.activeChannel == Just target && model.composerAudience == audiencePrefix then
+                                            Nothing
+
+                                        else
+                                            decorated.composerAudience
+                                in
+                                ( { decorated | replyingTo = consumedReply, composerAudience = consumedAudience }
+                                , discardOutbounds ++ queuedEffects
+                                )
+
+                            ( ( Just (RuntimeDomain.ScheduledCreate _ _ _ conversationId dueAtMs _ _ _), "scheduled", "create" ), ( RuntimeDomain.Accepted, "local" ) ) ->
+                                let
+                                    ( draftSettled, draftEffects ) = settleScheduledComposerDraft model (Ids.requestIdToRuntime result.requestId)
+                                in
+                                ( addToast
+                                    { variant = ToastSuccess
+                                    , title = "Scheduled message saved"
+                                    , description = Just ("Saved locally for " ++ conversationId ++ " at " ++ scheduleSendLabel dueAtMs (floor model.nowMs) ++ ". Delivery is handled later by the private journal.")
+                                    , duration = Nothing
+                                    , groupKey = Nothing
+                                    , undo = Nothing
+                                    }
+                                    model.nowMs
+                                    draftSettled
+                                , draftEffects
+                                )
+
+                            ( ( Just (RuntimeDomain.ScheduledEdit _ _ _ dueAtMs _ _ _), "scheduled", "edit" ), ( RuntimeDomain.Accepted, "local" ) ) ->
+                                let
+                                    ( refreshed, refreshOut ) =
+                                        makeRuntimeDomainOutbound model RuntimeDomain.ScheduledList
+
+                                    saved =
+                                        addToast
+                                            { variant = ToastSuccess
+                                            , title = "Scheduled message updated"
+                                            , description = Just ("Updated for " ++ scheduleSendLabel dueAtMs (floor model.nowMs) ++ ". Delivery remains separately tracked by the private journal.")
+                                            , duration = Nothing
+                                            , groupKey = Nothing
+                                            , undo = Nothing
+                                            }
+                                            model.nowMs
+                                            refreshed
+                                in
+                                ( saved, Maybe.withDefault [] (Maybe.map List.singleton refreshOut) )
+
+                            ( ( Just (RuntimeDomain.ScheduledCancel _ _), "scheduled", "cancel" ), ( RuntimeDomain.Accepted, "local" ) ) ->
+                                let
+                                    ( refreshed, refreshOut ) =
+                                        makeRuntimeDomainOutbound model RuntimeDomain.ScheduledList
+                                in
+                                ( refreshed, Maybe.withDefault [] (Maybe.map List.singleton refreshOut) )
+
+                            ( ( Just (RuntimeDomain.ScheduledReconcile _ _), "scheduled", "reconcile" ), ( RuntimeDomain.Accepted, _ ) ) ->
+                                let
+                                    ( refreshed, refreshOut ) =
+                                        makeRuntimeDomainOutbound model RuntimeDomain.ScheduledList
+                                in
+                                ( refreshed, Maybe.withDefault [] (Maybe.map List.singleton refreshOut) )
+
+                            _ ->
+                                ( model, [] )
+
+                    muteAfterResult =
+                        if result.domain == "media" && result.action == "mute" && result.status == RuntimeDomain.Accepted then
+                            case model.runtimeDomainPendingAction of
+                                Just (RuntimeDomain.MediaMute muted) -> muted
+                                _ -> model.callSelfMuted
+
+                        else if result.domain == "media" && result.action == "leave" && result.status == RuntimeDomain.Accepted then
+                            False
+
+                        else
+                            model.callSelfMuted
+
+                    deafenAfterResult =
+                        if result.domain == "media" && result.action == "deafen" && result.status == RuntimeDomain.Accepted then
+                            case model.runtimeDomainPendingAction of
+                                Just (RuntimeDomain.MediaDeafen deafened) -> deafened
+                                _ -> model.callSelfDeafened
+
+                        else if result.domain == "media" && result.action == "leave" && result.status == RuntimeDomain.Accepted then
+                            False
+
+                        else
+                            model.callSelfDeafened
+
+                    pushResultItem =
+                        result.items |> List.filter (\item -> String.startsWith "push:" item.state) |> List.head
+
+                    pushOnAfterResult =
+                        if result.domain == "platform" && List.member result.action [ "push-inspect", "push-enable", "push-disable", "push-reconcile" ] then
+                            case ( result.action, result.status, pushResultItem ) of
+                                ( "push-disable", RuntimeDomain.Accepted, _ ) ->
+                                    False
+
+                                ( _, _, Just item ) ->
+                                    String.endsWith "registered" item.state
+
+                                _ ->
+                                    model.webPushOn
+
+                        else
+                            model.webPushOn
+
+                    pushBusyAfterResult =
+                        if result.domain == "platform" && List.member result.action [ "push-inspect", "push-enable", "push-disable", "push-reconcile" ] then
+                            False
+
+                        else
+                            model.webPushBusy
+
+                    pushErrorAfterResult =
+                        if result.domain == "platform" && List.member result.action [ "push-inspect", "push-enable", "push-disable", "push-reconcile" ] then
+                            if List.member result.status [ RuntimeDomain.Blocked, RuntimeDomain.Failed, RuntimeDomain.Unknown, RuntimeDomain.Held ] then
+                                Just (Maybe.withDefault "Notification state is not confirmed." result.reason)
+
+                            else if result.action == "push-inspect" && Maybe.map (not << String.isEmpty << .ref) pushResultItem == Just True then
+                                Just "Push is available. Press Turn on again to confirm browser permission and registration."
+
+                            else
+                                Nothing
+
+                        else
+                            model.webPushError
+
+                    nextComposerError =
+                        if result.domain == "journal" && result.action == "queue" && result.status == RuntimeDomain.TransportAdmitted && result.completionScope == "transport" then
+                            let
+                                volatile =
+                                    List.any (\item -> List.member "volatile" item.extra) result.items
+                            in
+                            Just
+                                (if volatile then
+                                    "Message handed to this connection. Server confirmation is pending; it will not be resent automatically."
+
+                                 else
+                                    "Message handed to the network transport. Server confirmation is pending; it will not be resent automatically."
+                                )
+
+                        else if result.domain == "journal" && result.action == "queue" && List.member result.status [ RuntimeDomain.Held, RuntimeDomain.Blocked, RuntimeDomain.Failed, RuntimeDomain.Unknown ] then
+                            Just
+                                (if result.status == RuntimeDomain.Held then
+                                    "The message could not be saved to durable local storage. Your composer text was kept."
+
+                                 else
+                                    "Message delivery is not confirmed. Review the local delivery journal before any retry."
+                                )
+
+                        else
+                            rowModel.composerError
+
+                    nextScheduleError =
+                        if result.domain == "scheduled" && List.member result.status [ RuntimeDomain.Blocked, RuntimeDomain.Failed, RuntimeDomain.Unknown, RuntimeDomain.Held ] then
+                            Just (if result.status == RuntimeDomain.Unknown then "The scheduled operation is unresolved. It will not be duplicated; refresh the scheduled list to reconcile it." else "The scheduled operation could not be saved. The private editor text was preserved.")
+
+                        else
+                            rowModel.scheduleError
+                in
+                ( { rowModel
+                    | runtimeDomainPending = if result.status == RuntimeDomain.Pending || (result.status == RuntimeDomain.TransportAdmitted && not (result.domain == "journal" && result.action == "queue")) then Just result.requestId else Nothing
+                    , runtimeDomainPendingAction = if result.status == RuntimeDomain.Pending || (result.status == RuntimeDomain.TransportAdmitted && not (result.domain == "journal" && result.action == "queue")) then model.runtimeDomainPendingAction else Nothing
+                    , runtimeDomainResult = Just result
+                    , queuedDraftRevisions = Dict.remove (Ids.requestIdToRuntime result.requestId) rowModel.queuedDraftRevisions
+                    , selectedContinuationRef = if result.domain == "continuation" && result.status == RuntimeDomain.Accepted && result.completionScope == "local" then result.selectedContinuationRef else model.selectedContinuationRef
+                    , callSelfMuted = muteAfterResult
+                    , callSelfDeafened = deafenAfterResult
+                    , webPushOn = pushOnAfterResult
+                    , webPushBusy = pushBusyAfterResult
+                    , webPushError = pushErrorAfterResult
+                    , composerError = nextComposerError
+                    , scheduleError = nextScheduleError
+                  }
+                , rowEffects
+                )
+            else if ownerMatches && result.domain == "journal" && result.action == "flush" then
+                ( { model
+                    | composerError =
+                        if List.member result.status [ RuntimeDomain.Unknown, RuntimeDomain.Blocked, RuntimeDomain.Failed ] then
+                            Just "Delivery is uncertain. The journal will not resend automatically; review the entry before retrying."
+
+                        else
+                            model.composerError
+                    , runtimeDomainResult = Just result
+                  }
+                , []
+                )
+            else
+                ( model, [] )
+
+        RuntimeDomainObservationReceived observation ->
+            let
+                currentOwner = Maybe.withDefault False (Maybe.map (\stamp -> stamp.ownerRef == observation.ownerRef && stamp.accountGeneration == observation.accountGeneration && stamp.connectionGeneration == observation.connectionGeneration) model.runtimeOwnerStamp)
+                newer = observation.sequence > Maybe.withDefault 0 (Dict.get observation.domain model.runtimeDomainObservation)
+                controlledTransfer =
+                    case ( model.runtimeOwnerStamp, ( model.sessionRecoveryView, ( model.sessionRecoveryViewOwner, observation.sessionRecovery ) ) ) of
+                        ( Just newOwner, ( Just previousView, ( Just oldOwner, Just nextView ) ) ) ->
+                            let
+                                ownersDiffer =
+                                    oldOwner.ownerRef /= newOwner.ownerRef
+                                        || oldOwner.accountGeneration /= newOwner.accountGeneration
+                                        || oldOwner.connectionGeneration /= newOwner.connectionGeneration
+
+                                allowedTransferStatus =
+                                    if previousView.status == "redirecting" then
+                                        List.member nextView.status [ "awaiting-authentication", "blocked", "rejected" ]
+
+                                    else if previousView.status == "awaiting-authentication" then
+                                        List.member nextView.status [ "pending", "transport-admitted", "blocked", "rejected", "accepted" ]
+
+                                    else
+                                        False
+
+                                expectedIntentMatches =
+                                    case model.sessionRecoveryExpectedAccount of
+                                        Just intent ->
+                                            intent.requestId == previousView.requestId
+                                                && intent.credentialRef == previousView.credentialRef
+                                                && intent.networkId == newOwner.networkId
+                                                && (newOwner.accountId == Nothing || accountOwnerKey newOwner.accountId == accountOwnerKey (Just intent.accountId))
+
+                                        Nothing ->
+                                            False
+                            in
+                            ownersDiffer
+                                && allowedTransferStatus
+                                && expectedIntentMatches
+                                && nextView.requestId == previousView.requestId
+                                && nextView.credentialRef == previousView.credentialRef
+                                && nextView.transferFrom == Just { ownerRef = oldOwner.ownerRef, accountGeneration = oldOwner.accountGeneration, connectionGeneration = oldOwner.connectionGeneration }
+                                && newOwner.ownerRef == observation.ownerRef
+                                && newOwner.accountGeneration == observation.accountGeneration
+                                && newOwner.connectionGeneration == observation.connectionGeneration
+                                && (nextView.status /= "accepted" || List.member nextView.outcome [ Just "exact-restored", Just "logical-attached" ])
+
+                        _ -> False
+
+                recoveryCorrelation =
+                    case ( observation.sessionRecovery, model.sessionRecoveryView ) of
+                        ( Just nextView, Just currentView ) ->
+                            currentOwner
+                                && model.sessionRecoveryViewOwner == model.runtimeOwnerStamp
+                                && nextView.requestId == currentView.requestId
+                                && nextView.credentialRef == currentView.credentialRef
+
+                        _ ->
+                            False
+
+                passkeyCorrelation =
+                    case ( observation.passkeyManagement, model.passkeyManagementView ) of
+                        ( Just nextView, Just currentView ) ->
+                            currentOwner && nextView.requestId == currentView.requestId
+
+                        _ ->
+                            False
+
+                webAuthnCorrelation =
+                    case observation.webAuthn of
+                        Just view ->
+                            let
+                                matchingAction =
+                                    case model.runtimeDomainPendingAction of
+                                        Just (RuntimeDomain.WebAuthnBegin ceremony _) -> ceremony == view.ceremony
+                                        Just (RuntimeDomain.WebAuthnCancel _) -> True
+                                        _ -> False
+                            in
+                            currentOwner
+                                && matchingAction
+                                && Maybe.map Ids.requestIdToRuntime model.runtimeDomainPending == Just view.requestId
+
+                        Nothing ->
+                            False
+
+                sessionInventoryCorrelation =
+                    case observation.sessionInventory of
+                        Just view ->
+                            currentOwner
+                                && Maybe.map Ids.requestIdToRuntime model.runtimeDomainPending == Just view.requestId
+
+                        Nothing ->
+                            False
+
+                sessionRevocationCorrelation =
+                    case observation.sessionRevocation of
+                        Just view ->
+                            currentOwner
+                                && Maybe.map Ids.requestIdToRuntime model.runtimeDomainPending == Just view.requestId
+
+                        Nothing ->
+                            False
+
+                accountCommunityCorrelation =
+                    case observation.accountCommunity of
+                        Just view ->
+                            currentOwner
+                                && Maybe.map Ids.requestIdToRuntime model.runtimeDomainPending == Just view.requestId
+
+                        Nothing ->
+                            False
+
+                serviceIntegrationCorrelation =
+                    case observation.serviceIntegration of
+                        Just view ->
+                            let
+                                pendingMatches =
+                                    model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId
+
+                                retainedMatches =
+                                    model.serviceIntegrationView == Just view
+                            in
+                            currentOwner
+                                && (pendingMatches || retainedMatches)
+
+                        Nothing ->
+                            False
+
+                draftRecoveryCorrelation =
+                    case observation.draftRecovery of
+                        Just view ->
+                            currentOwner
+                                && Maybe.map Ids.requestIdToRuntime model.runtimeDomainPending == Just view.requestId
+
+                        Nothing ->
+                            False
+
+                mediaQualityCorrelation =
+                    case observation.mediaQuality of
+                        Just view ->
+                            let
+                                pendingMatches =
+                                    model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId
+
+                                retainedMatches =
+                                    model.mediaQualityViewOwner == model.runtimeOwnerStamp
+                                        && Maybe.map .requestId model.mediaQualityView == Just view.requestId
+                            in
+                            currentOwner && (pendingMatches || retainedMatches)
+
+                        Nothing ->
+                            False
+
+                mediaControlCorrelation =
+                    case observation.mediaControl of
+                        Just view ->
+                            let
+                                previousSequence = Maybe.map .sequence model.mediaControlView |> Maybe.withDefault -1
+                                previousDomainSequence = Dict.get observation.domain model.runtimeDomainObservation |> Maybe.withDefault 0
+                            in
+                            currentOwner
+                                && view.sequence > previousSequence
+                                && observation.sequence > previousDomainSequence
+
+                        Nothing ->
+                            False
+
+                acceptedOwner =
+                    if observation.sessionRecovery /= Nothing then
+                        recoveryCorrelation || controlledTransfer
+
+                    else if observation.passkeyManagement /= Nothing then
+                        passkeyCorrelation
+
+                    else if observation.webAuthn /= Nothing then
+                        webAuthnCorrelation
+
+                    else if observation.sessionInventory /= Nothing then
+                        sessionInventoryCorrelation
+
+                    else if observation.sessionRevocation /= Nothing then
+                        sessionRevocationCorrelation
+
+                    else if observation.accountCommunity /= Nothing then
+                        accountCommunityCorrelation
+
+                    else if observation.serviceIntegration /= Nothing then
+                        serviceIntegrationCorrelation
+
+                    else if observation.draftRecovery /= Nothing then
+                        draftRecoveryCorrelation
+
+                    else if observation.mediaQuality /= Nothing then
+                        mediaQualityCorrelation
+
+                    else if observation.mediaControl /= Nothing then
+                        mediaControlCorrelation
+
+                    else
+                        currentOwner
+
+            in
+            if acceptedOwner && newer then
+                ( { model
+                    | runtimeDomainObservation = Dict.insert observation.domain observation.sequence model.runtimeDomainObservation
+                    , scheduledObservationView =
+                        if observation.domain == "scheduled" then
+                            observation.scheduledView
+
+                        else
+                            model.scheduledObservationView
+                    , privateAccountStatus =
+                        if observation.domain == "account-security" && observation.securityStatus /= Nothing then
+                            observation.securityStatus
+
+                        else
+                            model.privateAccountStatus
+                    , sessionRecoveryView =
+                        if observation.domain == "session" && observation.sessionRecovery /= Nothing then
+                            observation.sessionRecovery
+
+                        else
+                            model.sessionRecoveryView
+                    , sessionRecoveryViewOwner =
+                        if observation.domain == "session" && observation.sessionRecovery /= Nothing then
+                            model.runtimeOwnerStamp
+
+                        else
+                            model.sessionRecoveryViewOwner
+                    , sessionReclaim =
+                        case observation.sessionRecovery of
+                            Just view ->
+                                sessionReclaimAfterRecoveryView model view
+
+                            Nothing ->
+                                model.sessionReclaim
+                    , sessionCommandsSent =
+                        if observation.sessionRecovery /= Nothing then
+                            True
+
+                        else
+                            model.sessionCommandsSent
+                    , sessionRecoveryExpectedAccount =
+                        case observation.sessionRecovery of
+                            Just view ->
+                                if view.status == "accepted" then
+                                    Nothing
+
+                                else
+                                    model.sessionRecoveryExpectedAccount
+
+                            Nothing ->
+                                model.sessionRecoveryExpectedAccount
+                    , passkeyManagementView =
+                        if observation.domain == "account-security" && observation.passkeyManagement /= Nothing then
+                            observation.passkeyManagement
+
+                        else
+                            model.passkeyManagementView
+                    , webAuthnObservationView =
+                        if observation.domain == "webauthn" && observation.webAuthn /= Nothing then
+                            observation.webAuthn
+
+                        else
+                            model.webAuthnObservationView
+                    , sessionInventoryView =
+                        case observation.sessionInventory of
+                            Just view -> Just view
+                            Nothing -> model.sessionInventoryView
+                    , sessionRevocationView =
+                        case observation.sessionRevocation of
+                            Just view -> Just view
+                            Nothing -> model.sessionRevocationView
+                    , accountCommunityView =
+                        case observation.accountCommunity of
+                            Just view -> Just view
+                            Nothing -> model.accountCommunityView
+                    , serviceIntegrationView =
+                        case observation.serviceIntegration of
+                            Just view -> Just view
+                            Nothing -> model.serviceIntegrationView
+                    , serviceIntegrationFormCleanRevision =
+                        case observation.serviceIntegration of
+                            Just view ->
+                                if view.phase == "accepted" && model.serviceIntegrationPendingFormRevision == Just model.serviceIntegrationFormRevision then
+                                    model.serviceIntegrationFormRevision
+
+                                else
+                                    model.serviceIntegrationFormCleanRevision
+
+                            Nothing ->
+                                model.serviceIntegrationFormCleanRevision
+                    , serviceIntegrationPendingFormRevision =
+                        case observation.serviceIntegration of
+                            Just view -> if view.phase == "pending" then model.serviceIntegrationPendingFormRevision else Nothing
+                            Nothing -> model.serviceIntegrationPendingFormRevision
+                    , draftRecoveryView =
+                        case observation.draftRecovery of
+                            Just view -> Just view
+                            Nothing -> model.draftRecoveryView
+                    , mediaQualityView =
+                        case observation.mediaQuality of
+                            Just view -> Just view
+                            Nothing -> model.mediaQualityView
+                    , mediaQualityViewOwner =
+                        if observation.mediaQuality /= Nothing then model.runtimeOwnerStamp else model.mediaQualityViewOwner
+                    , mediaControlView =
+                        case observation.mediaControl of
+                            Just view -> Just view
+                            Nothing -> model.mediaControlView
+                    , mediaControlViewOwner =
+                        if observation.mediaControl /= Nothing then model.runtimeOwnerStamp else model.mediaControlViewOwner
+                    , mediaBrowserAudioConsent =
+                        case ( observation.mediaControl, model.runtimeOwnerStamp ) of
+                            ( Just view, Just stamp ) ->
+                                model.mediaBrowserAudioConsentCall == mediaConsentScope stamp view.call && model.mediaBrowserAudioConsent
+
+                            ( Just _, Nothing ) ->
+                                False
+
+                            ( Nothing, _ ) ->
+                                model.mediaBrowserAudioConsent
+                    , mediaBrowserAudioConsentCall =
+                        case ( observation.mediaControl, model.runtimeOwnerStamp ) of
+                            ( Just view, Just stamp ) ->
+                                if model.mediaBrowserAudioConsentCall == mediaConsentScope stamp view.call then
+                                    model.mediaBrowserAudioConsentCall
+
+                                else
+                                    Nothing
+
+                            ( Just _, Nothing ) ->
+                                Nothing
+
+                            ( Nothing, _ ) ->
+                                model.mediaBrowserAudioConsentCall
+                    , mediaGestureResult =
+                        case ( observation.mediaControl, model.mediaGestureResult ) of
+                            ( Just view, Just status ) ->
+                                if (String.isEmpty status.conversationId && String.isEmpty status.callRef)
+                                    || view.call == Just { conversationId = status.conversationId, callRef = status.callRef } then
+                                    model.mediaGestureResult
+
+                                else
+                                    Nothing
+
+                            ( Just _, Nothing ) ->
+                                Nothing
+
+                            ( Nothing, _ ) ->
+                                model.mediaGestureResult
+                    , runtimeDomainPending =
+                        if observation.sessionInventory /= Nothing then
+                            if Maybe.map (.status >> (\status -> List.member status [ "pending", "transport-admitted" ])) observation.sessionInventory == Just True then model.runtimeDomainPending else Nothing
+                        else if observation.sessionRevocation /= Nothing then
+                            if Maybe.map (.status >> (\status -> List.member status [ "requesting", "preflight-pending" ])) observation.sessionRevocation == Just True then model.runtimeDomainPending else Nothing
+                        else if observation.accountCommunity /= Nothing then
+                            if Maybe.map (.status >> (==) "pending") observation.accountCommunity == Just True then model.runtimeDomainPending else Nothing
+                        else if observation.serviceIntegration /= Nothing then
+                            case observation.serviceIntegration of
+                                Just view ->
+                                    if model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then
+                                        if view.phase == "pending" then model.runtimeDomainPending else Nothing
+
+                                    else
+                                        model.runtimeDomainPending
+
+                                Nothing ->
+                                    model.runtimeDomainPending
+                        else if observation.draftRecovery /= Nothing then
+                            if Maybe.map (.status >> (==) "pending") observation.draftRecovery == Just True then model.runtimeDomainPending else Nothing
+                        else if observation.mediaQuality /= Nothing then
+                            Nothing
+                        else
+                            case ( observation.sessionRecovery, observation.webAuthn ) of
+                                ( Just view, _ ) ->
+                                    if recoveryViewSettlesRequest view && model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then Nothing else model.runtimeDomainPending
+                                ( Nothing, Just view ) ->
+                                    if List.member view.phase [ "transport-admitted", "blocked", "unknown" ] && model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then Nothing else model.runtimeDomainPending
+                                ( Nothing, Nothing ) -> model.runtimeDomainPending
+                    , runtimeDomainPendingAction =
+                        if observation.sessionInventory /= Nothing then
+                            if Maybe.map (.status >> (\status -> List.member status [ "pending", "transport-admitted" ])) observation.sessionInventory == Just True then model.runtimeDomainPendingAction else Nothing
+                        else if observation.sessionRevocation /= Nothing then
+                            if Maybe.map (.status >> (\status -> List.member status [ "requesting", "preflight-pending" ])) observation.sessionRevocation == Just True then model.runtimeDomainPendingAction else Nothing
+                        else if observation.accountCommunity /= Nothing then
+                            if Maybe.map (.status >> (==) "pending") observation.accountCommunity == Just True then model.runtimeDomainPendingAction else Nothing
+                        else if observation.serviceIntegration /= Nothing then
+                            case observation.serviceIntegration of
+                                Just view ->
+                                    if model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then
+                                        if view.phase == "pending" then model.runtimeDomainPendingAction else Nothing
+
+                                    else
+                                        model.runtimeDomainPendingAction
+
+                                Nothing ->
+                                    model.runtimeDomainPendingAction
+                        else if observation.draftRecovery /= Nothing then
+                            if Maybe.map (.status >> (==) "pending") observation.draftRecovery == Just True then model.runtimeDomainPendingAction else Nothing
+                        else
+                            case ( observation.sessionRecovery, observation.webAuthn ) of
+                                ( Just view, _ ) ->
+                                    if recoveryViewSettlesRequest view && model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then Nothing else model.runtimeDomainPendingAction
+                                ( Nothing, Just view ) ->
+                                    if List.member view.phase [ "transport-admitted", "blocked", "unknown" ] && model.runtimeDomainPending == Ids.requestIdFromRuntime view.requestId then Nothing else model.runtimeDomainPendingAction
+                                ( Nothing, Nothing ) -> model.runtimeDomainPendingAction
+                    , autoReconnect =
+                        if observation.domain == "session" && Maybe.map .status observation.sessionRecovery == Just "redirecting" then
+                            False
+
+                        else
+                            model.autoReconnect
+                    , reconnectIn =
+                        if observation.domain == "session" && Maybe.map .status observation.sessionRecovery == Just "redirecting" then
+                            0
+
+                        else
+                            model.reconnectIn
+                    , reconnectDueMs =
+                        if observation.domain == "session" && Maybe.map .status observation.sessionRecovery == Just "redirecting" then
+                            0
+
+                        else
+                            model.reconnectDueMs
+                  }
+                , case observation.sessionRecovery of
+                    Just view ->
+                        if recoveryViewClearsTimer view then
+                            [ ReclaimTimersCleared ]
+
+                        else
+                            []
+
+                    Nothing ->
+                        []
+                )
+            else
+                ( model, [] )
+
+        RuntimeFeatureReadinessReceived readiness ->
+            case model.runtimeOwnerStamp of
+                Just stamp ->
+                    if stamp.ownerRef /= readiness.ownerRef || stamp.accountGeneration /= readiness.accountGeneration || stamp.connectionGeneration /= readiness.connectionGeneration then
+                        ( model, [] )
+
+                    else
+                        let
+                            readyModel =
+                                { model
+                                    | runtimeFeatureRound = Just { roundRef = readiness.roundRef, ownerRef = readiness.ownerRef, accountGeneration = readiness.accountGeneration, connectionGeneration = readiness.connectionGeneration, e2ee = readiness.e2ee, media = readiness.media, newCapabilities = readiness.newCapabilities, ended = False, endRequested = False }
+                                    , mediaAvailable = readiness.media && List.member "onyx/media" model.caps
+                                }
+
+                            ( requested, out ) =
+                                requestReadyRuntimeCaps readyModel
+                        in
+                        ( requested, out )
+
+                Nothing ->
+                    ( model, [] )
+
+        RuntimeCapabilityAdmissionReceived result ->
+            if result.names == [] then
+                case model.runtimeFeatureRound of
+                    Just round ->
+                        if round.roundRef /= result.roundRef then
+                            ( model, [] )
+                        else if result.status == "transport-admitted" then
+                            ( { model | runtimeFeatureRound = Just { round | ended = True, endRequested = False } }, [] )
+                        else if String.startsWith "blocked:" result.status then
+                            ( { model | runtimeFeatureRound = Just { round | ended = False, endRequested = False } }, [] )
+                        else
+                            ( model, [] )
+
+                    Nothing ->
+                        ( model, [] )
+
+            else if result.status == "transport-admitted" || result.status == "unknown" then
+                ( model, [] )
+
+            else
+                let
+                    rejected =
+                        syncCapRequestProjections
+                            { model
+                                | capRequestGroups =
+                                    List.map
+                                        (\group ->
+                                            if group.purpose == RuntimeFeatures && group.roundRef == Just result.roundRef && group.requested == result.names && group.state == CapRequestPending then
+                                                { group | state = CapRequestRejected, unresolved = [] }
+
+                                            else
+                                                group
+                                        )
+                                        model.capRequestGroups
+                            }
+
+                    ( settled, out ) = endRuntimeCapabilityRound rejected result.roundRef
+                in
+                ( settled, out )
+
+        RuntimeCapabilityResolutionReceived result ->
+            case model.runtimeFeatureRound of
+                Just round ->
+                    if round.roundRef /= result.roundRef || result.connectionGeneration /= round.connectionGeneration then
+                        ( model, [] )
+                    else
+                        let
+                            physicalStillMatches =
+                                Maybe.withDefault False (Maybe.map (\stamp -> stamp.connectionGeneration == round.connectionGeneration) model.runtimeOwnerStamp)
+
+                            eligible =
+                                physicalStillMatches && result.ownerRef == round.ownerRef && result.accountGeneration == round.accountGeneration
+
+                            settledGroups =
+                                List.map
+                                    (\group ->
+                                        if group.purpose == RuntimeFeatures && group.roundRef == Just result.roundRef && group.state == CapRequestPending && List.any (\name -> List.member name result.names && List.member name group.unresolved) group.unresolved then
+                                            if result.result == "del" then
+                                                let unresolved = List.filter (\name -> not (List.member name result.names)) group.unresolved in
+                                                { group | unresolved = unresolved, state = if List.isEmpty unresolved then CapRequestRejected else CapRequestPending }
+
+                                            else if eligible && result.result == "ack" then
+                                                let unresolved = List.filter (\name -> not (List.member name result.names)) group.unresolved in
+                                                { group | unresolved = unresolved, state = if List.isEmpty unresolved then CapRequestAcked else CapRequestPending }
+                                            else
+                                                { group | unresolved = [], state = CapRequestRejected }
+                                        else
+                                            group
+                                    )
+                                    model.capRequestGroups
+
+                            ( settled, out ) = settleRuntimeCapabilityRounds (syncCapRequestProjections { model | capRequestGroups = settledGroups })
+                        in
+                        ( settled, out )
+
+                Nothing ->
+                    ( model, [] )
+
+        SessionCredentialsIgnored ->
+            ( model, [] )
+
+        SessionNewAttachmentRequested ->
+            if model.connection == Live && model.accountName /= Nothing && not model.sessionTokenIssuanceRequested && not (sessionResumePending model) then
+                ( { model | sessionTokenIssuanceRequested = True, sessionReclaim = Nothing, sessionRecoveryView = Nothing, sessionRecoveryViewOwner = Nothing, sessionRecoveryExpectedAccount = Nothing }, [ SessionTokenIssueRequested ] )
+
+            else
+                ( model, [] )
+
+        SessionRetryRequested ->
+            case model.sessionReclaim of
+                Just notice ->
+                    if model.connection == Live && model.accountName /= Nothing && notice.phase == ReclaimFailed
+                        && List.member notice.outcome [ Session.AttachmentBusy, Session.ResumeRetryable ] then
+                        case notice.credentialRef of
+                            Just credentialRef ->
+                                let
+                                    prepared = { model | sessionReclaim = Just { notice | phase = Restoring, outcome = Session.ResumePending } }
+                                    ( requested, commandOut ) = startSessionRecovery prepared (Ids.credentialRefToRuntime credentialRef) (RuntimeDomain.RetrySession (Ids.credentialRefToRuntime credentialRef) False)
+                                in
+                                ( requested, commandOut ++ [ ReclaimTimerStarted { stage = "confirm" } ] )
+
+                            Nothing ->
+                                ( model, [] )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        WsFramesReceived batch ->
+            if model.runtimeOwnerStamp /= Just batch.owner then
+                ( model, [] )
+
+            else
+                -- Preserve the legacy per-frame receipt clock and line
+                -- semantics by folding every frame through WsBatchReceived.
+                List.foldl
+                    (\frame ( acc, outs ) ->
+                        let
+                            ( next, frameOut ) =
+                                update (WsBatchReceived frame) acc
+                        in
+                        ( next, outs ++ frameOut )
+                    )
+                    ( model, [] )
+                    batch.frames
 
         WsBatchReceived batch ->
             -- The receipt stamp keeps the clock honest between Ticks
@@ -34589,6 +41291,11 @@ update msg model =
                     ( resetChannelListTransport
                         { model
                             | connection = Registering
+                            , physicalConnectionGeneration = model.physicalConnectionGeneration + 1
+                            -- ISUPPORT is negotiated per physical socket; a
+                            -- reconnect can land on a node with a different
+                            -- PREFIX/CASEMAPPING inventory.
+                            , isupport = Isupport.defaultSupport
                             -- A fresh socket consumes any countdown (its
                             -- fire redialed us here); the attempt budget
                             -- resets at 001 on success, matching the
@@ -34598,13 +41305,24 @@ update msg model =
                             , reconnectIn = 0
                             , reconnectDueMs = 0
                         , endpoint = learnEndpoint model.endpoint url
+                        -- Server provenance is per physical socket: the
+                        -- first-wins prefix is relearned from this
+                        -- connection's own 001, so a node change never
+                        -- keeps trusting the previous node's name.
+                        , serverPrefix = Nothing
                         , publisher = nextPublisher
+                        , caps = []
+                        , mediaAvailable = False
                         , capAvailable = []
+                        , capAvailableValues = Dict.empty
+                        , capRequestGroups = []
+                        , capRequestGroupSeq = 0
                         , capReqPending = 0
                         , capReqNames = []
                         , capNegotiating = True
                         , nickAliasTryIdx = 0
                         , sessionCommandsSent = False
+                        , sessionTokenIssuanceRequested = False
                         , connectNick = model.ourNick
                         , saslMechs = []
                         , sasl = SaslIdle
@@ -34620,21 +41338,58 @@ update msg model =
                 _ ->
                     ( model, [] )
 
+        ClientLineRejected rejected ->
+            if
+                rejected.endpoint == model.endpoint
+                    && rejected.physicalConnectionGeneration == model.physicalConnectionGeneration
+                    && rejected.runtimeOwnerStamp == model.runtimeOwnerStamp
+            then
+                ( { model | composerError = Just "The command could not be sent because it exceeds the client wire limits." }, [] )
+
+            else
+                ( model, [] )
+
         WsClosed close ->
-            -- A close strands every in-flight label (no echo/ACK/FAIL
-            -- can still arrive), so confirm those rows in place and
-            -- drop the registry — mirroring `_clearPendingLabeledSends`.
+            -- A close strands every in-flight label, so preserve each
+            -- row as delivery-unknown and drop old-generation echo
+            -- correlation.
             -- Tracked echo-batch refs die with the connection too.
-            -- Open history batches die with it as well (mirroring the
-            -- reconnect collector clear), and a pending server search
+            -- Open plain history keeps only its already validated rows
+            -- and reports an incomplete response; partial multiline
+            -- messages are discarded. A pending server search
             -- errors instead of sticking: its batch will never arrive.
             -- The close itself records like the oracle `onClose`: a
             -- `Disconnected: <reason>` system inbox row plus the same
             -- line in the service log.
             let
+                ( settledBatches, batchOut ) =
+                    retireOpenHistoryBatches model
+
                 cleared =
-                    { model
+                    { settledBatches
                         | connection = Offline
+                        , physicalConnectionGeneration = model.physicalConnectionGeneration + 1
+                        , mediaControlView = Nothing
+                        , mediaControlViewOwner = Nothing
+                        , mediaBrowserAudioConsent = False
+                        , mediaBrowserAudioConsentCall = Nothing
+                        , mediaGestureResult = Nothing
+                        , mediaQualityView = Nothing
+                        , mediaQualityViewOwner = Nothing
+                        , pendingMessageEdits =
+                            Dict.map
+                                (\_ pending -> { pending | outcomeUnknown = True })
+                                settledBatches.pendingMessageEdits
+                        , stewardTransferAttempts =
+                            Dict.map
+                                (\_ attempt ->
+                                    if List.member attempt.status [ "pending", "partial", "reconciling" ] then
+                                        { attempt | status = "unknown", reconcileAt = Nothing, reconcileSawNames = False }
+
+                                    else
+                                        attempt
+                                )
+                                settledBatches.stewardTransferAttempts
                         -- The socket died, so any pending identify reply
                         -- dies with it: a 464 arriving on the next socket
                         -- belongs to no live attempt. A reclaim dialog is
@@ -34642,6 +41397,8 @@ update msg model =
                         -- likewise moot: its reply contexts die and
                         -- captured credentials are forgotten.
                         , identifyReplyAccount = Nothing
+                        , connectionNickPending = Nothing
+                        , connectionNickNotice = Nothing
                         , registerReplyAccount = Nothing
                         , verifyReplyAccount = Nothing
                         , totpReplyAccount = Nothing
@@ -34665,16 +41422,21 @@ update msg model =
                         , capNegotiating = False
                         , capReqPending = 0
                         , capReqNames = []
+                        , capRequestGroups = []
+                        , capRequestGroupSeq = 0
+                        , runtimeFeatureRound = Nothing
                         , sasl = SaslIdle
                         , saslAuthenticated = False
                         , ownEchoBatches = Set.empty
                         , historyBatches = Dict.empty
+                        , uncertainLabels = Dict.empty
                         , serverSearchPending = Nothing
                         , staleServerSearches = Dict.empty
                         , historyTargetsPending = False
                         , historyTargetsBatchRef = Nothing
                         , historyTargetsStartedAt = Nothing
                         , historyLoading = Set.empty
+                        , pendingHistoryRequests = Dict.empty
                         , pendingDiscoveries = Dict.empty
                         , pendingPins = Dict.empty
                         , pendingTravel = Nothing
@@ -34726,9 +41488,16 @@ update msg model =
                         , topic = Nothing
                         }
             in
-            ( resetGuestClaim noticed, [] )
+            ( resetGuestClaim noticed, batchOut )
 
         VaultRowsReceived { target, rows, status } ->
+            update (VaultRowsScopedReceived { target = target, rows = rows, status = status, ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, retentionScope = unknownRetentionReadScope }) model
+
+        VaultRowsScopedReceived { target, rows, status, ownerRef, accountGeneration, connectionGeneration, retentionScope } ->
+            if not (historyResponseOwnerMatches model ownerRef accountGeneration connectionGeneration) then
+                ( model, [] )
+
+            else
             -- The open media panel claims its target's rows (dropping
             -- owner-stale responses unpainted); normal hydration still
             -- runs.
@@ -34739,7 +41508,7 @@ update msg model =
                             { model
                                 | mediaIndexVault = rows
                                 , mediaIndexVaultState =
-                                    if status == "ok" then
+                                    if status == "ok" && retentionScope.kind /= "unknown" then
                                         MediaVaultReady
 
                                     else
@@ -34751,40 +41520,55 @@ update msg model =
 
                     else
                         model
+
+                scoped =
+                    { claimed | retentionReadScopes = Dict.insert (String.toLower target) retentionScope claimed.retentionReadScopes }
             in
-            if status /= "ok" then
-                case Dict.get (String.toLower target) claimed.channels of
+            if status /= "ok" || retentionScope.kind == "unknown" then
+                case Dict.get (String.toLower target) scoped.channels of
                     Just channel ->
                         if List.isEmpty channel.messages then
-                            ( logService (rememberVaultIds claimed rows) "Local history is unavailable on this device.", [] )
+                            ( logService (rememberVaultIds scoped rows) (retentionUnavailableMessage retentionScope), [] )
 
                         else
-                            ( rememberVaultIds claimed rows, [] )
+                            ( rememberVaultIds scoped rows, [] )
 
                     Nothing ->
-                        ( rememberVaultIds claimed rows, [] )
+                        ( rememberVaultIds scoped rows, [] )
 
             else
-                ( rememberVaultIds (mergeVaultRows claimed target rows) rows, [] )
+                ( rememberVaultIds (mergeVaultRows scoped target rows) rows, [] )
 
         VaultRowsAroundReceived { target, at, rows, status } ->
-            if status /= "ok" then
-                ( logService model "Local history is unavailable on this device.", [] )
+            update (VaultRowsAroundScopedReceived { target = target, at = at, rows = rows, status = status, ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, retentionScope = unknownRetentionReadScope }) model
+
+        VaultRowsAroundScopedReceived { target, at, rows, status, ownerRef, accountGeneration, connectionGeneration, retentionScope } ->
+            if not (historyResponseOwnerMatches model ownerRef accountGeneration connectionGeneration) then
+                ( model, [] )
+
+            else if status /= "ok" || retentionScope.kind == "unknown" then
+                ( logService model (retentionUnavailableMessage retentionScope), [] )
 
             else
-                ( mergeVaultAround model target at rows, [] )
+                ( mergeVaultAround { model | retentionReadScopes = Dict.insert (String.toLower target) retentionScope model.retentionReadScopes } target at rows, [] )
 
         VaultSearched { rows, status, seq, mode } ->
+            update (VaultSearchedScoped { rows = rows, status = status, seq = seq, mode = mode, ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing, retentionScopes = [] }) model
+
+        VaultSearchedScoped { rows, status, seq, mode, ownerRef, accountGeneration, connectionGeneration, retentionScopes } ->
             -- A newer query or a close supersedes this response (mirrors
             -- the `vaultSeq`/abort guard); a missing database resolves
             -- empty-done like the oracle, anything else errors. The
             -- echoed mode labels the resolved batch even when the user
             -- retoggled mid-flight.
-            if seq /= model.vaultSearchSeq then
+            if not (historyResponseOwnerMatches model ownerRef accountGeneration connectionGeneration) || seq /= model.vaultSearchSeq then
                 ( model, [] )
 
-            else if status == "ok" then
-                ( { model | vaultRawHits = List.filterMap (vaultHitFromRow model model.vaultSearchQuery) rows, vaultStatus = VaultSearchDone, vaultSearchModeShown = parseVaultSearchMode mode }, [] )
+            else if status == "ok" && not (List.any (\entry -> entry.scope.kind == "unknown") retentionScopes) then
+                ( { model | vaultRawHits = List.filterMap (vaultHitFromRow model model.vaultSearchQuery) rows, vaultStatus = VaultSearchDone, vaultSearchModeShown = parseVaultSearchMode mode, retentionReadScopes = List.foldl (\entry scopes -> Dict.insert (String.toLower entry.conversationId) entry.scope scopes) model.retentionReadScopes retentionScopes }, [] )
+
+            else if status == "incomplete" || List.any (\entry -> entry.scope.kind == "unknown") retentionScopes then
+                ( { model | vaultRawHits = [], vaultStatus = VaultSearchIncomplete, vaultSearchModeShown = parseVaultSearchMode mode, retentionReadScopes = List.foldl (\entry scopes -> Dict.insert (String.toLower entry.conversationId) entry.scope scopes) model.retentionReadScopes retentionScopes }, [] )
 
             else if status == "unavailable" then
                 ( { model | vaultRawHits = [], vaultStatus = VaultSearchDone, vaultSearchModeShown = parseVaultSearchMode mode }, [] )
@@ -34808,13 +41592,17 @@ update msg model =
                 ( navigated, navOut ) =
                     update (ChannelSelect target) (invalidateVaultSearch { model | searchOpen = False })
             in
-            ( navigated, navOut ++ [ VaultFetchAround { target = String.toLower target, at = at, limit = keepMessages } ] )
+            ( navigated, navOut ++ [ vaultFetchAroundOutbound navigated (String.toLower target) at keepMessages ] )
 
         VaultExported { targets, messages } ->
-            ( logService model
-                ("Vault exported (" ++ String.fromInt messages ++ " messages, " ++ String.fromInt targets ++ " targets).")
-            , []
-            )
+            if model.runtimeOwnerStamp /= Nothing then
+                ( logService model "Whole-vault export is unavailable in the scoped workspace. Select conversations and use the private export action.", [] )
+
+            else
+                ( logService model
+                    ("Vault exported (" ++ String.fromInt messages ++ " messages, " ++ String.fromInt targets ++ " targets).")
+                , []
+                )
 
         VaultStored _ ->
             ( model, [] )
@@ -34850,7 +41638,7 @@ update msg model =
                                                         Nothing
 
                                                     rows ->
-                                                        Just (VaultPersist { target = importedTarget.target, rows = rows })
+                                                        Just (vaultPersistOutbound model importedTarget.target rows)
                                             )
                                             snap.targets
 
@@ -34872,7 +41660,7 @@ update msg model =
                                     )
 
         OutboxQueued entry ->
-            if List.any (\row -> row.id == entry.id) model.outbox then
+            if List.any (\row -> row.id == entry.id) model.outbox || findOutboxRow model entry.id /= Nothing then
                 ( model, [] )
 
             else
@@ -34899,34 +41687,59 @@ update msg model =
                         }
 
                     withRow =
-                        updateChannel model entry.target
+                        updateChannel { model | ownedRowIds = markOwnedRow placeholder.id model.ownedRowIds } entry.target
                             (\c ->
                                 { c
                                     | messages =
-                                        List.take keepMessages (placeholder :: c.messages)
+                                        List.take (messageRetentionFor model entry.target) (placeholder :: c.messages)
                                 }
                             )
+
+                    draftKey =
+                        ircCaseKey withRow entry.target
+
+                    revisionMatches =
+                        entry.revision /= Nothing && Dict.get draftKey withRow.composerDraftVersions == entry.revision
+
+                    activeTargetMatches =
+                        Maybe.map (ircCaseKey withRow >> (==) draftKey) withRow.activeChannel == Just True
+
+                    visibleDraftConsumed =
+                        activeTargetMatches && revisionMatches && withRow.composer == entry.text
+
+                    admissionModel =
+                        if visibleDraftConsumed then
+                            resumeLatestReading withRow
+
+                        else
+                            withRow
+
+                    requestId =
+                        Ids.requestIdFromRuntime entry.id
                 in
                 -- The commit clears the visible draft when it still
                 -- shows the queued text, and drops the stored
                 -- per-target draft whenever it still holds the queued
                 -- text (a room switch in between must not resurrect
                 -- it; newer typing in either place is kept).
-                ( { withRow
-                    | messageSeq = withRow.messageSeq + 1
+                ( { admissionModel
+                    | messageSeq = admissionModel.messageSeq + 1
                     , outbox = { id = entry.id, target = entry.target, text = entry.text, queuedAt = entry.queuedAt } :: withRow.outbox
                     , composerDrafts =
-                        if Dict.get (String.toLower entry.target) withRow.composerDrafts == Just entry.text then
-                            Dict.remove (String.toLower entry.target) withRow.composerDrafts
+                        if revisionMatches && Dict.get draftKey withRow.composerDrafts == Just entry.text then
+                            Dict.remove draftKey withRow.composerDrafts
 
                         else
                             withRow.composerDrafts
                     , composer =
-                        if withRow.composer == entry.text then
+                        if activeTargetMatches && revisionMatches && withRow.composer == entry.text then
                             ""
 
                         else
                             withRow.composer
+                    , composerDraftVersions =
+                        if revisionMatches then Dict.remove draftKey withRow.composerDraftVersions else withRow.composerDraftVersions
+                    , queuedDraftRevisions = Maybe.withDefault withRow.queuedDraftRevisions (Maybe.map (\id -> Dict.remove (Ids.requestIdToRuntime id) withRow.queuedDraftRevisions) requestId)
                   }
                 , []
                 )
@@ -35115,6 +41928,9 @@ update msg model =
         CancelScheduledMessage { id } ->
             requestCancelScheduledMessage model id
 
+        CancelRuntimeScheduledMessage { scheduleRef, revision } ->
+            update (RuntimeDomainActionRequested (RuntimeDomain.ScheduledCancel scheduleRef revision)) model
+
         ScheduledFenceResult result ->
             foldScheduledFenceResult model result
 
@@ -35134,7 +41950,18 @@ update msg model =
             ( { model | showScheduledMessages = visible }, [] )
 
         SetAccountOpen True ->
-            openAccountPanel model
+            if model.accountOpen then
+                ( model, [] )
+
+            else
+                let
+                    ( opened, openOut ) =
+                        openAccountPanel model
+
+                    ( refreshed, sessionOut ) =
+                        update SessionListRequested opened
+                in
+                ( refreshed, openOut ++ sessionOut )
 
         SetAccountOpen False ->
             ( { model | accountOpen = False }, [] )
@@ -35149,7 +41976,11 @@ update msg model =
             -- Mirroring the popover's queue button: the popover closes
             -- (keeping the custom field for next open) and the sheet
             -- opens on the owned queue.
-            ( { model | scheduleOpen = False, scheduleError = Nothing, showScheduledMessages = True }, [] )
+            let
+                ( listed, listOut ) =
+                    makeRuntimeDomainOutbound { model | scheduleOpen = False, scheduleError = Nothing, showScheduledMessages = True } RuntimeDomain.ScheduledList
+            in
+            ( listed, Maybe.withDefault [] (Maybe.map List.singleton listOut) )
 
         ScheduleWhenInput value ->
             ( { model | scheduleWhen = value, scheduleError = Nothing }, [] )
@@ -35175,7 +42006,11 @@ update msg model =
                     ( model, [] )
 
         ScheduleCustomSubmit ->
-            ( model, [ ScheduleParseRequest { value = model.scheduleWhen } ] )
+            if retainedDraftLocked model then
+                ( { model | scheduleError = Just "Clear or reauthorize the retained draft before scheduling a message." }, [] )
+
+            else
+                ( model, [ ScheduleParseRequest { value = model.scheduleWhen } ] )
 
         ScheduleClockReceived result ->
             ( { model
@@ -35258,6 +42093,16 @@ update msg model =
                         -- An unanswered room creation disarms on the 1s
                         -- Tick (the oracle's 15s timer).
                         , pendingCreateRoom = createWatched.pendingCreateRoom
+                        , stewardTransferAttempts =
+                            Dict.map
+                                (\_ attempt ->
+                                    if List.member attempt.status [ "pending", "partial", "reconciling" ] && toFloat (Time.posixToMillis posix) >= attempt.deadline then
+                                        { attempt | status = "unknown", reconcileAt = Nothing }
+
+                                    else
+                                        attempt
+                                )
+                                model.stewardTransferAttempts
                     }
 
                 ( polled, pollOut ) =
@@ -35290,28 +42135,41 @@ update msg model =
                 searchOut =
                     vaultOut ++ pollOut ++ reclaimOut ++ redialOut ++ pingOut ++ dispatchOut ++ attrOut
 
+                ( expiredBatches, batchOut ) =
+                    expireHistoryBatches
+                        (expireServerSearch attributed
+                            |> expirePendingLabelRequests
+                            |> expirePendingMessageEdits
+                        )
+
                 timed =
-                    expireServerSearch attributed
+                    pruneDeliveryUnknown expiredBatches
+
+                ( dirtyFlushed, dirtyVaultOut ) =
+                    flushDirtyVaultTargets timed
+
+                timedOut =
+                    searchOut ++ batchOut
 
                 stale =
-                    case timed.statusFetchedAt of
+                    case dirtyFlushed.statusFetchedAt of
                         Nothing ->
                             True
 
                         Just fetchedAt ->
-                            timed.nowMs - fetchedAt >= 30000
+                            dirtyFlushed.nowMs - fetchedAt >= 30000
             in
-            if timed.route == Route.Status && not timed.statusLoading && stale then
+            if dirtyFlushed.route == Route.Status && not dirtyFlushed.statusLoading && stale then
                 let
                     ( statused, statusOut ) =
-                        requestStatus timed
+                        requestStatus dirtyFlushed
                 in
-                ( statused, searchOut ++ statusOut )
+                ( statused, timedOut ++ dirtyVaultOut ++ statusOut )
 
             else
                 let
                     reverted =
-                        { timed
+                        { dirtyFlushed
                             | downloadCopies = downloadCopiesReverted ticked
                             , studioExportCopied = studioCopyKept ticked ticked.studioExportRevertAt ticked.studioExportCopied
                             , studioSeedCopied = studioCopyKept ticked ticked.studioSeedRevertAt ticked.studioSeedCopied
@@ -35335,48 +42193,33 @@ update msg model =
                             requestStatsIndex False reverted
                     in
                     if String.isEmpty withIndex.statsDetailRequested then
-                        ( withIndex, searchOut ++ indexOut )
+                        ( withIndex, timedOut ++ dirtyVaultOut ++ indexOut )
 
                     else
                         let
                             ( withDetail, detailOut ) =
                                 requestStatsDetailFor withIndex withIndex.statsDetailRequested
                         in
-                        ( withDetail, searchOut ++ indexOut ++ detailOut )
+                        ( withDetail, timedOut ++ dirtyVaultOut ++ indexOut ++ detailOut )
 
                 else
-                    ( reverted, searchOut )
+                    ( reverted, timedOut ++ dirtyVaultOut )
 
-        SaslCredentialsProvided { account, password, hasClientCert } ->
+        SaslCredentialsProvided { account, hasClientCert } ->
             -- A sign-in form hands the secret to the ports side, which
             -- holds it for the exchange; the model keeps only the
             -- account plus the fact that a credential exists. The
             -- password value itself never rests in Elm state.
             ( { model
                 | saslAccount = Just account
-                , saslPasswordHeld = not (String.isEmpty password)
+                , saslPasswordHeld = True
                 , saslClientCert = hasClientCert
               }
-            , [ SaslCredentialsStored { account = account, password = password, hasClientCert = hasClientCert } ]
+            , [ SaslCredentialsStored { account = account, hasClientCert = hasClientCert } ]
             )
 
-        SaslPayload { payload } ->
-            -- Ports-side crypto answered a challenge: chunk the blob
-            -- into 400-byte `AUTHENTICATE` lines. A payload arriving
-            -- with no exchange in flight is dropped, never sent.
-            case model.sasl of
-                SaslIdle ->
-                    ( model, [] )
-
-                SaslPending _ ->
-                    ( model
-                    , List.map
-                        (\chunk -> SendLine (Wire.formatIrcLine "AUTHENTICATE" [ chunk ]))
-                        (Wire.chunkSaslPayload payload)
-                    )
-
         SaslFailed { reason } ->
-            failSasl model
+            abortSasl model
                 (if String.isEmpty (String.trim reason) then
                     "SASL authentication failed"
 
@@ -35385,7 +42228,7 @@ update msg model =
                 )
 
         SaslTimeout ->
-            failSasl model "SASL authentication timed out"
+            abortSasl model "SASL authentication timed out"
 
         SearchRowsReceived { rows, status } ->
             -- Ports-side list answer: replace the visible list with
@@ -35508,6 +42351,124 @@ update msg model =
         NotificationCenterOpened ->
             ( { model | showNotificationCenter = True, inboxFilter = InboxAll }, [] )
 
+        RuntimeNotificationNavigationReceived request ->
+            let
+                currentOwner =
+                    case model.runtimeOwnerStamp of
+                        Just stamp ->
+                            stamp.ownerRef == request.ownerRef
+                                && stamp.accountGeneration == request.accountGeneration
+                                && stamp.connectionGeneration == request.connectionGeneration
+                        Nothing -> False
+
+                openExisting =
+                    case ( request.kind, request.conversationId ) of
+                        ( "inbox", Nothing ) ->
+                            Just ( { model | showNotificationCenter = True, inboxFilter = InboxAll }, [] )
+
+                        ( "dm", Just conversation ) ->
+                            openNotificationDm model conversation
+
+                        ( "mention", Just conversation ) ->
+                            openNotificationConversation model conversation
+
+                        ( "call", Just conversation ) ->
+                            -- Call notifications focus only an already
+                            -- present conversation; they never answer it.
+                            openNotificationConversation model conversation
+
+                        _ ->
+                            Nothing
+
+                ( next, effects, opened ) =
+                    if currentOwner then
+                        case openExisting of
+                            Just ( updated, outbounds ) ->
+                                ( updated, outbounds, True )
+
+                            Nothing ->
+                                ( model, [], False )
+
+                    else
+                        ( model, [], False )
+            in
+            ( next
+            , effects
+                ++ [ RuntimeNotificationNavigationReceipt
+                        { requestId = request.requestId
+                        , ownerRef = request.ownerRef
+                        , accountGeneration = request.accountGeneration
+                        , connectionGeneration = request.connectionGeneration
+                        , opened = opened
+                        }
+                   ]
+            )
+
+        ComposerCompositionStarted ->
+            ( { model | composerComposing = True }, [] )
+
+        ComposerCompositionEnded ->
+            ( { model | composerComposing = False }, [] )
+
+        MediaQualityPolicySet policy ->
+            case ( model.mediaQualityView, model.runtimeOwnerStamp, model.activeChannel ) of
+                ( Just quality, Just stamp, Just active ) ->
+                    if quality.conversationId == active
+                        && model.mediaQualityViewOwner == Just stamp
+                        && model.calls.lifecycle == Media.InCall
+                        && List.member policy [ "auto", "balanced", "audio-priority" ] then
+                        update (RuntimeDomainActionRequested (RuntimeDomain.MediaQuality quality.conversationId quality.callRef policy)) model
+
+                    else
+                        ( model, [] )
+
+                _ ->
+                    ( model, [] )
+
+        MediaCaptionLanguageChanged language ->
+            if String.length language <= 64 && not (String.any (\char -> Char.toCode char < 32 || Char.toCode char == 127) language) then
+                ( { model | mediaCaptionLanguage = language }, [] )
+            else
+                ( model, [] )
+
+        MediaBrowserAudioConsentChanged consent ->
+            case model.mediaControlView of
+                Just mediaView ->
+                    case mediaView.call of
+                        Just call ->
+                            if model.mediaControlViewOwner == model.runtimeOwnerStamp && model.activeChannel == Just call.conversationId then
+                                ( { model | mediaBrowserAudioConsent = consent, mediaBrowserAudioConsentCall = if consent then Maybe.map (\stamp -> Maybe.withDefault "" (mediaConsentScope stamp (Just call))) model.runtimeOwnerStamp else Nothing }, [] )
+
+                            else
+                                ( { model | mediaBrowserAudioConsent = False, mediaBrowserAudioConsentCall = Nothing }, [] )
+
+                        Nothing ->
+                            ( { model | mediaBrowserAudioConsent = False, mediaBrowserAudioConsentCall = Nothing }, [] )
+
+                Nothing ->
+                    ( { model | mediaBrowserAudioConsent = False, mediaBrowserAudioConsentCall = Nothing }, [] )
+
+        MediaOutputDeviceSelected deviceRef ->
+            case model.mediaControlView of
+                Just mediaView ->
+                    if model.mediaControlViewOwner == model.runtimeOwnerStamp
+                        && List.any (\device -> device.ref == deviceRef) mediaView.devices.outputs then
+                        update (RuntimeDomainActionRequested (RuntimeDomain.MediaOutput { deviceRef = Just deviceRef, volumePercent = mediaView.devices.requestedVolumePercent })) model
+                    else
+                        ( model, [] )
+                Nothing ->
+                    ( model, [] )
+
+        MediaOutputVolumeChanged raw ->
+            case String.toInt raw of
+                Just volumePercent ->
+                    if volumePercent >= 0 && volumePercent <= 100 then
+                        ( { model | mediaOutputVolumePercent = volumePercent }, [] )
+                    else
+                        ( model, [] )
+                Nothing ->
+                    ( model, [] )
+
         NotificationCenterClosed ->
             ( { model | showNotificationCenter = False }, [] )
 
@@ -35564,8 +42525,15 @@ update msg model =
                         Err _ ->
                             model.nickAliases
 
+                -- The canonical name is the account (or guest nick), not
+                -- the storage identity (a guest's carries its owner ref).
                 canonical =
-                    Maybe.withDefault "" (Maybe.map .identity (deviceMemoryOwner model))
+                    case deviceMemoryOwner model of
+                        Just _ ->
+                            String.toLower (String.trim (Maybe.withDefault model.ourNick model.accountName))
+
+                        Nothing ->
+                            ""
             in
             ( { model | nickAliases = normalizeNickAliases raw canonical }, [] )
 
@@ -35630,10 +42598,13 @@ update msg model =
                     ( syncOwnCustomStatusActivity stored Nothing, [] )
 
         SessionListRequested ->
-            -- `SESSION LIST`: collect rows until "end of session list".
-            -- Shared with the Account open-refresh via
-            -- `requestSessionList`.
-            requestSessionList model
+            if sessionResumePending model then
+                ( { model | accountSessionsPending = False, accountSessionsError = Just "Wait for session restore confirmation before listing attachments." }, [] )
+            else if model.connection /= Live || model.accountName == Nothing || model.runtimeOwnerStamp == Nothing then
+                ( { model | accountSessionsPending = False, accountSessionsError = Just "Sign in to list sessions." }, [] )
+            else
+                update (RuntimeDomainActionRequested RuntimeDomain.LocalSessionList)
+                    { model | accountSessionsPending = True, accountSessionsError = Nothing }
 
         SessionLogoutRequested ->
             -- `LOGOUT`: the 901 fold clears the account; a guest or
@@ -35831,8 +42802,74 @@ update msg model =
         PasskeySupportReceived { supported } ->
             ( { model | passkeyBrowserSupported = Just supported }, [] )
 
+        AccountCommunityInput input ->
+            ( { model | accountCommunityInput = String.left 128 input }, [] )
+
+        ServiceIntegrationFieldChanged field value ->
+            let
+                nextForm =
+                    updateServiceIntegrationForm field value model.serviceIntegrationForm
+            in
+            if nextForm == model.serviceIntegrationForm then
+                ( model, [] )
+
+            else
+                ( { model
+                    | serviceIntegrationForm = nextForm
+                    , serviceIntegrationFormRevision = model.serviceIntegrationFormRevision + 1
+                  }
+                , []
+                )
+
+        ServiceIntegrationFormReset ->
+            let
+                nextRevision =
+                    model.serviceIntegrationFormRevision + 1
+            in
+            ( { model
+                | serviceIntegrationForm = emptyServiceIntegrationForm
+                , serviceIntegrationFormRevision = nextRevision
+                , serviceIntegrationFormCleanRevision = nextRevision
+                , serviceIntegrationPendingFormRevision = Nothing
+              }
+            , []
+            )
+
+        DraftRecoveryPreviewDismissed ->
+            ( { model | draftRecoveryPreview = Nothing, draftRecoveryCapture = Nothing }, [] )
+
+        DraftRecoveryPreviewInserted ->
+            case ( model.draftRecoveryPreview, model.draftRecoveryCapture, model.runtimeOwnerStamp ) of
+                ( Just recovered, Just capture, Just stamp ) ->
+                    let
+                        key = ircCaseKey model capture.target
+                        versionStillCurrent = Maybe.withDefault 0 (Dict.get key model.composerDraftVersions) == capture.composerRevision
+                        ownerStillCurrent = stamp.ownerRef == capture.ownerRef && stamp.accountGeneration == capture.accountGeneration && stamp.connectionGeneration == capture.connectionGeneration
+                        targetStillCurrent = Maybe.map (ircCaseKey model >> (==) key) model.activeChannel == Just True
+                    in
+                    if versionStillCurrent && ownerStillCurrent && targetStillCurrent && recovered.draftRef == capture.draftRef && recovered.conversationId == capture.target then
+                        let
+                            nextVersion = capture.composerRevision + 1
+                        in
+                        ( { model
+                            | composer = recovered.text
+                            , composerDrafts = Dict.insert key recovered.text model.composerDrafts
+                            , composerDraftVersions = Dict.insert key nextVersion model.composerDraftVersions
+                            , draftRecoveryPreview = Nothing
+                            , draftRecoveryCapture = Nothing
+                            , composerError = Nothing
+                          }
+                        , []
+                        )
+
+                    else
+                        ( { model | draftRecoveryPreview = Nothing, draftRecoveryCapture = Nothing, composerError = Just "The composer or owner changed. Review the saved draft again before replacing text." }, [] )
+
+                _ ->
+                    ( model, [] )
+
         PasskeyListRequested ->
-            requestPasskeyList model
+            update (RuntimeDomainActionRequested RuntimeDomain.PasskeyList) model
 
         PasskeyLabelInput value ->
             ( { model | passkeyLabel = boundedPasskeyLabel value }, [] )
@@ -35866,15 +42903,15 @@ update msg model =
                     ( model, [] )
 
                 Just id ->
-                    let
-                        ( next, outs ) =
-                            requestPasskeyRename model id model.passkeyRenameValue
-                    in
-                    if List.isEmpty outs then
-                        ( next, outs )
+                    if String.isEmpty (String.trim model.passkeyRenameValue) || utf8ByteLength model.passkeyRenameValue > 64 || String.any isTopicControlChar model.passkeyRenameValue then
+                        let
+                            passkeyState =
+                                model.passkey
+                        in
+                        ( { model | passkey = { passkeyState | error = Just "Choose a passkey name without control characters, up to 64 bytes." } }, [] )
 
                     else
-                        ( { next | passkeyRenamingId = Nothing, passkeyRenameValue = "" }, outs )
+                        update (RuntimeDomainActionRequested (RuntimeDomain.PasskeyRename id model.passkeyRenameValue)) model
 
         PasskeyRenameCancelled ->
             ( { model | passkeyRenamingId = Nothing, passkeyRenameValue = "" }, [] )
@@ -35888,11 +42925,7 @@ update msg model =
                     ( model, [] )
 
                 Just id ->
-                    let
-                        ( next, outs ) =
-                            requestPasskeyRemove model id
-                    in
-                    ( { next | passkeyRemoveArmed = Nothing }, outs )
+                    update (RuntimeDomainActionRequested (RuntimeDomain.PasskeyRemove id)) model
 
         PasskeyRemoveCancelled ->
             ( { model | passkeyRemoveArmed = Nothing }, [] )
@@ -35972,14 +43005,16 @@ update msg model =
                                 ( next, [ SendLine line ] )
 
         SessionDropRequested { index } ->
-            -- Revoke another attachment by physical SID, falling back to
-            -- the legacy LIST ordinal. The current connection is always
-            -- refused; offline/guest/bad-index requests stay silent.
-            if model.connection /= Live || model.accountName == Nothing || index < 1 then
+            -- Local SESSION leases use opaque row refs. The ordinal remains
+            -- display-only and is never sent back as a selector.
+            if sessionResumePending model then
+                ( { model | accountSessionsPending = False, accountSessionsError = Just "Wait for session restore confirmation before changing attachments." }, [] )
+
+            else if model.connection /= Live || model.accountName == Nothing || index < 1 then
                 ( model, [] )
 
             else
-                case List.filter (\r -> r.index == index) model.accountSessions |> List.head of
+                case model.sessionInventoryView |> Maybe.map .localRows |> Maybe.withDefault [] |> List.filter (\row -> row.index == index) |> List.head of
                     Just row ->
                         if row.current then
                             ( { model | accountSessionsError = Just "Cannot drop this connection — sign out instead." }
@@ -35987,27 +43022,22 @@ update msg model =
                             )
 
                         else
-                            ( { model | accountSessionsPending = True, accountSessionsError = Nothing }
-                            , [ SendLine (Wire.formatIrcLine "SESSION" [ "DROP", sessionDropSelector (Just row) index ]) ]
-                            )
+                            update (RuntimeDomainActionRequested (RuntimeDomain.LocalSessionDrop row.rowRef))
+                                { model | accountSessionsPending = True, accountSessionsError = Nothing }
 
                     Nothing ->
-                        ( { model | accountSessionsPending = True, accountSessionsError = Nothing }
-                        , [ SendLine (Wire.formatIrcLine "SESSION" [ "DROP", sessionDropSelector Nothing index ]) ]
-                        )
+                        ( { model | accountSessionsPending = False, accountSessionsError = Just "Refresh the session list before selecting a session to sign out." }, [] )
 
         ReclaimTimerFired { stage } ->
-            -- Ports-side reclaim timers: the confirm window promotes a
-            -- still-`Restoring` resume to a brief `Reclaimed` toast (and
-            -- arms dismissal); dismissal clears the toast. A terminal
-            -- FAIL already overwrote the phase, so a late fire is a
-            -- no-op — mirroring the oracle's phase checks.
+            -- A timeout cannot prove that the bearer was accepted. Keep the
+            -- restoring state and surface uncertainty; only the typed,
+            -- owner-stamped recovery projection promotes it to `Reclaimed`.
             if stage == "confirm" then
                 case model.sessionReclaim of
                     Just notice ->
                         if notice.phase == Restoring then
-                            ( { model | sessionReclaim = Just { phase = Reclaimed, kind = notice.kind } }
-                            , [ ReclaimTimerStarted { stage = "dismiss" } ]
+                            ( logService model "Session resume is still awaiting server confirmation."
+                            , []
                             )
 
                         else
@@ -36041,34 +43071,150 @@ update msg model =
                 typed =
                     case model.activeChannel of
                         Nothing ->
-                            { model | composer = text, composerError = Nothing }
-
-                        Just current ->
                             { model
                                 | composer = text
                                 , composerError = Nothing
-                                , composerDrafts = Dict.insert (String.toLower current) text model.composerDrafts
+                                , slashDismissed = False
+                                , slashIndex = 0
+                                , nickDismissed = False
+                                , nickIndex = 0
+                            }
+
+                        Just current ->
+                            let
+                                key = ircCaseKey model current
+                                revision = Maybe.withDefault 0 (Dict.get key model.composerDraftVersions) + 1
+                            in
+                            { model
+                                | composer = text
+                                , composerError = Nothing
+                                , slashDismissed = False
+                                , slashIndex = 0
+                                , nickDismissed = False
+                                , nickIndex = 0
+                                , composerDrafts = Dict.insert key text model.composerDrafts
+                                , composerDraftVersions = Dict.insert key revision model.composerDraftVersions
                             }
             in
-            case model.activeChannel of
-                Nothing ->
-                    ( typed, [] )
+            if retainedDraftLocked typed then
+                ( typed, [] )
 
-                Just target ->
-                    let
-                        trimmed =
-                            String.trim text
-                    in
-                    sendTyping typed target (not (String.isEmpty trimmed) && not (String.startsWith "/" trimmed))
+            else
+                case model.activeChannel of
+                    Nothing ->
+                        ( typed, [] )
+
+                    Just target ->
+                        let
+                            trimmed =
+                                String.trim text
+
+                            key =
+                                ircCaseKey model target
+
+                            revision =
+                                Maybe.withDefault 1 (Dict.get key typed.composerDraftVersions)
+
+                            ( typingModel, typingOut ) =
+                                sendTyping typed target (not (String.isEmpty trimmed) && not (String.startsWith "/" trimmed))
+                        in
+                        case model.runtimeOwnerStamp of
+                            Just stamp ->
+                                ( typingModel
+                                , typingOut ++ [ RuntimeDraftAutosaveTimerStarted { target = target, revision = revision, delayMs = 500, ownerRef = stamp.ownerRef, accountGeneration = stamp.accountGeneration, connectionGeneration = stamp.connectionGeneration } ]
+                                )
+
+                            Nothing ->
+                                ( typingModel, typingOut )
+
+        RetiredDraftReauthorize ->
+            case ( model.retiredDraftOwner, model.runtimeOwnerStamp ) of
+                ( Just origin, Just stamp ) ->
+                    if origin.accountId == Nothing
+                        && origin.networkId == stamp.networkId
+                        && stamp.accountId == Nothing
+                        && stamp.connectionGeneration > origin.connectionGeneration then
+                        armRetainedDraftAutosaves
+                            { model
+                                | retiredDraftOwner = Nothing
+                                , composerError = Nothing
+                                , scheduleError = Nothing
+                            }
+
+                    else
+                        ( model, [] )
+
+                _ ->
+                    ( model, [] )
+
+        RetiredDraftDiscard ->
+            let
+                discardedKeys =
+                    model.composerDrafts
+                        |> Dict.keys
+                        |> Set.fromList
+            in
+            ( { model
+                | composer = ""
+                , composerDrafts = Dict.empty
+                , composerDraftVersions = Dict.empty
+                , retiredDraftOwner = Nothing
+                , hydratedDraftTargets = Set.union model.hydratedDraftTargets discardedKeys
+                , draftLoadPending = Nothing
+                , draftSavePending = Dict.empty
+                , queuedDraftRevisions = Dict.empty
+                , composerError = Nothing
+                , scheduleError = Nothing
+                , scheduleOpen = False
+              }
+            , []
+            )
+
+        DraftAutosaveTimerFired { target, revision, ownerRef, accountGeneration, connectionGeneration } ->
+            let
+                key = ircCaseKey model target
+                currentRevision = Dict.get key model.composerDraftVersions
+                body = Dict.get key model.composerDrafts
+            in
+            case ( currentRevision, body, model.runtimeOwnerStamp ) of
+                ( Just expected, Just draftText, Just stamp ) ->
+                    if not (retainedDraftLocked model) && expected == revision && stamp.ownerRef == ownerRef && stamp.accountGeneration == accountGeneration && stamp.connectionGeneration == connectionGeneration then
+                        let
+                            nextClock = model.eventClock + 1
+                        in
+                        case (( Ids.requestIdFromRuntime ("draftSave" ++ String.padLeft 13 '0' (String.fromInt nextClock)), Ids.ownerRefFromRuntime stamp.ownerRef ), ( Ids.accountGenerationFromInt stamp.accountGeneration, Ids.connectionGenerationFromInt stamp.connectionGeneration )) of
+                            ( ( Just requestId, Just ownerRefId ), ( Just accountGenerationId, Just connectionGenerationId ) ) ->
+                                ( { model | eventClock = nextClock, draftSavePending = Dict.insert key { requestId = requestId, revision = revision } model.draftSavePending }
+                                , [ RuntimeDomainCommand
+                                        { requestId = requestId
+                                        , ownerRef = ownerRefId
+                                        , accountGeneration = accountGenerationId
+                                        , connectionGeneration = connectionGenerationId
+                                        , action = RuntimeDomain.SaveDraft target draftText revision
+                                        }
+                                  ]
+                                )
+
+                            _ ->
+                                ( { model | composerError = Just "The draft could not be saved because this connection identity is invalid." }, [] )
+
+                    else
+                        ( model, [] )
+
+                _ ->
+                    ( model, [] )
 
         AttachPick ->
             -- Attaching mid-edit refuses with the draft kept
             -- (mirroring the oracle `addFiles` edit guard).
-            case Maybe.andThen (activeEditFor model) model.activeChannel of
-                Just _ ->
+            case ( retainedDraftLocked model, Maybe.andThen (activeEditFor model) model.activeChannel ) of
+                ( True, _ ) ->
+                    ( { model | composerError = Just "Clear or reauthorize the retained draft before attaching files." }, [] )
+
+                ( False, Just _ ) ->
                     ( { model | composerError = Just "Finish editing before attaching files." }, [] )
 
-                Nothing ->
+                ( False, Nothing ) ->
                     pickAttachments model
 
         AttachRemove id ->
@@ -36077,8 +43223,11 @@ update msg model =
         UploadPicked { key, files } ->
             -- Staging mirrors `addFiles`: an armed edit and protected
             -- DMs refuse before the cap plan runs, with the draft kept.
-            case model.activeChannel of
-                Just target ->
+            case ( retainedDraftLocked model, model.activeChannel ) of
+                ( True, _ ) ->
+                    ( { model | composerError = Just "Clear or reauthorize the retained draft before attaching files." }, [] )
+
+                ( False, Just target ) ->
                     if activeEditFor model target /= Nothing then
                         ( { model | composerError = Just "Finish editing before attaching files." }, [] )
 
@@ -36088,7 +43237,7 @@ update msg model =
                     else
                         ( stagePicked model key files, [] )
 
-                Nothing ->
+                ( False, Nothing ) ->
                     ( stagePicked model key files, [] )
 
         UploadDone done ->
@@ -36131,7 +43280,7 @@ update msg model =
                         , mediaIndexOwner = mediaOwnerKey model
                         , mediaPictureAllowed = Set.empty
                       }
-                    , [ VaultFetch { target = key, limit = keepMessages } ]
+                    , [ vaultFetchOutbound model key keepMessages ]
                     )
 
         MediaIndexClose ->
@@ -36146,7 +43295,7 @@ update msg model =
                     | mediaIndexVaultState = MediaVaultLoading
                     , mediaIndexOwner = mediaOwnerKey model
                   }
-                , [ VaultFetch { target = model.mediaIndexTarget, limit = keepMessages } ]
+                , [ vaultFetchOutbound model model.mediaIndexTarget keepMessages ]
                 )
 
             else
@@ -36190,7 +43339,7 @@ update msg model =
                         model.nowMs
                         { current
                             | composer = merged
-                            , composerDrafts = Dict.insert (String.toLower target) merged current.composerDrafts
+                            , composerDrafts = Dict.insert (ircCaseKey current target) merged current.composerDrafts
                             , messageMenu = Nothing
                         }
                     , []
@@ -36264,11 +43413,19 @@ update msg model =
                                 Just current ->
                                     let
                                         stored =
-                                            Dict.get (String.toLower current) model.composerDrafts
+                                            Dict.get (ircCaseKey model current) model.composerDrafts
                                     in
                                     Maybe.withDefault edit.draft stored
                     in
                     sendTyping { model | editingMessage = Nothing, composer = restored } (Maybe.withDefault "" model.activeChannel) False
+
+        DismissEditUncertainty target msgid ->
+            ( { model
+                | pendingMessageEdits = Dict.remove (messageMutationKey target msgid) model.pendingMessageEdits
+                , composerError = Nothing
+              }
+            , []
+            )
 
         MessageMenuOpen { target, msgid } ->
             -- The per-message menu toggles on its own row (mirroring
@@ -36352,7 +43509,15 @@ update msg model =
                     ( model, [] )
 
                 Just open ->
-                    Tuple.mapFirst (\m -> { m | reactionPicker = Nothing }) (sendReaction model open.target open.msgid emoji)
+                    let
+                        ( sent, outbound ) =
+                            sendReaction model open.target open.msgid emoji
+                    in
+                    if sent.composerError == Just "The reaction could not be safely sent." then
+                        ( sent, outbound )
+
+                    else
+                        ( { sent | reactionPicker = Nothing }, outbound )
 
         MessageMenuDeleteAsk ->
             -- The destructive action arms a confirm step first
@@ -36486,7 +43651,7 @@ update msg model =
             if not (isChannelName model target && isChannelOp model target) then
                 ( { model | messageMenu = Nothing }, [] )
 
-            else if List.member msgid (channelPins model target) then
+            else if List.member msgid (desiredPins model target) then
                 Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (unpinMessage model target msgid)
 
             else
@@ -36595,106 +43760,19 @@ update msg model =
             ( { model | zone = zone }, [] )
 
         ComposerSend ->
-            case model.activeChannel of
-                Nothing ->
-                    ( model, [] )
+            let
+                ( next, outs ) =
+                    composerSendUpdate model
 
-                Just target ->
-                    case activeEditFor model target of
-                        Just edit ->
-                            -- Edit mode: send becomes save (mirror the
-                            -- oracle `handleSend` edit branch; edit
-                            -- mode never carries staged attachments —
-                            -- the send button is disabled there, and an
-                            -- empty draft cannot save).
-                            if String.isEmpty (String.trim model.composer) then
-                                ( model, [] )
+                ( seen, seenOut ) =
+                    if String.isEmpty (String.trim model.composer) || not (String.isEmpty next.composer) then
+                        ( next, [] )
 
-                            else
-                                let
-                                    ( edited, out ) =
-                                        requestEdit model target edit.msgid model.composer
-                                in
-                                if List.isEmpty out then
-                                    -- Refused (cap, transport, or the row
-                                    -- changed under us): like the oracle
-                                    -- `editMessage` refused path, the arm
-                                    -- and the draft stay for retry and the
-                                    -- refusal copy coaches (Elm has no
-                                    -- admit-uncertain tier — every refusal
-                                    -- here is a pre-send gate).
-                                    ( { edited | composerError = Just "Edit was refused. Your replacement text is still here." }, [] )
+                    else
+                        markFirstHourSeen next
+            in
+            ( seen, outs ++ seenOut )
 
-                                else
-                                    ( { edited | editingMessage = Nothing, composer = "", composerDrafts = Dict.remove (String.toLower target) edited.composerDrafts }, out )
-
-                        Nothing ->
-                            if not (List.isEmpty model.attachments) then
-                                sendWithAttachments model target
-
-                            else if String.isEmpty (String.trim model.composer) then
-                                ( model, [] )
-
-                            else
-                                let
-                                    trimmed =
-                                        String.trim model.composer
-
-                            -- Text-only conveniences (`/shrug` family)
-                            -- expand to ordinary text first, mirroring the
-                            -- oracle composer (`expandSlashTextCommand`
-                            -- over the trimmed draft); anything else
-                                -- passes through byte-identical.
-                                    outgoing =
-                                        if String.startsWith "/" trimmed then
-                                            expandSlashTextCommand trimmed
-
-                                        else
-                                            model.composer
-
-                                    sending =
-                                        { model | composer = outgoing }
-                                in
-                                if isBlockedDmTarget sending target then
-                                    -- A DM to a locally blocked nick refuses before
-                                    -- anything else (mirroring the oracle composer
-                                    -- gate): the draft stays for unblock-and-send.
-                                    refuseBlockedDm sending target
-
-                                else if sending.composerAudience /= Nothing && composerSendTarget sending target == Nothing then
-                                    -- A set audience that can no longer be honored
-                                    -- (room left, prefix withdrawn) refuses instead of
-                                    -- widening an ops-only message to everyone.
-                                    ( logService sending "Status audience unavailable here — message not sent.", [] )
-
-                                else if String.startsWith "/" outgoing && sending.connection /= Live then
-                                    -- Real commands never queue from the offline
-                                    -- outbox (mirroring the oracle composer
-                                    -- guard): the draft stays, the inline error
-                                    -- coaches, nothing emits.
-                                    ( { model | composerError = Just "Commands can't be queued. Reconnect to run this command." }, [] )
-
-                                else
-                                    case parseSlashLocal outgoing of
-                                        Just ( verb, nickArg ) ->
-                                            -- Local slash commands never hit the wire
-                                            -- (online or offline, sealed or not —
-                                            -- mirroring the oracle slash dispatch,
-                                            -- which runs ahead of delivery). The
-                                            -- stored draft drops with the dispatch
-                                            -- (a kept visible draft re-seeds it on
-                                            -- the next input or switch).
-                                            Tuple.mapFirst (dropStoredDraftFor target) (runSlashLocal sending target verb nickArg)
-
-                                        Nothing ->
-                                            if String.startsWith "/" outgoing then
-                                                -- Unhandled verbs go out as raw
-                                                -- uppercase IRC (mirroring the
-                                                -- oracle `sendRaw` fallthrough).
-                                                sendRawSlashCommand sending target outgoing
-
-                                            else
-                                                sendComposerText sending target
 
         ChannelSelect name ->
             -- A context switch dismisses the message menu and its
@@ -36708,7 +43786,7 @@ update msg model =
 
                 switched =
                     openPinnedForum
-                        { selected | messageMenu = Nothing, reactionPicker = Nothing, translations = Dict.empty }
+                        { selected | messageMenu = Nothing, reactionPicker = Nothing, translations = Dict.empty, clientRoomsOpen = False, clientMembersOpen = False }
                         name
             in
             if switched.mediaIndexOpen then
@@ -36722,7 +43800,7 @@ update msg model =
                     , mediaIndexVaultState = MediaVaultLoading
                     , mediaIndexOwner = mediaOwnerKey switched
                   }
-                , selectOuts ++ [ VaultFetch { target = key, limit = keepMessages } ]
+                , selectOuts ++ [ vaultFetchOutbound selected key keepMessages ]
                 )
 
             else
@@ -36745,7 +43823,7 @@ update msg model =
                         ( marked, markOuts ) =
                             markAllChannelTopicsRead model channel
                     in
-                    ( { marked | activeChannelTopics = Dict.remove key marked.activeChannelTopics }, markOuts )
+                    ( resetThreadWindow { marked | activeChannelTopics = Dict.remove key marked.activeChannelTopics }, markOuts )
 
                 Just requested ->
                     case resolveKnownChannelTopic model channel requested of
@@ -36761,10 +43839,10 @@ update msg model =
                                 ( marked, markOuts ) =
                                     markLatestChannelTopicRead inserted channel valid
                             in
-                            ( reconcileChannelTopicUnread marked key, markOuts )
+                            ( resetThreadWindow (reconcileChannelTopicUnread marked key), markOuts )
 
                         Nothing ->
-                            ( { model | activeChannelTopics = Dict.remove key model.activeChannelTopics }, [] )
+                            ( resetThreadWindow { model | activeChannelTopics = Dict.remove key model.activeChannelTopics }, [] )
 
         PinnedMessageRequest req ->
             requestPinnedMessage model req.channel req.messageId
@@ -36809,12 +43887,15 @@ update msg model =
                                 -- Window shows the oldest buffered row:
                                 -- page further back from the server
                                 -- (mirrors `loadHistory` rewind).
-                                requestRewindHistory model name
+                                requestRewindHistory (invalidateVaultSearch { model | historyLanding = Nothing, searchOpen = False, forceUnreadNav = False }) name
 
                             else if win.hiddenAfter == 0 && model.threadWindowSize < MessageWindow.maxWindowRows then
                                 ( { model
                                     | threadWindowSize = min MessageWindow.maxWindowRows (model.threadWindowSize + threadWindowStep)
                                     , ignoreUnreadAnchor = True
+                                    , forceUnreadNav = False
+                                    , historyLanding = Nothing
+                                    , searchOpen = False
                                   }
                                 , []
                                 )
@@ -36823,19 +43904,172 @@ update msg model =
                                 ( { model
                                     | threadPageStart = Just (max 0 (win.start - win.rendered))
                                     , ignoreUnreadAnchor = True
+                                    , forceUnreadNav = False
+                                    , historyLanding = Nothing
+                                    , searchOpen = False
                                   }
                                 , []
                                 )
 
+        ThreadCatchUp ->
+            case model.activeChannel of
+                Nothing ->
+                    ( model, [] )
+
+                Just target ->
+                    requestCatchUpHistory model target
+
+        ThreadFillGaps ->
+            case model.activeChannel of
+                Nothing ->
+                    ( model, [] )
+
+                Just target ->
+                    requestHistoryBetween model target
+
+        ThreadFollowChanged state ->
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower state.target) then
+                ( { model | threadFollowing = state.following }, [] )
+            else
+                ( model, [] )
+
         ThreadShowLatest ->
-            -- Jump back to the live tail (mirroring the latest
-            -- pill: trailing window, and no leftover unread divider
-            -- steals it back).
+            ( resumeLatestReading model, [] )
+
+        ThreadJumpUnread ->
+            case model.activeChannel of
+                Nothing ->
+                    ( model, [] )
+
+                Just name ->
+                    case Dict.get (String.toLower name) model.channels of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just channel ->
+                            let
+                                chronological =
+                                    threadVisibleRows model channel
+
+                                unreadIndex =
+                                    Dict.get (String.toLower name) model.viewUnreadDividerId
+                                        |> Maybe.andThen (threadRowIndex (List.reverse chronological))
+
+                                planned =
+                                    MessageWindow.planUnreadNavigation
+                                        { total = toFloat (List.length chronological)
+                                        , unreadIndex = Maybe.map toFloat unreadIndex
+                                        , windowSize = toFloat MessageWindow.defaultWindowSize
+                                        }
+                            in
+                            case planned of
+                                Nothing ->
+                                    ( model, [] )
+
+                                Just plan ->
+                                    ( { model
+                                        | threadWindowSize = MessageWindow.defaultWindowSize
+                                        , threadPageStart = Just plan.window.start
+                                        , ignoreUnreadAnchor = False
+                                        , threadFollowing = False
+                                        , forceUnreadNav = True
+                                        , historyLanding = Nothing
+                                        , searchOpen = False
+                                      }
+                                    , []
+                                    )
+
+        SlashSuggestMove delta ->
             let
-                trailed =
-                    resetThreadWindow model
+                count =
+                    List.length (slashSuggestionCommands model)
             in
-            ( { trailed | ignoreUnreadAnchor = True }, [] )
+            if count == 0 then
+                ( model, [] )
+
+            else
+                ( { model | slashIndex = modBy count (model.slashIndex + delta) }, [] )
+
+        SlashSuggestPick name ->
+            case List.filter (\command -> command.name == name) (slashSuggestionCommands model) |> List.head of
+                Nothing ->
+                    ( model, [] )
+
+                Just command ->
+                    let
+                        next =
+                            SlashSuggest.complete model.composer (slashSuggestCommand command)
+                    in
+                    ( { model | composer = next, slashIndex = 0, slashDismissed = False, composerError = Nothing }, [] )
+
+        SlashSuggestDismiss ->
+            ( { model | slashDismissed = True }, [] )
+
+        NickSuggestMove delta ->
+            let
+                count =
+                    List.length (nickSuggestionMatches model)
+            in
+            if count == 0 then
+                ( model, [] )
+
+            else
+                ( { model | nickIndex = modBy count (model.nickIndex + delta) }, [] )
+
+        NickSuggestPick nick ->
+            case NickComplete.nickTokenAt model.composer (String.length model.composer) of
+                Nothing ->
+                    ( model, [] )
+
+                Just token ->
+                    let
+                        applied =
+                            NickComplete.applyNickCompletion model.composer token nick
+
+                        drafted =
+                            case model.activeChannel of
+                                Just current ->
+                                    Dict.insert (ircCaseKey model current) applied.text model.composerDrafts
+
+                                Nothing ->
+                                    model.composerDrafts
+                    in
+                    ( { model | composer = applied.text, composerDrafts = drafted, nickIndex = 0, composerError = Nothing }, [] )
+
+        NickSuggestDismiss ->
+            ( { model | nickDismissed = True }, [] )
+
+        SetDndQuietHours start end ->
+            let
+                hours =
+                    QuietHours.applyHours model.dndQuietStart model.dndQuietEnd start end
+
+                updated =
+                    { model | dndQuietStart = hours.start, dndQuietEnd = hours.end }
+            in
+            ( updated, [ DndQuietSave { start = hours.start, end = hours.end } ] )
+
+        FirstHourDismiss ->
+            markFirstHourSeen model
+
+        FirstHourInvite ->
+            let
+                ( seen, seenOut ) =
+                    markFirstHourSeen model
+
+                href =
+                    FirstHour.inviteFriendsHref (Maybe.andThen .channel model.firstHourHandoff)
+            in
+            ( seen, seenOut ++ [ PushUrl href ] )
+
+        NavigationLoaded value ->
+            absorbNavigation model value
+
+        DeviceSlotsLoaded value ->
+            ( applyDeviceSlots value model, [] )
+
+        SearchOpenHistory ->
+            ( invalidateVaultSearch { model | searchOpen = False, route = Route.Appearance }, [ PushUrl "/appearance/" ] )
 
         IgnoreUser _ ->
             foldBlocklistAction model msg
@@ -36871,10 +44105,106 @@ update msg model =
             foldBlocklistAction model msg
 
         ToggleCalls ->
-            ( { model | callsOpen = not model.callsOpen }, [] )
+            ( { model | callsOpen = not model.callsOpen, clientRoomsOpen = False, clientMembersOpen = False }, [] )
+
+        ToggleClientRooms ->
+            ( { model | clientRoomsOpen = not model.clientRoomsOpen, clientMembersOpen = False, callsOpen = False }, [] )
+
+        ToggleClientMembers ->
+            ( { model | clientMembersOpen = not model.clientMembersOpen, clientRoomsOpen = False, callsOpen = False }, [] )
 
         ReconnectNow ->
             reconnectNow model
+
+        ConnectionDialogOpen ->
+            ( { model
+                | connectionDialogOpen = True
+                , connectionNickDraft = Maybe.withDefault model.ourNick model.connectionNickPending
+                , connectionAccountDraft = Maybe.withDefault model.ourNick model.accountName
+                , connectionSignIn = False
+                , connectionDialogError = Nothing
+              }
+            , []
+            )
+
+        ConnectionDialogClose ->
+            ( { model | connectionDialogOpen = False, connectionDialogError = Nothing }, [] )
+
+        ConnectionNickInput value ->
+            ( { model | connectionNickDraft = String.left maxNickAliasLength value, connectionDialogError = Nothing, connectionNickNotice = Nothing }, [] )
+
+        ConnectionAccountInput value ->
+            ( { model | connectionAccountDraft = String.left 64 value, connectionDialogError = Nothing }, [] )
+
+        ConnectionModeChanged signIn ->
+            ( { model | connectionSignIn = signIn, connectionDialogError = Nothing }, [] )
+
+        ConnectionNickSubmit ->
+            if model.connection /= Live then
+                ( { model | connectionDialogError = Just "Reconnect before changing your chat name." }, [] )
+
+            else if model.connectionNickPending /= Nothing then
+                ( model, [] )
+
+            else
+                case normalizeNickAlias model.connectionNickDraft of
+                    Nothing ->
+                        ( { model | connectionDialogError = Just "Use a valid chat name without spaces or control characters." }, [] )
+
+                    Just nick ->
+                        if nick == model.ourNick then
+                            ( model, [] )
+
+                        else
+                            ( { model | connectionDialogError = Nothing, connectionNickPending = Just nick, connectionNickNotice = Nothing }, [ SendLine (Wire.formatIrcLine "NICK" [ nick ]) ] )
+
+        ConnectionCancelSignIn ->
+            if model.identifyReplyAccount /= Nothing || model.connectionNickPending /= Nothing then
+                ( model, [ WsDisconnect ] )
+
+            else
+                ( model, [] )
+
+        ConnectionSignInSubmit ->
+            if model.connection /= Live then
+                ( { model | connectionDialogError = Just "Reconnect before signing in." }, [] )
+
+            else if model.identifyReplyAccount /= Nothing then
+                ( { model | connectionDialogError = Just "A sign-in request is already in progress." }, [] )
+
+            else
+                let
+                    account = String.trim model.connectionAccountDraft
+                in
+                if String.isEmpty account || String.any (\char -> List.member (Char.toCode char) [ 9, 10, 11, 12, 13, 32 ] || Char.toCode char < 32 || Char.toCode char == 127) account then
+                    ( { model | connectionDialogError = Just "Enter a valid account name and password." }, [] )
+
+                else
+                    ( { model
+                        | connectionDialogError = Nothing
+                        , identifyReplyAccount = Just account
+                        , eventClock = model.eventClock + 1
+                      }
+                    , case model.runtimeOwnerStamp of
+                        Just stamp ->
+                            [ PrivateIdentifyRequested
+                                { account = account
+                                , requestId = "privateIdentify" ++ String.padLeft 12 '0' (String.fromInt (model.eventClock + 1))
+                                , ownerRef = stamp.ownerRef
+                                , accountGeneration = stamp.accountGeneration
+                                , connectionGeneration = stamp.connectionGeneration
+                                }
+                            ]
+
+                        Nothing ->
+                            []
+                    )
+
+        ConnectionKeepName ->
+            update GuestClaimOpen { model | connectionDialogOpen = False }
+
+        ConnectionAccountSettings ->
+            update (SetAccountOpen True) { model | connectionDialogOpen = False }
 
         ToastDismiss id ->
             ( dismissToast id model, [] )
@@ -36943,7 +44273,11 @@ update msg model =
                 ( { started | createRoomError = Just createRoomOfflineError }, outs )
 
         CreateRoomOpen ->
-            ( openCreateRoom model, [] )
+            let
+                ( seen, seenOut ) =
+                    markFirstHourSeen model
+            in
+            ( openCreateRoom seen, seenOut )
 
         CreateRoomClose ->
             ( { model | browserOpen = False, browserMode = BrowseMode }, [] )
@@ -36972,6 +44306,9 @@ update msg model =
         CreateInviteeAdd ->
             ( addCreateInvitee model, [] )
 
+        CreateInviteePick nick ->
+            ( addCreateInvitee { model | createInviteeDraft = nick }, [] )
+
         CreateInviteeRemove nick ->
             ( { model | createInvitees = removeFormationInvitee model.createInvitees nick }, [] )
 
@@ -36991,7 +44328,14 @@ update msg model =
             receiveDeviceHistoryRows model answer
 
         BrowserOpen ->
-            openBrowser model
+            let
+                ( seen, seenOut ) =
+                    markFirstHourSeen model
+
+                ( opened, openOut ) =
+                    openBrowser seen
+            in
+            ( opened, seenOut ++ openOut )
 
         BrowserClose ->
             ( { model | browserOpen = False }, [] )
@@ -37230,10 +44574,10 @@ update msg model =
             -- appearance route it also cancels a staged background
             -- (mirroring the page's Escape-to-cancel).
             if model.route == Route.Appearance && backgroundDirty model then
-                ( { model | navMenuOpen = False, backgroundCandidate = model.backgroundId, backgroundPreview = Nothing }, [] )
+                ( { model | navMenuOpen = False, clientRoomsOpen = False, clientMembersOpen = False, backgroundCandidate = model.backgroundId, backgroundPreview = Nothing }, [] )
 
             else
-                ( { model | navMenuOpen = False }, [] )
+                ( { model | navMenuOpen = False, clientRoomsOpen = False, clientMembersOpen = False }, [] )
 
         SelectRoadmapPriority { state } ->
             -- Legend clicks name a known priority; anything else
@@ -38518,7 +45862,7 @@ update msg model =
                             Nothing ->
                                 []
                 in
-                ( { model | callSelfMuted = False }
+                ( { model | callSelfMuted = False, callSelfDeafened = False }
                 , leaveFirst ++ [ VoiceJoin { channel = channel, video = video } ]
                 )
 
@@ -38528,7 +45872,7 @@ update msg model =
             case model.calls.channel of
                 Just current ->
                     if model.calls.lifecycle /= Media.Idle then
-                        ( { model | callSelfMuted = False }, [ VoiceLeave { channel = current } ] )
+                        update (RuntimeDomainActionRequested (RuntimeDomain.MediaLeave (Just current))) model
 
                     else
                         ( model, [] )
@@ -38543,13 +45887,16 @@ update msg model =
                 next =
                     not model.callSelfMuted
             in
-            ( { model | callSelfMuted = next }, [ VoiceMute { muted = next } ] )
+            update (RuntimeDomainActionRequested (RuntimeDomain.MediaMute next)) model
+
+        CallToggleDeafen ->
+            update (RuntimeDomainActionRequested (RuntimeDomain.MediaDeafen (not model.callSelfDeafened))) model
 
         CallHubChanged hub ->
             -- Engine-bridge seam (lands with the engine): lifecycle,
             -- channel, peer, start time, and outcome in one snapshot.
             -- An idle hub releases the local capture flag with it.
-            ( { model | calls = hub, callSelfMuted = model.callSelfMuted && hub.lifecycle /= Media.Idle }, [] )
+            ( { model | calls = hub, callSelfMuted = model.callSelfMuted && hub.lifecycle /= Media.Idle, callSelfDeafened = model.callSelfDeafened && hub.lifecycle /= Media.Idle }, [] )
 
         CallHubSnapshot raw ->
             -- Voice engine lifecycle feed: validated fail-closed, merged
@@ -38561,13 +45908,10 @@ update msg model =
                         merged =
                             Media.applyEngineSnapshot model.calls snap
                     in
-                    ( { model | calls = merged, callSelfMuted = model.callSelfMuted && merged.lifecycle /= Media.Idle }, [] )
+                    ( { model | calls = merged, callSelfMuted = model.callSelfMuted && merged.lifecycle /= Media.Idle, callSelfDeafened = model.callSelfDeafened && merged.lifecycle /= Media.Idle }, [] )
 
                 Nothing ->
                     ( model, [] )
-
-        SelectBoardTab tab ->
-            ( { model | landingBoardTab = tab }, [] )
 
         WhoisRequest nick ->
             requestWhois model nick
@@ -38636,7 +45980,7 @@ update msg model =
                             model.nowMs
                             { current
                                 | composer = merged
-                                , composerDrafts = Dict.insert (String.toLower channel) merged current.composerDrafts
+                                , composerDrafts = Dict.insert (ircCaseKey current channel) merged current.composerDrafts
                             }
                         , []
                         )
@@ -39259,18 +46603,13 @@ update msg model =
 
             else
                 let
-                    updated =
-                        { model
-                            | forumChannels =
-                                if Set.member key model.forumChannels then
-                                    Set.remove key model.forumChannels
+                    queued =
+                        queueNavigationForum key model
 
-                                else
-                                    Set.insert key model.forumChannels
-                            , forumView = Dict.insert key True model.forumView
-                        }
+                    updated =
+                        { queued | forumView = Dict.insert key True queued.forumView }
                 in
-                ( updated, forumChannelsSaveOut updated )
+                ( updated, forumChannelsSaveOut updated ++ navigationLoadOut model )
 
         FollowTopicToggle { channel, topic } ->
             -- Follow or unfollow one conversation (mirroring
@@ -39318,7 +46657,15 @@ update msg model =
             requestEdit model target messageId newText
 
         MessageDeleteRequested target messageId ->
-            Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (requestDelete model target messageId)
+            let
+                ( requested, outbound ) =
+                    requestDelete model target messageId
+            in
+            if List.isEmpty outbound then
+                ( requested, outbound )
+
+            else
+                ( { requested | messageMenu = Nothing }, outbound )
 
         OwnMetadataSet key value ->
             setOwnMetadata model key value
@@ -39418,7 +46765,7 @@ update msg model =
                                             ( cleared, "" )
 
                                     tags =
-                                        (if List.member "onyx/e2ee" model.caps then
+                                        (if runtimeFeatureReady model "onyx/e2ee" then
                                             Dict.singleton "+onyx/e2ee" "mls"
 
                                          else
@@ -39440,6 +46787,7 @@ update msg model =
                                     -- would vanish on reload without echo-message.
                                     vaultRow =
                                         { id = String.toLower target ++ ":" ++ String.fromInt model.messageSeq
+                                        , wireMessageId = Nothing
                                         , target = String.toLower target
                                         , from = model.ourNick
                                         , body = envelope
@@ -39456,7 +46804,7 @@ update msg model =
                                             (\c ->
                                                 { c
                                                     | messages =
-                                                        List.take keepMessages
+                                                        List.take (messageRetentionFor registered target)
                                                             ({ id = model.messageSeq
                                                              , from = model.ourNick
                                                              , body = envelope
@@ -39480,14 +46828,14 @@ update msg model =
                                                             )
                                                 }
                                             )
-                                            |> (\m -> { m | messageSeq = m.messageSeq + 1 })
+                                            |> (\m -> { m | messageSeq = m.messageSeq + 1, ownedRowIds = markOwnedRow model.messageSeq m.ownedRowIds })
                                 in
                             let
                                 ( previewed, previewOuts ) =
                                     requestPreviewForBody filed text
                             in
                             ( rememberVaultIds previewed [ vaultRow ]
-                            , [ SendLine line, VaultPersist { target = String.toLower target, rows = [ vaultRow ] } ] ++ previewOuts
+                            , [ SendLine line, vaultPersistOutbound model (String.toLower target) [ vaultRow ] ] ++ previewOuts
                             )
 
         DmSealFailed { target, keyChanged, schedId } ->
@@ -39605,6 +46953,7 @@ update msg model =
                         -- only, never the transient plaintext.
                         vaultRow =
                             { id = String.toLower room ++ ":" ++ String.fromInt model.messageSeq
+                            , wireMessageId = Nothing
                             , target = String.toLower room
                             , from = model.ourNick
                             , body = envelope
@@ -39621,7 +46970,7 @@ update msg model =
                                 (\c ->
                                     { c
                                         | messages =
-                                            List.take keepMessages
+                                            List.take (messageRetentionFor registered room)
                                                 ({ id = model.messageSeq
                                                  , from = model.ourNick
                                                  , body = envelope
@@ -39645,14 +46994,14 @@ update msg model =
                                                 )
                                     }
                                 )
-                                |> (\m -> { m | messageSeq = m.messageSeq + 1 })
+                                |> (\m -> { m | messageSeq = m.messageSeq + 1, ownedRowIds = markOwnedRow model.messageSeq m.ownedRowIds })
                     in
                     (let
                         ( previewed, previewOuts ) =
                             requestPreviewForBody filed text
                      in
                      ( rememberVaultIds previewed [ vaultRow ]
-                     , [ SendLine line, VaultPersist { target = String.toLower room, rows = [ vaultRow ] } ] ++ previewOuts
+                     , [ SendLine line, vaultPersistOutbound model (String.toLower room) [ vaultRow ] ] ++ previewOuts
                      )
                     )
 
@@ -39877,6 +47226,9 @@ update msg model =
         StewardGrantTransfer channel ->
             requestStewardGrantTransfer model channel
 
+        StewardReconcileTransfer channel ->
+            requestStewardReconcileTransfer model channel
+
         StewardConfirmClose channel ->
             requestStewardCloseRoom model channel
 
@@ -39911,47 +47263,244 @@ nick, exactly as they render.
 -}
 foldParsed : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldParsed model parsed =
-    if isRepeatDelivery model parsed then
-        -- Bouncer/session-sync rewind of an already-folded line: drop
-        -- before the store and the vault (msgid-merge dedup).
-        ( model, [] )
+    case settlePendingEditEcho model parsed of
+        Just ( settled, target ) ->
+            flushVaultBuffer settled target
 
-    else
-        case divertHistoryBatch model parsed of
-            Just buffered ->
-                -- Batched playback child: held for the close merge,
-                -- never folded live.
-                ( buffered, [] )
+        Nothing ->
+            case divertHistoryBatch model parsed of
+                Just buffered ->
+                    -- Batch children are classified before replay dedup or
+                    -- live folds, so even an old msgid cannot escape its
+                    -- captured history/label/quarantine context.
+                    ( buffered, [] )
 
-            Nothing ->
-                let
-                    filed =
-                        rememberDelivery model parsed
-
-                    ( next, outbound ) =
-                        foldLine filed parsed
-                in
-                -- A dropped self-echo never reaches the vault: the optimistic send
-                -- already persisted it, and a second row would fork history.
-                -- A swallowed CTCP wrapper never reaches the vault either
-                -- (mirroring the oracle `break` before store and vault).
-                if parsed.command == "PRIVMSG" && isLiveSelfEcho model parsed then
-                    ( next, outbound )
-
-                else if isSwallowedCtcpWire model.ourNick parsed then
-                    ( next, outbound )
-
-                else
-                    case persistRow next parsed of
-                        Just row ->
-                            -- Whole-buffer flush through the signature
-                            -- gate (one VaultPersist per content change;
-                            -- the seen-ids land as part of the flush).
-                            flushVaultBuffer (rememberVaultIds next row.rows) row.target
-                                |> (\( flushed, flushOuts ) -> ( flushed, outbound ++ flushOuts ))
+                Nothing ->
+                    case foldAuthoritativeEditEcho model parsed of
+                        Just ( edited, target ) ->
+                            flushVaultBuffer edited target
 
                         Nothing ->
-                            ( next, outbound )
+                            if isRepeatDelivery model parsed then
+                                -- Bouncer/session-sync rewind of an already-folded line: drop
+                                -- before the store and vault (msgid-merge dedup).
+                                ( model, [] )
+
+                            else
+                                let
+                                    filed =
+                                        rememberDelivery model parsed
+
+                                    ( next, outbound ) =
+                                        foldLine filed parsed
+                                in
+                                if parsed.command == "PRIVMSG" && isLiveSelfEcho model parsed then
+                                    ( next, outbound )
+
+                                else if isSwallowedCtcpWire model.ourNick parsed then
+                                    ( next, outbound )
+
+                                else if isPrivateServerControlNotice model parsed then
+                                    -- Trusted SESSION/MEMO NOTICE records
+                                    -- belong to private control or the typed
+                                    -- memo fold. Never persist the raw wrapper
+                                    -- into a self-target conversation shell.
+                                    -- `deliverOfflineMemo` has already filed
+                                    -- its single user-visible memo row above.
+                                    ( next, outbound )
+
+                                else
+                                    case persistRow next parsed of
+                                        Just row ->
+                                            let
+                                                remembered =
+                                                    rememberVaultIds next row.rows
+                                            in
+                                            case remembered.runtimeOwnerStamp of
+                                                Just stamp ->
+                                                    let
+                                                        ( dirty, flushOuts ) =
+                                                            markVaultDirty remembered row.target stamp
+                                                    in
+                                                    ( dirty, outbound ++ flushOuts )
+
+                                                Nothing ->
+                                                    flushVaultBuffer remembered row.target
+                                                        |> (\( flushed, flushOuts ) -> ( flushed, outbound ++ flushOuts ))
+
+                                        Nothing ->
+                                            ( next, outbound )
+
+
+settlePendingEditEcho : Model -> Wire.IrcMessage -> Maybe ( Model, String )
+settlePendingEditEcho model message =
+    case ( message.params, message.nick, model.runtimeOwnerStamp ) of
+        ( target :: body :: _, Just nick, Just owner ) ->
+            let
+                editTag =
+                    case Dict.get "+draft/edit" message.tags of
+                        Just value ->
+                            Just value
+
+                        Nothing ->
+                            Dict.get "draft/edit" message.tags
+
+                revisionTag =
+                    case Dict.get "+draft/revision" message.tags of
+                        Just value ->
+                            Just value
+
+                        Nothing ->
+                            Dict.get "draft/revision" message.tags
+                originalId = Maybe.withDefault "" editTag
+                label = labelOf message
+                conversation = dmMutateBucket model target nick
+                targetKey = String.toLower conversation
+                key = messageMutationKey target originalId
+                pending = Dict.get key model.pendingMessageEdits
+            in
+            if message.command /= "PRIVMSG"
+                || model.connection /= Live
+                || Dict.member "batch" message.tags
+                || String.isEmpty originalId
+                || Dict.get "msgid" message.tags /= Just originalId
+                || revisionTag /= Just "1" then
+                Nothing
+
+            else
+                case Dict.get targetKey model.channels of
+                    Nothing ->
+                        Nothing
+
+                    Just channel ->
+                        case List.filter (\row -> row.msgid == Just originalId) channel.messages |> List.head of
+                            Nothing ->
+                                Nothing
+
+                            Just original ->
+                                let
+                                    pendingMatches =
+                                        case pending of
+                                            Just item ->
+                                                item.label /= Nothing
+                                                    && item.label == label
+                                                    && item.generation == model.physicalConnectionGeneration
+                                                    && item.owner == owner
+                                                    && item.targetKey == targetKey
+                                                    && item.msgid == originalId
+                                                    && String.toLower nick == String.toLower model.ourNick
+
+                                            Nothing ->
+                                                False
+
+                                    allowedOriginal = not (messageLocked original) && not original.deleted && not original.redacted
+                                in
+                                if not pendingMatches || not allowedOriginal then
+                                    Nothing
+
+                                else
+                                    let
+                                        messages =
+                                            List.map
+                                                (\row -> if row.msgid == Just originalId then { row | body = body, edited = True } else row)
+                                                channel.messages
+
+                                        composerStillMatches =
+                                            case pending of
+                                                Just item ->
+                                                    item.desiredText == model.composer
+                                                        && Dict.get (ircCaseKey model item.target) model.composerDraftVersions == item.draftRevision
+
+                                                Nothing ->
+                                                    False
+                                        editorMatches = Maybe.map (\edit -> edit.msgid == originalId && String.toLower edit.target == targetKey) model.editingMessage == Just True
+
+                                        next =
+                                            { model
+                                                | channels = Dict.insert targetKey { channel | messages = messages } model.channels
+                                                , editHistory = recordEdit model.editHistory originalId original.body (rowTime model message)
+                                                , pendingMessageEdits = Dict.remove key model.pendingMessageEdits
+                                                , editingMessage = if composerStillMatches && editorMatches then Nothing else model.editingMessage
+                                                , composer = if composerStillMatches && editorMatches then "" else model.composer
+                                                , composerDrafts = if composerStillMatches && editorMatches then Dict.remove targetKey model.composerDrafts else model.composerDrafts
+                                                , composerError = Nothing
+                                            }
+                                    in
+                                    Just ( next, conversation )
+
+        _ ->
+            Nothing
+
+
+{-| Apply an authoritative EDIT-shaped self-message without treating its body
+or fixed revision number as proof that a particular local edit request won.
+Only an exact labeled response can settle `pendingMessageEdits`; this path
+updates the canonical row and leaves any local edit request unresolved.
+-}
+foldAuthoritativeEditEcho : Model -> Wire.IrcMessage -> Maybe ( Model, String )
+foldAuthoritativeEditEcho model message =
+    case ( message.params, message.nick, model.runtimeOwnerStamp ) of
+        ( target :: body :: _, Just nick, Just _ ) ->
+            let
+                originalId =
+                    Dict.get "+draft/edit" message.tags |> Maybe.withDefault (Maybe.withDefault "" (Dict.get "draft/edit" message.tags))
+
+                revision =
+                    Dict.get "+draft/revision" message.tags |> Maybe.withDefault (Maybe.withDefault "" (Dict.get "draft/revision" message.tags))
+
+                conversation =
+                    dmMutateBucket model target nick
+
+                targetKey =
+                    String.toLower conversation
+
+                targetChannel =
+                    Dict.get targetKey model.channels
+            in
+            if message.command /= "PRIVMSG"
+                || model.connection /= Live
+                || Dict.member "batch" message.tags
+                || String.isEmpty originalId
+                || Dict.get "msgid" message.tags /= Just originalId
+                || revision /= "1"
+            then
+                Nothing
+
+            else
+                targetChannel
+                    |> Maybe.andThen
+                        (\channel ->
+                            channel.messages
+                                |> List.filter (\row -> row.msgid == Just originalId)
+                                |> List.head
+                                |> Maybe.andThen
+                                    (\original ->
+                                        if String.toLower original.from /= String.toLower nick || messageLocked original || original.deleted || original.redacted then
+                                            Nothing
+
+                                        else if original.body == body then
+                                            Just ( model, conversation )
+
+                                        else
+                                            let
+                                                messages =
+                                                    List.map
+                                                        (\row -> if row.msgid == Just originalId then { row | body = body, edited = True } else row)
+                                                        channel.messages
+
+                                                next =
+                                                    { model
+                                                        | channels = Dict.insert targetKey { channel | messages = messages } model.channels
+                                                        , editHistory = recordEdit model.editHistory originalId original.body (rowTime model message)
+                                                    }
+                                            in
+                                            Just ( next, conversation )
+                                    )
+                        )
+
+        _ ->
+            Nothing
+
 
 
 persistRow : Model -> Wire.IrcMessage -> Maybe { target : String, rows : List VaultRow }
@@ -39980,6 +47529,7 @@ persistChatRow model parsed =
 
                 row =
                     { id = key ++ ":" ++ String.fromInt (model.messageSeq - 1)
+                    , wireMessageId = Dict.get "msgid" parsed.tags
                     , target = key
                     , from = Maybe.withDefault "" parsed.nick
                     , body = body
@@ -40038,7 +47588,7 @@ mergeVaultRows model target rows =
                         , pending = False
                         , plaintext = Nothing
                         , at = row.at
-                        , msgid = Nothing
+                        , msgid = row.wireMessageId
                         , reactions = []
                         , edited = False
                         , deleted = row.deleted
@@ -40057,7 +47607,7 @@ mergeVaultRows model target rows =
                     chats =
                         List.indexedMap toChat rows
                             |> List.reverse
-                            |> List.take keepMessages
+                            |> List.take (messageRetentionFor model key)
                 in
                 updateChannel model key
                     (\c -> { c | messages = chats })
@@ -40083,18 +47633,14 @@ rowSeq key id =
 
 {-| Vault ids already observed this session (persisted live lines plus
 loaded windows, newest first, bounded). Time-travel windows dedupe
-against these exactly like the oracle's id-keyed history merge — every
-live line is persisted synchronously, so an unseen window row is always
-older history, never a live duplicate.
+against these exactly like the oracle's id-keyed history merge. Live
+rows enter the bounded dirty-target queue and persist from the current
+buffer on Tick; an unseen window row is still history, never a live
+duplicate.
 -}
-maxVaultSeenIds : Int
-maxVaultSeenIds =
-    2000
-
-
 rememberVaultIds : Model -> List VaultRow -> Model
 rememberVaultIds model rows =
-    { model | vaultSeenIds = List.take maxVaultSeenIds (List.map .id rows ++ model.vaultSeenIds) }
+    { model | vaultSeenIds = VaultSeenIds.remember (List.map .id rows) model.vaultSeenIds }
 
 
 {-| Maximum live owner/target watermarks (mirrors
@@ -40102,6 +47648,200 @@ rememberVaultIds model rows =
 vaultSyncTargetCacheCap : Int
 vaultSyncTargetCacheCap =
     512
+
+
+vaultDirtyTargetsPerTick : Int
+vaultDirtyTargetsPerTick =
+    4
+
+
+isWorkspaceMutation : RuntimeDomain.Action -> Bool
+isWorkspaceMutation action =
+    case action of
+        RuntimeDomain.RememberWorkspace _ ->
+            True
+
+        RuntimeDomain.SelectWorkspace _ ->
+            True
+
+        RuntimeDomain.LockWorkspace ->
+            True
+
+        _ ->
+            False
+
+
+clearAllVaultDirtyTargets : Model -> Model
+clearAllVaultDirtyTargets model =
+    { model | vaultDirtyTargets = Dict.empty, vaultDirtyOrder = [] }
+
+
+prepareVaultDirtyModel : Msg -> Model -> Model
+prepareVaultDirtyModel msg model =
+    let
+        workspaceResultMatches =
+            case msg of
+                RuntimeDomainResultReceived result ->
+                    result.domain == "workspace"
+                        && List.member result.action [ "select", "lock", "remember" ]
+                        && Maybe.withDefault False
+                            (Maybe.map
+                                (\stamp ->
+                                    stamp.ownerRef == Ids.ownerRefToRuntime result.ownerRef
+                                        && stamp.accountGeneration == Ids.accountGenerationToInt result.accountGeneration
+                                        && stamp.connectionGeneration == Ids.connectionGenerationToInt result.connectionGeneration
+                                )
+                                model.runtimeOwnerStamp
+                            )
+
+                _ ->
+                    False
+
+        workspaceObservationMatches =
+            case msg of
+                RuntimeDomainObservationReceived observation ->
+                    observation.domain == "workspace"
+                        && Maybe.withDefault False
+                            (Maybe.map
+                                (\stamp ->
+                                    stamp.ownerRef == observation.ownerRef
+                                        && stamp.accountGeneration == observation.accountGeneration
+                                        && stamp.connectionGeneration == observation.connectionGeneration
+                                )
+                                model.runtimeOwnerStamp
+                            )
+                        && observation.sequence > Maybe.withDefault 0 (Dict.get "workspace" model.runtimeDomainObservation)
+
+                _ ->
+                    False
+
+        ownerChanged =
+            case msg of
+                RuntimeOwnerStateReceived stamp ->
+                    model.runtimeOwnerStamp /= Just stamp
+
+                _ ->
+                    False
+
+        workspaceAction =
+            case msg of
+                RuntimeDomainActionRequested action ->
+                    isWorkspaceMutation action
+
+                _ ->
+                    False
+    in
+    if workspaceResultMatches || workspaceObservationMatches || ownerChanged || workspaceAction then
+        clearAllVaultDirtyTargets model
+
+    else
+        model
+
+
+clearVaultDirtyTarget : Model -> String -> Model
+clearVaultDirtyTarget model target =
+    let
+        key =
+            String.toLower target
+    in
+    { model
+        | vaultDirtyTargets = Dict.remove key model.vaultDirtyTargets
+        , vaultDirtyOrder = List.filter ((/=) key) model.vaultDirtyOrder
+    }
+
+
+markVaultDirty : Model -> String -> VaultDirtyOwner -> ( Model, List Outbound )
+markVaultDirty model target stamp =
+    let
+        key =
+            String.toLower target
+
+        existing =
+            Dict.get key model.vaultDirtyTargets
+
+        base =
+            if existing == Just stamp then
+                model
+
+            else if existing /= Nothing then
+                clearVaultDirtyTarget model key
+
+            else
+                model
+    in
+    if Dict.member key base.vaultDirtyTargets then
+        ( base, [] )
+
+    else
+        let
+            ( available, overflowOut ) =
+                if Dict.size base.vaultDirtyTargets < vaultSyncTargetCacheCap then
+                    ( base, [] )
+
+                else
+                    case base.vaultDirtyOrder of
+                        oldest :: _ ->
+                            case Dict.get oldest base.vaultDirtyTargets of
+                                Just oldStamp ->
+                                    if base.runtimeOwnerStamp == Just oldStamp && Dict.member oldest base.channels then
+                                        let
+                                            ( flushed, outs ) =
+                                                flushVaultBuffer base oldest
+                                        in
+                                        ( clearVaultDirtyTarget flushed oldest, outs )
+
+                                    else
+                                        ( clearVaultDirtyTarget base oldest, [] )
+
+                                Nothing ->
+                                    ( clearVaultDirtyTarget base oldest, [] )
+
+                        [] ->
+                            ( base, [] )
+
+            marked =
+                { available
+                    | vaultDirtyTargets = Dict.insert key stamp available.vaultDirtyTargets
+                    , vaultDirtyOrder = available.vaultDirtyOrder ++ [ key ]
+                }
+        in
+        ( marked, overflowOut )
+
+
+flushDirtyVaultTargets : Model -> ( Model, List Outbound )
+flushDirtyVaultTargets model =
+    let
+        ( batch, remaining ) =
+            List.take vaultDirtyTargetsPerTick model.vaultDirtyOrder
+                |> (\targets -> ( targets, List.drop (List.length targets) model.vaultDirtyOrder ))
+
+        detached =
+            { model
+                | vaultDirtyTargets = List.foldl Dict.remove model.vaultDirtyTargets batch
+                , vaultDirtyOrder = remaining
+            }
+
+        flushOne target ( current, out ) =
+            case Dict.get target model.vaultDirtyTargets of
+                Just stamp ->
+                    if current.runtimeOwnerStamp == Just stamp && Dict.member target current.channels then
+                        let
+                            ( flushed, flushOut ) =
+                                flushVaultBuffer current target
+                        in
+                        ( flushed, out ++ flushOut )
+
+                    else
+                        ( current, out )
+
+                Nothing ->
+                    ( current, out )
+    in
+    if Maybe.withDefault False (Maybe.map isWorkspaceMutation model.runtimeDomainPendingAction) then
+        ( model, [] )
+
+    else
+        List.foldl flushOne ( detached, [] ) batch
 
 
 {-| Rows worth persisting (mirrors `persistableRows`: settled
@@ -40248,6 +47988,7 @@ sanitizeReplyRef ref =
 chatToVaultRow : String -> ChatMessage -> VaultRow
 chatToVaultRow target message =
     { id = target ++ ":" ++ String.fromInt message.id
+    , wireMessageId = message.msgid
     , target = target
     , from = message.from
     , body = message.body
@@ -40290,13 +48031,16 @@ flushVaultBuffer model target =
     let
         key =
             String.toLower target
+
+        cleared =
+            clearVaultDirtyTarget model key
     in
-    case Dict.get key model.channels of
+    case Dict.get key cleared.channels of
         Nothing ->
-            ( model, [] )
+            ( cleared, [] )
 
         Just channel ->
-            flushVaultBufferFor model key channel.messages
+            flushVaultBufferFor cleared key channel.messages
 
 
 flushVaultBufferFor : Model -> String -> List ChatMessage -> ( Model, List Outbound )
@@ -40338,7 +48082,44 @@ flushVaultBufferFor model key messages =
                         List.filter (\k -> k /= key) pruned.vaultPersistOrder ++ [ key ]
                 }
         in
-        ( rememberVaultIds stored rows, [ VaultPersist { target = key, rows = rows } ] )
+        ( rememberVaultIds stored rows, [ vaultPersistOutbound model key rows ] )
+
+
+vaultPersistOutbound : Model -> String -> List VaultRow -> Outbound
+vaultPersistOutbound model target rows =
+    let fields = runtimeOwnerFields model in
+    VaultPersist
+        { target = target
+        , rows = rows
+        , ownerRef = fields.ownerRef
+        , accountGeneration = fields.accountGeneration
+        , connectionGeneration = fields.connectionGeneration
+        }
+
+
+runtimeOwnerFields : Model -> { ownerRef : Maybe String, accountGeneration : Maybe Int, connectionGeneration : Maybe Int }
+runtimeOwnerFields model =
+    case model.runtimeOwnerStamp of
+        Just stamp ->
+            { ownerRef = Just stamp.ownerRef
+            , accountGeneration = Just stamp.accountGeneration
+            , connectionGeneration = Just stamp.connectionGeneration
+            }
+
+        Nothing ->
+            { ownerRef = Nothing, accountGeneration = Nothing, connectionGeneration = Nothing }
+
+
+vaultFetchOutbound : Model -> String -> Int -> Outbound
+vaultFetchOutbound model target limit =
+    let fields = runtimeOwnerFields model in
+    VaultFetch { target = target, limit = limit, ownerRef = fields.ownerRef, accountGeneration = fields.accountGeneration, connectionGeneration = fields.connectionGeneration }
+
+
+vaultFetchAroundOutbound : Model -> String -> Int -> Int -> Outbound
+vaultFetchAroundOutbound model target at limit =
+    let fields = runtimeOwnerFields model in
+    VaultFetchAround { target = target, at = at, limit = limit, ownerRef = fields.ownerRef, accountGeneration = fields.accountGeneration, connectionGeneration = fields.connectionGeneration }
 
 
 {-| Nearest window row to a time-travel anchor: smallest clock
@@ -40379,7 +48160,7 @@ mergeVaultAround model target anchor rows =
             Just channel ->
                 let
                     fresh =
-                        List.filter (\row -> not (List.member row.id model.vaultSeenIds)) rows
+                        List.filter (\row -> not (VaultSeenIds.member row.id model.vaultSeenIds)) rows
 
                     toChat index row =
                         { id = index
@@ -40408,7 +48189,7 @@ mergeVaultAround model target anchor rows =
 
                     merged =
                         List.indexedMap (\index chat -> { chat | id = index }) (channel.messages ++ freshChats)
-                            |> List.take keepMessages
+                            |> List.take (messageRetentionFor seen key)
 
                     stored =
                         List.map .id rows
@@ -40424,3 +48205,8 @@ mergeVaultAround model target anchor rows =
                                 , historyLanding = nearestRowId anchor rows
                             }
                        )
+
+
+isLowerHex : Char -> Bool
+isLowerHex char =
+    (char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')

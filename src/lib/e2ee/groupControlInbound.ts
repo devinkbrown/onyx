@@ -120,14 +120,16 @@ export function parseGroupControlDelivery(
   if (!fromAccount) return null;
   const fromDeviceIndex = hasWireAccount ? 2 : 1;
 
+  const toAccount = raw.params[hasWireAccount ? 3 : 2];
+  const toDevice = raw.params[hasWireAccount ? 4 : 3];
   const routing: GroupControlRouting = descriptor.kind === 'welcome'
     ? {
       channel: raw.params[0] ?? '',
       kind: 'welcome',
       fromAccount,
       fromDevice: raw.params[fromDeviceIndex] ?? '',
-      toAccount: raw.params[hasWireAccount ? 3 : 2],
-      toDevice: raw.params[hasWireAccount ? 4 : 3],
+      ...(toAccount !== undefined ? { toAccount } : {}),
+      ...(toDevice !== undefined ? { toDevice } : {}),
     }
     : {
       channel: raw.params[0] ?? '',
@@ -149,13 +151,13 @@ export function parseGroupControlDelivery(
     sourcePrefix: raw.prefix,
     locked,
     payloadParts,
-    lockReason: !hasWireAccount
-      ? 'missing-account'
+    ...(!hasWireAccount
+      ? { lockReason: 'missing-account' as const }
       : payloadParts === null
-        ? 'bad-payload'
+        ? { lockReason: 'bad-payload' as const }
         : payloadParts.version !== GROUP_CONTROL_PAYLOAD_VERSION || payloadParts.diagnosticOnly === true
-          ? 'legacy-ogc1'
-          : undefined,
+          ? { lockReason: 'legacy-ogc1' as const }
+          : {}),
   };
 }
 

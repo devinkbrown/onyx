@@ -10,8 +10,8 @@ renders `statusFeedState` with the oracle's voice and chrome.
 -}
 
 import App exposing (Model, Msg(..), statusFeedState)
-import Html exposing (Html, a, button, div, h1, h2, p, section, span, text)
-import Html.Attributes exposing (attribute, class, disabled, href, id, tabindex)
+import Html exposing (Html, a, article, button, div, h1, h2, p, section, text)
+import Html.Attributes exposing (attribute, class, disabled, href, id)
 import Html.Events exposing (onClick)
 import Status
 import View.PublicFrame exposing (frame)
@@ -19,11 +19,8 @@ import View.PublicFrame exposing (frame)
 
 contextLine : Html Msg
 contextLine =
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text "Tonight" ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text "Status" ]
-        ]
+    p [ class "site-context-line" ]
+        [ text "Tonight — network status" ]
 
 
 {-| The status body. -}
@@ -39,52 +36,41 @@ view model =
         loading =
             model.statusLoading
     in
-    div [ class "ui-root r status-route" ]
-        [ section
-            [ class "r-wrap r-section status-hero status-scroll-surface"
-            , attribute "aria-labelledby" "status-heading"
-            , attribute "role" "region"
-            , tabindex 0
+    article [ class "site-article" ]
+        [ h1 [ id "status-heading", class "site-display-sm" ] [ text "Are the rooms up tonight?" ]
+        , p [ class "site-lede" ] [ text "One honest sentence. If we cannot say, we say so." ]
+        , div
+            [ class "site-observation"
+            , id "status-observation"
+            , attribute "data-feed-state" (Status.feedStateKey state)
+            , attribute "role" "status"
+            , attribute "aria-live" "polite"
+            , attribute "aria-atomic" "true"
             ]
-            [ p [ class "status-kicker" ] [ text "for people in the rooms" ]
-            , h1 [ id "status-heading" ] [ text "Are the rooms up tonight?" ]
-            , p [ class "status-lede" ] [ text "One honest sentence. If we cannot say, we say so." ]
-            , div
-                [ class "status-observation"
-                , id "status-observation"
-                , attribute "data-feed-state" (Status.feedStateKey state)
-                , attribute "role" "status"
-                , attribute "aria-live" "polite"
-                , attribute "aria-atomic" "true"
-                ]
-                [ span [ class "status-observation__marker", attribute "aria-hidden" "true" ] []
-                , span [ class "status-observation__label" ] [ text voice.label ]
-                , span [ class "status-observation__detail" ] [ text voice.sentence ]
-                ]
-            , div [ class "status-check" ]
-                [ button
-                    ([ Html.Attributes.type_ "button"
-                     , class "status-check__button"
-                     , attribute "aria-describedby" "status-observation"
-                     , onClick StatusRefetch
-                     ]
-                        ++ (if loading then
-                                [ disabled True, attribute "aria-busy" "true" ]
+            [ p [ class "site-observation-label" ] [ text voice.label ]
+            , p [ class "site-observation-detail" ] [ text voice.sentence ]
+            ]
+        , div [ class "site-cta" ]
+            [ button
+                ([ Html.Attributes.type_ "button"
+                 , class "status-check__button site-cta-primary"
+                 , attribute "aria-describedby" "status-observation"
+                 , onClick StatusRefetch
+                 ]
+                    ++ (if loading then
+                            [ disabled True, attribute "aria-busy" "true" ]
 
-                            else
-                                []
-                           )
-                    )
-                    [ text (if loading then "Checking status…" else "Check again") ]
-                ]
+                        else
+                            []
+                       )
+                )
+                [ text (if loading then "Checking status…" else "Check again") ]
             ]
-        , div [ class "r-wrap" ]
-            [ div [ class "r-divider", attribute "aria-hidden" "true" ] [] ]
-        , section [ class "r-wrap status-quiet", attribute "aria-labelledby" "status-next-heading" ]
-            [ h2 [ id "status-next-heading" ] [ text "What we are working on" ]
+        , section [ class "site-section", attribute "aria-labelledby" "status-next-heading" ]
+            [ h2 [ id "status-next-heading", class "site-h2" ] [ text "What we are working on" ]
             , p []
                 [ text "Rooms, calls, catch-up, and a Home Screen on this device live on a quieter page. Status stays about tonight." ]
-            , a [ class "status-quiet-link", href "/roadmap/" ] [ text "Open the roadmap" ]
+            , a [ href "/roadmap/" ] [ text "Open the roadmap" ]
             ]
         ]
 

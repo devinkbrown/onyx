@@ -33,6 +33,7 @@ export function PublicHeader(props: { currentPath?: string; navItems?: readonly 
               alt=""
               decoding="async"
             />
+            <span class="public-frame__name">Onyx</span>
           </span>
         </a>
         <PublicNav currentPath={props.currentPath} items={props.navItems} />

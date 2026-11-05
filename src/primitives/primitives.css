@@ -108,9 +108,27 @@
 .onyx-icon-button:disabled,
 .onyx-tabs__trigger:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 1;
   transform: none;
   box-shadow: none;
+}
+
+/* A faded coral fill composites into mud on graphite. Rest the control on a
+   solid surface and keep the label at full strength until it can be used. */
+.onyx-button--primary:disabled,
+.onyx-button--primary[aria-disabled='true'] {
+  color: var(--paper-dim);
+  background: var(--stone-3);
+  border-color: var(--stone-line);
+}
+
+.onyx-button--ghost:disabled,
+.onyx-button--ghost[aria-disabled='true'],
+.onyx-button--danger:disabled,
+.onyx-button--danger[aria-disabled='true'],
+.onyx-icon-button:disabled,
+.onyx-tabs__trigger:disabled {
+  color: var(--paper-mute);
 }
 
 .onyx-icon-button {

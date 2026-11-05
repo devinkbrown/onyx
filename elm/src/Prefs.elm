@@ -682,5 +682,8 @@ updatePreference prefs key value =
         "httpsOnly" ->
             { prefs | httpsOnly = value == "true" }
 
+        "localHistory" ->
+            { prefs | localHistory = value == "true" }
+
         _ ->
             prefs

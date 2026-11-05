@@ -7,13 +7,15 @@ receipt + the shared-receipt finish gate.
 
 Divergences are ports/DOM-shaped and documented: the native share-sheet
 button has no port (copy covers the receipt); Enter-to-add on the
-invitee field stays a DOM concern; the friend quick-add row has no Elm
-friends store yet; the next-hang label renders once `createHangLabel`
-is fed (locale formatting stays in JS).
+invitee field stays a DOM concern; the next-hang label renders once
+`createHangLabel` is fed (locale formatting stays in JS). Friend
+quick-add reads `model.friends` (online first, then code-point order).
 -}
 
-import App exposing (Model, Msg(..), RoomSkin, canFinishCreateRoom, createShareUrl, formationCopy, formationInviteTarget, normalizeCreateRoomName, roomSkins)
+import App exposing (FriendEntry, Model, Msg(..), RoomSkin, canFinishCreateRoom, createShareUrl, formationCopy, formationInviteTarget, normalizeCreateRoomName, roomSkins)
+import Dict
 import Html exposing (Html, button, details, div, fieldset, form, h2, h3, input, label, legend, li, p, span, summary, text, ul)
+import Set
 import Html.Attributes exposing (attribute, checked, class, disabled, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput, onSubmit)
 
@@ -144,6 +146,7 @@ formation model =
                                    )
                             )
                         ]
+                    , friendRow model
                     , div [ class "chb-invitee-row" ]
                         [ div [ class "chb-field" ]
                             [ label [ attribute "for" "chb-create-invitee" ] [ text "Add someone by name" ]
@@ -230,6 +233,63 @@ formation model =
                 ]
             ]
         ]
+
+
+friendRow : Model -> Html Msg
+friendRow model =
+    let
+        choices =
+            friendChoices model
+    in
+    if List.isEmpty choices then
+        text ""
+
+    else
+        div [ class "chb-friends", attribute "role" "group", attribute "aria-label" "Friends you can add" ]
+            (List.map friendButton choices)
+
+
+friendButton : FriendEntry -> Html Msg
+friendButton friend =
+    button
+        [ type_ "button"
+        , class "chb-friend"
+        , onClick (CreateInviteePick friend.nick)
+        ]
+        [ text ("Add " ++ friend.nick) ]
+
+
+friendChoices : Model -> List FriendEntry
+friendChoices model =
+    let
+        self =
+            String.toLower (String.trim model.ourNick)
+
+        taken =
+            Set.fromList
+                (List.map String.toLower model.createInvitees
+                    ++ (if String.isEmpty self then
+                            []
+
+                        else
+                            [ self ]
+                       )
+                )
+    in
+    Dict.values model.friends
+        |> List.filter (\friend -> not (Set.member (String.toLower friend.nick) taken))
+        |> List.sortWith
+            (\a b ->
+                let
+                    onlineOrder =
+                        compare (if a.online then 0 else 1) (if b.online then 0 else 1)
+                in
+                if onlineOrder == EQ then
+                    compare (String.toLower a.nick) (String.toLower b.nick)
+
+                else
+                    onlineOrder
+            )
 
 
 hangSuffix : String -> String

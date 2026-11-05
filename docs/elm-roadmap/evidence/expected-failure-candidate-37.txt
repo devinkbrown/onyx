@@ -1,0 +1,4 @@
+Validated roadmap evidence ledger: 53 packages, 74 scenarios, 11 milestones; 2 package acceptances have current source-bound reviews. T/M acceptance remains row-scoped.
+Validated 4 catalog-bound Elm transcript cases; deterministic seed 11031904.
+Expected-failure proof passed: E04.cap-ping-known-good passed from the original catalog, then failed one exact expected outbound assertion in an isolated catalog/generated-module copy; other cases passed.
+Receipt: /tmp/onyx-elm-verification-final/receipts/expected-failure-1793846181690.json

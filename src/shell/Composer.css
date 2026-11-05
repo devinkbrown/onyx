@@ -12,8 +12,11 @@
 /* Composer-specific finish layer. The shell owns layout; these local rules
    make the writing surface read as one calm, touchable instrument. */
 .shell-composer-inner {
-  gap: 4px;
-  border-color: color-mix(in oklab, var(--seam) 82%, var(--lapis));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border-color: color-mix(in oklab, var(--paper) 16%, var(--seam));
+  background: color-mix(in oklab, var(--stone-2) 88%, var(--ink));
 }
 
 .shell-composer-inner:focus-within {

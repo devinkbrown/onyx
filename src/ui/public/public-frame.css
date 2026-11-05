@@ -94,19 +94,38 @@
   flex: none;
   align-items: center;
   min-width: 0;
-  gap: 0.75rem;
+  gap: 0.7rem;
   color: var(--public-text);
-  font: 800 0.98rem/1 var(--public-sans);
+  font: 750 1.2rem/1 var(--public-sans);
+  letter-spacing: -0.04em;
   text-decoration: none;
 }
-.public-frame__brand-visual { display: inline-flex; min-width: 0; align-items: center; }
-.public-frame__mark { display: block; width: 2.5rem; height: 2.5rem; border-radius: 0.35rem; }
-.public-frame__lockup { display: none; width: auto; max-width: 11rem; height: 2.7rem; }
-.public-frame__wordmark { display: block; width: auto; max-width: 5.5rem; height: 1.65rem; }
-@media (min-width: 48rem) {
-  .public-frame__lockup { display: block; }
-  .public-frame__brand .public-frame__mark,
-  .public-frame__brand .public-frame__wordmark { display: none; }
+.public-frame__brand-visual { display: inline-flex; min-width: 0; align-items: center; gap: 0.65rem; }
+.public-frame__mark {
+  display: block;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  object-fit: contain;
+}
+.public-frame__name {
+  color: var(--public-text);
+  font: 750 1.35rem/1 var(--public-sans);
+  letter-spacing: -0.045em;
+}
+/* The bitmap lockup and wordmark stay in the DOM for the brand contract.
+   Their plates were black; the live name is the text beside the mark. */
+.public-frame__lockup,
+.public-frame__wordmark {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 .public-frame__nav-cluster { display: flex; align-items: center; gap: 0.8rem; min-width: 0; margin-left: auto; }
 .public-frame__nav-links { min-width: 0; }
@@ -119,13 +138,18 @@
   text-decoration: none;
   white-space: nowrap;
 }
-.public-frame__nav a:hover,
-.public-frame__nav a[aria-current='page'] { color: var(--public-text); text-decoration: underline; text-underline-offset: 0.25em; }
+.public-frame__nav a:hover { color: var(--public-text); }
+.public-frame__nav a[aria-current='page'] {
+  color: var(--public-text);
+  background: color-mix(in oklab, var(--public-current) 18%, transparent);
+  border-radius: 0.6rem;
+  text-decoration: none;
+}
 .public-frame__open {
   justify-content: center;
   padding-inline: 1rem;
   border: 1px solid var(--public-action);
-  border-radius: var(--public-radius);
+  border-radius: 0.7rem;
   color: var(--public-action-text);
   background: var(--public-action);
   font: 800 0.95rem/1.2 var(--public-sans);
@@ -173,11 +197,11 @@
   gap: 0.35rem 0.6rem;
   margin: 0;
   color: var(--public-muted);
-  font: 700 0.8rem/1.4 var(--public-mono);
-  letter-spacing: 0.03em;
+  font: 650 0.95rem/1.4 var(--public-sans);
+  letter-spacing: 0;
   overflow-wrap: anywhere;
 }
-.public-frame__current-kicker { color: var(--public-current-strong); text-transform: uppercase; }
+.public-frame__current-kicker { color: var(--public-current-strong); }
 .public-frame__current-label { color: var(--public-text); }
 .public-frame__main {
   position: relative;
@@ -193,8 +217,8 @@
 .public-frame__footer-inner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, auto); gap: clamp(2rem, 7vw, 6rem); padding-block: 2.5rem max(2.5rem, env(safe-area-inset-bottom)); }
 .public-frame__footer-identity { min-width: 0; }
 .public-frame__footer p { max-width: 48ch; margin: 0.65rem 0 0; color: var(--public-muted); font: 400 0.95rem/1.55 var(--public-sans); }
-.public-frame__footer-brand { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--public-text); font: 800 1rem/1 var(--public-sans); text-decoration: none; }
-.public-frame__footer-brand .public-frame__mark { width: 1.75rem; height: 1.75rem; }
+.public-frame__footer-brand { display: inline-flex; align-items: center; gap: 0.65rem; color: var(--public-text); font: 750 1.15rem/1 var(--public-sans); letter-spacing: -0.04em; text-decoration: none; }
+.public-frame__footer-brand .public-frame__mark { width: 2rem; height: 2rem; }
 .public-frame__footer-title { margin: 0 !important; color: var(--public-text) !important; font-weight: 700 !important; }
 .public-frame__footer-links { display: grid; grid-template-columns: repeat(2, max-content); gap: 0.15rem 1.25rem; align-content: start; margin-top: 0.45rem; }
 .public-frame__footer a:not(.public-frame__footer-brand) { color: var(--public-muted); font: 700 0.875rem/1.2 var(--public-sans); text-decoration: none; }

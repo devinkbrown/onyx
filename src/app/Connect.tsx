@@ -61,6 +61,7 @@ import {
 import { normalizeRoomTarget } from '@/shell/roomIdentity';
 import { recordFirstHourHandoff } from '@/lib/firstHour/firstHour';
 import { SceneAtmosphere } from '@/backgrounds/SceneAtmosphere';
+import { BrandMark } from '@/ui/public';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 import { nicknameError } from '@/lib/identity/nickname';
@@ -1083,6 +1084,10 @@ export function Connect(props: ConnectProps): JSX.Element {
       fallback={
         <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />
+          <a class="conn-brand" href="/" aria-label="Onyx home">
+            <BrandMark size={32} />
+            <span>Onyx</span>
+          </a>
 
           <div class="conn-stage" role="main">
             <aside class="conn-context" aria-label="Destination">

@@ -32,9 +32,13 @@ describe('Onyx client/server contract v2 schema', () => {
     ['client session persistence', (value) => { value.client.group_control_runtime.session_persistence = 'production_active'; }],
     ['client store seal', (value) => { value.client.group_message_crypto.store_seal = 'production_active'; }],
     ['client store open', (value) => { value.client.group_message_crypto.store_open = 'production_active'; }],
+    ['old group message activation hold', (value) => { value.client.group_message_crypto.store_seal = 'activation_hold'; }],
+    ['plaintext required-room queue', (value) => { value.client.group_message_crypto.outbound = 'required rooms queue plaintext'; }],
+    ['unowned asynchronous open', (value) => { value.client.group_message_crypto.inbound = 'async plaintext without ownership revalidation'; }],
     ['transport missing', (value) => { delete value.transport; }],
     ['transport nonobject', (value) => { value.transport = ['websocket']; }],
     ['transport websocket drift', (value) => { value.transport.websocket = 'multiple IRC messages per frame'; }],
+    ['old websocket frame wording', (value) => { value.transport.websocket = 'one IRC message per frame; no trailing frame bytes'; }],
     ['guest negotiation', (value) => { value.eligibility.guest.onyx_e2ee_negotiation = 'forbidden'; }],
     ['guest authoring prose', (value) => { value.eligibility.guest.authoring = 'NOT_LOGGED_IN is not required'; }],
     ['guest recipient prose', (value) => { value.eligibility.guest.recipient = 'not ineligible; no reusable session row'; }],
@@ -129,6 +133,10 @@ describe('Onyx client/server contract v2 schema', () => {
       value.session.replay_live_separation.helix_e2ee_group = 'EGRG Helix checkpoints are not replay metadata only; opaque payloads enter Helix';
     }],
     ['session commands', (value) => { value.session.commands[0] = 'SESSION LIST'; }],
+    ['MTOKEN request', (value) => { value.session.commands.splice(1, 0, 'SESSION MTOKEN'); }],
+    ['missing session responses', (value) => { delete value.session.responses; }],
+    ['bad session response', (value) => { value.session.responses[1] = 'SESSION MTOKEN'; }],
+    ['revision three', (value) => { value.revision = 3; }],
     ['control forms', (value) => {
       value.e2ee_group.control_command.forms[0] = '<channel> commit <from-device> :<opaque-base64url>';
     }],

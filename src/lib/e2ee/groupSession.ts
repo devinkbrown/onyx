@@ -71,6 +71,13 @@ export type GroupSessionApplyResult =
   | { ok: true; epoch: bigint; commitHash: Uint8Array; commitId: Uint8Array }
   | { ok: false; reason: GroupSessionApplyFailure };
 
+/** Short-lived private escrow input after the signed commit/key commitment is verified. */
+export type VerifiedGroupEpochMaterial = {
+  readonly room: string; readonly epoch: bigint; readonly commitId: Uint8Array; readonly commitHash: Uint8Array;
+  readonly membershipDigest: Uint8Array; readonly newEpochKeyCommitment: Uint8Array; readonly epochKey: Uint8Array;
+};
+export type VerifiedGroupEpochMaterialHook = (material: VerifiedGroupEpochMaterial) => void | Promise<void>;
+
 export type GroupSessionMessageFailure = 'destroyed' | 'room-mismatch' | 'epoch-unavailable' | 'seal-failed' | 'open-failed';
 export type GroupSessionSealResult =
   | { ok: true; room: string; epoch: number; envelope: string }
@@ -90,6 +97,7 @@ export type GroupSessionBootstrapInput = {
   account: string;
   deviceId: string;
   signal?: AbortSignal;
+  onVerifiedEpochMaterial?: VerifiedGroupEpochMaterialHook;
 };
 
 export type GroupSessionBootstrapEpochInput = GroupSessionBootstrapInput & {
@@ -232,6 +240,7 @@ export class GroupSession {
     let hash: Uint8Array | null = null;
     try {
       if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+
       const room = normalizeGroupRoom(input.room);
       const account = canonicalAccount(input.account);
       if (!room || !account || !validDevice(input.deviceId)) {
@@ -340,6 +349,17 @@ export class GroupSession {
         return { ok: false, reason: 'welcome-mismatch' };
       }
       if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+
+      if (input.onVerifiedEpochMaterial) {
+        const material: VerifiedGroupEpochMaterial = { room, epoch: record.nextEpoch, commitId: copy(record.commitId),
+          commitHash: copy(hash), membershipDigest: copy(record.membershipDigest),
+          newEpochKeyCommitment: copy(record.newEpochKeyCommitment), epochKey: copy(snapshot.epochKey) };
+        try { await input.onVerifiedEpochMaterial(material); }
+        catch { /* local recovery durability must not falsify a verified live install */ }
+        finally { material.commitId.fill(0); material.commitHash.fill(0); material.membershipDigest.fill(0);
+          material.newEpochKeyCommitment.fill(0); material.epochKey.fill(0); }
+        if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+      }
 
       const session = new GroupSession({
         room,
@@ -513,6 +533,17 @@ export class GroupSession {
       }
       if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
 
+      if (input.onVerifiedEpochMaterial) {
+        const material: VerifiedGroupEpochMaterial = { room, epoch: record.nextEpoch, commitId: copy(record.commitId),
+          commitHash: copy(hash), membershipDigest: copy(record.membershipDigest),
+          newEpochKeyCommitment: copy(record.newEpochKeyCommitment), epochKey: copy(snapshot.epochKey) };
+        try { await input.onVerifiedEpochMaterial(material); }
+        catch { /* local recovery durability must not falsify a verified live install */ }
+        finally { material.commitId.fill(0); material.commitHash.fill(0); material.membershipDigest.fill(0);
+          material.newEpochKeyCommitment.fill(0); material.epochKey.fill(0); }
+        if (input.signal?.aborted) return { ok: false, reason: 'destroyed' };
+      }
+
       const session = new GroupSession({
         room,
         account,
@@ -558,6 +589,18 @@ export class GroupSession {
 
   commitHash(): Uint8Array | null {
     return this.destroyed ? null : copy(this.currentCommitHash);
+  }
+
+  /** Install a locally recovered key only when the authenticated head is unchanged.
+   * Callers must verify the signed accepted commit and key commitment first. */
+  installRecoveredCurrentKey(input: { readonly expectedEpoch: bigint; readonly expectedCommitHash: Uint8Array; readonly expectedMembershipDigest: Uint8Array; readonly epochKey: Uint8Array }): boolean {
+    if (this.destroyed || input.epochKey.byteLength !== GROUP_SESSION_KEY_BYTES || !nonZero(input.epochKey)
+      || input.expectedEpoch !== this.currentEpochValue || !equalBytes(this.currentCommitHash, input.expectedCommitHash)
+      || !equalBytes(this.currentMembership, input.expectedMembershipDigest)) return false;
+    this.currentKey.fill(0);
+    this.currentKey = copy(input.epochKey);
+    return !this.destroyed && input.expectedEpoch === this.currentEpochValue
+      && equalBytes(this.currentCommitHash, input.expectedCommitHash) && equalBytes(this.currentMembership, input.expectedMembershipDigest);
   }
 
   private messageRoom(room: string): string | null {
@@ -651,8 +694,8 @@ export class GroupSession {
         priorEpoch: this.currentEpochValue,
         priorCommitHash: this.currentCommitHash,
         membershipDigest: input.membershipDigest,
-        commitId: input.commitId,
-        newEpochKey: input.newEpochKey,
+        ...(input.commitId ? { commitId: input.commitId } : {}),
+        ...(input.newEpochKey ? { newEpochKey: input.newEpochKey } : {}),
       });
       if (this.destroyed) {
         prepared?.destroy();
@@ -716,6 +759,7 @@ export class GroupSession {
     expectedHash?: Uint8Array,
     suppliedEpochKey?: Uint8Array,
     signal?: AbortSignal,
+    onVerifiedEpochMaterial?: VerifiedGroupEpochMaterialHook,
   ): Promise<GroupSessionApplyResult> {
     if (this.destroyed || signal?.aborted) return { ok: false, reason: 'destroyed' };
     const context = buildGroupCommitContext({ room: this.roomName, fromAccount: route.fromAccount, fromDevice: route.fromDevice, priorEpoch: record.priorEpoch, nextEpoch: record.nextEpoch, commitId: record.commitId });
@@ -745,6 +789,16 @@ export class GroupSession {
     }
     if (this.destroyed || signal?.aborted) { expectedCommitment.fill(0); hash.fill(0); return { ok: false, reason: 'destroyed' }; }
     expectedCommitment.fill(0);
+    if (onVerifiedEpochMaterial) {
+      const material: VerifiedGroupEpochMaterial = { room: this.roomName, epoch: record.nextEpoch, commitId: copy(record.commitId),
+        commitHash: copy(hash), membershipDigest: copy(record.membershipDigest),
+        newEpochKeyCommitment: copy(record.newEpochKeyCommitment), epochKey: copy(suppliedEpochKey) };
+      try { await onVerifiedEpochMaterial(material); }
+      catch { /* local recovery durability must not falsify a verified live install */ }
+      finally { material.commitId.fill(0); material.commitHash.fill(0); material.membershipDigest.fill(0);
+        material.newEpochKeyCommitment.fill(0); material.epochKey.fill(0); }
+      if (this.destroyed || signal?.aborted) { hash.fill(0); return { ok: false, reason: 'destroyed' }; }
+    }
     // Every validation completes before the state swap. This is the commit
     // point: no partially installed epoch can escape on a failure path.
     const nextKey = copy(suppliedEpochKey);
@@ -854,6 +908,7 @@ export class GroupSession {
     commitResolution: ResolveResult;
     commitRouting: GroupControlRouting;
     signal?: AbortSignal;
+    onVerifiedEpochMaterial?: VerifiedGroupEpochMaterialHook;
   }): Promise<GroupSessionApplyResult> {
     return this.withMutation(async () => {
       if (this.destroyed || input.signal?.aborted) return { ok: false, reason: 'destroyed' };
@@ -946,7 +1001,7 @@ export class GroupSession {
           if (oldest === undefined) break;
           this.discardPendingWelcome(oldest);
         }
-        return await this.applyRecord(record, commitRoute, undefined, this.pendingWelcomes.get(pendingKey)?.epochKey, input.signal);
+        return await this.applyRecord(record, commitRoute, undefined, this.pendingWelcomes.get(pendingKey)?.epochKey, input.signal, input.onVerifiedEpochMaterial);
       } finally {
         if (insertedPending && pendingKey && this.pendingWelcomes.has(pendingKey)) this.discardPendingWelcome(pendingKey);
         snapshot.commitId.fill(0);

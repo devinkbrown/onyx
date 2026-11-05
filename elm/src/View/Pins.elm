@@ -6,8 +6,9 @@ against the loaded buffer, with jump-to-message and op-gated unpin.
 
 import App exposing (Model, Msg(..))
 import Html exposing (Html, a, button, div, li, p, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, href)
+import Html.Attributes exposing (attribute, class, href, title)
 import Html.Events exposing (onClick)
+import Provenance
 
 
 pinsDrawer : Model -> Html Msg
@@ -55,6 +56,7 @@ contextBlock model =
                     , text " "
                     , strong [] [ text channel ]
                     ]
+                , provenanceBadge
                 ]
             , if isLedgerChannel channel then
                 a
@@ -68,6 +70,19 @@ contextBlock model =
               else
                 text ""
             ]
+
+
+{-| Server-scope badge (mirroring `ProvenanceBadge` for the
+pinned-messages subject, as in `PinnedMessages.tsx`). -}
+provenanceBadge : Html Msg
+provenanceBadge =
+    span
+        [ class "provenance-badge"
+        , attribute "data-scope" (Provenance.scopeToString Provenance.Server)
+        , attribute "aria-label" (Provenance.ariaLabel Provenance.Server "Pinned messages")
+        , title (Provenance.descriptionFor Provenance.Server)
+        ]
+        [ text (Provenance.labelFor Provenance.Server) ]
 
 
 isLedgerChannel : String -> Bool

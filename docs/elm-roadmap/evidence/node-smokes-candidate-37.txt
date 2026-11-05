@@ -1,0 +1,848 @@
+$ /usr/bin/node /home/kain/onyx/elm/accountData.smoke.mjs (timeout 60000ms)
+✔ accountDownload subscribes and tolerates headless node (12.180281ms)
+✔ deviceHistoryCopyRequest echoes the seq with empty-snapshot rows (52.452207ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73.904511
+$ /usr/bin/node /home/kain/onyx/elm/attribution.smoke.mjs (timeout 60000ms)
+✔ transcripts match the independent byte vectors (10.225382ms)
+✔ enroll round trip signs the transcript and confirms the marker (16.821078ms)
+✔ residence round trip signs the residence message (2.944566ms)
+✔ malformed requests and stores fail closed (2.980943ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.587398
+$ /usr/bin/node /home/kain/onyx/elm/autoJoinSave.smoke.mjs (timeout 60000ms)
+✔ save writes the auto-join array in order (12.030745ms)
+✔ empty channels remove the key (0.467629ms)
+✔ non-array channels are ignored (0.408851ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25.476889
+$ /usr/bin/node /home/kain/onyx/elm/blocklists.smoke.mjs (timeout 60000ms)
+✔ saves write both lists under their namespaced keys (11.91735ms)
+✔ non-array payloads are skipped without clearing (0.436654ms)
+✔ null request is ignored (0.422068ms)
+✔ quota failure degrades silently (0.510506ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 26.85075
+$ /usr/bin/node /home/kain/onyx/elm/cadenceBridge.smoke.mjs (timeout 60000ms)
+✔ mediaReceiveRaw forwards KAT bytes on a media protocol (5.169841ms)
+✔ mediaReceiveRaw leaves text for the line buffer (0.27803ms)
+✔ mediaReceiveRaw closes 1002 on binary without the media subprotocol (0.340831ms)
+✔ mediaReceiveRaw closes 1002 on binary over the text subprotocol (0.392118ms)
+✔ mediaReceiveRaw closes 1009 on oversized frames and drops empties (0.374302ms)
+✔ mediaReceiveRaw drops without a port (0.296857ms)
+✔ sendDatagram sends a fresh copy on an admitting socket (1.118409ms)
+✔ sendDatagram sheds closed, text, full, oversized, and misshapen sends (18.946175ms)
+✔ deliverToEngine hands a copy to the host hook only (1.163921ms)
+✔ wireMediaBinary routes both ports and tolerates missing ports (1.906388ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45.361922
+$ /usr/bin/node /home/kain/onyx/elm/channelColorsSave.smoke.mjs (timeout 60000ms)
+✔ save writes the channel map as a JSON object (13.11717ms)
+✔ empty entries remove the key (0.587623ms)
+✔ malformed entries are skipped (0.507772ms)
+✔ non-array entries are ignored (0.450725ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.799475
+$ /usr/bin/node /home/kain/onyx/elm/channelNotifySave.smoke.mjs (timeout 60000ms)
+✔ save writes the channel map as a JSON object (15.928082ms)
+✔ empty entries remove the key (0.614837ms)
+✔ malformed entries are skipped (0.502259ms)
+✔ non-array entries are ignored and missing port is tolerated (0.421085ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.868083
+$ /usr/bin/node /home/kain/onyx/elm/clipboard.smoke.mjs (timeout 60000ms)
+✔ empty text reports false without touching the DOM (2.165597ms)
+✔ without a clipboard API or document reports false gracefully (0.934907ms)
+✔ wire() forwards the copy result to clipboardResult (34.544129ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47.88802
+$ /usr/bin/node /home/kain/onyx/elm/contactsPresence.smoke.mjs (timeout 60000ms)
+✔ loads resolve empty and saves no-op without storage (15.41249ms)
+✔ wire without the contacts ports does not crash (0.483727ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.957698
+$ /usr/bin/node /home/kain/onyx/elm/ctcpQuery.smoke.mjs (timeout 60000ms)
+✔ config loads resolve null without storage; missing ports stay silent (17.875353ms)
+✔ config round-trips verbatim, purges legacy, caps oversize (0.782851ms)
+✔ TIME reply sends a well-formed NOTICE over the live socket (38.034313ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 40075.234081
+$ /usr/bin/node /home/kain/onyx/elm/deviceSlots.smoke.mjs (timeout 60000ms)
+✔ an owner announce loads slots and later saves mirror them (16.042463ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.879144
+$ /usr/bin/node /home/kain/onyx/elm/dmSearchScope.smoke.mjs (timeout 60000ms)
+✔ plain rows prove plain, empty history proves plain (2.428055ms)
+✔ one encrypted row anywhere proves encrypted (0.374999ms)
+✔ row verdict never mistakes prefixes or shapes (0.310961ms)
+✔ classify bridge answers through vaultDmPrivacyClassified (12.478818ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.817029
+$ /usr/bin/node /home/kain/onyx/elm/dndSave.smoke.mjs (timeout 60000ms)
+✔ save writes both axes under their namespaced keys (13.004594ms)
+✔ null until removes the until key but keeps enabled (0.528317ms)
+✔ non-boolean enabled is skipped without clearing (0.453782ms)
+✔ null request is ignored (0.435532ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.704926
+$ /usr/bin/node /home/kain/onyx/elm/e2ee.smoke.mjs (timeout 60000ms)
+✔ seal/open round-trips both directions with open-then-pin (30.185181ms)
+✔ safety numbers agree across directions and registry ids are stable (5.978385ms)
+✔ rotated peer key blocks with key-changed, never plaintext (9.461322ms)
+✔ pins are namespaced per device-memory owner (7.036312ms)
+✔ multi-device fan-out opens on every device (11.593888ms)
+✔ room seal/open round-trips under the active epoch (2.12902ms)
+✔ room crypto fails closed across rooms, epochs, and tampering (2.666448ms)
+✔ tampered envelopes and garbage keys fail locked (6.621782ms)
+✔ control-record signature verifies over a real Ed25519 envelope (5.7345ms)
+✔ control-record verification fails closed on tampering and garbage (3.29999ms)
+✔ directory derivation trusts only derived-id matches (3.055555ms)
+✔ directory derivation fails closed on bad keys and over-cap snapshots (2.868581ms)
+✔ signer pins first-use, pin, rotate, and forget (7.574725ms)
+✔ invalid signatures never touch pins (2.889674ms)
+✔ wire bridge flags seal-time key changes, surfaces other failures (55.174009ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 172.778146
+$ /usr/bin/node /home/kain/onyx/elm/e2eeDevice.smoke.mjs (timeout 60000ms)
+✔ identity request without a readable store reports empty legs (66.664935ms)
+✔ wire without the identity ports does not crash (0.594126ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80.42098
+$ /usr/bin/node /home/kain/onyx/elm/groupPublisher.smoke.mjs (timeout 60000ms)
+✔ deriveDeviceId matches the independent sha256 vector (9.394381ms)
+✔ project() pairs sign-v1 with the live dm-v1 key and is stable (18.125657ms)
+✔ corrupt sign-v1 row fails closed without rotating (3.160568ms)
+✔ unreadable store and missing ECDH yield null (4.716108ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48.815532
+$ /usr/bin/node /home/kain/onyx/elm/groupWelcome.smoke.mjs (timeout 60000ms)
+✔ prepare → open → install → seal/open round trip (30.621067ms)
+✔ ODD1-wrapped recipient key opens too (7.058574ms)
+✔ tampered envelope, wrong commitment, and wrong room fail closed (10.371765ms)
+✔ missing recipient key stays locked (4.387201ms)
+✔ room keyring keeps the oldest epoch exactly at the cap (2.312868ms)
+✔ room keyring evicts the lowest epoch past 8 (3.465968ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 70.510849
+$ /usr/bin/node /home/kain/onyx/elm/guestClaimDismiss.smoke.mjs (timeout 60000ms)
+✔ save writes the owner marker and purges the legacy key (14.449713ms)
+✔ request loads true once dismissed, false otherwise (2.097379ms)
+✔ ownerless payloads never touch storage (0.545359ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.832848
+$ /usr/bin/node /home/kain/onyx/elm/guidesProgress.smoke.mjs (timeout 60000ms)
+✔ missing slot reads as [] (24.335212ms)
+✔ stored array (even with junk) reads raw for Elm to allowlist (10.867586ms)
+✔ corrupt JSON reads as [] (10.79236ms)
+✔ writes store the filtered list under the namespaced key (0.857208ms)
+✔ quota failure degrades silently (0.544873ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 61.350636
+$ /usr/bin/node /home/kain/onyx/elm/highlightWords.smoke.mjs (timeout 60000ms)
+✔ save writes the validated list under the namespaced key (12.056143ms)
+✔ emptied list removes the key (0.534721ms)
+✔ non-array payload is skipped without clearing (0.44639ms)
+✔ null request is ignored (0.404671ms)
+✔ quota failure degrades silently (0.512232ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.469803
+$ /usr/bin/node /home/kain/onyx/elm/identityOverrides.smoke.mjs (timeout 60000ms)
+✔ reads the three journals through untouched (196.251618ms)
+✔ purges legacy ownerless journals on every read (18.126717ms)
+✔ corrupt, oversized, and missing journals land empty (17.902087ms)
+✔ null keys stay empty without touching storage (13.652424ms)
+✔ saves provided journals and purges legacy keys (17.449098ms)
+✔ emptied journals remove their keys and untouched slots stay (13.569265ms)
+✔ save drops over-cap and non-string journals (22.9772ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 314.974592
+$ /usr/bin/node /home/kain/onyx/elm/identityProfile.smoke.mjs (timeout 60000ms)
+✔ save merges status keys and loads them back with an ISO expiry (15.169857ms)
+✔ save preserves sibling fields, clears on empty, and removes empty slots (1.892534ms)
+✔ legacy ownerless keys are purged and over-cap slots read empty (0.789183ms)
+✔ ownerless requests never touch storage (0.500636ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33.603403
+$ /usr/bin/node /home/kain/onyx/elm/lightboxFocus.smoke.mjs (timeout 60000ms)
+✔ mounting moves focus in and unmounting returns it (384.595906ms)
+✔ mounting isolates the background and locks scroll (39.547088ms)
+✔ Tab cycles at the dialog edges (43.23178ms)
+✔ outside targets and claimed events never trap (30.734828ms)
+✔ client sheets isolate nested app chrome, trap focus, and restore existing attributes (40.335542ms)
+✔ closing a nested modal restores the parent control and then the original opener (52.208152ms)
+✔ Escape closes the highest visual modal rather than a later background sheet (45.442905ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 647.882756
+$ /usr/bin/node /home/kain/onyx/elm/mediaSave.smoke.mjs (timeout 60000ms)
+✔ save clicks a download anchor with the Elm-built filename (13.252769ms)
+✔ missing href clicks nothing; missing name defaults to image (0.712145ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27.542862
+$ /usr/bin/node /home/kain/onyx/elm/nickAliases.smoke.mjs (timeout 60000ms)
+✔ request reads the owner slot verbatim for Elm to normalize (14.505374ms)
+✔ legacy bare key is purged and missing slots read empty (0.613541ms)
+✔ over-cap slots and corrupt JSON read empty (0.666223ms)
+✔ ownerless requests never touch storage (0.480526ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.309971
+$ /usr/bin/node /home/kain/onyx/elm/nodesProbe.smoke.mjs (timeout 60000ms)
+✔ recognized pin resolves the registry node without probing (2.994298ms)
+✔ unknown pin synthesizes the env entry (1.23098ms)
+✔ unreachable host pings Infinity inside the bound (91.689859ms)
+✔ all-failed probes fall back to the single node (5.69902ms)
+✔ pickFastest takes the finite minimum, ties keep first (0.361986ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 113.016753
+$ /usr/bin/node /home/kain/onyx/elm/notifyAlerts.smoke.mjs (timeout 60000ms)
+✔ wire pushes the live permission and visibility at once (13.607922ms)
+✔ unsupported platform reports unsupported (0.542119ms)
+✔ followed saves persist the validated key list (0.951629ms)
+✔ granted desktop alerts render silent and focus on click (0.712612ms)
+✔ denied permission suppresses desktop but sound still beeps (1.135362ms)
+✔ sound-only alerts skip Notification entirely (0.679096ms)
+✔ permission request round-trips the grant (11.170563ms)
+✔ visibilitychange refires the feed (0.60683ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41.099865
+$ /usr/bin/node /home/kain/onyx/elm/offlineMemo.smoke.mjs (timeout 60000ms)
+✔ offlineMemoNotice dispatches onyx:offlineMemo with the aggregate (14.322876ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27.108187
+$ /usr/bin/node /home/kain/onyx/elm/outbox.smoke.mjs (timeout 60000ms)
+✔ isOutboxTarget mirrors isSafeOutboxTarget (2.719097ms)
+✔ plainEntry coerces stored rows to the Elm shape (2.110942ms)
+✔ open socket sends live rows and drops expired ones (0.813858ms)
+✔ closed socket holds live rows (pure plan) (0.401485ms)
+✔ exact TTL boundary stays live (0.451208ms)
+✔ open socket flush sends live, drops expired, reports zero waiting (13.760957ms)
+✔ closed socket holds live rows as silent waiting, never uncertain (4.189159ms)
+✔ prune failure counts without losing the queue (7.572277ms)
+✔ admission prune failure still counts sent and stuck, never uncertain (4.127198ms)
+✔ wire-admitted rows never re-send, only retry the prune (4.261889ms)
+✔ wire-admitted prune failure counts stuck without re-sending (3.912928ms)
+✔ mid-send death reports uncertain once, then carries silently (6.513621ms)
+✔ mark-transaction failure still prunes and reports sent (6.272753ms)
+✔ null db reports an empty flush (0.425148ms)
+✔ broken walk reports walkOk false (0.515191ms)
+✔ labeled flush stamps @label and reports row labels (7.79897ms)
+✔ unlabeled flush reports no labels and sends bare lines (6.480722ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90.941405
+$ /usr/bin/node /home/kain/onyx/elm/personReportReceipt.smoke.mjs (timeout 60000ms)
+✔ saves a receipt newest-first with an id and timestamp (196.381987ms)
+✔ prepends and caps the journal at twenty rows (22.793893ms)
+✔ a corrupt journal degrades to a fresh write (14.644932ms)
+✔ sanitizes fields and refuses empty nick or draft (13.810134ms)
+✔ missing key or storage never throws (16.75067ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 289.735409
+$ /usr/bin/node /home/kain/onyx/elm/pingKeepalive.smoke.mjs (timeout 60000ms)
+✔ idle fires the Elm probe then closes a dead peer (33.261727ms)
+✔ observed PONG re-arms the cycle and cancels the close (42.559305ms)
+✔ clear silences a scheduled probe (20.035887ms)
+✔ reschedule resets the idle clock (30.201548ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 139.676261
+$ /usr/bin/node /home/kain/onyx/elm/publicFeed.smoke.mjs (timeout 60000ms)
+✔ live fetch returns ok/body/status (50.978371ms)
+✔ HTTP failure reports ok:false with empty body (6.351008ms)
+✔ oversize content-length rejects without reading (3.623957ms)
+✔ missing fetch implementation reports ok:false (0.3898ms)
+✔ wire() forwards feed results by caller key (506.310213ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 606.631508
+$ /usr/bin/node /home/kain/onyx/elm/retentionPolicy.smoke.mjs (timeout 60000ms)
+✔ boot replays the stored policy sanitized (15.85835ms)
+✔ boot without storage falls back to the 400 default (0.517904ms)
+✔ save writes, then reports saved without a vault (1.221927ms)
+✔ hostile save JSON fails closed to session-only (0.5582ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34.700007
+$ /usr/bin/node /home/kain/onyx/elm/sasl.smoke.mjs (timeout 60000ms)
+✔ timeout mirrors the oracle 15s guard (2.037082ms)
+✔ PLAIN blob is UTF-8 \0nick\0pass and refused without a password (0.657331ms)
+✔ SCRAM full exchange matches the independent computation (22.106855ms)
+✔ SCRAM fails closed on hostile challenges (7.536605ms)
+✔ constant-time compare is length-strict (0.387095ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.443494
+$ /usr/bin/node /home/kain/onyx/elm/savedSearches.smoke.mjs (timeout 60000ms)
+✔ bounds mirror the oracle (2.152399ms)
+✔ save validates, upserts by label, and lists newest-first (38.107977ms)
+✔ delete verifies and clear empties (29.152028ms)
+✔ cap prunes oldest first (285.052583ms)
+✔ export shape and import merge are idempotent (32.217745ms)
+✔ imported id claimed by another label is re-keyed, never clobbered (13.815983ms)
+✔ sync messages are metadata-only and echo-safe (62.757488ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 476.318278
+$ /usr/bin/node /home/kain/onyx/elm/scheduleClock.smoke.mjs (timeout 60000ms)
+✔ clock answers a next-9am epoch and a datetime-local floor (13.873841ms)
+✔ parse echoes the value with the epoch, or null for garbage (1.845273ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.044534
+$ /usr/bin/node /home/kain/onyx/elm/scheduledRuntimePorts.smoke.mjs (timeout 60000ms)
+✔ scheduled editor request reaches private runtime and only returns a stamped opaque ref (16.538248ms)
+✔ a private editor result from a retired owner is ignored (2.185968ms)
+✔ runtime startup leaves v5 upgrade unblocked and standalone v3 closes on versionchange (13.428756ms)
+✔ schedule clock returns a local tomorrow-at-nine preset and local minute value (1.714008ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47.8202
+$ /usr/bin/node /home/kain/onyx/elm/scheduledSave.smoke.mjs (timeout 60000ms)
+✔ legacy scheduledSave cannot persist plaintext rows (17.543135ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30.605278
+$ /usr/bin/node /home/kain/onyx/elm/scheduledVault.smoke.mjs (timeout 60000ms)
+✔ legacy scheduled row and claim ports are not subscribed (14.431056ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27.563512
+$ /usr/bin/node /home/kain/onyx/elm/searchHotkey.smoke.mjs (timeout 60000ms)
+✔ ctrl+f preventDefaults and emits once (13.891617ms)
+✔ meta+F (shifted key) emits (0.717709ms)
+✔ plain f, shift/alt combos, and composing never fire (0.801888ms)
+✔ a modal dialog owns the keyboard (0.774863ms)
+✔ no searchHotkey port means no listener, no crash (0.666622ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.906458
+$ /usr/bin/node /home/kain/onyx/elm/sessionResume.smoke.mjs (timeout 60000ms)
+✔ legacy public bearer store is absent from browser ports (2.391777ms)
+✔ credential operations remain behind the private owner and opaque refs (0.45415ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18.725753
+$ /usr/bin/node /home/kain/onyx/elm/starredSave.smoke.mjs (timeout 60000ms)
+✔ save writes the starred array (13.119942ms)
+✔ empty channels remove the key (0.505998ms)
+✔ non-array channels are ignored (0.482116ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27.496351
+$ /usr/bin/node /home/kain/onyx/elm/statsPorts.smoke.mjs (timeout 60000ms)
+✔ historyReplace swaps the query without navigating (13.959736ms)
+✔ inspector reveal scrolls smooth and focuses with preventScroll (1.090882ms)
+✔ inspector reveal degrades to auto scroll under reduced motion (0.933304ms)
+✔ inspector reveal without a target or DOM never throws (0.821773ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.287796
+$ /usr/bin/node /home/kain/onyx/elm/studioPorts.smoke.mjs (timeout 60000ms)
+✔ apply commits token vars and removes stale ones (12.721367ms)
+✔ share copies origin plus code and echoes ts:share (13.260754ms)
+✔ prompt echoes kind and text; cancel yields null (0.693197ms)
+✔ eye-dropper reports unsupported without the API (11.159777ms)
+✔ eye-dropper relays selected hex and cancellations (20.607462ms)
+✔ strip removes only the theme param; customs store and refresh (1.539371ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 74.388011
+$ /usr/bin/node /home/kain/onyx/elm/tempBan.smoke.mjs (timeout 60000ms)
+✔ tempBan timer fires the key back after its delay (64.930103ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.419702
+$ /usr/bin/node /home/kain/onyx/elm/threadReveal.smoke.mjs (timeout 60000ms)
+✔ latest waits for the rendered transcript then reaches the normal scroll end (377.412995ms)
+✔ latest reaches zero in the reversed mobile scroll container (34.441484ms)
+✔ latest clamps a short normal transcript at zero (34.465581ms)
+✔ row ids are compared as complete data values, including selector punctuation (28.812285ms)
+✔ earlier reveals the first stable message row after the new window renders (19.267815ms)
+✔ a superseded reveal cannot move focus while the latest request scrolls (22.583751ms)
+✔ switching conversations before rendering invalidates the pending reveal (18.312254ms)
+✔ an absent row preserves both scroll position and the current focus (16.264982ms)
+✔ an absent transcript and an empty earlier window safely do nothing (18.349671ms)
+✔ unsupported requests do not schedule a scroll or invalidate a valid reveal (27.503449ms)
+✔ appended messages follow a reader near the latest normal transcript row (27.843492ms)
+✔ appended messages keep a reader near the reversed mobile tail at zero (43.438152ms)
+✔ appended messages preserve an away reader's column scroll offset (18.460901ms)
+✔ a queued column automatic follow yields to a reader who scrolls away (18.876991ms)
+✔ appended messages preserve an away reader's column-reverse scroll offset (14.914736ms)
+✔ a queued column-reverse automatic follow yields to a reader who scrolls away (16.280568ms)
+✔ resize follows the tail while preserving a reader's deliberate earlier position (14.004672ms)
+✔ replacing a pane invalidates its already queued resize scroll (20.651829ms)
+✔ unmounting a pane prevents its queued follow callback from changing detached DOM (14.565389ms)
+✔ a queued automatic follow cannot override a newer explicit row reveal (15.024659ms)
+✔ follow state publishes only when its current target or following value changes (18.875213ms)
+✔ a reused pane publishes the new conversation target without accepting a stale reveal (19.223814ms)
+✔ replacing a pane projects the new target and drops the old pane's scroll listener (18.836226ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 876.357183
+$ /usr/bin/node /home/kain/onyx/elm/tools/validate-roadmap-evidence.smoke.mjs (timeout 60000ms)
+Roadmap evidence ledger smoke passed: pending rows, scoped acceptance, status, path, digest and applicability checks.
+$ /usr/bin/node /home/kain/onyx/elm/topicFocus.smoke.mjs (timeout 60000ms)
+✔ focuses the active filter chip with preventScroll (13.761021ms)
+✔ missing chips and missing documents no-op (0.603094ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.179492
+$ /usr/bin/node /home/kain/onyx/elm/topicHistory.smoke.mjs (timeout 60000ms)
+✔ save writes the owner slot and loads it back bounded (15.058127ms)
+✔ empty history removes the slot and legacy keys are purged (0.714414ms)
+✔ over-cap slots and corrupt JSON read empty (0.760408ms)
+✔ ownerless requests never touch storage (0.531553ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.602376
+$ /usr/bin/node /home/kain/onyx/elm/topicReadSave.smoke.mjs (timeout 60000ms)
+✔ save writes validated rows to the owner slot and purges legacy (13.368639ms)
+✔ empty markers remove the key; ownerless and rowless saves are ignored (0.56688ms)
+✔ request loads stored rows through the loaded port (0.834047ms)
+✔ oversized slots read empty without parsing (0.535572ms)
+✔ cross-tab writes for the pending owner re-send; others are ignored (0.762053ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31.04916
+$ /usr/bin/node /home/kain/onyx/elm/transcriptDownload.smoke.mjs (timeout 60000ms)
+✔ txt download carries filename, body, and plain MIME (14.319854ms)
+✔ json MIME passes; anything else falls back to plain text (0.756524ms)
+✔ missing fields fail closed with defaults (0.6878ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1024.761929
+$ /usr/bin/node /home/kain/onyx/elm/translate.smoke.mjs (timeout 60000ms)
+✔ config reports availability, stored target, and browser fallback (193.273164ms)
+✔ absent API reports unavailable (21.913718ms)
+✔ requests translate through the browser API and echo the request (22.765457ms)
+✔ target saves persist to the onyx key (14.727492ms)
+✔ requests without an API report failure with the echo intact (18.634004ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 281.836826
+$ /usr/bin/node /home/kain/onyx/elm/uploadBridge.smoke.mjs (timeout 60000ms)
+✔ posts the file field as multipart and returns the JSON url (62.248537ms)
+✔ non-2xx uploads report status without a body (15.280528ms)
+✔ oversize bodies fail closed (7.263044ms)
+✔ preview fetches the same-origin endpoint with the url query (7.076223ms)
+✔ preview refuses cross-origin endpoints (0.340818ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 105.664857
+$ /usr/bin/node /home/kain/onyx/elm/vaultHistory.smoke.mjs (timeout 60000ms)
+✔ aroundWindow mirrors loadAround: nearest-first, sliced, chronological (5.922518ms)
+✔ exportSnapshot mirrors exportVault shape and bounds (3.614038ms)
+✔ exportSnapshot carries row types; legacy rows default to msg (0.687504ms)
+✔ tombstoned rows never surface in recall or time-travel (4.667695ms)
+✔ plainRow carries reply context; hostile shapes read back empty (0.518418ms)
+✔ plainRow carries tombstone flags; legacy rows read back clear (0.328812ms)
+✔ null store fails closed with unavailable/empty results (1.27304ms)
+✔ sanitizeRetentionPolicy fails closed and idempotent (0.762645ms)
+✔ retentionEffectiveKeep resolves overrides case-insensitively (0.431505ms)
+✔ selectPruneIds keeps newest by count, oldest-first out (0.845593ms)
+✔ selectPruneIds age cutoff is strictly-older, boundary kept (0.529565ms)
+✔ selectPruneIds composes count and age by union, ties by id (0.362308ms)
+✔ retentionPolicy falls back without browser storage (0.362521ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38.970488
+$ /usr/bin/node /home/kain/onyx/elm/vaultSearch.smoke.mjs (timeout 60000ms)
+✔ matches body and sender case-insensitively, newest first (4.142852ms)
+✔ sender-only match counts (0.408685ms)
+✔ blank query matches nothing (4.355411ms)
+✔ limit slices the newest end (0.423329ms)
+✔ rows without id or target are skipped (0.406421ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24.998432
+$ /usr/bin/node /home/kain/onyx/elm/vaultSemantic.smoke.mjs (timeout 60000ms)
+✔ constants match the oracle (k=60, dim=256, boosts) (4.303889ms)
+✔ tokenize lowercases, splits, drops singles, keeps unicode (2.028208ms)
+✔ embed is deterministic, unit-norm, zero on token-free text (1.740906ms)
+✔ cosine is 1 on identical vectors, 0 on zero/mismatch (0.648232ms)
+✔ rankBySimilarity is stable on ties (1.168137ms)
+✔ RRF scores rank-1 as 1/(k+1) and rewards agreement (1.103875ms)
+✔ hybrid ranks the verbatim hit first with the neighbor behind (3.577656ms)
+✔ hybrid lexical leg finds substring-only rows first (3.857572ms)
+✔ hybrid returns [] for blank queries (0.876248ms)
+✔ hybrid honors the limit (0.905736ms)
+✔ hybrid boosts same-room hits when activeTarget is set (1.076502ms)
+✔ hybrid penalizes self authors so peers surface first (0.841959ms)
+✔ hybrid recency-boosts the newer lexical twin (0.641603ms)
+✔ semantic ranks topical neighbors above unrelated rows (0.706685ms)
+✔ semantic honors limit and minScore (0.559379ms)
+✔ boostedScore applies each axis like the oracle (0.355401ms)
+✔ hitAgeMs reads epoch stamps defensively (1.339282ms)
+✔ mode saves persist only the three known modes (8.566461ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.738852
+$ /usr/bin/node /home/kain/onyx/elm/vhostRefresh.smoke.mjs (timeout 60000ms)
+✔ refresh request fires the refresh send after ~300ms (414.255541ms)
+✔ wire without the vhost ports does not crash (1.118966ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 428.014269
+$ /usr/bin/node /home/kain/onyx/elm/voiceBridge.smoke.mjs (timeout 60000ms)
+✔ join without an engine feeds the failed outcome, never a phantom call (14.462583ms)
+✔ blank join channel sends nothing (0.522588ms)
+✔ leave and mute without an engine no-op without crashing (0.668633ms)
+✔ commands route to a mounted engine, rejections fail closed (2.378138ms)
+✔ rejecting engine join feeds joinFailed (10.754906ms)
+✔ passkeySupport is reported once at wire time (0.742966ms)
+✔ wire without the passkeySupport port does not crash (0.388307ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41.276797
+$ /usr/bin/node /home/kain/onyx/elm/webPush.smoke.mjs (timeout 60000ms)
+✔ probe reports support and permission (6.05646ms)
+✔ enable subscribes, marks, and registers (3.223387ms)
+✔ enable gates carry the typed reasons without prompting (1.155463ms)
+✔ recover needs intent and never prompts (0.938153ms)
+✔ retire paths: foreign and incomplete subscriptions (2.022724ms)
+✔ disable revokes locally and unregisters (1.777584ms)
+✔ checkActive reflects ownership and retires foreigners (2.016286ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33.19531
+$ /usr/bin/node /home/kain/onyx/elm/websocket.smoke.mjs (timeout 60000ms)
+✔ WS frames register without CRLF, remain separate, and reject outbound line injection (59.300243ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 72.984341
+$ /usr/bin/node /home/kain/onyx/elm/whoisTimeout.smoke.mjs (timeout 60000ms)
+✔ whois timeout fires nick and generation back after its delay (63.930051ms)
+✔ a newer request supersedes the pending fire (65.239642ms)
+✔ empty nicks, bad generations, and missing payloads schedule nothing (50.789923ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 191.658758
+Receipt: /tmp/onyx-elm-verification-final/receipts/node-smokes-1793846161498.json

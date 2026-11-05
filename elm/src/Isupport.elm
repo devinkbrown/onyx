@@ -11,6 +11,7 @@ module Isupport exposing
     , parseStatusmsgSymbols
     , statusmsgChannel
     , isChannelTarget
+    , unknownTokens
     )
 
 {-| ISUPPORT (005) token table — Elm port of the `_parseISUPPORT` fold
@@ -20,10 +21,11 @@ and its helpers in `src/lib/irc/client.ts`
 `ISupport` defaults.
 
 Envelope rules (fail closed): the nick param and trailing text are
-skipped, at most 256 tokens are honored, keys match `[A-Z][A-Z0-9-]*`
-(≤64 chars), values carry no C0/space/DEL (≤1024 chars). Unknown tokens
-are validated and ignored. Every branch keeps its last known-good value
-on malformed input.
+skipped, at most 256 distinct tokens are retained, keys match
+`[A-Z][A-Z0-9-]*` (≤64 chars), and values decode `\\xHH` byte escapes
+with a 1024-character decoded limit. Valid unknown tokens remain in a
+bounded diagnostic inventory and never enable behavior. Malformed input
+keeps the last known-good projection.
 
 Reuses `Modes` (CHANMODES groups, default prefix maps) and `Wire`
 (CHANLIMIT parse, PREFIX parse).
@@ -74,6 +76,8 @@ type alias ISupport =
     , vapid : String
     , attributionNode : Maybe String
     , statusmsg : String
+    , tokens : Dict String (Maybe String)
+    , tokenOrder : List String
     }
 
 
@@ -119,6 +123,8 @@ defaultSupport =
     , vapid = ""
     , statusmsg = ""
     , attributionNode = Nothing
+    , tokens = Dict.empty
+    , tokenOrder = []
     }
 
 
@@ -266,22 +272,6 @@ isKeyChar c =
         || code == 0x2D
 
 
-isTokenValue : String -> Bool
-isTokenValue value =
-    String.length value
-        <= maxTokenValueLength
-        && not (List.any isValueBad (String.toList value))
-
-
-isValueBad : Char -> Bool
-isValueBad c =
-    let
-        code =
-            Char.toCode c
-    in
-    code <= 0x20 || code == 0x7F
-
-
 splitToken : String -> Maybe ( String, String )
 splitToken token =
     case String.indexes "=" token of
@@ -292,10 +282,282 @@ splitToken token =
             Just ( String.slice 0 idx token, String.dropLeft (idx + 1) token )
 
 
+decodeTokenValue : String -> Maybe String
+decodeTokenValue raw =
+    if String.length raw > maxTokenValueLength * 4 then
+        Nothing
+
+    else
+        raw
+            |> String.toList
+            |> decodeEscapedChars
+            |> Maybe.andThen decodeUtf8
+            |> Maybe.andThen
+                (\value ->
+                    if isDecodedTokenValue value then
+                        Just value
+
+                    else
+                        Nothing
+                )
+
+
+decodeEscapedChars : List Char -> Maybe (List Int)
+decodeEscapedChars chars =
+    case chars of
+        [] ->
+            Just []
+
+        '\\' :: 'x' :: high :: low :: rest ->
+            Maybe.map2 Tuple.pair (hexValue high) (hexValue low)
+                |> Maybe.andThen
+                    (\( h, l ) ->
+                        decodeEscapedChars rest
+                            |> Maybe.map ((::) (h * 16 + l))
+                    )
+
+        '\\' :: _ ->
+            Nothing
+
+        char :: rest ->
+            decodeEscapedChars rest
+                |> Maybe.map (List.append (encodeUtf8Char (Char.toCode char)))
+
+
+encodeUtf8Char : Int -> List Int
+encodeUtf8Char code =
+    if code <= 0x7F then
+        [ code ]
+
+    else if code <= 0x7FF then
+        [ 0xC0 + code // 64, 0x80 + modBy 64 code ]
+
+    else if code <= 0xFFFF then
+        [ 0xE0 + code // 4096, 0x80 + modBy 64 (code // 64), 0x80 + modBy 64 code ]
+
+    else
+        [ 0xF0 + code // 262144
+        , 0x80 + modBy 64 (code // 4096)
+        , 0x80 + modBy 64 (code // 64)
+        , 0x80 + modBy 64 code
+        ]
+
+
+decodeUtf8 : List Int -> Maybe String
+decodeUtf8 bytes =
+    decodeUtf8Chars bytes [] |> Maybe.map (String.fromList << List.reverse)
+
+
+decodeUtf8Chars : List Int -> List Char -> Maybe (List Char)
+decodeUtf8Chars bytes acc =
+    case bytes of
+        [] ->
+            Just acc
+
+        first :: rest ->
+            if first <= 0x7F then
+                decodeUtf8Chars rest (Char.fromCode first :: acc)
+
+            else
+                case rest of
+                    second :: tail ->
+                        if first >= 0xC2 && first <= 0xDF && isContinuation second then
+                            decodeUtf8Chars tail (Char.fromCode ((first - 0xC0) * 64 + second - 0x80) :: acc)
+
+                        else
+                            case rest of
+                                second3 :: third :: tail3 ->
+                                    if first >= 0xE0 && first <= 0xEF && isContinuation second3 && isContinuation third && validThreeByte first second3 then
+                                        decodeUtf8Chars tail3 (Char.fromCode ((first - 0xE0) * 4096 + (second3 - 0x80) * 64 + third - 0x80) :: acc)
+
+                                    else
+                                        decodeFourByte first rest acc
+
+                                _ ->
+                                    decodeFourByte first rest acc
+
+                    _ ->
+                        Nothing
+
+
+decodeFourByte : Int -> List Int -> List Char -> Maybe (List Char)
+decodeFourByte lead bytes acc =
+    case bytes of
+        second :: third :: fourth :: tail ->
+            if lead >= 0xF0 && lead <= 0xF4 && isContinuation second && isContinuation third && isContinuation fourth && validFourByte lead second then
+                decodeUtf8Chars tail (Char.fromCode ((lead - 0xF0) * 262144 + (second - 0x80) * 4096 + (third - 0x80) * 64 + fourth - 0x80) :: acc)
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+isContinuation : Int -> Bool
+isContinuation byte =
+    byte >= 0x80 && byte <= 0xBF
+
+
+validThreeByte : Int -> Int -> Bool
+validThreeByte lead second =
+    not ((lead == 0xE0 && second < 0xA0) || (lead == 0xED && second >= 0xA0))
+
+
+validFourByte : Int -> Int -> Bool
+validFourByte lead second =
+    not ((lead == 0xF0 && second < 0x90) || (lead == 0xF4 && second >= 0x90))
+
+
+hexValue : Char -> Maybe Int
+hexValue char =
+    let code = Char.toCode char in
+    if code >= 0x30 && code <= 0x39 then
+        Just (code - 0x30)
+
+    else if code >= 0x41 && code <= 0x46 then
+        Just (code - 0x41 + 10)
+
+    else if code >= 0x61 && code <= 0x66 then
+        Just (code - 0x61 + 10)
+
+    else
+        Nothing
+
+
+{-| Diagnostic inventory for syntactically valid but unsupported keys.
+Values are decoded and bounded by the same envelope as recognized tokens.
+-}
+unknownTokens : ISupport -> Dict String (Maybe String)
+unknownTokens support =
+    Dict.filter (\key _ -> not (isKnownKey key)) support.tokens
+
+
+isKnownKey : String -> Bool
+isKnownKey key =
+    List.member key
+        [ "PREFIX", "NETWORK", "CHANTYPES", "CASEMAPPING", "NICKLEN", "TOPICLEN"
+        , "CHANLIMIT", "MAXCHANNELS", "MODES", "CHANMODES", "IRCX", "SILENCE"
+        , "VAPID", "ACCOUNTRESIDENCE", "STATUSMSG"
+        ]
+
+
 {-| Fold one validated `KEY[=value]` token into the table. -}
 applyIsupportToken : ISupport -> String -> String -> ISupport
 applyIsupportToken support key val =
-    if String.isEmpty key || not (isTokenKey key) || not (isTokenValue val) then
+    if String.isEmpty key || not (isTokenKey key) || not (isDecodedTokenValue val) || not (isValidKnownAdvertisement key val) then
+        support
+
+    else
+        storeAndProject support key (Just (Just val))
+
+
+storeAndProject : ISupport -> String -> Maybe (Maybe String) -> ISupport
+storeAndProject support key value =
+    let
+        isNew =
+            not (Dict.member key support.tokens)
+
+        withinCap =
+            not isNew || Dict.size support.tokens < maxTokenCount
+
+        nextTokens =
+            case value of
+                Just advertised ->
+                    Dict.insert key advertised support.tokens
+
+                Nothing ->
+                    Dict.remove key support.tokens
+
+        nextOrder =
+            case value of
+                Just _ ->
+                    List.filter ((/=) key) support.tokenOrder ++ [ key ]
+
+                Nothing ->
+                    List.filter ((/=) key) support.tokenOrder
+    in
+    if not withinCap then
+        support
+
+    else if value == Nothing then
+        let
+            replayed =
+                List.foldl
+                    (\token acc ->
+                        case Dict.get token nextTokens of
+                            Just advertised ->
+                                projectKnown acc token (Maybe.withDefault "" advertised)
+
+                            Nothing ->
+                                acc
+                    )
+                    defaultSupport
+                    nextOrder
+        in
+        { replayed | tokens = nextTokens, tokenOrder = nextOrder }
+
+    else
+        case value of
+            Just advertised ->
+                let
+                    projected =
+                        projectKnown support key (Maybe.withDefault "" advertised)
+                in
+                { projected | tokens = nextTokens, tokenOrder = nextOrder }
+
+            Nothing ->
+                support
+
+
+isDecodedTokenValue : String -> Bool
+isDecodedTokenValue value =
+    String.length value <= maxTokenValueLength
+        && not (List.any (\c -> let n = Char.toCode c in n < 0x20 || n == 0x7F) (String.toList value))
+
+
+isValidKnownAdvertisement : String -> String -> Bool
+isValidKnownAdvertisement key val =
+    if not (isKnownKey key) then
+        True
+
+    else if key == "PREFIX" then
+        not (Dict.isEmpty (Wire.parsePrefix val).modeToPrefix)
+
+    else if key == "NETWORK" then
+        not (String.isEmpty val) && String.length val <= 256
+
+    else if key == "CHANTYPES" then
+        parseChannelTypes val /= Nothing
+
+    else if key == "CASEMAPPING" then
+        List.member (String.toLower val) [ "ascii", "rfc1459", "strict-rfc1459" ]
+
+    else if List.member key [ "NICKLEN", "TOPICLEN", "MAXCHANNELS", "MODES" ] then
+        parsePositiveInt val /= Nothing
+
+    else if key == "CHANLIMIT" then
+        not (Dict.isEmpty (Wire.parseChanLimit val))
+
+    else if key == "CHANMODES" then
+        Modes.parseChanGroups val /= Nothing
+
+    else if key == "SILENCE" then
+        String.isEmpty val || parsePositiveInt val /= Nothing
+
+    else if key == "ACCOUNTRESIDENCE" then
+        parseAttributionNode val /= Nothing
+
+    else if key == "STATUSMSG" then
+        parseStatusmsgSymbols val /= Nothing
+
+    else
+        True
+
+
+projectKnown : ISupport -> String -> String -> ISupport
+projectKnown support key val =
+    if not (isKnownKey key) then
         support
 
     else if key == "PREFIX" then
@@ -496,15 +758,51 @@ applyIsupportLine support params =
     in
     List.foldl
         (\token acc ->
-            case splitToken token of
-                Just ( key, val ) ->
-                    applyIsupportToken acc key val
-
-                Nothing ->
-                    acc
+            applyRawToken acc token
         )
         support
         middle
+
+
+applyRawToken : ISupport -> String -> ISupport
+applyRawToken support token =
+    if String.startsWith "-" token then
+        let
+            key =
+                String.dropLeft 1 token
+        in
+        if String.contains "=" token || not (isTokenKey key) then
+            support
+
+        else
+            storeAndProject support key Nothing
+
+    else
+        case splitToken token of
+            Just ( key, rawValue ) ->
+                if not (isTokenKey key) then
+                    support
+
+                else if String.contains "=" token then
+                    case decodeTokenValue rawValue of
+                        Just val ->
+                            if not (isValidKnownAdvertisement key val) then
+                                support
+
+                            else
+                                storeAndProject support key (Just (Just val))
+
+                        Nothing ->
+                            support
+
+                else if isValidKnownAdvertisement key "" then
+                    storeAndProject support key (Just Nothing)
+
+                else
+                    support
+
+            Nothing ->
+                support
 
 
 dropTrailing : List String -> List String

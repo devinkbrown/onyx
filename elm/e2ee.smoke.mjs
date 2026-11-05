@@ -141,7 +141,7 @@ test("multi-device fan-out opens on every device", async () => {
   assert.equal(sealed.status, "sealed");
   assert.ok(sealed.envelope.startsWith("ONYXDMN1 "));
 
-  for (const [b, pub] of [[b1, b1Pub], [b2, b2Pub]]) {
+  for (const [b] of [[b1, b1Pub], [b2, b2Pub]]) {
     const opened = await b.openFrom("a", aPub, sealed.envelope);
     assert.equal(opened.status, "opened");
     assert.equal(opened.plaintext, "hello devices");

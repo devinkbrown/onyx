@@ -47,26 +47,32 @@ The section is honest about what your browser and server can actually do:
 
 - **"This browser does not support passkeys."** — your browser can't do
   WebAuthn. Try a current Chrome, Safari, Firefox, or Edge on a device with a
-  screen lock. (`src/shell/PasskeysSection.tsx:133`)
-- **"This server does not offer passkey sign-in yet."** — the network you're
-  connected to hasn't turned on passkey support. You can still protect your
-  account with a password and two-factor authentication.
-  (`src/shell/PasskeysSection.tsx:141`)
+  screen lock. (`src/shell/PasskeysSection.tsx:190`)
+- **"This server does not offer passkey sign-in yet."** — passkeys are not
+  currently available on the network you're connected to. You can still protect
+  your account with a password and two-factor authentication.
+  (`src/shell/PasskeysSection.tsx:198`)
 
-Onyx doesn't get server passkey support advertised up front, so it *probes* the
-server the first time you open the panel and only shows the manager once the
-server answers. (`src/lib/store/store.ts:569`) Until a server answers the probe,
-the section fails closed to the "not offered yet" state rather than pretending
-the feature works. (`src/lib/store/store.ts:3500`)
+Onyx does not receive a passkey capability advertisement up front. When a
+signed-in user opens the panel, the client probes with `WEBAUTHN LIST`; a
+successful reply enables the manager. If the command is unavailable, the
+server does not answer, or passkeys are temporarily unavailable, the client
+fails closed and the section reports that the server does not offer passkey
+sign-in. (`src/shell/PasskeysSection.tsx:125`, `src/lib/store/store.ts:8677`, `src/lib/store/store.ts:8687`)
 
-> **Status — coming once server support lands.** The full passkey manager
-> (register, list, rename, remove) is built and shipping in the client, but it
-> only lights up end-to-end once your Onyx Server replies to the `WEBAUTHN`
-> command with the expected `NOTE WEBAUTHN …` messages — a known server-side
-> gap. Renaming in particular degrades gracefully: if the server has passkeys
-> but not the rename subcommand, Onyx hides the **Rename** button and tells you
-> *"This server does not support renaming passkeys yet."* rather than failing
-> repeatedly. (`src/lib/store/store.ts:4892`, `src/shell/PasskeysSection.tsx:233`)
+The client supports the passkey manager, and Onyx Server implements the
+`WEBAUTHN` command. Server success replies are targeted IRCX `EVENT` messages
+such as `:server EVENT <nick> WEBAUTHN CRED …`; the client consumes that event
+plane. The server requires `[webauthn]` configuration with an RP ID and at least
+one allowed origin, and fails closed when either is missing.
+(client: `src/lib/webauthn/passkey.ts:6`, `src/lib/store/store.ts:10539`;
+Onyx Server: `src/daemon/server.zig:57172`,
+`etc/onyx-server.reference.toml:795`)
+
+If a network's server has the base passkey commands but does not implement
+`WEBAUTHN RENAME`, Onyx hides **Rename** after the server rejects that
+subcommand and explains that renaming is unavailable there.
+(`src/lib/store/store.ts:10561`, `src/shell/PasskeysSection.tsx:233`)
 
 ## "Since you were away" — the Home catch-up digest
 

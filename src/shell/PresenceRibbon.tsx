@@ -17,7 +17,7 @@
  * store reads via useStore; snapshots via getState() in handlers.
  */
 
-import { createEffect, createMemo, createSignal, lazy, onCleanup, Show, splitProps, Suspense, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, lazy, onCleanup, Show, splitProps, Suspense, untrack, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences, preferences } from '@/lib/prefs/preferences';
 import { channelNotifyMode } from '@/lib/notifications/channelNotifyMode';
@@ -523,7 +523,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     // Let Popover finish its focus return before Search captures its opener.
     // The menu item unmounts; the surviving Actions button owns Escape return.
     queueMicrotask(() => {
-      if (!trigger?.isConnected || moreOpen() || activeView() !== view) return;
+      if (!trigger?.isConnected || untrack(moreOpen) || untrack(activeView) !== view) return;
       trigger.focus({ preventScroll: true });
       openMessageSearch();
     });

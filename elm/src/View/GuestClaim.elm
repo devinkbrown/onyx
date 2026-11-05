@@ -6,8 +6,8 @@ outside the composer column; sheet runs REGISTER → optional VERIFY →
 IDENTIFY on the live socket without disconnecting).
 
 Visibility mirrors `showChip` (guest + non-empty live nick + not
-dismissed; the first-hour handoff suppress has no Elm state and stays
-ahead). The sheet mirrors the prompt's two forms (register vs verify
+dismissed) and `FirstHour.shouldSuppressGuestClaim` via
+`guestClaimVisible`. The sheet mirrors the prompt's two forms (register vs verify
 when `ClaimVerifying` or `verifyRequired`), verbatim copy and error
 precedence (local error, then `registerError`, then the IDENTIFY
 `accountActionError`), busy gating (submit disabled + close refused
@@ -20,6 +20,7 @@ import App exposing (GuestClaimPhase(..), Model, Msg(..), guestClaimMinPassword,
 import Html exposing (Html, b, button, div, form, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import RuntimeDomain
 
 
 guestClaim : Model -> Html Msg
@@ -113,7 +114,12 @@ sheet model =
             isGuestClaimBusy model
 
         verifying =
-            model.guestClaimPhase == ClaimVerifying || model.verifyRequired
+            model.guestClaimPhase == ClaimVerifying
+                || model.verifyRequired
+                || Maybe.map (\status -> status.outcome == "account-registered") model.privateAccountStatus == Just True
+
+        verified =
+            Maybe.map (\status -> status.outcome == "email-verified") model.privateAccountStatus == Just True
     in
     div [ class "guest-claim-veil" ]
         [ div
@@ -123,13 +129,76 @@ sheet model =
             , attribute "data-testid" "guest-claim-sheet"
             ]
             [ p [ class "guest-claim-sheet__lede" ]
-                [ text "Create an account for the name you are using. You stay connected while it is set up." ]
-            , if verifying then
-                verifyForm model busy
+                [ text
+                    (if verified then
+                        "Your account email is verified. Sign in separately when you are ready."
+
+                     else
+                        "Create an account for the name you are using. You stay connected while it is set up."
+                    )
+                ]
+            , if verified then
+                button [ type_ "button", onClick GuestClaimClose ] [ text "Close" ]
+
+              else if verifying then
+                if model.runtimeOwnerStamp /= Nothing then
+                    div []
+                        [ privateGuestForm busy "Verify your account email" "The verification code is entered in a private browser form." "account-verify" "account-verify" (if String.isEmpty model.guestClaimNick then String.trim model.ourNick else model.guestClaimNick)
+                        , privateRecoveryControls model
+                        ]
+                else
+                    verifyForm model busy
+
+              else if model.runtimeOwnerStamp /= Nothing then
+                div []
+                    [ privateGuestForm busy "Create your account" "Password and optional recovery email are collected in a private browser form." "account-register" "account-register" (String.trim model.ourNick)
+                    , privateRecoveryControls model
+                    ]
 
               else
                 registerForm model busy
             ]
+        ]
+
+
+privateGuestForm : Bool -> String -> String -> String -> String -> String -> Html Msg
+privateGuestForm busy title description kind action account =
+    div [ class "guest-claim-sheet__form", attribute "aria-label" title ]
+        [ p [ class "guest-claim-sheet__lede" ] [ text description ]
+        , p [ class "guest-claim-sheet__hint" ] [ text ("Account name: " ++ account) ]
+        , button
+            [ type_ "button"
+            , class "guest-claim-sheet__submit"
+            , disabled busy
+            , onClick (App.RuntimePrivateAccountFormRequested { kind = kind, action = action, account = Just account })
+            ]
+            [ text title ]
+        , button [ type_ "button", disabled busy, onClick GuestClaimClose ] [ text "Close" ]
+        ]
+
+
+privateRecoveryControls : Model -> Html Msg
+privateRecoveryControls model =
+    let
+        account =
+            if String.isEmpty model.guestClaimNick then
+                String.trim model.ourNick
+            else
+                String.trim model.guestClaimNick
+    in
+    div [ class "guest-claim-sheet__actions", attribute "aria-label" "Account recovery" ]
+        [ button
+            [ type_ "button"
+            , disabled (String.isEmpty account)
+            , onClick (App.RuntimeDomainActionRequested (RuntimeDomain.AccountSecurityBegin "password-reset-request" Nothing (Just account)))
+            ]
+            [ text "Request a password reset" ]
+        , button
+            [ type_ "button"
+            , disabled (String.isEmpty account)
+            , onClick (App.RuntimePrivateAccountFormRequested { kind = "password-reset-confirm", action = "password-reset-confirm", account = Just account })
+            ]
+            [ text "Enter a reset code" ]
         ]
 
 

@@ -1,0 +1,39 @@
+{
+  "clientValidator": {
+    "command": [
+      "/usr/local/bin/pnpm",
+      "check:server-contract-v2"
+    ],
+    "exitStatus": 0,
+    "stdout": "\n> onyx@0.1.3 check:server-contract-v2 /home/kain/onyx\n> node tools/check-server-contract-v2.mjs ../onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n\nProtocol contract v2 valid: /home/kain/onyx/docs/protocol/onyx-client-contract.v2.json = /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n",
+    "stderr": "",
+    "error": null
+  },
+  "serverValidator": {
+    "command": [
+      "python3",
+      "-B",
+      "/home/kain/onyx-server/tools/check-client-contract.py"
+    ],
+    "exitStatus": 0,
+    "stdout": "Protocol contract valid: /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n",
+    "stderr": "",
+    "error": null
+  },
+  "validatorConcordance": "verified",
+  "e02AcceptanceStatus": "pending",
+  "clientSources": {
+    "checkerSha256": "cbb5b6fbfc1cca7ea5a6449b9632c347f45afed64f59034a991f9448dcb2c3df",
+    "contractV2Sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e",
+    "gitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03"
+  },
+  "serverSources": {
+    "checkerSha256": "db24c5d8ed7f452c99edfa3bbbeb3c44e4165ac40319b50fb75e70dc6053de1e",
+    "contractV1Sha256": "6e375d15dbb503de23720eb0e646e31040155823fef2fd45004cf71dfce5bf38",
+    "contractV2Sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e",
+    "gitHead": "b9be884cce57dadf91d415f61e703de95e521757"
+  },
+  "sourceAndJsonEdits": "none; this lane observes validators and does not mutate either contract"
+}
+VERIFIED: client and server contract validators both passed and agree. E02 package/release acceptance remains pending separate source-bound review.
+Receipt: /tmp/onyx-elm-verification-final/receipts/contract-observations-1793790654888.json

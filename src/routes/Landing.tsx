@@ -58,6 +58,7 @@ export default function Landing() {
               <div class="home-cta-row">
                 <a class="home-cta-primary" href="/app/">Open Onyx</a>
                 <a class="home-secondary-link" href={`${publicRouteById('invite').href}?join=%23root`}>See the public room</a>
+                <a class="home-secondary-link" href={publicRouteById('download').href}>Keep it on this device</a>
               </div>
               <p class="home-device-note home-desktop-note">
                 Browser first. Keep it on this device from a supporting browser — <a class="home-local-link" href={publicRouteById('download').href}>see device options</a>.

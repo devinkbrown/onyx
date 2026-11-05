@@ -11,7 +11,7 @@ export interface IRCMessage {
   raw: string;
 }
 
-export type StandardReplyKind = 'NOTE' | 'FAIL' | 'WARN';
+export type StandardReplyKind = 'FAIL' | 'WARN';
 
 export interface StandardReply {
   kind: StandardReplyKind;

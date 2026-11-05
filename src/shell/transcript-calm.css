@@ -1,0 +1,89 @@
+/* Transcript calm reading layer (overhaul W5 slice 1).
+ *
+ * The conversation is the reading plane: comfortable measure, quiet
+ * timestamps, calm dividers. Scoped overrides only — grouping, unread seam,
+ * jump controls, and message semantics stay exactly as built.
+ *
+ * Contracts: no layout shift of interactive targets, visible focus kept,
+ * reduced-motion and forced-colors paths included. No gradients, no glow. */
+
+/* Reading measure + rhythm: one calm column, air between speakers. */
+.shell-msg-group {
+  max-width: 68ch;
+  margin-top: 1rem;
+  padding: 4px 16px;
+}
+
+.shell-msg-cont {
+  max-width: 68ch;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* Body text: 15–16px humanist sans, roomy line height. */
+.shell-msg-text {
+  font-size: 0.9625rem;
+  line-height: 1.55;
+}
+
+/* Timestamps: small quiet tabular numerals, never tracked-out micro mono. */
+.shell-msg-ts,
+.shell-msg-cont-ts,
+.shell-msg-edited-btn {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-mute);
+  opacity: 1;
+}
+
+/* Day divider: sentence-case quiet milestone, thin hairlines. */
+.shell-day-divider-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--paper-mute);
+}
+
+/* Unread seam holds position with a plain-language label. */
+.shell-unread-divider-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Jump-to-latest pill: calm, matte, reachable. */
+.shell-jump-latest {
+  min-height: var(--target-min, 44px);
+  border-radius: 999px;
+  font-family: var(--font-sans);
+}
+
+.shell-jump-latest:focus-visible {
+  outline: 2px solid var(--lapis-bright, #65adf5);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-msg-group,
+  .shell-msg-cont {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-unread-divider {
+    border-color: Highlight;
+  }
+
+  .shell-day-divider-label,
+  .shell-msg-ts,
+  .shell-msg-cont-ts {
+    color: CanvasText;
+  }
+}

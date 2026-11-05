@@ -1,0 +1,80 @@
+# Handoff — Onyx Elm port wind-down
+
+Date: 2026-10-07. Branch `onyx-solid` is green and pushed
+through slice-73 (`2e0182c8`, ls-remote verified).
+
+## Pushed (remote `onyx-solid` = `d558a40f`, verified)
+
+- slice-71 `bfe9fda8`: topic create form (validated draft, raw-set
+  `TopicCreateSubmit` mirroring `startTopic`), Forum toggle, forum
+  cards with latest-message preview, validated `ForumOpenTopic`
+  (focus handoff still a narrowing).
+- slice-72 `d558a40f`: topic-unread visibility on delivery
+  (`isTopicVisibleConversation` mirrors `isChannelMessageVisible`,
+  threaded through all three `trackUnread` call sites;
+  followed-hidden rows record follow inbox rows with the narrower
+  destination). Mutation-checked: exactly the 2 new tests fail
+  without the fold.
+
+## Uncommitted working tree (slice-73, DO NOT push as-is)
+
+Elm files (mine, slice-73):
+
+- `elm/src/Topic.elm` — new `projectTopicUnread` (markerless
+  reduction of `projectRoomTopicUnread`: divider-else-first-unread
+  boundary over the newest-first buffer; system/own/`none`/mentions
+  exclusions; lowercase keys; missing boundary counts nothing) +
+  `TopicUnreadRow`/`TopicUnreadScope`.
+- `elm/src/App.elm` — `forumChannels : Set String` (+ both Model
+  literals), `ForumChannelToggle`/`FollowTopicToggle` msgs,
+  `ForumChannelsSave` outbound, `parseForumChannels` (256 cap,
+  shared notify-channel rule), `forumPinnedFor`/`followActiveFor`/
+  `topicFollowedFor`/`openPinnedForum` (pinned + labeled rows
+  re-opens forum on `ChannelSelect`), `notifyLevel` exposed.
+- `elm/src/Main.elm` — `forumChannelsSave` port + outbound branch +
+  `forumChannels` flag decode into the model.
+- `elm/index.html` — `forumChannels` flag from `onyx:forum-channels`.
+- `elm/ports.js` — `forumChannelsSave` bridge (same shape as the
+  starred rail; empty set removes the key).
+- `elm/src/View/Thread.elm` — tools row now renders on pref alone
+  (oracle `shell-topic-filter` fidelity: create + follow always;
+  filter bar + Forum/Pin still gated on topics); chip unread badges
+  (`topic-chip__unread`, `", N unread"` aria); card unread span +
+  `", N unread on this device"` aria; per-card follow switch
+  (`shell-topic-card-follow`); tools follow toggle
+  (`shell-topic-follow`, Follow/Following room/topic labels);
+  pin switch (`Pin forum`/`Forum pinned`); Forum button `is-active`.
+- `elm/app.css` — styles for the new classes.
+- `elm/tests/TopicTest.elm` — 3 projector vectors (boundary
+  inclusion/newer-only, lowercase keys, missing boundary empty,
+  system/own/untagged skips, `none`/`mentions` levels).
+- `elm/tests/ViewTest.elm` — new `topic tools pin, follow, and
+  unread badges` test; composer input finds scoped by placeholder
+  (create form now always renders).
+
+Not mine — leave alone: `public/brand/*.png`, `src/app/Connect.tsx`,
+`src/app/connect.css`, `src/primitives/primitives.css`,
+`src/routes/Landing.test.tsx`, etc.
+
+## Next steps (in order)
+
+1. Slice-74 candidates (uncommitted tree holds only unrelated
+   brand/TS files plus this note — leave them alone): per-topic read cursors
+   (`markTopicRead`/`reconcileChannelTopicUnread` ledger + ports
+   persistence, closing the slice-73 projector narrowing); split
+   buttons (oracle `onSplit` has NO non-test caller in `src/` —
+   verify again before building anything); pinned-forum live
+   re-open on first topic arrival (currently navigation-only
+   narrowing); forum-card focus handoff (`openTopic`
+   `queueMicrotask` focus — narrowing).
+5. Standing rules still apply: pnpm only; `onyx:` prefix;
+   `ocean.*` frozen; only `./deploy.sh` writes `out/`; git skill
+   before history writes; commit/push only the named slice files.
+
+## Gates reference
+
+- `export PATH=/tmp:$PATH ELM_HOME=/tmp/elmhome`
+- `cd elm && /tmp/elm make src/Main.elm --output /dev/null`
+  (capture to file; `| tail` masks failures)
+- `/tmp/elmtools/package/bin/elm-test`
+- `node --check elm/ports.js`, `pnpm typecheck`, `pnpm test`

@@ -9,6 +9,11 @@ export const MAX_WIRE_FRAME_LINES = 512;
 export const MAX_IRC_PREFIX_LENGTH = 512;
 export const MAX_IRC_COMMAND_LENGTH = 64;
 export const MAX_IRC_MESSAGE_PARAMS = 512;
+const SOURCE_BACKED_DOTTED_COMMANDS = new Set([
+  'E2EE.KEYPACKAGE',
+  'E2EE.COMMIT',
+  'E2EE.WELCOME',
+]);
 
 /**
  * Split a received WebSocket text frame into complete IRC lines.
@@ -140,8 +145,10 @@ export function parseIRCMessage(raw: string): IRCMessage {
   // Parse command
   const commandEnd = line.indexOf(' ', pos);
   const rawCommand = commandEnd === -1 ? line.slice(pos) : line.slice(pos, commandEnd);
-  const command = rawCommand.length <= MAX_IRC_COMMAND_LENGTH && /^[A-Za-z0-9]+$/u.test(rawCommand)
-    ? rawCommand.toUpperCase()
+  const normalizedCommand = rawCommand.toUpperCase();
+  const command = rawCommand.length <= MAX_IRC_COMMAND_LENGTH
+    && (/^[A-Za-z0-9]+$/u.test(rawCommand) || SOURCE_BACKED_DOTTED_COMMANDS.has(normalizedCommand))
+    ? normalizedCommand
     : '';
   pos = commandEnd === -1 ? line.length : commandEnd + 1;
 
@@ -360,12 +367,18 @@ export function parseCHANLIMIT(value: string): Record<string, number> {
 }
 
 export function normalizeCase(value: string, casemapping: string): string {
-  if (casemapping.toLowerCase() === 'ascii') return value.toLowerCase();
-  return value.toLowerCase()
-    .replace(/\[/g, '{')
-    .replace(/\]/g, '}')
-    .replace(/\\/g, '|')
-    .replace(/\^/g, '~');
+  const folded = value.replace(/[A-Z]/g, letter => String.fromCharCode(letter.charCodeAt(0) + 0x20));
+  const mapping = casemapping.toLowerCase();
+  if (mapping === 'ascii') return folded;
+  return folded.replace(/[\[\]\\^]/g, character => {
+    if (character === '[') return '{';
+    if (character === ']') return '}';
+    if (character === '\\') return '|';
+    // RFC1459's strict variant differs only here; unknown mapping strings keep
+    // the historical RFC1459 fallback behavior for existing callers.
+    if (character === '^' && mapping !== 'strict-rfc1459') return '~';
+    return character;
+  });
 }
 
 export type SaslMechanism = 'SCRAM-SHA-256' | 'PLAIN' | 'EXTERNAL';
@@ -383,28 +396,16 @@ export function selectSaslMechanism(
 
 export const MAX_STANDARD_REPLY_PARAMS = 32;
 export const MAX_STANDARD_REPLY_TOKEN_LENGTH = 4 * 1024;
-/** Larger ceiling for offline-memo body on NOTE MEMO. */
-const MAX_STANDARD_REPLY_MEMO_LENGTH = 128 * 1024;
 
 export function parseStandardReply(msg: IRCMessage): StandardReply | null {
-  if (msg.command !== 'NOTE' && msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
+  if (msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
   if (msg.params.length === 0 || msg.params.length > MAX_STANDARD_REPLY_PARAMS) return null;
   const command = msg.params[0]!;
   const code = msg.params[1] ?? '';
-  // Onyx Server's offline memo delivery predates standard-reply framing and puts
-  // `from <nick> :<text>` in the apparent code slot. Preserve the vault's
-  // bounded 64 KiB message path without granting the larger ceiling to error
-  // codes, notifications, or other standard replies.
-  const cmdUpper = command.toUpperCase();
-  const codeLimit = msg.command === 'NOTE'
-    && cmdUpper === 'MEMO'
-    && msg.params.length === 2
-    ? MAX_STANDARD_REPLY_MEMO_LENGTH
-    : MAX_STANDARD_REPLY_TOKEN_LENGTH;
   if (
     !command
     || command.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
-    || code.length > codeLimit
+    || code.length > MAX_STANDARD_REPLY_TOKEN_LENGTH
   ) return null;
 
   const description = msg.params.length > 2 ? msg.params[msg.params.length - 1]! : '';
@@ -463,7 +464,7 @@ function parseBoolToken(value: string): boolean | undefined {
 }
 
 /**
- * Parse the body of an ACCOUNTINFO reply (the NOTICE/NOTE trailing text) into
+ * Parse the body of an ACCOUNTINFO NOTICE into
  * structured fields. Returns null when no recognised `key=value` pair is found,
  * so callers can distinguish "this was an ACCOUNTINFO reply" from unrelated
  * account-channel notices. Tolerant of ordering and extra whitespace.
@@ -555,7 +556,7 @@ const MAX_SESSION_EXPIRES_DIGITS = 16;
  * Fail-closed predicate for Onyx SESSION TOKEN / MTOKEN bearers.
  *
  * A resume credential is a single wire atom: non-empty, ≤4 KiB, and free of
- * whitespace / C0 controls / DEL. Shared by the NOTE/NOTICE parsers, the live
+ * whitespace / C0 controls / DEL. Shared by the NOTICE parser, the live
  * client's `updateResumeTokens`, and the post-001 SESSION RESUME send path so
  * a hostile or buggy caller cannot install a multi-word or CRLF-laced token
  * that would become a colon-prefixed param or a second wire command.
@@ -573,7 +574,7 @@ export function isValidSessionCredential(token: string | null | undefined): toke
  *
  * Onyx Server emits mesh credentials as
  * `SESSION MTOKEN <hex> expires=<unix-seconds>` (NOTICE body). Local TOKEN
- * notes omit expiry. `expiresAt` is absolute unix seconds when advertised so
+ * replies omit expiry. `expiresAt` is absolute unix seconds when advertised so
  * the credentials store can purge stale portable state without decoding the
  * sealed value (session-resume-anywhere blueprint).
  */
@@ -615,47 +616,11 @@ function parseSessionCredentialAttrs(rest: string): { expiresAt?: number } | nul
   return expiresAt === undefined ? {} : { expiresAt };
 }
 
-/**
- * Parse `<token>[ key=value…]` into a SessionCredential. Fail-closed on a
- * multi-word free-text trailer (must be key=value attrs only).
- */
-function parseSessionCredentialBody(body: string): SessionCredential | null {
-  const trimmed = body.trim();
-  if (!trimmed) return null;
-  const sp = trimmed.search(/\s/u);
-  const token = sp === -1 ? trimmed : trimmed.slice(0, sp);
-  const rest = sp === -1 ? '' : trimmed.slice(sp + 1);
-  if (!isValidSessionCredential(token)) return null;
-  const attrs = parseSessionCredentialAttrs(rest);
-  if (attrs === null) return null;
-  return { token, ...attrs };
-}
-
 function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): SessionCredential | null {
-  const reply = parseStandardReply(msg);
-  if (reply?.kind === 'NOTE' && reply.command === 'SESSION' && reply.code === kind) {
-    // Standard-reply forms used by older deployments:
-    //   NOTE SESSION MTOKEN :<token>
-    //   NOTE SESSION MTOKEN <token> :expires=<unix>   (token in context)
-    //   NOTE SESSION MTOKEN :<token> expires=<unix>   (attrs in description)
-    if (reply.context.length > 0) {
-      const token = reply.context[0]!;
-      if (!isValidSessionCredential(token)) return null;
-      // Remaining context atoms + description are attribute candidates.
-      const attrParts = [...reply.context.slice(1)];
-      if (reply.description) attrParts.push(reply.description);
-      const attrs = parseSessionCredentialAttrs(attrParts.join(' '));
-      if (attrs === null) return null;
-      return { token, ...attrs };
-    }
-    return parseSessionCredentialBody(reply.description);
-  }
-
-  // Current Onyx Server emits session credentials as a traditional server NOTICE:
+  // Onyx Server emits session credentials as a traditional server NOTICE:
   //   :server NOTICE <nick> :SESSION TOKEN <token>
   //   :server NOTICE <nick> :SESSION MTOKEN <token> expires=<unix>
-  // while older deployments used NOTE SESSION TOKEN. Accept both envelopes;
-  // the store applies the NOTICE result only inside its server-source trust gate.
+  // The store applies the result only inside its server-source trust gate.
   if (msg.command !== 'NOTICE') return null;
   const body = msg.params[msg.params.length - 1]?.trim() ?? '';
   if (body.length > MAX_SESSION_CREDENTIAL_NOTICE_LENGTH) return null;
@@ -668,7 +633,7 @@ function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): Sess
   return { token, ...attrs };
 }
 
-export function parseSessionTokenNote(msg: IRCMessage): SessionCredential | null {
+export function parseSessionTokenCredential(msg: IRCMessage): SessionCredential | null {
   return parseSessionCredential(msg, 'TOKEN');
 }
 
@@ -676,12 +641,11 @@ export function parseSessionTokenNote(msg: IRCMessage): SessionCredential | null
  * Parse Onyx Server's mesh-sealed reclaim token, emitted alongside the local
  * TOKEN on mesh deployments. Wire forms:
  *   `:server NOTICE <nick> :SESSION MTOKEN <hex> expires=<unix>`  (current)
- *   `:server NOTE SESSION MTOKEN :<token>`                        (legacy)
  * Usable to reclaim/redirect the session from any node via
  * `SESSION RESUME <mtoken>`. When `expires=` is present it is absolute mesh
  * wall-clock unix seconds (12h portable lifetime on Onyx Server).
  */
-export function parseSessionMeshTokenNote(msg: IRCMessage): SessionCredential | null {
+export function parseSessionMeshTokenCredential(msg: IRCMessage): SessionCredential | null {
   return parseSessionCredential(msg, 'MTOKEN');
 }
 
@@ -740,7 +704,7 @@ export function parseMonitorNumeric(msg: IRCMessage): {
     return {
       kind: 'full',
       targets: parseMonitorTargets(targetParam),
-      limit,
+      ...(limit === undefined ? {} : { limit }),
       description: (msg.params[msg.params.length - 1] ?? '')
         .slice(0, MAX_MONITOR_NUMERIC_DESCRIPTION_LENGTH),
     };

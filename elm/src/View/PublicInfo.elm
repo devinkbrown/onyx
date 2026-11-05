@@ -137,31 +137,21 @@ view page =
         key =
             pageKey page
     in
-    div [ class ("ui-root r data-page public-info-page public-info-page--" ++ key) ]
-        [ div [ class "r-ground", attribute "aria-hidden" "true" ] []
-        , div [ class "r-flecks", attribute "aria-hidden" "true" ] []
-        , section [ class "r-wrap r-section public-info-article", attribute "aria-labelledby" ("public-info-" ++ key ++ "-heading") ]
-            [ div [ class "public-info-article__header" ]
-                [ p [ class "r-kicker" ] [ text "public contract" ]
-                , h1 [ id ("public-info-" ++ key ++ "-heading") ] [ text item.title ]
-                , p [ class "sub" ] [ text item.lede ]
-                ]
-            , article [ class "public-info-statement", attribute "aria-labelledby" ("public-info-" ++ key ++ "-statement") ]
-                [ p [ class "label" ] [ text "Onyx · public statement" ]
-                , h2 [ id ("public-info-" ++ key ++ "-statement") ] [ text "The statement" ]
-                , p [] [ text item.statement ]
-                ]
+    article [ class "site-article", attribute "aria-labelledby" ("public-info-" ++ key ++ "-heading") ]
+        [ p [ class "site-note" ] [ text "Public contract" ]
+        , h1 [ id ("public-info-" ++ key ++ "-heading"), class "site-display-sm" ] [ text item.title ]
+        , p [ class "site-lede" ] [ text item.lede ]
+        , section [ class "site-section", attribute "aria-labelledby" ("public-info-" ++ key ++ "-statement") ]
+            [ h2 [ id ("public-info-" ++ key ++ "-statement"), class "site-h2" ] [ text "The statement" ]
+            , p [] [ text item.statement ]
             ]
         ]
 
 
 contextLine : PublicInfoPage -> Html Msg
 contextLine page =
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text "Public contract" ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text (content page).title ]
-        ]
+    p [ class "site-context-line" ]
+        [ text ("Public contract — " ++ (content page).title) ]
 
 
 {-| The supporting-page route inside the public frame. -}

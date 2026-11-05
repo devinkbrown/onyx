@@ -126,11 +126,11 @@ test("plainRow carries reply context; hostile shapes read back empty", () => {
 test("plainRow carries tombstone flags; legacy rows read back clear", () => {
   assert.deepEqual(
     vaultStore.plainRow({ id: "x", target: "#c", from: "a", body: "b", at: 1, deleted: 1, redacted: 0 }),
-    { id: "x", target: "#c", from: "a", body: "b", at: 1, rowType: "msg", deleted: true, redacted: false, replyTo: null },
+    { id: "x", wireMessageId: null, target: "#c", from: "a", body: "b", at: 1, rowType: "msg", deleted: true, redacted: false, replyTo: null },
   );
   assert.deepEqual(
     vaultStore.plainRow(row("#c:1", 1000)),
-    { ...row("#c:1", 1000), rowType: "msg", deleted: false, redacted: false, replyTo: null },
+    { ...row("#c:1", 1000), wireMessageId: null, rowType: "msg", deleted: false, redacted: false, replyTo: null },
   );
 });
 

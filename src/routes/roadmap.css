@@ -157,6 +157,9 @@
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
+  .roadmap-summary,
+  .roadmap-note p { font-size: 16px !important; line-height: 1.5; }
+
   .roadmap-page,
   .roadmap-page .r-wrap,
   .roadmap-grid,

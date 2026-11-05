@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { IRCClient } from '../irc/client';
 import {
   OpcodecWasm, CadenceVoxEncoder, CadenceVisEncoder,
   rgbaToYuv420,
@@ -44,7 +43,7 @@ import type { IRCMessage } from '../irc/types';
 import type {
   CallState, VoiceCallState, MediaKind,
   CadencePeerState, CadenceRoomStats, NetworkQualityTier,
-  CadenceMediaCallbacks, CadenceChannelInfo,
+  CadenceMediaCallbacks, CadenceChannelInfo, MediaIdentityAdapter, MediaIdentityContext, MediaPublicIdentity,
 } from './types';
 
 // WS media-plane Cadence band ids: media bands are >= 64. band_id discriminates
@@ -72,6 +71,26 @@ const LARGE_INLINE_MEDIA_SUBTYPES = new Set([
   'VOICE_DATA',
   'VIDEO_DATA',
 ]);
+
+interface AudioCapturePipeline {
+  readonly context: AudioContext;
+  encoder: CadenceVoxEncoder;
+  quality: CadenceVoxQuality;
+  noiseSuppress: boolean;
+  readonly source: MediaStreamAudioSourceNode;
+  readonly processor: AudioWorkletNode | ScriptProcessorNode;
+  activate(): void;
+  dispose(): void;
+}
+
+interface StagedAudioOperation {
+  readonly cancelled: Promise<false>;
+  readonly cancel: () => void;
+  readonly transfer: () => void;
+  readonly setPipeline: (pipeline: AudioCapturePipeline) => void;
+  readonly setCleanup: (cleanup: () => void) => void;
+  readonly isCancelled: () => boolean;
+}
 
 function validMediaToken(value: string, maxLength: number): boolean {
   return value.length > 0
@@ -328,8 +347,19 @@ type LocalRecordingSession = {
   blob: Blob | null;
 };
 
+/** Narrow private protocol adapter implemented by the authenticated transport
+ * owner. Cadence does not cast a different socket implementation to IRCClient. */
+export interface CadenceMediaClientPort {
+  readonly currentNick: string;
+  readonly extraMessageHandlers: Set<(message: IRCMessage) => void>;
+  readonly binaryHandlers: Set<(data: Uint8Array) => void>;
+  sendRaw(command: string, ...params: string[]): boolean;
+  sendBinary(bytes: Uint8Array): boolean;
+  send?(line: string): boolean;
+}
+
 export class CadenceMediaEngine {
-  private client: IRCClient | null = null;
+  private client: CadenceMediaClientPort | null = null;
   private readonly cb: CadenceMediaCallbacks;
   private readonly defaultKind: MediaKind;
 
@@ -343,7 +373,7 @@ export class CadenceMediaEngine {
   private wsVidSeq = 0;
   private readonly streamRouter = new MediaStreamRouter();
   /** Client this engine's media handlers are currently registered on. */
-  private boundMediaClient: IRCClient | null = null;
+  private boundMediaClient: CadenceMediaClientPort | null = null;
   // Stable references so they can be added to / removed from the client's
   // subscriber sets across setClient transitions.
   private readonly onMediaServerMessageBound = (msg: IRCMessage) => this.handleMediaServerMessage(msg);
@@ -363,22 +393,27 @@ export class CadenceMediaEngine {
 
   private localStream: MediaStream | null = null;
   private localKind:   MediaKind | null   = null;
+  private screenShareStream: MediaStream | null = null;
   private activeRoom:  string | null      = null;
   private callState:   CallState          = 'idle';
   private callWith     = '';
 
   private audEnc: CadenceVoxEncoder | null = null;
+  private localMuted = false;
   private vidEnc: CadenceVisEncoder | null = null;
   private localVideoProfile: VideoCaptureProfile | null = null;
 
   private audioCtx:     AudioContext | null = null;
   private audioWorklet: AudioWorkletNode | ScriptProcessorNode | null = null;
+  private audioPipeline: AudioCapturePipeline | null = null;
+  private stagedAudioOperations = new Set<StagedAudioOperation>();
   private vidFrameTimer: ReturnType<typeof setInterval> | null = null;
   private vidCanvas:    HTMLCanvasElement | null = null;
   private vidCapture:   HTMLVideoElement | null  = null;
 
   /* Worker-path state (Chromium: MediaStreamTrackProcessor + OffscreenCanvas) */
   private vidWorker:    Worker | null = null;
+  private videoOperationGeneration = 0;
   private workerReady   = false;
   /* Cloned video track retained on the MAIN thread in the readable-stream
    * worker path (MediaStreamTrackProcessor consumes it here; only its
@@ -439,6 +474,12 @@ export class CadenceMediaEngine {
   private readonly callGuard = new TeardownGuard();
   private mediaIdentity: DeviceKeys | null = null;
   private mediaIdentityPromise: Promise<DeviceKeys> | null = null;
+  private scopedPublicIdentity: MediaPublicIdentity | null = null;
+  private scopedPublicIdentityPromise: Promise<MediaPublicIdentity> | null = null;
+  private readonly identityAdapter: MediaIdentityAdapter | null;
+  private readonly identityContextProvider: (() => MediaIdentityContext | null) | null;
+  private callRef = crypto.randomUUID();
+  private callOperationGeneration = 0;
   private incomingKind: MediaKind;
 
   /* PTT */
@@ -452,6 +493,8 @@ export class CadenceMediaEngine {
 
   /* Adaptive network */
   private suggestedBps     = 0;
+  private observedNetworkTier: NetworkQualityTier | null = null;
+  private qualityPolicy: import('./types').MediaQualityPolicy = 'auto';
   private networkTier: NetworkQualityTier = 0;
   private prevNetworkTier: NetworkQualityTier = 0;
   private videoSkipCount   = 0;
@@ -460,10 +503,12 @@ export class CadenceMediaEngine {
   private lastLossRate  = 0;
   private lastDecodeAt  = 0;
 
-  constructor(callbacks: CadenceMediaCallbacks, options: { kind: MediaKind } = { kind: 'video' }) {
+  constructor(callbacks: CadenceMediaCallbacks, options: { kind: MediaKind; identityAdapter?: MediaIdentityAdapter; identityContext?: () => MediaIdentityContext | null } = { kind: 'video' }) {
     this.cb          = callbacks;
     this.defaultKind = options.kind;
     this.incomingKind = options.kind;
+    this.identityAdapter = options.identityAdapter ?? null;
+    this.identityContextProvider = options.identityContext ?? null;
 
     this.registry.onPeerStateChanged = s => this.cb.onPeerState?.(s);
     this.registry.onPeerLeft         = n => this.cb.onPeerLeft(n);
@@ -475,7 +520,7 @@ export class CadenceMediaEngine {
     highResolutionCapability.prime();
   }
 
-  setClient(client: IRCClient | null) {
+  setClient(client: CadenceMediaClientPort | null) {
     const prev = this.client;
     const replacedClient = Boolean(prev && client && prev !== client);
     this.client = client;
@@ -501,6 +546,7 @@ export class CadenceMediaEngine {
       setTimeout(() => {
         if (this.client && this.activeRoom === room) {
           this.mediaframeCmd(room, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+          this.publishMuteState(room);
           if (this.localKind === 'video' || this.localKind === 'screen') {
             const profile = this.localVideoProfile ?? videoProfileFor(this.localKind);
             this.mediaframeCmd(
@@ -514,6 +560,9 @@ export class CadenceMediaEngine {
       }, 500);
     }
   }
+
+  /** Private binary ingress from the authenticated physical transport. */
+  receiveBinary(data: Uint8Array): void { this.handleMediaDatagram(data); }
 
   getNetworkStats(): {
     suggestedBps: number; tier: NetworkQualityTier;
@@ -533,9 +582,37 @@ export class CadenceMediaEngine {
     };
   }
 
+  getMediaCounters() {
+    const playout = this.registry.getAudioPlayoutCounters();
+    return {
+      audioUnderruns: playout.underruns, queuedAudioFrames: playout.queued,
+      lateAudioFrames: playout.late, droppedAudioFrames: playout.dropped,
+      droppedVideoFrames: null,
+      encodedAudioFrames: this.audEnc?.framesEncoded ?? null,
+      decodedAudioFrames: this.registry.totalFramesDecoded(),
+      encodedVideoFrames: this.vidEnc?.framesEncoded ?? null,
+      decodedVideoFrames: this.registry.totalVideoFramesDecoded(),
+    };
+  }
+
   getLocalStream()  { return this.localStream; }
   getLocalKind()    { return this.localKind; }
   getCallState()    { return { callState: this.callState, callWith: this.callWith, callChannel: this.activeRoom }; }
+  getCallRef() { return this.callRef; }
+  setQualityPolicy(policy: import('./types').MediaQualityPolicy): void {
+    this.qualityPolicy = policy;
+    this.applyQualityTier(this.observedNetworkTier ?? this.networkTier);
+    if (policy === 'audio-priority' && (this.vidEnc || this.vidWorker)) this.stopVideoCapture();
+  }
+  getQualityObservation(): import('./types').MediaQualityObservation {
+    const inCall = this.callState === 'in_call';
+    const encodingVideo = !!(this.vidEnc || this.vidWorker);
+    return {
+      observedNetworkTier: this.observedNetworkTier,
+      observedAudioQuality: this.audEnc && this.audioQuality !== 3 ? this.audioQuality : null,
+      videoState: encodingVideo ? 'encoding' : inCall && this.audEnc ? 'audio-only' : inCall ? 'unknown' : 'inactive',
+    };
+  }
 
   getPeers(): Map<string, CadencePeerState> {
     const out = new Map<string, CadencePeerState>();
@@ -545,8 +622,133 @@ export class CadenceMediaEngine {
 
   getPresenceList(): string[] { return Array.from(this.presenceList); }
 
-  setOutput(deviceId: string | null, volumePercent: number): void {
-    this.registry.setOutput(deviceId, volumePercent / 100);
+  async setOutput(deviceId: string | null, volumePercent: number): Promise<import('./PeerRegistry').AudioOutputEffect> {
+    return this.registry.setOutput(deviceId, volumePercent / 100);
+  }
+  getOutputEffect(): import('./PeerRegistry').AudioOutputEffect { return this.registry.outputEffect(); }
+
+  async recoverAudio(): Promise<{ readonly state: 'applied' | 'deferred' | 'rejected'; readonly reason: string | null }> {
+    const captureContext = this.audioCtx;
+    const speakingContext = this.speakingCtx;
+    const contexts = [captureContext, speakingContext].filter((context): context is AudioContext => !!context);
+    try {
+      // Start every owned resume in this call stack so browser transient
+      // activation reaches capture, VAD, and remote playout contexts together.
+      const captureResumes = contexts.map(context => {
+        if (context.state === 'closed') return Promise.reject(new Error('closed'));
+        try { return context.resume(); } catch (error) { return Promise.reject(error); }
+      });
+      const playoutRecovery = this.registry.recoverAudio();
+      await Promise.all(captureResumes);
+      const localContextsStillRunning = this.audioCtx === captureContext && this.speakingCtx === speakingContext
+        && contexts.every(context => context.state === 'running');
+      if (!localContextsStillRunning) return { state: 'rejected', reason: 'capture-context-changed' };
+      const output = await playoutRecovery;
+      if (output.state === 'rejected') return output;
+      if (output.state === 'deferred' && output.reason !== null) return output;
+      if (this.audioCtx !== captureContext || this.speakingCtx !== speakingContext
+        || contexts.some(context => context.state !== 'running')) return { state: 'rejected', reason: 'capture-context-changed' };
+      if (!contexts.length && output.state === 'deferred') return { state: 'deferred', reason: null };
+      return { state: 'applied', reason: null };
+    } catch { return { state: 'rejected', reason: 'capture-context-resume-failed' }; }
+  }
+
+  /** Replace only the active microphone track while keeping the call, video
+   * publication, and mute state. The old microphone is stopped after the new
+   * encoder source is running successfully. */
+  async replaceAudioInput(stream: MediaStream, preacquiredContext: AudioContext | null): Promise<boolean> {
+    const prior = this.localStream;
+    const room = this.activeRoom;
+    const priorKind = this.localKind;
+    if (this.callState !== 'in_call' || !room || !prior || !priorKind || priorKind === 'screen') return false;
+    const newAudioTracks = stream.getAudioTracks().filter(track => track.readyState === 'live');
+    const replacement = newAudioTracks[0];
+    if (!replacement) return false;
+    const oldAudioTracks = prior.getAudioTracks();
+    const oldVideoTracks = prior.getVideoTracks().filter(track => track.readyState === 'live');
+    const combined = new MediaStream([replacement, ...oldVideoTracks]);
+    const staged = this.registerStagedAudioOperation(stream.getTracks(), preacquiredContext);
+    const operation = this.callOperationGeneration;
+    const socket = this.client;
+    const current = () => this.callOperationGeneration === operation && this.activeRoom === room && this.client === socket && this.callState === 'in_call';
+    let transferred = false;
+    try {
+      const preparation = this.prepareAudioPipeline(combined, preacquiredContext, () => current() && !staged.isCancelled(), staged.setCleanup)
+        .then(pipeline => { if (staged.isCancelled()) { pipeline.dispose(); return null; } staged.setPipeline(pipeline); return pipeline; }, error => {
+          if (staged.isCancelled()) return null;
+          throw error;
+        });
+      const pipeline = await Promise.race([preparation, staged.cancelled]);
+      if (!pipeline || staged.isCancelled() || !current()) { staged.cancel(); return false; }
+      // Perform all allocations that can fail before transferring stream
+      // ownership. The old encoder and local stream remain live on failure.
+      this.reconcileAudioPipelineQuality(pipeline);
+      // Read mute from the still-owned old track at the exact ownership
+      // transfer point, after all setup awaits have completed.
+      replacement.enabled = !this.localMuted && (oldAudioTracks.length === 0 || oldAudioTracks.every(track => track.enabled));
+      if (!current() || staged.isCancelled()) return false;
+      this.localStream = combined;
+      this.localKind = priorKind;
+      staged.transfer();
+      this.installAudioPipeline(pipeline);
+      transferred = true;
+      combined.getTracks().forEach(track => track.addEventListener('ended', () => {
+        if (this.localStream !== combined) return;
+        if (track.kind === 'audio') {
+          this.stopAudioCapture();
+          this.cb.onError('Local microphone ended');
+        }
+        if (combined.getTracks().every(item => item.readyState === 'ended')) this.releaseMedia();
+      }, { once: true }));
+      oldAudioTracks.forEach(track => { try { track.stop(); } catch { /* best-effort */ } });
+      for (const track of stream.getTracks()) if (track !== replacement) { try { track.stop(); } catch { /* best-effort */ } }
+      try { this.cb.onLocalStream(combined); } catch { /* isolate observers from media ownership */ }
+      if (!current()) return false;
+      this.startSpeakingMeter(combined);
+      return true;
+    } catch {
+      if (!transferred) {
+        staged.cancel();
+      }
+      return false;
+    }
+  }
+
+  private registerStagedAudioOperation(ownedTracks: readonly MediaStreamTrack[], context: AudioContext | null): StagedAudioOperation {
+    let cancelled = false;
+    let pipeline: AudioCapturePipeline | null = null;
+    let cleanup: (() => void) | null = null;
+    let settle!: (value: false) => void;
+    const cancelledPromise = new Promise<false>(resolve => { settle = resolve; });
+    let operation!: StagedAudioOperation;
+    const stopOwnedTracks = () => { for (const track of ownedTracks) { try { track.stop(); } catch { /* best-effort */ } } };
+    const closeContext = () => { if (context && context.state !== 'closed') void context.close().catch(() => {}); };
+    operation = {
+      cancelled: cancelledPromise,
+      isCancelled: () => cancelled,
+      setPipeline(value) { if (cancelled) value.dispose(); else pipeline = value; },
+      setCleanup(value) { if (cancelled) value(); else cleanup = value; },
+      cancel: () => {
+        if (cancelled) return;
+        cancelled = true;
+        this.stagedAudioOperations.delete(operation);
+        try { pipeline?.dispose(); } catch { /* staged resources are best-effort */ }
+        try { cleanup?.(); } catch { /* partial staged resources are best-effort */ }
+        pipeline = null; cleanup = null;
+        stopOwnedTracks(); closeContext(); settle(false);
+      },
+      transfer: () => {
+        if (cancelled) return;
+        this.stagedAudioOperations.delete(operation);
+        pipeline = null; cleanup = null;
+      },
+    };
+    this.stagedAudioOperations.add(operation);
+    return operation;
+  }
+
+  private cancelStagedAudioOperations(): void {
+    for (const operation of [...this.stagedAudioOperations]) operation.cancel();
   }
 
   setDeafened(deafened: boolean): void {
@@ -564,7 +766,37 @@ export class CadenceMediaEngine {
     }
   }
 
+  private identityContext(): MediaIdentityContext | null {
+    const context = this.identityContextProvider?.() ?? null;
+    return context && context.callRef === this.callRef && this.activeRoom
+      && context.conversationId.toLowerCase() === this.activeRoom.toLowerCase() ? context : null;
+  }
+  private sameIdentityContext(a: MediaIdentityContext | null, b: MediaIdentityContext | null): boolean {
+    return !!a && !!b && a.callRef === b.callRef && a.conversationId === b.conversationId
+      && a.owner.ownerRef === b.owner.ownerRef && a.owner.accountGeneration === b.owner.accountGeneration
+      && a.owner.connectionGeneration === b.owner.connectionGeneration;
+  }
+
+  private ensureScopedPublicIdentity(): Promise<MediaPublicIdentity> {
+    if (!this.identityAdapter) return Promise.reject(new Error('Scoped media identity adapter unavailable'));
+    const context = this.identityContext();
+    if (!context) return Promise.reject(new Error('Scoped media identity context unavailable'));
+    if (this.scopedPublicIdentity && this.scopedPublicIdentity.directoryRevision) return Promise.resolve(this.scopedPublicIdentity);
+    if (!this.scopedPublicIdentityPromise) {
+      const room = this.activeRoom;
+      const callRef = this.callRef;
+      this.scopedPublicIdentityPromise = this.identityAdapter.getPublicIdentity(context).then(identity => {
+        if (!identity || !identity.deviceId || !identity.directoryRevision || identity.ecdhPublicRaw.byteLength !== 65 || identity.signingPublicRaw.byteLength !== MEDIA_SIGNING_PUBLIC_BYTES) throw new Error('Scoped media identity unavailable');
+        if (this.activeRoom !== room || this.callRef !== callRef || !this.sameIdentityContext(this.identityContext(), context)) throw new Error('Media identity context changed');
+        this.scopedPublicIdentity = identity;
+        return identity;
+      }).catch(error => { this.scopedPublicIdentityPromise = null; throw error; });
+    }
+    return this.scopedPublicIdentityPromise;
+  }
+
   private ensureMediaIdentity(): Promise<DeviceKeys> {
+    if (this.identityAdapter) return Promise.reject(new Error('Legacy media identity is disabled for scoped calls'));
     if (this.mediaIdentity) return Promise.resolve(this.mediaIdentity);
     // Reuse the account-published DM ECDH identity. A separate, unadvertised
     // media key would let a malicious relay substitute both handshake halves.
@@ -581,6 +813,12 @@ export class CadenceMediaEngine {
         });
     }
     return this.mediaIdentityPromise;
+  }
+
+  private async ensureIdentityReady(): Promise<void> {
+    if (this.identityAdapter) { await this.ensureScopedPublicIdentity(); return; }
+    await this.ensureMediaIdentity();
+    await this.ensureMediaSigningIdentity();
   }
 
   getScreenStream(nick: string): MediaStream | null {
@@ -629,6 +867,7 @@ export class CadenceMediaEngine {
     if (this.localStream && this.localStream !== stream) this.releaseMedia();
     this.localStream = stream;
     this.localKind = kind;
+    this.applyLocalMute(stream);
     this.cb.onLocalStream(stream);
     stream.getTracks().forEach((t) => {
       t.addEventListener('ended', () => {
@@ -648,7 +887,9 @@ export class CadenceMediaEngine {
     quality: StreamQuality = '4k60',
     broadcast = false,
     selectedProfile?: VideoCaptureProfile,
+    isOperationCurrent: () => boolean = () => true,
   ): Promise<MediaStream> {
+    if (!isOperationCurrent()) throw new Error('Media call operation retired');
     if (this.localStream && this.localKind === kind) return this.localStream;
     if (this.localStream) this.releaseMedia();
     if (!this.mediaAllowed(kind)) throw new Error(`${kind} media is disabled`);
@@ -666,6 +907,7 @@ export class CadenceMediaEngine {
         },
         audio: true,
       });
+      if (!isOperationCurrent()) { stream.getTracks().forEach(track => track.stop()); throw new Error('Media call operation retired'); }
       return this.adoptLocalStream(stream, kind);
     }
 
@@ -675,13 +917,13 @@ export class CadenceMediaEngine {
     const attempts: MediaStreamConstraints[] = [
       {
         audio: {
-          deviceId: settings?.inputDeviceId ? { exact: settings.inputDeviceId } : undefined,
+          ...(settings?.inputDeviceId ? { deviceId: { exact: settings.inputDeviceId } } : {}),
           noiseSuppression: settings?.noiseSuppression ?? true,
           echoCancellation: settings?.echoCancellation ?? true,
         },
         video: kind === 'video'
           ? {
-              deviceId: settings?.cameraDeviceId ? { exact: settings.cameraDeviceId } : undefined,
+              ...(settings?.cameraDeviceId ? { deviceId: { exact: settings.cameraDeviceId } } : {}),
               width: { ideal: profile.width, max: profile.width },
               height: { ideal: profile.height, max: profile.height },
               frameRate: { ideal: profile.fps, max: profile.fps },
@@ -711,6 +953,7 @@ export class CadenceMediaEngine {
     for (const constraints of attempts) {
       try {
         const stream = await devs.getUserMedia(constraints);
+        if (!isOperationCurrent()) { stream.getTracks().forEach(track => track.stop()); throw new Error('Media call operation retired'); }
         return this.adoptLocalStream(stream, kind);
       } catch (error) {
         lastError = error;
@@ -724,7 +967,7 @@ export class CadenceMediaEngine {
   private releaseMedia() {
     if (this.callState === 'in_call' && this.activeRoom) {
       const ch = this.activeRoom;
-      if (this.localKind === 'voice' || this.localKind === 'video') this.mediaframeCmd(ch, 'VOICE_LEAVE');
+      if (this.screenShareStream || this.localKind === 'voice' || this.localKind === 'video') this.mediaframeCmd(ch, 'VOICE_LEAVE');
       if (this.localKind === 'video') this.mediaframeCmd(ch, 'VIDEO_LEAVE');
       if (this.localKind === 'screen') this.mediaframeCmd(ch, 'VIDEO_LEAVE');
     }
@@ -734,6 +977,8 @@ export class CadenceMediaEngine {
     this.localStream?.getTracks().forEach(t => t.stop());
     this.localStream = null;
     this.localKind   = null;
+    this.screenShareStream?.getTracks().forEach(t => t.stop());
+    this.screenShareStream = null;
     this.localVideoProfile = null;
     this.cb.onLocalStream(null);
   }
@@ -742,69 +987,157 @@ export class CadenceMediaEngine {
   // Audio capture + encode loop
   // ----------------------------------------------------------------
 
-  private async startAudioCapture(stream: MediaStream) {
-    this.stopAudioCapture();
-    let wasm: OpcodecWasm;
+  private async prepareAudioPipeline(stream: MediaStream, preacquiredContext: AudioContext | null | undefined,
+    isOperationCurrent: () => boolean, registerCleanup?: (cleanup: () => void) => void): Promise<AudioCapturePipeline> {
+    // Retain a gesture-created context before ensureWasm's first await so a
+    // call retirement can close it even while codec setup is pending.
+    let context: AudioContext | null = preacquiredContext ?? null;
+    let encoder: CadenceVoxEncoder | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let processor: AudioWorkletNode | ScriptProcessorNode | null = null;
+    let quality: CadenceVoxQuality = this.audioQuality;
+    let noiseSuppress = true;
+    let activated = false;
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      activated = false;
+      try { processor?.disconnect(); } catch { /* already disconnected */ }
+      if (processor && 'port' in processor) processor.port.onmessage = null;
+      if (processor && 'onaudioprocess' in processor) processor.onaudioprocess = null;
+      try { source?.disconnect(); } catch { /* already disconnected */ }
+      if (context && context.state !== 'closed') void context.close().catch(() => {});
+      try { encoder?.destroy(); } catch { /* encoder teardown is best effort */ }
+    };
+    registerCleanup?.(dispose);
     try {
-      wasm = await this.ensureWasm();
-      const mq = this.cb.getMediaQuality?.();
-      const aq: 0 | 1 | 2 = mq?.audioQuality ?? (AUDIO_QUALITY as 0 | 1 | 2);
-      const ns2 = mq?.noiseSuppress ?? true;
-      this.audEnc = wasm.audioEncoder(SAMPLE_RATE, aq, ns2);
-    } catch (err) {
-      this.cb.onError('Codec unavailable — audio capture disabled');
-      this.setIdle();
-      // Rethrow so joinVoice/joinVideo roll the provisional call panel back
-      // instead of looking "in call" with no media path.
-      throw err instanceof Error ? err : new Error('Codec unavailable — audio capture disabled');
-    }
-    const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
-    this.audioCtx = ctx;
-    const src = ctx.createMediaStreamSource(stream);
-    const FRAME = CADENCEVOX_FRAME_48K * AUDIO_CHANNELS;
-    let useWorklet = false;
-    try {
-      await ctx.audioWorklet.addModule(
-        'data:application/javascript,' + encodeURIComponent(AUDIO_WORKLET_CODE),
-      );
-      useWorklet = true;
-    } catch { /* fallback */ }
-
-    if (useWorklet) {
-      const node = new AudioWorkletNode(ctx, 'cadencevox-capture', {
-        processorOptions: { frameSize: FRAME },
-      });
-      node.port.onmessage = (e: MessageEvent) => this.onAudioFrame(e.data as Int16Array);
-      src.connect(node);
-      this.audioWorklet = node;
-    } else {
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
-      // Persistent mono accumulator. Each callback delivers up to 4096
-      // samples; we must drain ALL complete 960-sample frames and keep the
-      // remainder, not emit one frame and discard the rest (which dropped
-      // ~76% of audio at a 4096 buffer size).
-      let acc = new Float32Array(0);
-      proc.onaudioprocess = (e) => {
-        const ch0 = e.inputBuffer.getChannelData(0);
-        const merged = new Float32Array(acc.length + ch0.length);
-        merged.set(acc, 0); merged.set(ch0, acc.length);
-        acc = merged;
-        let off = 0;
-        while (acc.length - off >= CADENCEVOX_FRAME_48K) {
-          const i16 = new Int16Array(FRAME);
-          for (let s = 0; s < CADENCEVOX_FRAME_48K; s++) {
-            const v = Math.max(-1, Math.min(1, acc[off + s]!));
-            i16[s * 2]     = v * 32767;
-            i16[s * 2 + 1] = v * 32767;
+      if (!isOperationCurrent()) throw new Error('Media call operation retired');
+      let wasm: OpcodecWasm;
+      try {
+        wasm = await this.ensureWasm();
+        if (!isOperationCurrent()) throw new Error('Media call operation retired');
+        const mq = this.cb.getMediaQuality?.();
+        quality = this.audioQuality;
+        noiseSuppress = mq?.noiseSuppress ?? true;
+        encoder = wasm.audioEncoder(SAMPLE_RATE, quality, noiseSuppress);
+      } catch {
+        if (!isOperationCurrent()) throw new Error('Media call operation retired');
+        this.cb.onError('Codec unavailable — audio capture disabled');
+        throw new Error('Codec unavailable — audio capture disabled');
+      }
+      if (!isOperationCurrent()) throw new Error('Media call operation retired');
+      context = preacquiredContext ?? new AudioContext({ sampleRate: SAMPLE_RATE });
+      if (context.state === 'closed') throw new Error('Gesture-authorized audio context is closed');
+      try { await context.resume(); }
+      catch { throw new Error('Audio context could not resume'); }
+      if (!isOperationCurrent() || context.state !== 'running') throw new Error('Audio context could not resume');
+      source = context.createMediaStreamSource(stream);
+      const frameSize = CADENCEVOX_FRAME_48K * AUDIO_CHANNELS;
+      let useWorklet = false;
+      try {
+        await context.audioWorklet.addModule('data:application/javascript,' + encodeURIComponent(AUDIO_WORKLET_CODE));
+        if (!isOperationCurrent()) throw new Error('Media call operation retired');
+        useWorklet = true;
+      } catch (error) { if (!isOperationCurrent()) throw error; /* ScriptProcessor fallback */ }
+      if (!isOperationCurrent()) throw new Error('Media call operation retired');
+      if (useWorklet) {
+        const node = new AudioWorkletNode(context, 'cadencevox-capture', { processorOptions: { frameSize } });
+        processor = node;
+        node.port.onmessage = event => { if (activated && this.audioPipeline?.processor === node) this.onAudioFrame(event.data as Int16Array); };
+        source.connect(node);
+      } else {
+        const proc = context.createScriptProcessor(4096, 1, 1);
+        processor = proc;
+        let accumulator = new Float32Array(0);
+        proc.onaudioprocess = event => {
+          if (!activated || this.audioPipeline?.processor !== proc) return;
+          const channel = event.inputBuffer.getChannelData(0);
+          const merged = new Float32Array(accumulator.length + channel.length);
+          merged.set(accumulator, 0); merged.set(channel, accumulator.length); accumulator = merged;
+          let offset = 0;
+          while (accumulator.length - offset >= CADENCEVOX_FRAME_48K) {
+            const samples = new Int16Array(frameSize);
+            for (let sample = 0; sample < CADENCEVOX_FRAME_48K; sample++) {
+              const value = Math.max(-1, Math.min(1, accumulator[offset + sample]!));
+              samples[sample * 2] = value * 32767; samples[sample * 2 + 1] = value * 32767;
+            }
+            this.onAudioFrame(samples); offset += CADENCEVOX_FRAME_48K;
           }
-          this.onAudioFrame(i16);
-          off += CADENCEVOX_FRAME_48K;
-        }
-        acc = acc.slice(off);
+          accumulator = accumulator.slice(offset);
+        };
+        source.connect(proc); proc.connect(context.destination);
+      }
+      if (!isOperationCurrent()) throw new Error('Media call operation retired');
+      const candidate: AudioCapturePipeline = {
+        context: context!, get encoder() { return encoder!; }, set encoder(value) { encoder = value; },
+        quality, noiseSuppress,
+        source: source!, processor: processor!,
+        activate() { activated = true; }, dispose,
       };
-      src.connect(proc); proc.connect(ctx.destination);
-      this.audioWorklet = proc;
+      return candidate;
+    } catch (error) {
+      dispose();
+      if (error instanceof Error && error.message === 'Audio context could not resume' && isOperationCurrent()) this.cb.onError('Audio context could not resume');
+      throw error;
     }
+  }
+
+  private installAudioPipeline(pipeline: AudioCapturePipeline): void {
+    const previous = this.audioPipeline;
+    this.audioPipeline = pipeline;
+    this.audioCtx = pipeline.context;
+    this.audioWorklet = pipeline.processor;
+    this.audEnc = pipeline.encoder;
+    pipeline.activate();
+    try { previous?.dispose(); } catch { /* old pipeline teardown is best effort */ }
+  }
+
+  /** Bring a staged encoder up to the policy that is current at the exact
+   * ownership transfer point. Network observations may change while browser
+   * capture setup is awaiting permission/context/worklet readiness. */
+  private reconcileAudioPipelineQuality(pipeline: AudioCapturePipeline): void {
+    const targetQuality = this.audioQuality;
+    const targetNoiseSuppression = this.cb.getMediaQuality?.()?.noiseSuppress ?? pipeline.noiseSuppress;
+    if (pipeline.quality === targetQuality && pipeline.noiseSuppress === targetNoiseSuppression) return;
+    const wasm = this.wasm;
+    if (!wasm) throw new Error('Codec unavailable — audio capture disabled');
+    const next = wasm.audioEncoder(SAMPLE_RATE, targetQuality, targetNoiseSuppression);
+    const previous = pipeline.encoder;
+    pipeline.encoder = next;
+    pipeline.quality = targetQuality;
+    pipeline.noiseSuppress = targetNoiseSuppression;
+    try { previous.destroy(); } catch { /* staged encoder teardown is best effort */ }
+  }
+
+  private async startAudioCapture(stream: MediaStream, preacquiredContext?: AudioContext | null,
+    isOperationCurrent: () => boolean = () => true, retireCallOnCodecFailure = true): Promise<void> {
+    if (!isOperationCurrent()) return;
+    const staged = this.registerStagedAudioOperation(stream.getTracks(), preacquiredContext ?? null);
+    let pipeline: AudioCapturePipeline | null;
+    try {
+      const preparation = this.prepareAudioPipeline(stream, preacquiredContext, () => isOperationCurrent() && !staged.isCancelled(), staged.setCleanup)
+        .then(value => { if (staged.isCancelled()) { value.dispose(); return null; } staged.setPipeline(value); return value; }, error => {
+          if (staged.isCancelled()) return null;
+          throw error;
+        });
+      const prepared = await Promise.race([preparation, staged.cancelled]);
+      pipeline = prepared === false ? null : prepared;
+    }
+    catch (error) {
+      staged.cancel();
+      if (isOperationCurrent() && retireCallOnCodecFailure && error instanceof Error && error.message.startsWith('Codec unavailable')) this.setIdle();
+      throw error;
+    }
+    if (!pipeline || staged.isCancelled() || !isOperationCurrent()) { staged.cancel(); return; }
+    try { this.reconcileAudioPipelineQuality(pipeline); }
+    catch (error) {
+      staged.cancel();
+      if (retireCallOnCodecFailure && error instanceof Error && error.message.startsWith('Codec unavailable')) this.setIdle();
+      throw error;
+    }
+    staged.transfer();
+    this.installAudioPipeline(pipeline);
   }
 
   private onAudioFrame(i16: Int16Array) {
@@ -815,12 +1148,20 @@ export class CadenceMediaEngine {
   }
 
   private stopAudioCapture() {
-    if (this.audioWorklet) (this.audioWorklet as AudioWorkletNode | ScriptProcessorNode).disconnect();
+    const pipeline = this.audioPipeline;
+    const processor = this.audioWorklet;
+    const context = this.audioCtx;
+    const encoder = this.audEnc;
+    this.audioPipeline = null;
     this.audioWorklet = null;
-    this.audioCtx?.close().catch(() => {});
     this.audioCtx = null;
-    this.audEnc?.destroy();
     this.audEnc = null;
+    if (pipeline) pipeline.dispose();
+    else {
+      try { processor?.disconnect(); } catch { /* already disconnected */ }
+      void context?.close().catch(() => {});
+      encoder?.destroy();
+    }
   }
 
   // ----------------------------------------------------------------
@@ -851,14 +1192,17 @@ export class CadenceMediaEngine {
   private async startVideoCapture(
     stream: MediaStream,
     profile: VideoCaptureProfile = CAMERA_PROFILE,
+    isCallCurrent: () => boolean = () => true,
   ) {
+    if (!isCallCurrent()) return;
     this.stopVideoCapture();
+    const generation = this.videoOperationGeneration;
     this.localVideoProfile = profile;
 
     if (CadenceMediaEngine.supportsWorkerCapture()) {
-      await this.startVideoCaptureWorker(stream, profile);
+      await this.startVideoCaptureWorker(stream, profile, generation, isCallCurrent);
     } else {
-      await this.startVideoCaptureFallback(stream, profile);
+      await this.startVideoCaptureFallback(stream, profile, generation, isCallCurrent);
     }
   }
 
@@ -867,7 +1211,10 @@ export class CadenceMediaEngine {
   private async startVideoCaptureWorker(
     stream: MediaStream,
     profile: VideoCaptureProfile,
+    generation: number,
+    isCallCurrent: () => boolean,
   ): Promise<void> {
+    if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
     /* Pre-load WASM on the main thread too (for VIDEO_KEYREQ fallback and
      * any future main-thread codec use). Fire-and-forget. */
     this.ensureWasm().catch(() => {});
@@ -875,7 +1222,7 @@ export class CadenceMediaEngine {
     const videoTrack = stream.getVideoTracks()[0];
     if (!videoTrack) {
       /* No video track — fall back silently. */
-      await this.startVideoCaptureFallback(stream, profile);
+      await this.startVideoCaptureFallback(stream, profile, generation, isCallCurrent);
       return;
     }
 
@@ -889,6 +1236,7 @@ export class CadenceMediaEngine {
 
     /* Handle frames and diagnostics posted back from the worker. */
     worker.onmessage = (event: MessageEvent) => {
+      if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
       const msg = event.data as {
         type: 'encoded' | 'ready' | 'error';
         data?: Uint8Array;
@@ -914,6 +1262,7 @@ export class CadenceMediaEngine {
     };
 
     worker.onerror = (ev) => {
+      if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
       console.error('[cadence/worker] uncaught:', ev.message);
       this.handleVideoCodecFailure(ev.message || 'Video encode worker crashed');
     };
@@ -975,7 +1324,7 @@ export class CadenceMediaEngine {
     worker.terminate();
     this.vidWorker   = null;
     this.workerReady = false;
-    await this.startVideoCaptureFallback(stream, profile);
+    await this.startVideoCaptureFallback(stream, profile, generation, isCallCurrent);
   }
 
   /** True when a MediaStreamTrack can be structured-cloned/transferred to a worker. */
@@ -995,18 +1344,24 @@ export class CadenceMediaEngine {
   private async startVideoCaptureFallback(
     stream: MediaStream,
     profile: VideoCaptureProfile,
+    generation: number,
+    isCallCurrent: () => boolean,
   ): Promise<void> {
+    if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
     let wasm: OpcodecWasm;
     try {
       wasm = await this.ensureWasm();
     } catch (err) {
+      if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
       this.handleVideoCodecFailure(
         `Codec unavailable — video capture disabled: ${err instanceof Error ? err.message : String(err)}`,
       );
       return;
     }
+    if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
+    let encoder: CadenceVisEncoder;
     try {
-      this.vidEnc = wasm.videoEncoder(
+      encoder = wasm.videoEncoder(
         profile.width,
         profile.height,
         profile.quality,
@@ -1014,6 +1369,7 @@ export class CadenceMediaEngine {
         profile.fps,
       );
     } catch (err) {
+      if (generation !== this.videoOperationGeneration || !isCallCurrent()) return;
       /* Main-thread path has no size ladder — surface the same fail-closed toast. */
       this.handleVideoCodecFailure(
         `Encoder init failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -1022,7 +1378,10 @@ export class CadenceMediaEngine {
     }
     const video = document.createElement('video');
     video.srcObject = stream; video.muted = true;
-    await video.play();
+    try { await video.play(); }
+    catch (error) { encoder.destroy(); video.srcObject = null; throw error; }
+    if (generation !== this.videoOperationGeneration || !isCallCurrent()) { video.pause(); video.srcObject = null; encoder.destroy(); return; }
+    this.vidEnc = encoder;
     this.vidCapture = video;
     const canvas = document.createElement('canvas');
     canvas.width = profile.width; canvas.height = profile.height;
@@ -1106,6 +1465,7 @@ export class CadenceMediaEngine {
   }
 
   private stopVideoCapture() {
+    this.videoOperationGeneration++;
     /* Worker path teardown. */
     if (this.vidWorker) {
       this.vidWorker.postMessage({ type: 'stop' });
@@ -1196,30 +1556,31 @@ export class CadenceMediaEngine {
       const generation = this.callGuard.capture();
       const groupGeneration = this.mediaE2eeGeneration;
       const groupEpoch = this.mediaE2eeEpoch;
+      const macKey = this.wsMediaKey;
+      const callGeneration = this.callGuard.capture();
       const kind = ftype === 'AUDIO' ? 'audio' : 'video';
       const keyframe = ftype === 'KEYFRAME';
       const aad = mediaE2eeAad(channel, this.wsMyNick, kind, keyframe);
       group.encrypt(data, aad)
         .then(async (ciphertext) => {
-          const signing = await this.ensureMediaSigningIdentity();
-          const signature = new Uint8Array(await crypto.subtle.sign(
-            'Ed25519',
-            signing.keyPair.privateKey,
-            mediaFrameSignatureTranscript(
-              groupEpoch,
-              this.mediaAttachmentId,
-              aad,
-              ciphertext,
-            ) as BufferSource,
-          ));
+          if (!this.callGuard.isCurrent(callGeneration) || this.activeRoom !== channel || this.client !== client || this.wsMediaKey !== macKey) return;
+          const canonical = mediaFrameSignatureTranscript(groupEpoch, this.mediaAttachmentId, aad, ciphertext);
+          const identityContext = this.identityContext();
+          const signatureBytes = this.identityAdapter
+            ? identityContext ? await this.identityAdapter.signFrame(identityContext, canonical) : null
+            : new Uint8Array(await crypto.subtle.sign('Ed25519', (await this.ensureMediaSigningIdentity()).keyPair.privateKey, canonical as BufferSource));
+          if (!signatureBytes || signatureBytes.byteLength !== MEDIA_SIGNATURE_BYTES) throw new Error('Media frame signature unavailable');
+          const signature = signatureBytes;
           const signedCiphertext = new Uint8Array(
             MEDIA_ATTACHMENT_BYTES + ciphertext.length + MEDIA_SIGNATURE_BYTES,
           );
           signedCiphertext.set(this.mediaAttachmentId, 0);
           signedCiphertext.set(ciphertext, MEDIA_ATTACHMENT_BYTES);
           signedCiphertext.set(signature, MEDIA_ATTACHMENT_BYTES + ciphertext.length);
-          if (this.callGuard.isCurrent(generation)
+          if (this.callGuard.isCurrent(generation) && this.callGuard.isCurrent(callGeneration)
             && this.activeRoom === channel
+            && this.client === client
+            && this.wsMediaKey === macKey
             && this.mooringGroupKey === group
             && this.mediaE2eeGeneration === groupGeneration
             && this.mediaE2eeEpoch === groupEpoch) {
@@ -1258,8 +1619,14 @@ export class CadenceMediaEngine {
     });
 
     const key = this.wsMediaKey;
+    const callGeneration = this.callGuard.capture();
+    const room = this.activeRoom;
+    const epoch = this.mediaE2eeEpoch;
     appendMediaMac(key, frame)
-      .then((datagram) => { if (this.client === client) client.sendBinary(datagram); })
+      .then((datagram) => {
+        if (this.client === client && this.activeRoom === room && room === channel && this.wsMediaKey === key
+          && this.mediaE2eeEpoch === epoch && this.callGuard.isCurrent(callGeneration)) client.sendBinary(datagram);
+      })
       .catch(() => { /* a MAC failure drops one media frame; loss-tolerant */ });
   }
 
@@ -1270,9 +1637,7 @@ export class CadenceMediaEngine {
     let channel: string | undefined;
     let verb: string | undefined;
     let arg: string | undefined;
-    if (msg.command === 'NOTE' && msg.params[0] === 'MEDIA') {
-      channel = msg.params[1]; verb = msg.params[2]; arg = msg.params[3];
-    } else if (msg.command === 'EVENT' && (msg.params[1] ?? '').toUpperCase() === 'MEDIA') {
+    if (msg.command === 'EVENT' && (msg.params[1] ?? '').toUpperCase() === 'MEDIA') {
       verb = msg.params[2]; channel = msg.params[3]; arg = msg.params[4];
     } else {
       return;
@@ -1285,15 +1650,23 @@ export class CadenceMediaEngine {
       if (!b64) return;
       const macKey = decodeInlineBase64(b64, 64);
       if (!macKey) return;
+      const operation = this.callOperationGeneration;
+      const room = this.activeRoom;
+      const client = this.client;
+      if (!room || !client) { macKey.fill(0); return; }
       this.wsMyNick = this.client?.currentNick ?? this.wsMyNick;
       this.wsAudSeq = 0;
       this.wsVidSeq = 0;
       // Never wipe the peer map on MACKEY re-issue (video JOIN re-sends MACKEY).
       // Ensure the local nick is routable, then keep every already-seen peer.
       if (this.wsMyNick) this.streamRouter.addParticipant(this.wsMyNick);
-      importMediaMacKey(macKey)
-        .then((k) => { this.wsMediaKey = k; })
-        .catch(() => {});
+      void importMediaMacKey(macKey)
+        .then((key) => {
+          if (this.callOperationGeneration !== operation || this.activeRoom !== room || this.client !== client || this.callState !== 'in_call') return;
+          this.wsMediaKey = key;
+        })
+        .catch(() => {})
+        .finally(() => macKey.fill(0));
     } else if (verb === 'JOIN' || verb === 'ROSTER') {
       if (arg) this.streamRouter.addParticipant(arg);
     } else if (verb === 'LEAVE') {
@@ -1375,14 +1748,13 @@ export class CadenceMediaEngine {
     switch (subtype) {
       case 'VOICE_JOIN':
         this.client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
-        // Browser path is Cadence frames over WS binary (onyx.irc-media.v1).
-        // Codecs are CadenceVox/Vis; transport=webrtc only marks the server-side
-        // bridge leg / ICE advertisement — this client does not use RTCPeerConnection.
-        this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
+        // Browser path is Cadence frames over the authenticated WS binary plane,
+        // not a WebRTC peer offer.
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis');
         break;
       case 'VIDEO_JOIN':
         this.client.sendRaw('MEDIA', 'JOIN', channel, payload.includes('screen') ? 'screen' : 'video');
-        this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis', 'transport=webrtc');
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'cadencevox,cadencevis');
         break;
       case 'VOICE_LEAVE':
         // Full hangup: leave the media room entirely.
@@ -1412,60 +1784,85 @@ export class CadenceMediaEngine {
   // Public join / leave
   // ----------------------------------------------------------------
 
-  async joinVoice(channel: string, preacquired?: MediaStream | null) {
+  async joinVoice(channel: string, preacquired?: MediaStream | null, preacquiredAudioContext?: AudioContext | null) {
+    this.setActiveRoom(channel);
+    const operation = this.advanceCallOperationGeneration();
+    const socket = this.client;
+    const current = () => this.callOperationGeneration === operation && this.activeRoom === channel && this.client === socket;
+    let stream: MediaStream | null = preacquired ?? null;
+    let transferred = false;
     try {
       // WS media requires enrolled device identity + signing keys before any
       // E2EE frame is admitted by the server. Fail before capture when missing.
-      await this.ensureMediaIdentity();
-      await this.ensureMediaSigningIdentity();
-      const stream = preacquired
-        ? this.adoptLocalStream(preacquired, 'voice')
-        : await this.capture('voice');
+      await this.ensureIdentityReady();
+      if (!current()) throw new Error('Media call operation retired');
+      if (preacquired) { if (!current()) throw new Error('Media call operation retired'); stream = this.adoptLocalStream(preacquired, 'voice'); transferred = true; }
+      else stream = await this.capture('voice', '4k60', false, undefined, current);
       await this.ensureWasm();
+      if (!current()) throw new Error('Media call operation retired');
       this.setActiveRoom(channel);
       // Solo-ready group key so encode is live immediately; peers get a
       // redistributed epoch when the deterministic leader rotates on JOIN.
       await this.ensureLocalMediaGroupKey();
+      if (!current()) throw new Error('Media call operation retired');
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+      this.publishMuteState(channel);
       this.mediaframeCmd(channel, 'ROSTER');
       await this.sendMooringHandshake(channel);
-      await this.startAudioCapture(stream);
+      if (!current()) throw new Error('Media call operation retired');
+      await this.startAudioCapture(stream, preacquiredAudioContext, current);
+      if (!current()) throw new Error('Media call operation retired');
       this.startSpeakingMeter(stream);
       this.startGc();
     } catch (err) {
       // Release a half-started join so the store's null-stream rollback is honest
       // and a retry is not blocked by a stale localStream.
-      try { this.releaseMedia(); } catch { /* best-effort */ }
-      this.cb.onError(`Voice join failed: ${err}`);
+      if (current()) { try { this.releaseMedia(); } catch { /* best-effort */ } }
+      if (stream && (!transferred || this.localStream !== stream)) stream.getTracks().forEach(track => track.stop());
+      if (preacquiredAudioContext && this.audioCtx !== preacquiredAudioContext) void preacquiredAudioContext.close().catch(() => {});
+      if (current()) this.cb.onError(`Voice join failed: ${err}`);
       // Rethrow: swallowing made desktop failures look like a no-op click when
       // the toast path was slow or the provisional panel stayed stuck.
       throw err instanceof Error ? err : new Error(`Voice join failed: ${String(err)}`);
     }
   }
 
-  async joinVideo(channel: string, preacquired?: MediaStream | null) {
+  async joinVideo(channel: string, preacquired?: MediaStream | null, preacquiredAudioContext?: AudioContext | null) {
+    this.setActiveRoom(channel);
+    const operation = this.advanceCallOperationGeneration();
+    const socket = this.client;
+    const current = () => this.callOperationGeneration === operation && this.activeRoom === channel && this.client === socket;
+    let stream: MediaStream | null = preacquired ?? null;
+    let transferred = false;
     try {
-      await this.ensureMediaIdentity();
-      await this.ensureMediaSigningIdentity();
-      const stream = preacquired
-        ? this.adoptLocalStream(preacquired, 'video')
-        : await this.capture('video');
+      await this.ensureIdentityReady();
+      if (!current()) throw new Error('Media call operation retired');
+      if (preacquired) { stream = this.adoptLocalStream(preacquired, 'video'); transferred = true; }
+      else stream = await this.capture('video', '4k60', false, undefined, current);
       const profile = videoProfileFor('video');
       await this.ensureWasm();
+      if (!current()) throw new Error('Media call operation retired');
       this.setActiveRoom(channel);
       await this.ensureLocalMediaGroupKey();
+      if (!current()) throw new Error('Media call operation retired');
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+      this.publishMuteState(channel);
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       this.mediaframeCmd(channel, 'ROSTER');
       await this.sendMooringHandshake(channel);
-      await this.startAudioCapture(stream);
-      await this.startVideoCapture(stream, profile);
+      if (!current()) throw new Error('Media call operation retired');
+      await this.startAudioCapture(stream, preacquiredAudioContext, current);
+      if (!current()) throw new Error('Media call operation retired');
+      await this.startVideoCapture(stream, profile, current);
+      if (!current()) throw new Error('Media call operation retired');
       this.startSpeakingMeter(stream);
       this.startGc();
     } catch (err) {
-      try { this.releaseMedia(); } catch { /* best-effort */ }
-      this.cb.onError(`Video join failed: ${err}`);
+      if (current()) { try { this.releaseMedia(); } catch { /* best-effort */ } }
+      if (stream && (!transferred || this.localStream !== stream)) stream.getTracks().forEach(track => track.stop());
+      if (preacquiredAudioContext && this.audioCtx !== preacquiredAudioContext) void preacquiredAudioContext.close().catch(() => {});
+      if (current()) this.cb.onError(`Video join failed: ${err}`);
       throw err instanceof Error ? err : new Error(`Video join failed: ${String(err)}`);
     }
   }
@@ -1474,16 +1871,25 @@ export class CadenceMediaEngine {
     const ch = channel || this.activeRoom || '';
     // One LEAVE hangs up every published kind. Do not also emit VIDEO_LEAVE
     // (that now means "mute video", not hangup).
-    if (this.localKind === 'voice' || this.localKind === 'video' || this.localKind === 'screen') {
+    if (this.screenShareStream || this.localKind === 'voice' || this.localKind === 'video' || this.localKind === 'screen') {
       this.mediaframeCmd(ch, 'VOICE_LEAVE');
     }
     this.setIdle();
   }
 
   setMuted(muted: boolean) {
+    this.localMuted = muted;
     if (!this.activeRoom) return;
-    this.localStream?.getAudioTracks().forEach(t => { t.enabled = !muted; });
+    this.applyLocalMute(this.localStream);
     this.mediaframeCmd(this.activeRoom, muted ? 'MUTE' : 'UNMUTE');
+  }
+
+  private applyLocalMute(stream: MediaStream | null) {
+    stream?.getAudioTracks().forEach(track => { track.enabled = !this.localMuted; });
+  }
+
+  private publishMuteState(room: string) {
+    if (this.localMuted) this.mediaframeCmd(room, 'MUTE');
   }
 
   async startCamera(channel?: string) {
@@ -1588,50 +1994,95 @@ export class CadenceMediaEngine {
   async startScreenShare(channel?: string) {
     const target = channel ?? this.activeRoom;
     if (!target) { this.cb.onError('No active room for screen share'); return; }
-    try {
-      const profile = videoProfileFor('screen');
-      await this.capture('screen', '4k60', false, profile);
-      this.setActiveRoom(target);
-      this.mediaframeCmd(target, 'VIDEO_JOIN',
-        `${profile.width} ${profile.height} ${profile.quality} ${profile.fps} screen`);
-      this.mediaframeCmd(target, 'ROSTER');
-      this.sendMooringHandshake(target).catch(() => {});
-      if (this.localStream) await this.startVideoCapture(this.localStream, profile);
-    } catch (err) {
-      this.cb.onError(`Screen share failed: ${err}`);
-    }
+    await this.startBroadcast(target, 'screen', '4k60');
   }
 
-  async startBroadcast(channel: string, kind: 'camera' | 'screen', quality: StreamQuality = '4k60') {
+  async startBroadcast(channel: string, kind: 'camera' | 'screen', quality: StreamQuality = '4k60', preacquired?: MediaStream, preacquiredAudioContext?: AudioContext | null) {
+    this.setActiveRoom(channel);
+    const operation = this.advanceCallOperationGeneration();
+    const socket = this.client;
+    const current = () => this.callOperationGeneration === operation && this.activeRoom === channel && this.client === socket;
+    let stream: MediaStream | null = preacquired ?? null;
+    let transferred = false;
     try {
+      await this.ensureIdentityReady();
+      if (!current()) throw new Error('Media call operation retired');
       const mediaKind: MediaKind = kind === 'screen' ? 'screen' : 'video';
       const profile = videoProfileFor(mediaKind, quality, true);
-      const stream = await this.capture(mediaKind, quality, true, profile);
+      if (kind === 'screen') {
+        if (!preacquired) throw new Error('Screen sharing requires a trusted preacquired display stream');
+        stream = preacquired;
+        this.screenShareStream?.getTracks().forEach(track => track.stop());
+        this.screenShareStream = stream;
+        transferred = true;
+        stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => {
+          if (this.screenShareStream === stream) this.stopScreenShare();
+        }, { once: true }));
+      } else if (preacquired) {
+        stream = this.adoptLocalStream(preacquired, mediaKind);
+        transferred = true;
+      } else stream = await this.capture(mediaKind, quality, true, profile, current);
+      if (!current()) throw new Error('Media call operation retired');
       await this.ensureWasm();
-      this.setActiveRoom(channel);
-      if (stream.getAudioTracks().length > 0) {
+      if (!current()) throw new Error('Media call operation retired');
+      await this.ensureLocalMediaGroupKey();
+      if (!current()) throw new Error('Media call operation retired');
+      if (kind !== 'screen' && stream.getAudioTracks().length > 0) {
         this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
-        await this.startAudioCapture(stream);
+        this.publishMuteState(channel);
+        await this.startAudioCapture(stream, preacquiredAudioContext, current);
+        if (!current()) throw new Error('Media call operation retired');
         this.startSpeakingMeter(stream);
       }
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}${profile.screenShare ? ' screen' : ''}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendMooringHandshake(channel).catch(() => {});
-      await this.startVideoCapture(stream, profile);
+      if (!current()) throw new Error('Media call operation retired');
+      await this.sendMooringHandshake(channel);
+      if (!current()) throw new Error('Media call operation retired');
+      await this.startVideoCapture(stream, profile, current);
+      if (!current()) throw new Error('Media call operation retired');
       this.startGc();
     } catch (err) {
-      this.cb.onError(`Stream start failed: ${err}`);
+      if (current()) this.cb.onError(`Stream start failed: ${err}`);
+      if (stream && (!transferred || (kind === 'screen' ? this.screenShareStream !== stream : this.localStream !== stream))) stream.getTracks().forEach(track => track.stop());
+      if (current() && kind === 'screen' && stream !== null && this.screenShareStream === stream) { this.screenShareStream.getTracks().forEach(track => track.stop()); this.screenShareStream = null; }
+      if (preacquiredAudioContext && this.audioCtx !== preacquiredAudioContext) void preacquiredAudioContext.close().catch(() => {});
+      throw err instanceof Error ? err : new Error(`Stream start failed: ${String(err)}`);
     }
   }
 
   stopBroadcast(channel?: string) {
     const target = channel ?? this.activeRoom ?? '';
+    if (this.screenShareStream) { this.stopScreenShare(); return; }
     if (target) {
       this.mediaframeCmd(target, 'VIDEO_LEAVE');
       this.mediaframeCmd(target, 'VOICE_LEAVE');
     }
     this.setIdle();
+  }
+
+  stopScreenShare(): void {
+    if (!this.screenShareStream) return;
+    this.advanceCallOperationGeneration();
+    this.stopVideoCapture();
+    this.screenShareStream.getTracks().forEach(track => track.stop());
+    this.screenShareStream = null;
+    if (this.activeRoom) this.mediaframeCmd(this.activeRoom, 'VIDEO_LEAVE');
+    if (this.localStream?.getVideoTracks().length) {
+      this.localKind = 'video';
+      const operation = this.callOperationGeneration;
+      const room = this.activeRoom;
+      void this.startVideoCapture(this.localStream, videoProfileFor('video'), () => this.callOperationGeneration === operation && this.activeRoom === room).catch(() => {});
+      this.setCallState('in_call', this.client?.currentNick ?? '', this.activeRoom);
+    } else if (this.localStream) {
+      this.localKind = 'voice';
+      this.setCallState('in_call', this.client?.currentNick ?? '', this.activeRoom);
+    } else {
+      this.localKind = null;
+      this.setCallState('idle', '', null);
+      this.cb.onLocalStream(null);
+    }
   }
 
   // ----------------------------------------------------------------
@@ -1677,6 +2128,7 @@ export class CadenceMediaEngine {
       this.setCallState('in_call', this.callWith, null);
       this.mediaframeCmd(this.callWith, 'ACCEPT');
       this.mediaframeCmd(this.callWith, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+      this.publishMuteState(this.callWith);
       if (kind === 'video') {
         const profile = videoProfileFor('video');
         this.mediaframeCmd(this.callWith, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
@@ -2016,6 +2468,7 @@ export class CadenceMediaEngine {
           return candidate;
         });
         session.then(async vs => {
+          const incomingIdentityContext = this.identityContext();
           const localEphemeral = await this.ensureMediaEphemeralKeyPair();
           const localPublic = new Uint8Array(await crypto.subtle.exportKey('raw', localEphemeral.publicKey));
           const localNonce = this.mediaCallNonce;
@@ -2046,27 +2499,37 @@ export class CadenceMediaEngine {
             ) as BufferSource,
           );
           if (!signatureValid) throw new Error('Media E2EE handshake signature rejected');
+          const transcript = mediaHandshakeTranscript(channel, handshake.slice(0, MEDIA_HANDSHAKE_UNSIGNED_BYTES));
+          if (this.identityAdapter) {
+            if (!incomingIdentityContext) throw new Error('Scoped peer verification context unavailable');
+            const verified = await this.identityAdapter.verifyPeerBinding(incomingIdentityContext, {
+              peerNick: fromNick, attachmentId: peerAttachment, ecdhPublicRaw: peerStaticPublic,
+              signingPublicRaw: peerSigningPublic, handshakeTranscript: transcript, signature: peerSignature,
+            });
+            if (!verified) throw new Error('Media peer is not in the verified device directory');
+            if (!this.callGuard.isCurrent(hsGen) || !this.sameIdentityContext(this.identityContext(), incomingIdentityContext)
+              || this.mooringPeerLifecycles.get(peerKey) !== peerLifecycle || channel !== this.activeRoom) {
+              throw new Error('Media peer verification context changed');
+            }
+          } else {
+            if (!this.cb.verifyPeerMediaKey) throw new Error('Verified peer directory unavailable');
+            const peerPublicB64url = toB64url(peerStaticPublic);
+            const trustBinding = await mediaTrustBinding(peerStaticPublic, peerSigningPublic);
+            if (!(await this.cb.verifyPeerMediaKey(fromNick, peerPublicB64url, peerAttachmentB64, trustBinding))) {
+              throw new Error('Media E2EE peer key is not trusted');
+            }
+          }
           await vs.ingestPeerKey(
             peerEphemeralPublic,
             mediaPairwiseInfo(channel, localPublic, localNonce, peerEphemeralPublic, peerNonce),
           );
           // Only persist a TOFU pin after WebCrypto has accepted the P-256
           // point and the transcript-derived pairwise session is established.
-          const peerPublicB64url = toB64url(peerStaticPublic);
-          const trustBinding = await mediaTrustBinding(peerStaticPublic, peerSigningPublic);
-          if (this.cb.verifyPeerMediaKey
-            && !(await this.cb.verifyPeerMediaKey(
-              fromNick,
-              peerPublicB64url,
-              peerAttachmentB64,
-              trustBinding,
-            ))) {
-            throw new Error('Media E2EE peer key is not trusted');
-          }
           // Hangup (or a rejoin) happened while we were establishing — drop this
           // session instead of resurrecting it into an idle/new call.
           if (!this.callGuard.isCurrent(hsGen)
-            || this.mooringPeerLifecycles.get(peerKey) !== peerLifecycle) {
+            || this.mooringPeerLifecycles.get(peerKey) !== peerLifecycle || channel !== this.activeRoom
+            || this.identityAdapter && !this.sameIdentityContext(this.identityContext(), incomingIdentityContext)) {
             vs.destroy();
             return;
           }
@@ -2281,6 +2744,7 @@ export class CadenceMediaEngine {
         this.activeRoom = fromNick;
         this.setCallState('in_call', fromNick, null);
         this.mediaframeCmd(fromNick, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+        this.publishMuteState(fromNick);
         if (this.localKind === 'video') {
           const profile = this.localVideoProfile ?? videoProfileFor('video');
           this.mediaframeCmd(fromNick, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
@@ -2400,6 +2864,13 @@ export class CadenceMediaEngine {
       this.selfDetachedEpochFloor = null;
     }
     const changedRoom = this.activeRoom !== null && newRoom;
+    if (changedRoom && this.callState !== 'idle') this.setIdle();
+    if (newRoom || this.activeRoom === null) {
+      this.advanceCallOperationGeneration();
+      this.callRef = crypto.randomUUID();
+      this.scopedPublicIdentity = null;
+      this.scopedPublicIdentityPromise = null;
+    }
     if (changedRoom) {
       this.callGuard.bump();
       this.mediaE2eeGeneration++;
@@ -2514,12 +2985,21 @@ export class CadenceMediaEngine {
   private async sendMooringHandshake(channel: string): Promise<void> {
     const client = this.client;
     if (!client || !channel || channel !== this.activeRoom) return;
-    const id = await this.ensureMediaIdentity();
-    const staticPublic = fromB64url(id.publicB64);
+    const generation = this.callGuard.capture();
+    const callRef = this.callRef;
+    const identityContext = this.identityContext();
+    const scopedIdentity = this.identityAdapter ? await this.ensureScopedPublicIdentity() : null;
+    if (!this.callGuard.isCurrent(generation) || callRef !== this.callRef || channel !== this.activeRoom || client !== this.client
+      || this.identityAdapter && !this.sameIdentityContext(this.identityContext(), identityContext)) return;
+    const id = this.identityAdapter ? null : await this.ensureMediaIdentity();
+    if (!this.callGuard.isCurrent(generation) || callRef !== this.callRef || channel !== this.activeRoom || client !== this.client) return;
+    const staticPublic = scopedIdentity?.ecdhPublicRaw ?? (id ? fromB64url(id.publicB64) : null);
     if (!staticPublic) throw new Error('Invalid local E2EE public key');
     const ephemeral = await this.ensureMediaEphemeralKeyPair();
+    if (!this.callGuard.isCurrent(generation) || callRef !== this.callRef || channel !== this.activeRoom || client !== this.client) return;
     const ephemeralPublic = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeral.publicKey));
-    const signing = await this.ensureMediaSigningIdentity();
+    const signing = this.identityAdapter ? null : await this.ensureMediaSigningIdentity();
+    if (!this.callGuard.isCurrent(generation) || callRef !== this.callRef || channel !== this.activeRoom || client !== this.client) return;
     if (!this.mediaCallNonce) {
       this.mediaCallNonce = crypto.getRandomValues(new Uint8Array(MEDIA_CALL_NONCE_BYTES));
     }
@@ -2530,12 +3010,15 @@ export class CadenceMediaEngine {
     unsigned.set(staticPublic, offset); offset += 65;
     unsigned.set(ephemeralPublic, offset); offset += 65;
     unsigned.set(this.mediaCallNonce, offset); offset += MEDIA_CALL_NONCE_BYTES;
-    unsigned.set(signing.publicRaw, offset);
-    const signature = new Uint8Array(await crypto.subtle.sign(
-      'Ed25519',
-      signing.keyPair.privateKey,
-      mediaHandshakeTranscript(channel, unsigned) as BufferSource,
-    ));
+    unsigned.set(scopedIdentity?.signingPublicRaw ?? signing!.publicRaw, offset);
+    const transcript = mediaHandshakeTranscript(channel, unsigned);
+    const signatureBytes = this.identityAdapter
+      ? identityContext ? await this.identityAdapter.signHandshake(identityContext, transcript) : null
+      : new Uint8Array(await crypto.subtle.sign('Ed25519', signing!.keyPair.privateKey, transcript as BufferSource));
+    if (!this.callGuard.isCurrent(generation) || callRef !== this.callRef || channel !== this.activeRoom || client !== this.client
+      || this.identityAdapter && !this.sameIdentityContext(this.identityContext(), identityContext)) return;
+    if (!signatureBytes || signatureBytes.byteLength !== MEDIA_SIGNATURE_BYTES) throw new Error('Media handshake signature unavailable');
+    const signature = signatureBytes;
     const handshake = new Uint8Array(MEDIA_HANDSHAKE_BYTES);
     handshake.set(unsigned, 0);
     handshake.set(signature, MEDIA_HANDSHAKE_UNSIGNED_BYTES);
@@ -2553,7 +3036,14 @@ export class CadenceMediaEngine {
     this.cb.onCallState(state, nick, channel ?? this.activeRoom);
   }
 
+  private advanceCallOperationGeneration(): number {
+    this.cancelStagedAudioOperations();
+    this.callOperationGeneration++;
+    return this.callOperationGeneration;
+  }
+
   private setIdle() {
+    this.advanceCallOperationGeneration();
     this.clearRingTimer();
     this.stopAudioCapture(); this.stopVideoCapture(); this.stopSpeakingMeter();
     if (this.audioLevelTimer) { clearInterval(this.audioLevelTimer); this.audioLevelTimer = null; }
@@ -2656,12 +3146,20 @@ export class CadenceMediaEngine {
 
   private applyNetworkBitrate(bps: number) {
     this.suggestedBps = bps;
-    const tier: NetworkQualityTier =
+    const observed: NetworkQualityTier =
       bps >= BW_TIER_GOOD ? 0 : bps >= BW_TIER_FAIR ? 1 : bps >= BW_TIER_POOR ? 2 : 3;
+    const observationChanged = observed !== this.observedNetworkTier;
+    this.observedNetworkTier = observed;
+    this.applyQualityTier(observed);
+    if (observationChanged) this.cb.onNetworkQuality?.(observed, bps);
+  }
+
+  private applyQualityTier(observed: NetworkQualityTier) {
+    const policyFloor = this.qualityPolicy === 'balanced' ? 1 : this.qualityPolicy === 'audio-priority' ? 2 : 0;
+    const tier = Math.max(observed, policyFloor) as NetworkQualityTier;
     if (tier !== this.networkTier) {
       this.prevNetworkTier = this.networkTier;
       this.networkTier = tier;
-      this.cb.onNetworkQuality?.(tier, bps);
 
       /* Notify the encode worker of the new tier so it can update its draw
        * canvas resolution.  The fallback path reads this.networkTier directly
@@ -2675,8 +3173,8 @@ export class CadenceMediaEngine {
           if (pm.vidDec) this.sendFrame(this.activeRoom, 'VIDEO_KEYREQ', msgpackArray1(pm.state.nick));
         }
       }
-      if (this.localKind === 'screen' && this.localStream) {
-        const videoTrack = this.localStream.getVideoTracks()[0];
+      if (this.screenShareStream) {
+        const videoTrack = this.screenShareStream.getVideoTracks()[0];
         if (videoTrack) {
           const c: MediaTrackConstraints =
             tier === 0 ? {} : tier === 1 ? { width: 1280, height: 720 }
@@ -2685,12 +3183,18 @@ export class CadenceMediaEngine {
         }
       }
       const targetQ: CadenceVoxQuality = tier <= 1 ? 2 : tier === 2 ? 1 : 0;
-      if (targetQ !== this.audioQuality && this.audEnc && this.wasm) {
+      if (targetQ !== this.audioQuality) {
         this.audioQuality = targetQ;
-        this.audEnc.destroy();
-        this.audEnc = this.wasm.audioEncoder(SAMPLE_RATE, targetQ);
       }
-      if (bps < BW_AUDIO_ONLY && (this.vidEnc || this.vidWorker)) this.stopVideoCapture();
+      if (targetQ !== this.audioPipeline?.quality && this.audEnc && this.wasm) {
+        const previousEncoder = this.audEnc;
+        const noiseSuppress = this.audioPipeline?.noiseSuppress ?? this.cb.getMediaQuality?.()?.noiseSuppress ?? true;
+        const nextEncoder = this.wasm.audioEncoder(SAMPLE_RATE, targetQ, noiseSuppress);
+        if (this.audioPipeline) { this.audioPipeline.encoder = nextEncoder; this.audioPipeline.quality = targetQ; }
+        this.audEnc = nextEncoder;
+        previousEncoder.destroy();
+      }
+      if ((this.qualityPolicy === 'audio-priority' || (this.qualityPolicy === 'auto' && this.suggestedBps < BW_AUDIO_ONLY)) && (this.vidEnc || this.vidWorker)) this.stopVideoCapture();
     }
   }
 

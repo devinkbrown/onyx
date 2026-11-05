@@ -8,8 +8,7 @@
  * cached old entry. The user chooses Reload (fresh entry + new hashes) or
  * return home (eager Landing, no lazy shell).
  */
-import { ErrorBoundary, lazy, type Component, type JSX } from 'solid-js';
-import { Dynamic } from 'solid-js/web';
+import { createComponent, ErrorBoundary, lazy, type Component, type ComponentProps, type ValidComponent, type JSX } from 'solid-js';
 import { updateCoordinator } from '@/pwa/updateCoordinator';
 import recoveryStylesheet from './stale-chunk-recovery.css?url';
 
@@ -158,11 +157,11 @@ export function lazyRouteFallback(
  * A lazy component whose retry creates a new Solid lazy value. Solid caches a
  * rejected lazy promise, so resetting an ErrorBoundary alone cannot recover.
  */
-export function retryableLazy<T extends Record<string, any>>(
-  loader: () => Promise<{ default: Component<T> }>,
+export function retryableLazy<T extends Extract<ValidComponent, (...args: never[]) => JSX.Element>>(
+  loader: () => Promise<{ default: T }>,
   label: string,
-): Component<T> {
-  return function RetryableLazy(props: T): JSX.Element {
+): Component<ComponentProps<T>> {
+  return function RetryableLazy(props: ComponentProps<T>): JSX.Element {
     let attempt = 0;
     const load = () => {
       const currentAttempt = attempt;
@@ -186,7 +185,7 @@ export function retryableLazy<T extends Record<string, any>>(
           }}
         />
       )}>
-        <Dynamic component={current as Component<any>} {...props} />
+        {createComponent(current as Component<ComponentProps<T>>, props)}
       </ErrorBoundary>
     );
   };

@@ -1,0 +1,9 @@
+✔ source closure binds pinned tool and workspace patch inputs without widening installed dependency capture (35.584331ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 172.634714

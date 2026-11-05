@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-lab-runtime",
+  "startedAt": "2026-11-05T16:48:21.187Z",
+  "finishedAt": "2026-11-05T16:49:05.456Z",
+  "commandArgsRedacted": [
+    "--server-bin",
+    "[path-redacted]",
+    "--server-source",
+    "[path-redacted]",
+    "--server-build-receipt",
+    "[path-redacted]",
+    "--scratch-parent",
+    "/tmp",
+    "--topology",
+    "two",
+    "--suite",
+    "foundation",
+    "--scenario",
+    "logical",
+    "--receipt",
+    "[path-redacted]"
+  ],
+  "client": {
+    "gitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03",
+    "dirty": true,
+    "sourceManifestSha256": "659b29a70f85912d9afcff90a5a2364723ab461edc86c7c2803213fec5261acf",
+    "stageSha256": "5023477457a25c20b3ce446a03bb167e6aa091cb140eec45f53778ae5ae4c394"
+  },
+  "server": {
+    "binarySha256": "dd85c018b7427fff2c2689e6af0fb327371c7ac96ddfeea9e82037418bc448fc",
+    "version": "0.9.0+unknown",
+    "sourceGitHead": "b9be884cce57dadf91d415f61e703de95e521757",
+    "sourceDirty": true,
+    "sourceManifestSha256": "cba4f2ea88d499e044f671f12ea367d8f1a072df54a2f8c5f5b726c2b149ff8c",
+    "sourceBinding": "build-proven",
+    "buildReceipt": {
+      "compilerVersion": "0.17.0",
+      "compilerSha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "command": [
+        "zig",
+        "build",
+        "-j2",
+        "-Dtarget=x86_64-linux",
+        "-Dcpu=baseline",
+        "--prefix",
+        "[path-redacted]",
+        "--cache-dir",
+        "[path-redacted]",
+        "--summary",
+        "all"
+      ],
+      "sourceManifestSha256": "cba4f2ea88d499e044f671f12ea367d8f1a072df54a2f8c5f5b726c2b149ff8c",
+      "binarySha256": "dd85c018b7427fff2c2689e6af0fb327371c7ac96ddfeea9e82037418bc448fc"
+    }
+  },
+  "environment": {
+    "node": "v24.18.1",
+    "python": "not-used",
+    "openssl": "OpenSSL 3.5.9",
+    "browser": "Chromium 155.0.8059.39",
+    "os": "linux"
+  },
+  "topology": {
+    "kind": "two",
+    "nodes": [
+      {
+        "id": "A",
+        "host": "127.0.0.1",
+        "ircPort": 43567,
+        "tlsPort": 37437,
+        "wsPort": 34557,
+        "s2sPort": 35611,
+        "metricsPort": 42259,
+        "configSha256": "9625487f118922904dad8f771b3daa76bb283609e4d98233edd0b35114eeb9ae"
+      },
+      {
+        "id": "B",
+        "host": "127.0.0.1",
+        "ircPort": 44199,
+        "tlsPort": 41515,
+        "wsPort": 43445,
+        "s2sPort": 45977,
+        "metricsPort": 44289,
+        "configSha256": "5e5e68558d6d73980b70f25ef963cd1a6bfb56eead6d3b65c4f135fa44cc6369"
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "foundation",
+      "scenarioIds": [
+        "elm-browser-registration",
+        "cap-005",
+        "irc-frame-without-crlf"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "foundation-auth",
+      "scenarioIds": [
+        "elm-private-identify",
+        "authenticated-send",
+        "owner-scoped-outbox"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "foundation-wire",
+      "scenarioIds": [
+        "ping-pong",
+        "send-and-reconnect"
+      ],
+      "driver": "raw-tls",
+      "status": "pass",
+      "assertions": {
+        "executed": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "foundation-binary",
+      "scenarioIds": [
+        "binary-negative"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    }
+  ],
+  "compatibleLabObservation": "pass",
+  "currentSourceAcceptance": "pass",
+  "limitations": [],
+  "teardown": {
+    "trackedChildrenStopped": true,
+    "tempRemoved": true
+  }
+}

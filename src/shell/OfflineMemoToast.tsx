@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * OfflineMemoToast — surface NOTE MEMO delivery as a calm toast so offline
+ * OfflineMemoToast — surface MEMO delivery as a calm toast so offline
  * catches aren't only a sidebar stamp.
  */
 import { onCleanup, onMount } from 'solid-js';

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "b9be884cce57dadf91d415f61e703de95e521757",
+  "note": "Redacted source-backed contract cases consumed by RoadmapTranscriptTest.elm.",
+  "scenarios": [
+    {
+      "id": "E01.mode-permission-denied",
+      "serverSource": {
+        "path": "src/daemon/server.zig",
+        "symbol": "LinuxServer.handleMode / ERR_CHANOPRIVSNEEDED; queueNumeric / formatNumericLine",
+        "revision": "b9be884cce57dadf91d415f61e703de95e521757"
+      },
+      "initial": { "nowMs": 1000, "connection": "live" },
+      "steps": [
+        { "atMs": 1100, "line": ":lab.local 482 guest #protected :You're not channel operator" }
+      ],
+      "expect": {
+        "caps": [],
+        "outboundLines": [],
+        "reclaimPhase": "none",
+        "notificationTexts": ["You need operator privileges in #protected"]
+      }
+    },
+    {
+      "id": "E04.cap-ping-known-good",
+      "serverSource": {
+        "path": "src/proto/cap.zig",
+        "symbol": "default_specs",
+        "revision": "b9be884cce57dadf91d415f61e703de95e521757"
+      },
+      "initial": { "nowMs": 1000, "connection": "registering" },
+      "steps": [
+        { "atMs": 1000, "line": ":lab.local CAP guest LS :message-tags unknown/future" },
+        { "atMs": 1000, "line": ":lab.local CAP guest ACK :message-tags" },
+        { "atMs": 1000, "line": ":lab.local PING :fixture-cookie" }
+      ],
+      "expect": {
+        "caps": ["message-tags"],
+        "outboundLines": ["CAP REQ message-tags\r\n", "CAP END\r\n", "PONG fixture-cookie\r\n"],
+        "reclaimPhase": "none"
+      }
+    },
+    {
+      "id": "E04.reclaim-timeout-unknown",
+      "serverSource": {
+        "path": "src/daemon/server.zig",
+        "symbol": "handleSession / SESSION RESUME outcome notices",
+        "revision": "b9be884cce57dadf91d415f61e703de95e521757"
+      },
+      "initial": { "nowMs": 5000, "connection": "live", "reclaim": { "phase": "restoring", "kind": "local" } },
+      "steps": [ { "atMs": 6000, "event": "reclaim-confirm" } ],
+      "expect": {
+        "caps": [],
+        "outboundLines": [],
+        "reclaimPhase": "restoring"
+      }
+    },
+    {
+      "id": "E04.unsolicited-ack-expected-negative",
+      "serverSource": {
+        "path": "src/proto/cap.zig",
+        "symbol": "default_specs",
+        "revision": "b9be884cce57dadf91d415f61e703de95e521757"
+      },
+      "initial": { "nowMs": 1000, "connection": "registering" },
+      "steps": [ { "atMs": 1000, "line": ":lab.local CAP guest ACK :onyx/e2ee future-cap" } ],
+      "expect": { "caps": [], "outboundLines": [], "reclaimPhase": "none" }
+    }
+  ]
+}

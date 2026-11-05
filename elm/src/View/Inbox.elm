@@ -7,8 +7,9 @@ filters with counts, verbatim empty copy, glyph + label + context per
 row, click-to-open marking read and jumping, per-row dismiss, and
 mark-all-read).
 
-Focus-trap/Escape handling stays with the ports layer's DOM concerns;
-follow-topic pins stay ahead (the room opens without the topic jump).
+Focus-trap/Escape handling stays with the ports layer's DOM concerns.
+A follow row opens its room and applies the stored topic
+(`activateNotification`).
 -}
 
 import App exposing (InboxFilter(..), InboxNotification, Model, Msg(..), isAttentionNotification, notificationContext, notificationKindGlyph, notificationKindLabel, unreadAttentionCount)
@@ -37,7 +38,7 @@ inbox model =
                 )
             , onClick NotificationCenterOpened
             ]
-            ([ span [ attribute "aria-hidden" "true" ] [ text "🔔" ] ]
+            ([ span [ attribute "aria-hidden" "true" ] [ text "Inbox" ] ]
                 ++ (if unread > 0 then
                         [ span [ class "shell-ribbon-badge", attribute "data-testid" "inbox-badge" ]
                             [ text (String.fromInt unread) ]

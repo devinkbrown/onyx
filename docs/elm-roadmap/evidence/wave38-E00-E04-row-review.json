@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "reviewKind": "independent bounded E00/E04 row review by root integrator against Luna-authored evidence",
+  "reviewedAtUtc": "2026-11-05T03:06:07.345843+00:00",
+  "source38ManifestDigest": "1167bb359e1084b8d24b3736cd448d78ab9ac3b23f909fe2178c68344e60cb1d",
+  "source38ArchiveSha256": "9a592c8c7a469630d2288a2b51bf1c695b0d998fc839242c84cb737c6275e09e",
+  "source37TerminalGuard": true,
+  "source38TerminalGuard": true,
+  "acceptedPackageIds": [
+    "E00",
+    "E04"
+  ],
+  "decisions": [
+    {
+      "packageId": "E00",
+      "decision": "accepted",
+      "requirement": "Preserve full source, dependency lock/pins and module-responsibility map.",
+      "basis": "Source38 full closure/restore verification preserves2080files and corrected pins+patch;134module responsibility rows present. Sole App/MainTest direct-import attribution omission corrected and hash-bound. Source37 source-closure regression passed; selector source unchanged in38.",
+      "sourceBindings": [
+        {
+          "path": "elm/tools/source-closure.mjs",
+          "size": 5022,
+          "sha256": "02af87be61b7873b5fce51e655fc7928815c03d85184c3138f75423e69063809",
+          "mode": 384
+        },
+        {
+          "path": "elm/tools/source-closure.test.mjs",
+          "size": 2868,
+          "sha256": "bb4e0c881fd48f5c4d438250e34ef49bcfe21426bfafd09b7d7700858fd8520e",
+          "mode": 384
+        },
+        {
+          "path": "docs/elm-roadmap/module-ownership.md",
+          "size": 35614,
+          "sha256": "0c1927433e2d6f55dc8aee6227d8018e422ca96e87551e34d93c9c29c9fc241f",
+          "mode": 384
+        },
+        {
+          "path": "package.json",
+          "size": 4336,
+          "sha256": "45d7be324282a578e01142ac0f44c1f4dc7eb1c8eaa0434785937df37c4b743d",
+          "mode": 384
+        },
+        {
+          "path": "pnpm-lock.yaml",
+          "size": 118742,
+          "sha256": "85f819a9c09b7e89803cd8446ea6a2be51e4f2dd09b343672bbdad59d9546516",
+          "mode": 384
+        },
+        {
+          "path": "pnpm-workspace.yaml",
+          "size": 139,
+          "sha256": "f06cb42c8d6354bd758215314a333a473379f01fb866beb7d51e39e6fd8f67e0",
+          "mode": 384
+        },
+        {
+          "path": ".zigversion",
+          "size": 26,
+          "sha256": "2c0d09def115331b1e2ad839f6b4d320d9b082882c291a6fdcb663e338eebcca",
+          "mode": 384
+        },
+        {
+          "path": "patches/@native-sdk__cli@0.6.2.patch",
+          "size": 108171,
+          "sha256": "ae5e2d1c372b3bf4a2487e0955ba88d7e1c8881c2f8573b85628267af7c9c498",
+          "mode": 384
+        }
+      ]
+    },
+    {
+      "packageId": "E04",
+      "decision": "accepted",
+      "requirement": "| E04 | **EXTEND** existing Elm and smoke runners with deterministic transcript/clock lanes and scoped CI | Verification / M | One known-good and one failing transcript test demonstrated |",
+      "basis": "Root inspected deterministic fixture/clock consumer, scoped CI and actual isolated expected-failure implementation. Current-source37 proof: baseline4pass; mutant3pass1actualExpect.equal failure, not compileerror. All E04 evidence source inputs byte/mode-identical in source38; execution logs and receipt hashes verified.",
+      "source37ManifestDigest": "5ec98ba79e58903f894ef05aea77c94b18b079b14f5fa09b7098d90c5b5b5bc6",
+      "evidencePacketSha256": "0166afa52a9c7e5b251c2c14d516c87a9329dfaf1eca7b5c61e39d42f48ffd29",
+      "expectedFailureReceiptSha256": "aadabfe13b49018468d2393a690ce9127a6bbeddebcfafed39c339a6dfb1181f",
+      "sourceBindings": {
+        "elm/tools/run-roadmap-checks.mjs": "df047a4b75c6f47e5339b16fe95acb8e8bb31ca210fd2ccb89e2668d8bf3863a",
+        "elm/tests/RoadmapTranscriptTest.elm": "d9341fc80c7db1254249953f7d9c426ee2718207108a1eeb0d6701bebc2337af",
+        "elm/fixtures/roadmap/catalog.json": "ffa7604b88b69c9114effd5537091b08f526352240979998242c580874a55151",
+        "elm/tests/RoadmapFixtures.elm": "b9f3602093694fc7fbc2fcf7fab00c877b9de171b3b1fcb8ac7cbd18d9ee211b",
+        "elm/tools/generate-roadmap-fixtures.mjs": "6d26e33a6cf6360ec59cd87c20c379692a271dd84c7f62f2f484a31985e3c665",
+        "elm/tools/source-manifest.mjs": "39b9661237bd4e0bf4cfe3055296cc0f67f2359931f82b4125f0d75bc0135e10",
+        ".github/workflows/elm-client.yml": "62c346315899149237245ce5d51b4839bbf45fbb3b96d61c4b2a084c14ae74cf",
+        "elm/scheduleClock.smoke.mjs": "1390d2499605177bbd54a9bf08cb6417bc26dbed48a1a6f026fe9be249fd3e52",
+        "docs/elm-roadmap/acceptance-ledger.json": "e38f574c3ae6f088020620b470817cb89f715c8964cbb55bee55af4ffc4ef357",
+        "docs/elm-roadmap/implementation-status.json": "b6e5451a5d2e3809b44cf291a80594b6635d17676442994b687e8ff785db53c2"
+      }
+    }
+  ],
+  "limits": [
+    "Only E00 and E04 package criteria are accepted by this review.",
+    "No T-scenario, M-milestone, full security lifecycle, transport interoperability or release acceptance is inferred.",
+    "Known session lab failures and transport startup unknowns remain open.",
+    "No new tests/builds/probes were run while reviewing this evidence."
+  ]
+}

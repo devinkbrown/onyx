@@ -203,4 +203,56 @@ describe('PeerRegistry', () => {
     expect(screen?.screenH).toBe(720);
     expect(screen?.screenFps).toBe(MAX_PEER_VIDEO_FPS);
   });
+
+  it('reports output selection support and rejection from live playout contexts', async () => {
+    const registry = createRegistry();
+    expect(await registry.setOutput('speaker-opaque-id', 0.4)).toEqual({ state: 'deferred', reason: null, contexts: 0, deviceId: 'speaker-opaque-id', volumeState: 'deferred', volume: 0.4 });
+    const supported = registry.getOrCreate('supported', '#room', 'voice');
+    const createStereoPanner = () => ({ pan: { value: 0 } });
+    const setSinkId = vi.fn(async (_id: string) => {});
+    supported.audCtx = { setSinkId, createStereoPanner } as unknown as AudioContext;
+    expect(await registry.setOutput('speaker-opaque-id', 0.4)).toEqual({ state: 'applied', reason: null, contexts: 1, deviceId: 'speaker-opaque-id', volumeState: 'applied', volume: 0.4 });
+    expect(setSinkId).toHaveBeenCalledWith('speaker-opaque-id');
+    expect(registry.outputEffect().state).toBe('applied');
+
+    const unsupported = registry.getOrCreate('unsupported', '#room', 'voice');
+    const gain = { value: 0 };
+    unsupported.outputGain = { gain } as unknown as GainNode;
+    unsupported.audCtx = { createStereoPanner } as unknown as AudioContext;
+    expect(await registry.setOutput('other-speaker', 0.8)).toEqual({ state: 'unsupported', reason: 'set-sink-id-unavailable', contexts: 2, deviceId: 'other-speaker', volumeState: 'applied', volume: 0.8 });
+    expect(gain.value).toBe(0.8);
+
+    const rejected = registry.getOrCreate('rejected', '#room', 'voice');
+    rejected.audCtx = { setSinkId: vi.fn(async () => { throw new Error('permission denied'); }), createStereoPanner } as unknown as AudioContext;
+    expect(await registry.setOutput('forbidden-speaker', 0.8)).toEqual({ state: 'rejected', reason: 'set-sink-id-rejected', contexts: 3, deviceId: 'forbidden-speaker', volumeState: 'applied', volume: 0.8 });
+  });
+
+  it('reports recovery only when owned playout contexts remain running and preserves deafened state', async () => {
+    const registry = createRegistry();
+    const peer = registry.getOrCreate('recover', '#room', 'voice');
+    let state: AudioContextState = 'suspended';
+    const resumeControl: { finish: () => void } = { finish: () => {} };
+    peer.audCtx = {
+      get state() { return state; },
+      resume: () => new Promise<void>(resolve => { resumeControl.finish = () => { state = 'running'; resolve(); }; }),
+      suspend: async () => { state = 'suspended'; },
+    } as unknown as AudioContext;
+    const pending = registry.recoverAudio();
+    resumeControl.finish();
+    await expect(pending).resolves.toEqual({ state: 'applied', reason: null });
+
+    registry.setDeafened(true);
+    await expect(registry.recoverAudio()).resolves.toEqual({ state: 'deferred', reason: 'deafened' });
+  });
+
+  it('does not report recovery when a context is suspended again before observation', async () => {
+    const registry = createRegistry();
+    const peer = registry.getOrCreate('resuspend', '#room', 'voice');
+    let state: AudioContextState = 'suspended';
+    peer.audCtx = {
+      get state() { return state; },
+      resume: async () => { state = 'suspended'; },
+    } as unknown as AudioContext;
+    await expect(registry.recoverAudio()).resolves.toEqual({ state: 'rejected', reason: 'playout-context-changed' });
+  });
 });

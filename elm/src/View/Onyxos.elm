@@ -172,11 +172,8 @@ stageTab selected stage =
 
 contextLine : Html Msg
 contextLine =
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text "Native work" ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text "Evidence-led system engineering" ]
-        ]
+    p [ class "site-context-line" ]
+        [ text "Native work — evidence-led system engineering" ]
 
 
 {-| The OnyxOS body. `selected` is the active method stage id. -}

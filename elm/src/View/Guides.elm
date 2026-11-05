@@ -113,11 +113,8 @@ contextLine surface =
                 CommunityPage ->
                     "Community"
     in
-    p [ class "public-frame__current-line" ]
-        [ span [ class "public-frame__current-kicker" ] [ text kicker ]
-        , span [ attribute "aria-hidden" "true" ] [ text "·" ]
-        , span [ class "public-frame__current-label" ] [ text "Getting started" ]
-        ]
+    p [ class "site-context-line" ]
+        [ text (kicker ++ " — getting started") ]
 
 
 howtoLink : { href : String, label : String } -> Html Msg

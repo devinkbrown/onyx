@@ -465,3 +465,110 @@ test('keeps chat usable in a compact desktop conversation', async ({ page }) => 
   expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.feedTop);
   expect(geometry.feedHeight).toBeGreaterThanOrEqual(120);
 });
+
+test('keeps compact phone status text hittable beside the size toolbar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(`
+    <!doctype html>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <main class="voice-stage voice-stage--size-compact voice-stage--audio" data-call-state="active" data-testid="voice-stage">
+      <div class="voice-stage__chrome" data-testid="stage-chrome">
+        <button class="voice-stage__size-btn" aria-label="Compact stage">−</button>
+        <button class="voice-stage__size-btn" aria-label="Expand stage">+</button>
+        <button class="voice-stage__size-btn" aria-label="Fullscreen stage">⛶</button>
+      </div>
+      <p class="voice-stage__state" data-testid="voice-stage-state">Call is live</p>
+      <div class="voice-stage__grid" data-count="1">
+        <article class="voice-tile">
+          <div class="voice-tile__avatar-wrap"><span class="onyx-avatar">DJ</span></div>
+          <div class="voice-tile__topbar">
+            <button class="voice-tile__pip" aria-label="Open Dje in picture-in-picture">P</button>
+            <button class="voice-tile__pin" aria-label="Pin Dje">I</button>
+          </div>
+          <div class="voice-tile__bar"><span class="voice-tile__nick">Dje</span></div>
+        </article>
+      </div>
+    </main>
+  `);
+  await page.addStyleTag({ content: `
+    *, *::before, *::after { box-sizing:border-box; }
+    :root { --ink:#020a12; --stone:#123; --stone-2:#234; --stone-3:#345; --paper:#fff; --paper-dim:#ddd; --paper-mute:#aaa; --seam:#456; --seam-faint:#234; --stone-line:#456; --lapis:#168ce0; --lapis-bright:#55baff; --lapis-deep:#075080; --gold:#c90; --gold-bright:#fd5; --shu:#c34; --ok:#4ade80; --r-sm:6px; --r-md:10px; --r-pill:999px; --font-sans:sans-serif; --font-mono:monospace; --dur:0ms; --ease:linear; }
+    html, body { margin:0; width:100%; overflow:hidden; background:var(--ink); }
+    .onyx-avatar { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; }
+    ${voiceCss}
+  ` });
+
+  const status = page.getByTestId('voice-stage-state');
+  const strings = [
+    'Call is live',
+    'Connecting to the call…',
+    'The call is connected, but local media is unavailable. You can stay and listen.',
+  ];
+  for (const text of strings) {
+    await status.evaluate((element, value) => { element.textContent = value; }, text);
+    const geometry = await page.getByTestId('voice-stage').evaluate((stage) => {
+      const state = stage.querySelector<HTMLElement>('.voice-stage__state')!;
+      const chrome = stage.querySelector<HTMLElement>('.voice-stage__chrome')!;
+      const nick = stage.querySelector<HTMLElement>('.voice-tile__nick')!;
+      const pin = stage.querySelector<HTMLElement>('.voice-tile__pin')!;
+      const pip = stage.querySelector<HTMLElement>('.voice-tile__pip')!;
+      const tile = stage.querySelector<HTMLElement>('.voice-tile')!;
+      const range = document.createRange();
+      range.selectNodeContents(state);
+      const rects = [...range.getClientRects()];
+      let hits = 0;
+      let misses = 0;
+      for (const rect of rects) {
+        const steps = Math.max(3, Math.round(rect.width / 12));
+        for (let index = 0; index < steps; index += 1) {
+          const x = rect.left + ((index + 0.5) * rect.width) / steps;
+          const y = rect.top + rect.height / 2;
+          const hit = document.elementFromPoint(x, y);
+          if (hit && (hit === state || state.contains(hit))) hits += 1;
+          else misses += 1;
+        }
+      }
+      const nickRect = nick.getBoundingClientRect();
+      const stateRect = state.getBoundingClientRect();
+      const chromeRect = chrome.getBoundingClientRect();
+      const stageRect = stage.getBoundingClientRect();
+      const tileRect = tile.getBoundingClientRect();
+      const centerHit = (element: HTMLElement) => {
+        const rect = element.getBoundingClientRect();
+        return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      };
+      const nickHit = document.elementFromPoint(nickRect.left + 8, nickRect.top + nickRect.height / 2);
+      const pinHit = centerHit(pin);
+      const pipHit = centerHit(pip);
+      const overlaps = (a: DOMRect, b: DOMRect) => !(
+        a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom
+      );
+      return {
+        hits,
+        misses,
+        overlapsChrome: overlaps(stateRect, chromeRect),
+        overlapsNick: overlaps(stateRect, nickRect),
+        nickClear: nickHit === nick || nick.contains(nickHit),
+        pinClear: pinHit === pin || pin.contains(pinHit),
+        pipClear: pipHit === pip || pip.contains(pipHit),
+        stageHeight: stageRect.height,
+        topGap: tileRect.top - stageRect.top,
+        bottomGap: stageRect.bottom - tileRect.bottom,
+        tileRatio: tileRect.width / stageRect.width,
+        stateWidth: stateRect.width,
+      };
+    });
+    expect(geometry.hits, text).toBeGreaterThan(0);
+    if (text === 'Call is live') expect(geometry.stateWidth, text).toBeLessThan(160);
+    expect(geometry.misses, text).toBe(0);
+    expect(geometry.overlapsChrome, text).toBe(false);
+    expect(geometry.overlapsNick, text).toBe(false);
+    expect(geometry.nickClear, text).toBe(true);
+    expect(geometry.pinClear, text).toBe(true);
+    expect(geometry.pipClear, text).toBe(true);
+    expect(geometry.stageHeight, text).toBeLessThanOrEqual(220);
+    expect(geometry.topGap, text).toBeLessThanOrEqual(16);
+    expect(geometry.bottomGap, text).toBeLessThanOrEqual(16);
+    expect(geometry.tileRatio, text).toBeGreaterThanOrEqual(0.8);
+  }
+});

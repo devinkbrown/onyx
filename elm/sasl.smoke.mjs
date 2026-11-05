@@ -105,6 +105,41 @@ test("SCRAM fails closed on hostile challenges", async () => {
   assert.match(rejected.reason, /server rejected proof/);
 });
 
+test("clearCredentials retires an in-flight SCRAM exchange at every step", async () => {
+  sasl.setCredentials("user", "pencil", false);
+  const first = sasl.scramFirst("user");
+  const nonce = first.bare.split("r=")[1];
+  const serverFirst = `r=${nonce}srv,s=${b64(crypto.randomBytes(16))},i=4096`;
+  sasl.clearCredentials();
+  const afterClear = await sasl.scramNext(ub64(serverFirst));
+  assert.equal(afterClear.kind, "fail");
+  assert.match(afterClear.reason, /no SCRAM exchange in flight/);
+  assert.equal(sasl.plainPayload("user"), null);
+
+  /* Mid-exchange: the client-final was computed, then the credentials are
+     cleared; the server-final can no longer verify against the old state. */
+  sasl.setCredentials("user", "pencil", false);
+  const second = sasl.scramFirst("user");
+  const nonce2 = second.bare.split("r=")[1];
+  const serverFirst2 = `r=${nonce2}srv,s=${b64(crypto.randomBytes(16))},i=4096`;
+  const want = independentFinal({ password: "pencil", clientBare: second.bare, serverFirst: serverFirst2 });
+  const final = await sasl.scramNext(ub64(serverFirst2));
+  assert.equal(final.kind, "send");
+  sasl.clearCredentials();
+  const verify = await sasl.scramNext(ub64(`v=${want.serverSig}`));
+  assert.equal(verify.kind, "fail");
+  assert.equal(sasl.scramVerify(ub64(`v=${want.serverSig}`)).kind, "fail");
+
+  /* Re-storing credentials (a new login attempt) also starts clean. */
+  sasl.setCredentials("user", "pencil", false);
+  sasl.scramFirst("user");
+  sasl.setCredentials("other", "secret", false);
+  const replaced = await sasl.scramNext(ub64(serverFirst));
+  assert.equal(replaced.kind, "fail");
+  assert.match(replaced.reason, /no SCRAM exchange in flight/);
+  sasl.clearCredentials();
+});
+
 test("constant-time compare is length-strict", () => {
   assert.equal(sasl.equal("abc", "abc"), true);
   assert.equal(sasl.equal("abc", "abd"), false);

@@ -7,7 +7,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { createHash } from "node:crypto";
 
 const require = createRequire(import.meta.url);
 require("./ports.js");
@@ -42,10 +41,6 @@ function memDeps(extra) {
 const SERVER = "wss://irc.example:6697";
 const ACCOUNT = "alice";
 const NODE = "0123456789abcdef";
-
-function hex(bytes) {
-  return Buffer.from(bytes).toString("hex");
-}
 
 /* Independent oracle for the enroll transcript:
    "ONYX-ACCOUNT-IDENTITY-v1" || 0x00 || account || 0x00 || label || 0x00 || pub(32). */

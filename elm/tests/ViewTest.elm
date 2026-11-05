@@ -14,6 +14,7 @@ import Expect
 import Stats
 import Html
 import Html.Attributes as Attr
+import Ids
 import Isupport
 import Json.Encode as Encode
 import Media
@@ -21,6 +22,7 @@ import Moderation
 import Prefs
 import RoomMedia exposing (RoomMediaFilter(..))
 import Route
+import RuntimeDomain
 import Test exposing (Test, describe, test)
 import Status
 import Test.Html.Event as Event
@@ -39,6 +41,30 @@ import View.Trust exposing (houseRules, trustPageForPath)
 feed : Model -> String -> Model
 feed model line =
     Tuple.first (update (WsLineReceived line) model)
+
+
+feedServerNotice : Model -> String -> Model
+feedServerNotice model line =
+    let
+        registered =
+            feed model (":irc.example 001 " ++ model.ourNick ++ " :welcome")
+    in
+    feed registered line
+
+
+feedMultiline : Model -> String -> String -> List String -> Model
+feedMultiline model ref target parts =
+    let
+        opened =
+            feed model ("BATCH +" ++ ref ++ " draft/multiline " ++ target)
+
+        withParts =
+            List.foldl
+                (\part current -> feed current ("@batch=" ++ ref ++ " :alice!u@h PRIVMSG " ++ target ++ " :" ++ part))
+                opened
+                parts
+    in
+    feed withParts ("BATCH -" ++ ref)
 
 
 {-| Allow one URL for the newest #c row (per-instance consent keys ride
@@ -208,7 +234,191 @@ bigModel =
 suite : Test
 suite =
     describe "View"
-        [ test "blank model renders the welcome empty state" <|
+        [ test "sending from history returns to the live window despite old unread anchors" <|
+            \_ ->
+                let
+                    reading = { bigModel | composer = "new own message", threadPageStart = Just 0, historyLanding = Just "old", searchOpen = True, viewUnreadDividerId = Dict.singleton "#c" 1 }
+                    sent = Tuple.first (update ComposerSend reading)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ( Nothing, Nothing, False ) ( sent.threadPageStart, sent.historyLanding, sent.searchOpen )
+                    , \_ -> Expect.equal True sent.ignoreUnreadAnchor
+                    , \_ -> query sent |> Query.has [ Selector.text "new own message" ]
+                    ] ()
+        , test "pin landing overrides an active search in another window" <|
+            \_ ->
+                let
+                    searching = { bigModel | searchOpen = True, searchQuery = "row-149", channels = Dict.map (\_ channel -> { channel | messages = List.map (\row -> { row | msgid = Just ("m" ++ String.fromInt row.id) }) channel.messages }) bigModel.channels }
+                    landed = Tuple.first (update (PinnedMessageJump { channel = "#c", messageId = "m1" }) searching)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False landed.searchOpen
+                    , \_ -> query landed |> Query.has [ Selector.text "row-1" ]
+                    ] ()
+        , test "scroll reports from another conversation cannot change reading state" <|
+            \_ ->
+                let
+                    stale = Tuple.first (update (ThreadFollowChanged { target = "#old", following = False }) channelModel)
+                    reading = Tuple.first (update (ThreadFollowChanged { target = "#c", following = False }) stale)
+                    latest = Tuple.first (update ThreadShowLatest { reading | historyLanding = Just "old", searchOpen = True })
+                in
+                Expect.equal ( True, False, ( True, Nothing, False ) )
+                    ( stale.threadFollowing, reading.threadFollowing, ( latest.threadFollowing, latest.historyLanding, latest.searchOpen ) )
+        , test "filtered buffers share window offsets with the visible transcript" <|
+            \_ ->
+                let
+                    filtered =
+                        { bigModel
+                            | channels = Dict.map (\_ channel -> { channel | messages = List.map (\row -> { row | topic = if row.id <= 3 then "small" else "other" }) channel.messages }) bigModel.channels
+                            , activeChannelTopics = Dict.singleton "#c" "small"
+                        }
+                in
+                query filtered |> Query.findAll [ Selector.class "onyx-message" ] |> Query.count (Expect.equal 3)
+        , test "collapsing senders cannot leave offsets past the visible buffer" <|
+            \_ ->
+                let
+                    filtered =
+                        { bigModel
+                            | channels = Dict.map (\_ channel -> { channel | messages = List.map (\row -> { row | from = if row.id <= 3 then "visible" else "hidden" }) channel.messages }) bigModel.channels
+                            , collapsedNicks = Set.singleton "hidden"
+                        }
+                in
+                query filtered |> Query.findAll [ Selector.class "onyx-message" ] |> Query.count (Expect.equal 3)
+        , test "offline older-history requests produce no wire commands" <|
+            \_ ->
+                Expect.equal [] (Tuple.second (requestRewindHistory { channelModel | connection = Offline } "#c"))
+        , test "chat-name submission waits for the server and ignores duplicates" <|
+            \_ ->
+                let
+                    ( waiting, sent ) = update ConnectionNickSubmit { blank | connectionNickDraft = "newname" }
+                    ( duplicate, duplicateSent ) = update ConnectionNickSubmit waiting
+                    confirmed = feed waiting ":me!u@h NICK :newname"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "NICK newname\r\n" ] sent
+                    , \_ -> Expect.equal [] duplicateSent
+                    , \_ -> Expect.equal "me" duplicate.ourNick
+                    , \_ -> Expect.equal ( "newname", Nothing, Just "Your chat name is now newname." ) ( confirmed.ourNick, confirmed.connectionNickPending, confirmed.connectionNickNotice )
+                    ] ()
+        , test "rejected chat-name change preserves current identity without alias rotation" <|
+            \_ ->
+                let
+                    waiting = Tuple.first (update ConnectionNickSubmit { blank | connectionNickDraft = "taken", nickAliases = [ "fallback" ] })
+                    ( rejected, sent ) = update (WsLineReceived ":server 433 me taken :Nickname in use") waiting
+                in
+                Expect.equal ( ( "me", Nothing, Just "That chat name is already in use. Try another name." ), [] )
+                    ( ( rejected.ourNick, rejected.connectionNickPending, rejected.connectionDialogError ), sent )
+        , test "rail groups rooms and direct messages with selected semantics" <|
+            \_ ->
+                let
+                    joined = feed channelModel ":bob!u@h PRIVMSG me :hello privately"
+                    q = query joined
+                in
+                Expect.all
+                    [ \_ -> Query.has [ Selector.text "Direct messages" ] q
+                    , \_ -> Query.find [ Selector.attribute (Attr.attribute "aria-labelledby" "rail-direct-heading") ] q |> Query.has [ Selector.text "bob" ]
+                    , \_ -> Query.find [ Selector.attribute (Attr.attribute "aria-labelledby" "rail-direct-heading") ] q |> Query.hasNot [ Selector.class "onyx-rail-count" ]
+                    , \_ -> Query.find [ Selector.class "onyx-rail-active" ] q |> Query.has [ Selector.attribute (Attr.attribute "aria-current" "true") ]
+                    ] ()
+        , test "connection opener exposes a modal with the current name" <|
+            \_ ->
+                query (Tuple.first (update ConnectionDialogOpen blank))
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-dialog") ]
+                    |> Query.has [ Selector.text "Your connection", Selector.text blank.ourNick ]
+        , test "Connect is on the home screen and in the top bar" <|
+            \_ ->
+                let
+                    html =
+                        query blank
+                in
+                Expect.all
+                    [ \_ ->
+                        html
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-open") ]
+                            |> Query.has [ Selector.text "Connect" ]
+                    , \_ ->
+                        html
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-open") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ConnectionDialogOpen
+                    , \_ ->
+                        html
+                            |> Query.find [ Selector.class "onyx-empty-actions" ]
+                            |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Connect" ] ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ConnectionDialogOpen
+                    ]
+                    ()
+        , test "offline identity changes emit no wire commands" <|
+            \_ ->
+                let
+                    draft = { blank | connection = Offline, connectionNickDraft = "freshname", connectionAccountDraft = "account" }
+                in
+                Expect.equal ( [], [] )
+                    ( Tuple.second (update ConnectionNickSubmit draft)
+                    , Tuple.second (update ConnectionSignInSubmit draft)
+                    )
+        , test "connection close dismisses the password form" <|
+            \_ ->
+                query (Tuple.first (update ConnectionDialogClose { blank | connectionDialogOpen = True, connectionSignIn = True }))
+                    |> Query.findAll [ Selector.id "connection-password" ]
+                    |> Query.count (Expect.equal 0)
+        , test "pending sign-in recovery disconnects without resending credentials" <|
+            \_ ->
+                Expect.equal [ WsDisconnect ]
+                    (Tuple.second (update ConnectionCancelSignIn { blank | identifyReplyAccount = Just "account" }))
+        , test "pending sign-in offers reconnect recovery" <|
+            \_ ->
+                query { blank | connectionDialogOpen = True, connectionSignIn = True, identifyReplyAccount = Just "account" }
+                    |> Query.has [ Selector.text "Disconnect to retry" ]
+        , test "mobile room control exposes its panel and dispatches the toggle" <|
+            \_ ->
+                query blank
+                    |> Query.find [ Selector.tag "button", Selector.attribute (Attr.attribute "aria-controls" "client-rooms") ]
+                    |> Event.simulate Event.click
+                    |> Event.expect ToggleClientRooms
+        , test "mobile panels switch exclusively and Escape closes them" <|
+            \_ ->
+                let
+                    rooms =
+                        Tuple.first (update ToggleClientRooms blank)
+
+                    members =
+                        Tuple.first (update ToggleClientMembers rooms)
+
+                    closed =
+                        Tuple.first (update NavMenuEscape members)
+                in
+                Expect.equal
+                    [ ( True, False ), ( False, True ), ( False, False ) ]
+                    (List.map (\m -> ( m.clientRoomsOpen, m.clientMembersOpen )) [ rooms, members, closed ])
+        , test "room selection returns the mobile panel to the conversation" <|
+            \_ ->
+                let
+                    opened =
+                        Tuple.first (update ToggleClientRooms channelModel)
+
+                    selected =
+                        Tuple.first (update (ChannelSelect "#c") opened)
+                in
+                Expect.equal ( False, Just "#c" ) ( selected.clientRoomsOpen, selected.activeChannel )
+        , test "open mobile members panel carries matching accessibility state" <|
+            \_ ->
+                let
+                    opened =
+                        Tuple.first (update ToggleClientMembers blank)
+
+                    q =
+                        query opened
+                in
+                Expect.all
+                    [ \_ -> Query.has [ Selector.class "onyx-main-members-open" ] q
+                    , \_ ->
+                        Query.find [ Selector.tag "button", Selector.attribute (Attr.attribute "aria-controls" "client-members") ] q
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-expanded" "true") ]
+                    ]
+                    ()
+        , test "blank model renders the welcome empty state" <|
             \_ ->
                 query blank
                     |> Query.has [ Selector.text "Welcome to Onyx" ]
@@ -446,8 +656,10 @@ suite =
         , test "pins drawer lists newest-first with jump and op unpin" <|
             \_ ->
                 let
+                    -- Operator status only counts inside a room we are in
+                    -- (audit 2026-11-05), so the roster carries us too.
                     withPins =
-                        feed channelModel ":s 818 me #c PINS :m1,m2"
+                        feed (feed channelModel ":s 353 me = #c :me") ":s 818 me #c PINS :m1,m2"
 
                     withMsg =
                         feed withPins "@msgid=m2 :alice!u@h PRIVMSG #c :hello"
@@ -495,6 +707,28 @@ suite =
                     , \_ ->
                         query channelModel
                             |> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "pinned-messages") ]
+                    ]
+                    ()
+        , test "pins drawer shows server provenance badge" <|
+            \_ ->
+                let
+                    open =
+                        { channelModel | showPinnedMessages = True }
+                in
+                Expect.all
+                    [ \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "pins-context") ]
+                            |> Query.has
+                                [ Selector.class "provenance-badge"
+                                , Selector.text "This server"
+                                , Selector.attribute (Attr.attribute "data-scope" "server")
+                                , Selector.attribute (Attr.attribute "aria-label" "Pinned messages provenance: This server. Computed by the connected Onyx/Onyx Server server from server-side history.")
+                                ]
+                    , \_ ->
+                        query { open | activeChannel = Nothing }
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "pinned-messages") ]
+                            |> Query.hasNot [ Selector.class "provenance-badge" ]
                     ]
                     ()
         , test "media panel lists links with tabs and badge" <|
@@ -549,6 +783,7 @@ suite =
 
                     vaultRow =
                         { id = "#c:7"
+                        , wireMessageId = Nothing
                         , target = "#c"
                         , from = "alice"
                         , body = "https://vault.example/old"
@@ -749,8 +984,10 @@ suite =
             \_ ->
                 let
                     withFile =
-                        channelModel
-                            |> (\m -> feed m ":alice!u@h PRIVMSG #c :see this\n[file: a.png] 2.0 KB https://cdn.example.test/a.png")
+                        feedMultiline channelModel "file-image" "#c"
+                            [ "see this"
+                            , "[file: a.png] 2.0 KB https://cdn.example.test/a.png"
+                            ]
 
                     prefsOff =
                         let
@@ -783,7 +1020,10 @@ suite =
             \_ ->
                 let
                     withFile =
-                        feed channelModel ":alice!u@h PRIVMSG #c :see this\n[file: a.png] 2.0 KB https://app.example.test/a.png"
+                        feedMultiline channelModel "same-origin-image" "#c"
+                            [ "see this"
+                            , "[file: a.png] 2.0 KB https://app.example.test/a.png"
+                            ]
 
                     sameOrigin =
                         { withFile | origin = "https://app.example.test" }
@@ -846,7 +1086,10 @@ suite =
             \_ ->
                 let
                     withFile =
-                        feed channelModel ":alice!u@h PRIVMSG #c :watch this\n[file: v.mp4] 1.0 MB https://cdn.example.test/v.mp4"
+                        feedMultiline channelModel "remote-video" "#c"
+                            [ "watch this"
+                            , "[file: v.mp4] 1.0 MB https://cdn.example.test/v.mp4"
+                            ]
 
                     remote =
                         { withFile | origin = "https://app.example.test" }
@@ -883,7 +1126,10 @@ suite =
             \_ ->
                 let
                     withFile =
-                        feed channelModel ":alice!u@h PRIVMSG #c :hear this\n[file: a.mp3] 1.0 MB https://app.example.test/a.mp3"
+                        feedMultiline channelModel "same-origin-audio" "#c"
+                            [ "hear this"
+                            , "[file: a.mp3] 1.0 MB https://app.example.test/a.mp3"
+                            ]
 
                     sameOrigin =
                         { withFile | origin = "https://app.example.test" }
@@ -905,7 +1151,7 @@ suite =
             \_ ->
                 let
                     ( queued, _ ) =
-                        update (OutboxQueued { id = "ob-9", target = "#c", text = "later", queuedAt = 5 }) channelModel
+                        update (OutboxQueued { id = "ob-9", target = "#c", text = "later", queuedAt = 5, revision = Nothing }) channelModel
 
                     q =
                         query queued
@@ -1108,6 +1354,9 @@ suite =
                     owned =
                         Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m9" }) { base | caps = [ "draft/message-editing", "draft/message-redaction" ] })
 
+                    ownedCanonical =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m9" }) { base | caps = [ "message-editing", "message-redaction" ] })
+
                     asked =
                         Tuple.first (update MessageMenuDeleteAsk owned)
                 in
@@ -1139,7 +1388,7 @@ suite =
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.hasNot [ Selector.text "Edit", Selector.text "Delete for everyone" ]
+                            |> Query.hasNot [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Reply to alice") ]
@@ -1168,16 +1417,20 @@ suite =
                     , \_ ->
                         query owned
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.has [ Selector.text "Edit", Selector.text "Delete for everyone" ]
+                            |> Query.has [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
+                    , \_ ->
+                        query ownedCanonical
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
                     , \_ ->
                         query owned
-                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Delete message from me for everyone") ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Request server-history deletion for message from me") ]
                             |> Event.simulate Event.click
                             |> Event.expect MessageMenuDeleteAsk
                     , \_ ->
                         query asked
                             |> Query.find [ Selector.class "onyx-msg-menu-delete-confirm" ]
-                            |> Query.has [ Selector.text "Delete for everyone?", Selector.text "Keep message" ]
+                            |> Query.has [ Selector.text "Remove from server history?", Selector.text "Keep message" ]
                     , \_ ->
                         query asked
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Keep message from me") ]
@@ -1187,7 +1440,7 @@ suite =
                         query asked
                             |> Query.find
                                 [ Selector.tag "button"
-                                , Selector.attribute (Attr.attribute "aria-label" "Confirm deleting message from me for everyone")
+                                , Selector.attribute (Attr.attribute "aria-label" "Confirm removing message from me from server history")
                                 ]
                             |> Event.simulate Event.click
                             |> Event.expect (MessageDeleteRequested "#c" "m9")
@@ -1929,8 +2182,57 @@ suite =
                 Expect.all
                     [ \_ -> Query.has [ Selector.class "onyx-latest-button" ] (query paged)
                     , \_ -> Query.has [ Selector.class "onyx-earlier-button" ] (query paged)
-                    , \_ -> Query.hasNot [ Selector.class "onyx-earlier-button" ] (query channelModel)
+                    , \_ -> Query.has [ Selector.class "onyx-earlier-button" ] (query channelModel)
                     , \_ -> Query.hasNot [ Selector.class "onyx-latest-button" ] (query channelModel)
+                    ]
+                    ()
+        , test "paged day labels compare the first visible row with its predecessor" <|
+            \_ ->
+                let
+                    sunday =
+                        1705233600000
+
+                    monday =
+                        1705320000000
+
+                    dayPage =
+                        { bigModel
+                            | zone = Time.utc
+                            , nowMs = monday
+                            , threadPageStart = Just 10
+                            , channels =
+                                Dict.map
+                                    (\_ channel ->
+                                        { channel
+                                            | messages =
+                                                List.map
+                                                    (\row ->
+                                                        { row
+                                                            | at =
+                                                                if row.id < 10 then
+                                                                    sunday
+
+                                                                else
+                                                                    monday
+                                                        }
+                                                    )
+                                                    channel.messages
+                                        }
+                                    )
+                                    bigModel.channels
+                        }
+
+                    q =
+                        query dayPage
+                in
+                Expect.all
+                    [ \_ ->
+                        Query.findAll [ Selector.class "onyx-day-divider" ] q
+                            |> Query.count (Expect.equal 0)
+                    , \_ ->
+                        Query.findAll [ Selector.class "onyx-message" ] q
+                            |> Query.count (Expect.equal 120)
+                    , \_ -> Query.has [ Selector.text "row-11" ] q
                     ]
                     ()
         , test "thread renders the unread divider above its boundary row" <|
@@ -2057,7 +2359,7 @@ suite =
                         Query.find [ Selector.class "onyx-ident-action" ] q
                             |> Query.has [ Selector.text "alias" ]
                     , \_ -> Query.hasNot [ Selector.class "onyx-reclaim" ] q
-                    , \_ -> Query.hasNot [ Selector.class "onyx-ident-action" ] shut
+                    , \_ -> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Choose your chat name or sign in") ] shut
                     ]
                     ()
         , test "reclaim dialog gates submit on the password" <|
@@ -2157,10 +2459,10 @@ suite =
             \_ ->
                 let
                     one =
-                        feed channelModel ":s NOTE MEMO :from bob :hello"
+                        feedServerNotice channelModel ":irc.example NOTICE me :MEMO from bob :hello"
 
                     two =
-                        feed one ":s NOTE MEMO :from bob :again"
+                        feed one ":irc.example NOTICE me :MEMO from bob :again"
                 in
                 Expect.all
                     [ \_ ->
@@ -2177,7 +2479,7 @@ suite =
             \_ ->
                 let
                     memoed =
-                        feed channelModel ":s NOTE MEMO :from bob :hello"
+                        feedServerNotice channelModel ":irc.example NOTICE me :MEMO from bob :hello"
 
                     opened =
                         Tuple.first (update (ChannelSelect "bob") memoed)
@@ -3353,7 +3655,7 @@ suite =
                             Query.findAll [ Selector.class "onyx-scheduled" ] closed
                                 |> Query.count (Expect.equal 0)
                         , \_ -> Query.has [ Selector.text "No scheduled messages." ] opened
-                        , \_ -> Query.has [ Selector.text "Use Send later in the composer to keep a message on this device until later." ] opened
+                        , \_ -> Query.has [ Selector.text "Use Send later in the composer to save a message through private local custody." ] opened
                         ]
                         ()
             , test "open sheet lists owned rows with live state and per-row cancel" <|
@@ -3404,6 +3706,250 @@ suite =
                                 |> Event.expect (SetShowScheduledMessages False)
                         ]
                         ()
+            , test "runtime scheduled rows expose policy review and status-only reconcile controls" <|
+                \_ ->
+                    let
+                        result =
+                            case Ids.requestIdFromRuntime "AAAAAAAAAAAAAAAAAAAAAA" of
+                                Just requestId ->
+                                    case Ids.ownerRefFromRuntime "BBBBBBBBBBBBBBBBBBBBBB" of
+                                        Just ownerRef ->
+                                            case Ids.accountGenerationFromInt 1 of
+                                                Just accountGeneration ->
+                                                    case Ids.connectionGenerationFromInt 1 of
+                                                        Just connectionGeneration ->
+                                                            Just
+                                                                { requestId = requestId
+                                                                , ownerRef = ownerRef
+                                                                , accountGeneration = accountGeneration
+                                                                , connectionGeneration = connectionGeneration
+                                                                , domain = "scheduled"
+                                                                , action = "list"
+                                                                , status = RuntimeDomain.Accepted
+                                                                , completionScope = "local"
+                                                                , reason = Nothing
+                                                                , items = []
+                                                                , draftTarget = Nothing
+                                                                , draftText = Nothing
+                                                                , draftRevision = Nothing
+                                                                , selectedContinuationRef = Nothing
+                                                                , anchorTarget = Nothing
+                                                                , anchorAcceptedTimestamp = Nothing
+                                                                , anchorViewedCandidate = Nothing
+                                                                , scheduledMode = Just "durable"
+                                                                , scheduledLegacyHeldCount = 0
+                                                                , scheduledLegacyReviewUnavailable = False
+                                                                , scheduledViewReady = True
+                                                                , scheduledItems =
+                                                                    [ { scheduleRef = "schedule-policy"
+                                                                      , operationId = Nothing
+                                                                      , conversationId = Just "#room"
+                                                                      , dueAtMs = Just 1700000000000
+                                                                      , messageKind = Just "action"
+                                                                      , replyTo = Just "message-7"
+                                                                      , audiencePrefix = Just '@'
+                                                                      , revision = Just 3
+                                                                      , mode = "durable"
+                                                                      , state = "policy-review"
+                                                                      }
+                                                                    , { scheduleRef = "schedule-unknown"
+                                                                      , operationId = Just "operation-unknown"
+                                                                      , conversationId = Just "#room"
+                                                                      , dueAtMs = Just 1700000000000
+                                                                      , messageKind = Just "message"
+                                                                      , replyTo = Nothing
+                                                                      , audiencePrefix = Nothing
+                                                                      , revision = Just 4
+                                                                      , mode = "durable"
+                                                                      , state = "delivery-unknown"
+                                                                      }
+                                                                    ]
+                                                                , sessionRecovery = Nothing
+                                                                , passkeyManagement = Nothing
+                                                                , sessionInventory = Nothing
+                                                                , sessionRevocation = Nothing
+                                                                , accountCommunity = Nothing
+                                                                , serviceIntegration = Nothing
+                                                                , draftRecovery = Nothing
+                                                                , mediaQuality = Nothing
+                                                                , mediaControl = Nothing
+                                                                }
+
+                                                        Nothing ->
+                                                            Nothing
+
+                                                Nothing ->
+                                                    Nothing
+
+                                        Nothing ->
+                                            Nothing
+
+                                Nothing ->
+                                    Nothing
+                    in
+                    case result of
+                        Nothing ->
+                            Expect.fail "Expected valid private-runtime identifiers for scheduled view fixture"
+
+                        Just runtimeResult ->
+                            let
+                                sheet =
+                                    query { blank | showScheduledMessages = True, runtimeDomainResult = Just runtimeResult }
+                            in
+                            Expect.all
+                                [ \_ -> Query.has [ Selector.text "Review required before dispatch", Selector.text "Delivery outcome unknown" ] sheet
+                                , \_ -> Query.has [ Selector.text "Review the saved message before dispatch. Policy changed after it was scheduled." ] sheet
+                                , \_ -> Query.has [ Selector.text "Checking status will only reconcile its existing record; it will not send again." ] sheet
+                                , \_ ->
+                                    Query.find [ Selector.class "onyx-scheduled-edit" ] sheet
+                                        |> Event.simulate Event.click
+                                        |> Event.expect
+                                            (EditRuntimeScheduledMessage
+                                                { scheduleRef = "schedule-policy"
+                                                , revision = 3
+                                                , target = "#room"
+                                                , dueAtMs = 1700000000000
+                                                , messageKind = "action"
+                                                , replyTo = Just "message-7"
+                                                , audiencePrefix = Just '@'
+                                                }
+                                            )
+                                , \_ ->
+                                    Query.find [ Selector.class "onyx-scheduled-status" ] sheet
+                                        |> Event.simulate Event.click
+                                        |> Event.expect (CheckRuntimeScheduledMessageStatus { scheduleRef = "schedule-unknown", revision = 4 })
+                                , \_ -> Query.hasNot [ Selector.text "Resend", Selector.text "Send again" ] sheet
+                                ]
+                                ()
+            , test "scheduled pump observations repaint rows without clearing an interactive request" <|
+                \_ ->
+                    case Ids.requestIdFromRuntime "AAAAAAAAAAAAAAAAAAAAAA" of
+                        Nothing ->
+                            Expect.fail "Expected a valid pending runtime request ID"
+
+                        Just pendingRequest ->
+                            let
+                                ownerRef =
+                                    "BBBBBBBBBBBBBBBBBBBBBB"
+
+                                item =
+                                    { scheduleRef = "scheduled_observation_ref_0001"
+                                    , operationId = Just "scheduled_observation_operation"
+                                    , conversationId = Just "#fresh-room"
+                                    , dueAtMs = Just 1900000000000
+                                    , messageKind = Just "message"
+                                    , replyTo = Nothing
+                                    , audiencePrefix = Nothing
+                                    , revision = Just 8
+                                    , mode = "durable"
+                                    , state = "scheduled"
+                                    }
+
+                                base =
+                                    { blank
+                                        | showScheduledMessages = True
+                                        , runtimeOwnerStamp =
+                                            Just
+                                                { ownerRef = ownerRef
+                                                , networkId = "network"
+                                                , accountId = Nothing
+                                                , accountGeneration = 2
+                                                , connectionGeneration = 3
+                                                }
+                                        , runtimeDomainPending = Just pendingRequest
+                                        , runtimeDomainPendingAction = Just RuntimeDomain.ScheduledList
+                                    }
+
+                                observation =
+                                    { ownerRef = ownerRef
+                                    , accountGeneration = 2
+                                    , connectionGeneration = 3
+                                    , domain = "scheduled"
+                                    , sequence = 1
+                                    , securityStatus = Nothing
+                                    , sessionRecovery = Nothing
+                                    , passkeyManagement = Nothing
+                                    , sessionInventory = Nothing
+                                    , sessionRevocation = Nothing
+                                    , accountCommunity = Nothing
+                                    , serviceIntegration = Nothing
+                                    , draftRecovery = Nothing
+                                    , mediaQuality = Nothing
+                                    , mediaControl = Nothing
+                                    , webAuthn = Nothing
+                                    , scheduledView =
+                                        Just
+                                            { mode = "durable"
+                                            , legacyHeldCount = 0
+                                            , legacyReviewUnavailable = False
+                                            , items = [ item ]
+                                            }
+                                    }
+                            in
+                            case ( Ids.ownerRefFromRuntime ownerRef, Ids.accountGenerationFromInt 2, Ids.connectionGenerationFromInt 3 ) of
+                                ( Just typedOwnerRef, Just accountGeneration, Just connectionGeneration ) ->
+                                    let
+                                        staleResult =
+                                            { requestId = pendingRequest
+                                            , ownerRef = typedOwnerRef
+                                            , accountGeneration = accountGeneration
+                                            , connectionGeneration = connectionGeneration
+                                            , domain = "scheduled"
+                                            , action = "list"
+                                            , status = RuntimeDomain.Accepted
+                                            , completionScope = "local"
+                                            , reason = Nothing
+                                            , items = []
+                                            , draftTarget = Nothing
+                                            , draftText = Nothing
+                                            , draftRevision = Nothing
+                                            , selectedContinuationRef = Nothing
+                                            , anchorTarget = Nothing
+                                            , anchorAcceptedTimestamp = Nothing
+                                            , anchorViewedCandidate = Nothing
+                                            , scheduledMode = Just "durable"
+                                            , scheduledLegacyHeldCount = 0
+                                            , scheduledLegacyReviewUnavailable = False
+                                            , scheduledViewReady = True
+                                            , sessionRecovery = Nothing
+                                            , passkeyManagement = Nothing
+                                            , sessionInventory = Nothing
+                                            , sessionRevocation = Nothing
+                                            , accountCommunity = Nothing
+                                            , serviceIntegration = Nothing
+                                            , draftRecovery = Nothing
+                                            , mediaQuality = Nothing
+                                            , mediaControl = Nothing
+                                            , scheduledItems =
+                                                [ { scheduleRef = "stale_observation_ref_0001"
+                                                  , operationId = Just "stale_observation_operation"
+                                                  , conversationId = Just "#old-room"
+                                                  , dueAtMs = Just 1800000000000
+                                                  , messageKind = Just "message"
+                                                  , replyTo = Nothing
+                                                  , audiencePrefix = Nothing
+                                                  , revision = Just 7
+                                                  , mode = "durable"
+                                                  , state = "policy-review"
+                                                  }
+                                                ]
+                                            }
+
+                                        ( updated, effects ) =
+                                            update (RuntimeDomainObservationReceived observation) { base | runtimeDomainResult = Just staleResult }
+                                    in
+                                    Expect.all
+                                        [ \_ -> query updated |> Query.has [ Selector.text "#fresh-room" ]
+                                        , \_ -> query updated |> Query.hasNot [ Selector.text "#old-room" ]
+                                        , \_ -> Expect.equal (Just pendingRequest) updated.runtimeDomainPending
+                                        , \_ -> Expect.equal (Just RuntimeDomain.ScheduledList) updated.runtimeDomainPendingAction
+                                        , \_ -> Expect.equal (Just staleResult) updated.runtimeDomainResult
+                                        , \_ -> Expect.equal [] effects
+                                        ]
+                                        ()
+
+                                _ ->
+                                    Expect.fail "Expected valid scheduled observation owner generations"
             , test "composer send-later disables with reason and opens the picker" <|
                 \_ ->
                     let
@@ -3745,14 +4291,12 @@ suite =
                     Expect.all
                         [ \_ ->
                             q
-                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Join call in #room" ] ]
-                                |> Event.simulate Event.click
-                                |> Event.expect (CallJoin { channel = "#room", video = False })
+                                |> Query.find [ Selector.class "onyx-calls-join-voice" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "data-onyx-media-conversation" "#room") ]
                         , \_ ->
                             q
-                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Join with video in #room" ] ]
-                                |> Event.simulate Event.click
-                                |> Event.expect (CallJoin { channel = "#room", video = True })
+                                |> Query.find [ Selector.class "onyx-calls-join-video" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "data-onyx-media-conversation" "#room") ]
                         ]
                         ()
             , test "live call offers mute and leave" <|
@@ -3772,7 +4316,7 @@ suite =
                     Expect.all
                         [ \_ ->
                             q
-                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Mute" ] ]
+                                |> Query.find [ Selector.class "onyx-calls-mute" ]
                                 |> Event.simulate Event.click
                                 |> Event.expect CallToggleMute
                         , \_ ->
@@ -3790,7 +4334,7 @@ suite =
                     |> Event.expect ToggleCalls
             ]
         , describe "landing"
-            [ test "landing renders hero, trust, board, and shelf" <|
+            [ test "landing renders intro, ways-in ledger, trust, and shelf" <|
                 \_ ->
                     let
                         q =
@@ -3799,27 +4343,31 @@ suite =
                     Expect.all
                         [ \_ -> Query.has [ Selector.text "Good company." ] q
                         , \_ -> Query.has [ Selector.text "Great nights." ] q
+                        , \_ -> Query.has [ Selector.text "Three ways in" ] q
                         , \_ -> Query.has [ Selector.text "No ads" ] q
-                        , \_ -> Query.has [ Selector.text "Meet people" ] q
                         , \_ -> Query.has [ Selector.text "More to explore" ] q
                         , \_ ->
-                            Query.find [ Selector.tag "a", Selector.containing [ Selector.text "Open Onyx" ] ] q
+                            Query.find [ Selector.class "site-cta" ] q
+                                |> Query.find [ Selector.tag "a", Selector.containing [ Selector.text "Open Onyx" ] ]
                                 |> Query.has [ Selector.attribute (Attr.href "/app/") ]
                         ]
                         ()
-            , test "board tabs switch the panel" <|
+            , test "landing ledger shows every route at once with no tabs" <|
                 \_ ->
                     let
-                        switched =
-                            Tuple.first (update (SelectBoardTab "bring-people") { blank | route = Route.Landing })
+                        q =
+                            query { blank | route = Route.Landing }
                     in
                     Expect.all
                         [ \_ ->
-                            query switched
-                                |> Query.has [ Selector.text "Bring your people along." ]
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "ways-in-ledger") ] q
+                                |> Query.has
+                                    [ Selector.text "Walk into the public room."
+                                    , Selector.text "Bring your people along."
+                                    , Selector.text "Get oriented, then join in."
+                                    ]
                         , \_ ->
-                            query { blank | route = Route.Landing }
-                                |> Query.has [ Selector.text "Walk into the public room." ]
+                            Query.hasNot [ Selector.attribute (Attr.attribute "role" "tablist") ] q
                         ]
                         ()
             , test "landing carries the public title" <|
@@ -3863,7 +4411,7 @@ suite =
                     Expect.all
                         [ \_ ->
                             query { blank | route = Route.NotFound }
-                                |> Query.find [ Selector.class "public-frame__menu-toggle" ]
+                                |> Query.find [ Selector.class "site-menu-toggle" ]
                                 |> Event.simulate Event.click
                                 |> Event.expect ToggleNavMenu
                         , \_ -> Expect.equal True opened.navMenuOpen
@@ -4004,11 +4552,10 @@ suite =
                                 |> Query.has [ Selector.text "Rooms for people you already like." ]
                         , \_ ->
                             q
-                                |> Query.find [ Selector.tag "figcaption" ]
-                                |> Query.has [ Selector.text "This is an explanation, not a live room." ]
+                                |> Query.has [ Selector.text "A quiet harbor. The rooms stay open when you come back." ]
                         , \_ ->
                             q
-                                |> Query.findAll [ Selector.class "ab-who-card" ]
+                                |> Query.findAll [ Selector.class "site-who-row" ]
                                 |> Query.count (Expect.equal 3)
                         , \_ ->
                             q
@@ -5124,14 +5671,14 @@ suite =
                                 |> Query.has [ Selector.text "Local language tools" ]
                         , \_ ->
                             query { blank | route = Route.Appearance, translationAvailable = True }
-                                |> Query.find [ Selector.tag "select" ]
+                                |> Query.find [ Selector.tag "select", Selector.containing [ Selector.text "English" ] ]
                                 |> Query.has
                                     [ Selector.text "English"
                                     , Selector.text "Japanese"
                                     ]
                         , \_ ->
                             query { blank | route = Route.Appearance, translationAvailable = True }
-                                |> Query.find [ Selector.tag "select" ]
+                                |> Query.find [ Selector.tag "select", Selector.containing [ Selector.text "English" ] ]
                                 |> Event.simulate (Event.custom "change" (Encode.object [ ( "target", Encode.object [ ( "value", Encode.string "ja" ) ] ) ]))
                             |> Event.expect (TranslationTargetSet { target = "ja" })
                         , \_ ->
@@ -5426,11 +5973,16 @@ suite =
                                     , ourNick = "kai"
                                     , accountOpen = True
                                     , passkeyBrowserSupported = Just True
+                                    , passkeyManagementView = Just
+                                        { requestId = "passkey_view_request_000001"
+                                        , status = "ready"
+                                        , operation = Just "list"
+                                        , rows = [ { credentialRef = "passkey_ref_opaque_00000001", label = "laptop", signCount = "3", createdUnix = "1700000000" } ]
+                                        , reason = Nothing
+                                        }
                                     , passkey =
                                         { base
                                             | supported = Just True
-                                            , creds =
-                                                [ { id = "c1", label = "laptop", signCount = 3, createdAt = Nothing } ]
                                         }
                                 }
                     in
@@ -5438,13 +5990,15 @@ suite =
                         [ \_ ->
                             Query.has [ Selector.text "Passkeys", Selector.text "laptop" ] q
                         , \_ ->
+                            Query.hasNot [ Selector.text "passkey_ref_opaque_00000001" ] q
+                        , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "aria-label" "Rename laptop") ] q
                                 |> Event.simulate Event.click
-                                |> Event.expect (PasskeyRenameStarted { id = "c1", label = "laptop" })
+                                |> Event.expect (PasskeyRenameStarted { id = "passkey_ref_opaque_00000001", label = "laptop" })
                         , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "aria-label" "Remove laptop") ] q
                                 |> Event.simulate Event.click
-                                |> Event.expect (PasskeyRemoveArmed "c1")
+                                |> Event.expect (PasskeyRemoveArmed "passkey_ref_opaque_00000001")
                         , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "account-passkey-refresh") ] q
                                 |> Event.simulate Event.click

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "itemId": "E02",
+  "scope": {
+    "kind": "package",
+    "id": "E02"
+  },
+  "reviewer": {
+    "name": "Sol",
+    "role": "independent source reviewer"
+  },
+  "verdict": "accepted",
+  "summary": "Accept the bounded contract correction and validator-concordance package: revision-4 contract source review, candidate-6 client/server contract suites, and candidate-7 agreement from both validators. Candidate-5 disagreement is historical. This review does not accept runtime crypto or durable-denial behavior, broader policy, M0, scenarios, or release readiness.",
+  "sourceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/contracts.md",
+      "sha256": "e208a72ab9f178266effb5542d7fe4dba95b328ba4eaf386814fab662a895dd6"
+    },
+    {
+      "path": "tools/check-server-contract-v2.mjs",
+      "sha256": "cbb5b6fbfc1cca7ea5a6449b9632c347f45afed64f59034a991f9448dcb2c3df"
+    },
+    {
+      "path": "docs/protocol/onyx-client-contract.v2.json",
+      "sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e"
+    }
+  ],
+  "evidenceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/evidence/E02-contracts-revision-4-reviewed.md",
+      "sha256": "e208a72ab9f178266effb5542d7fe4dba95b328ba4eaf386814fab662a895dd6"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-client-contract-tests-candidate-6.txt",
+      "sha256": "8e62c4406fdd1f2c64eb20e9139ebc0ad3fb6f82e678ca07887ad50ad63cb271"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-server-contract-tests-candidate-6.txt",
+      "sha256": "e41d18fee0fa2ace9fc902d9568a47f347328927583470fbdc54d8a08454c526"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-validator-concordance-1793790654888.json",
+      "sha256": "879bf458bad1bb9bff001ec0ed684b19322cd386ecad0d39815d2486d916100f"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-validator-concordance-candidate-7.txt",
+      "sha256": "acebc0dbb6a7c8f4b8584f9a48cfb25dfd90e684587e634b81e5a3cce351d3af"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-client-contract-checker-v2.mjs",
+      "sha256": "cbb5b6fbfc1cca7ea5a6449b9632c347f45afed64f59034a991f9448dcb2c3df"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-server-client-contract-checker.py",
+      "sha256": "db24c5d8ed7f452c99edfa3bbbeb3c44e4165ac40319b50fb75e70dc6053de1e"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-client-contract-v2.json",
+      "sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E02-server-contract-v2.json",
+      "sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/candidate-27-source-manifest.json",
+      "sha256": "2a23322a2a67832d8c35f457a0cbe64a1cbfb08b70bfaa9d1708e733a11c1ee2"
+    }
+  ],
+  "applicability": {
+    "configuration": {
+      "status": "not-applicable",
+      "reason": "This bounded review covers contract corrections and offline validator concordance; it does not claim acceptance of negotiated capabilities or endpoint configuration."
+    },
+    "deployment": {
+      "status": "not-applicable",
+      "reason": "This bounded package review makes no deployment or release-readiness claim."
+    }
+  }
+}

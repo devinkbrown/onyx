@@ -1,4 +1,4 @@
-module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, topbar)
+module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
 
 {-| Shell top bar: brand mark, active-channel topic, connection pill.
 -}
@@ -8,6 +8,9 @@ import Dict
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import View.Inbox exposing (inbox)
+import Session
+import RuntimeDomain
 
 
 topbar : Model -> Html Msg
@@ -18,6 +21,32 @@ topbar model =
             , h1 [] [ text "Onyx" ]
             ]
         , div [ class "onyx-topic" ] [ text (activeTopic model) ]
+        , clientTools model
+        , button
+            [ type_ "button"
+            , attribute "aria-label" ("Connect. " ++ connectionLabel model)
+            , attribute "aria-haspopup" "dialog"
+            , attribute "data-testid" "connection-open"
+            , onClick ConnectionDialogOpen
+            , classList
+                [ ( "onyx-conn", True )
+                , ( "onyx-conn-live", model.connection == App.Live )
+                , ( "onyx-conn-connecting", model.connection == App.Registering )
+                ]
+            ]
+            [ span [ class "onyx-dot" ] []
+            , span [ class "onyx-conn-name" ] [ text "Connect" ]
+            , span [ class "onyx-conn-state" ] [ text (connectionLabel model) ]
+            ]
+        , identityChip model
+        ]
+
+
+clientTools : Model -> Html Msg
+clientTools model =
+    div [ class "onyx-topbar-tools", attribute "role" "group", attribute "aria-label" "Conversation tools" ]
+        [ clientPanelToggle "Rooms" "client-rooms" model.clientRoomsOpen ToggleClientRooms
+        , clientPanelToggle "Members" "client-members" model.clientMembersOpen ToggleClientMembers
         , button
             [ class "onyx-calls-toggle"
             , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]
@@ -40,18 +69,20 @@ topbar model =
             [ text "Search" ]
         , pinsToggle model
         , mediaToggle model
-        , div
-            [ classList
-                [ ( "onyx-conn", True )
-                , ( "onyx-conn-live", model.connection == App.Live )
-                , ( "onyx-conn-connecting", model.connection == App.Registering )
-                ]
-            ]
-            [ span [ class "onyx-dot" ] []
-            , text (connectionLabel model)
-            ]
-        , identityChip model
+        , inbox model
         ]
+
+
+clientPanelToggle : String -> String -> Bool -> Msg -> Html Msg
+clientPanelToggle label panelId open message =
+    button
+        [ class "onyx-client-panel-toggle"
+        , type_ "button"
+        , attribute "aria-controls" panelId
+        , attribute "aria-expanded" (if open then "true" else "false")
+        , onClick message
+        ]
+        [ text label ]
 
 
 {-| Pinned-messages toggle (the ribbon overflow entry in the
@@ -147,6 +178,7 @@ identityChip model =
         attrs =
             [ classList
                 [ ( "onyx-ident", True )
+                , ( "onyx-ident-action", True )
                 , ( "onyx-ident-alias", model.currentNickIsAlias )
                 , ( "onyx-ident-guest", guest )
                 ]
@@ -157,7 +189,7 @@ identityChip model =
         Just target ->
             button
                 (attrs
-                    ++ [ class "onyx-ident-action"
+                    ++ [ type_ "button"
                        , attribute "aria-label" ("Reclaim the nick " ++ target)
                        , onClick ReclaimOpen
                        ]
@@ -171,7 +203,7 @@ identityChip model =
                 Just _ ->
                     button
                         (attrs
-                            ++ [ class "onyx-ident-action"
+                            ++ [ type_ "button"
                                , attribute "aria-label" "Open account settings"
                                , attribute "data-testid" "account-open"
                                , onClick (SetAccountOpen True)
@@ -180,14 +212,17 @@ identityChip model =
                         inner
 
                 Nothing ->
-                    div attrs inner
+                    button
+                        (attrs ++ [ type_ "button", attribute "aria-label" "Choose your chat name or sign in", onClick ConnectionDialogOpen ])
+                        inner
 
 
 {-| Nick reclaim dialog, mirroring the connect form's GHOST reclaim:
 the account password for the taken name, a gated submit, and cancel.
 Rendered in the shell while `reclaimOpen`; the submit reuses the
 in-session GHOST+NICK fold (Elm auto-connects, so there is no
-pre-connect form to return to). Focus trap and Escape stay ahead.
+pre-connect form to return to). Focus trap and Escape are a ports/DOM
+boundary, the same light-dismiss limit as the other dialogs.
 -}
 reclaimDialog : Model -> Html Msg
 reclaimDialog model =
@@ -303,6 +338,88 @@ reconnectBanner model =
                 ]
 
 
+sessionRecoveryBanner : Model -> Html Msg
+sessionRecoveryBanner model =
+    case model.sessionReclaim of
+        Nothing ->
+            if not (List.isEmpty model.sessionTokens.credentials) then
+                div [ class "onyx-session-recovery", attribute "role" "group", attribute "aria-label" "Session attachments" ]
+                    (credentialStatus model ++ rememberControl model)
+
+            else if model.sessionCredentialIssuance == Session.CredentialPending then
+                div [ class "onyx-session-recovery", attribute "role" "status", attribute "aria-live" "polite" ] [ text "Waiting for the server to confirm a new session credential." ]
+
+            else if model.sessionCredentialIssuance == Session.CredentialUnknown then
+                div [ class "onyx-session-recovery", attribute "role" "status" ] [ text "The new session credential outcome is unknown; the previous credential was retained." ]
+
+            else if model.connection == App.Live && model.accountName /= Nothing && not model.sessionTokenIssuanceRequested then
+                div [ class "onyx-session-recovery", attribute "role" "group", attribute "aria-label" "Session attachments" ]
+                    [ span [] [ text "This sign-in has no saved attachment to restore." ]
+                    , button [ type_ "button", onClick SessionNewAttachmentRequested ] [ text "Create a new attachment" ]
+                    ]
+
+            else
+                text ""
+
+        Just notice ->
+            let
+                status =
+                    case ( notice.phase, notice.outcome ) of
+                        ( App.Restoring, _ ) -> "Checking the saved session attachment with the server."
+                        ( App.Reclaimed, Session.ExactRestored ) -> "The exact saved session attachment was restored."
+                        ( App.Reclaimed, Session.NewLegacyAttachment ) -> "The server attached a new session from legacy session state."
+                        ( App.Reclaimed, Session.LogicalRestored ) -> "The server restored the logical session."
+                        ( App.Reclaimed, _ ) -> "The server confirmed a session attachment."
+                        ( App.ReclaimFailed, Session.AttachmentBusy ) -> "This exact attachment is active in another connection. The saved credential is retained."
+                        ( App.ReclaimFailed, Session.MissingAttachment ) -> "The saved attachment is unavailable. No fallback attachment was attempted."
+                        ( App.ReclaimFailed, Session.ResumeRetryable ) -> "Session restore is temporarily unavailable. The saved credential is retained."
+                        ( App.ReclaimFailed, Session.ResumeRevoked ) -> "The server revoked this session credential."
+                        ( App.ReclaimFailed, _ ) -> "The server rejected this session credential."
+                        ( App.SignInAgain, _ ) -> "The saved session credential expired. Sign in again to continue."
+            in
+            div [ class "onyx-session-recovery", attribute "role" "status", attribute "aria-live" "polite" ]
+                ([ span [] [ text status ] ]
+                ++ (if List.isEmpty model.sessionTokens.credentials then [] else rememberControl model)
+                ++ [ if notice.phase == App.ReclaimFailed && List.member notice.outcome [ Session.AttachmentBusy, Session.ResumeRetryable ] && notice.credentialRef /= Nothing then
+                    button [ type_ "button", onClick SessionRetryRequested ] [ text "Retry this attachment" ]
+
+                  else if notice.phase == App.Reclaimed then
+                    button [ type_ "button", onClick SessionNewAttachmentRequested, disabled model.sessionTokenIssuanceRequested ] [ text "Create a new attachment" ]
+
+                  else if notice.phase == App.ReclaimFailed || notice.phase == App.SignInAgain then
+                    button [ type_ "button", onClick SessionNewAttachmentRequested, disabled (model.sessionTokenIssuanceRequested || model.accountName == Nothing) ] [ text "Create a new attachment" ]
+
+                  else
+                    text ""
+                ])
+
+
+credentialStatus : Model -> List (Html Msg)
+credentialStatus model =
+    [ span []
+        [ text
+            (case model.sessionCredentialIssuance of
+                Session.CredentialPending -> "Waiting for the server to confirm a new session credential."
+                Session.CredentialUnknown -> "The latest credential issuance outcome is unknown; saved credentials were preserved."
+                Session.CredentialIdle -> "A session credential is available for this account."
+            )
+        ]
+    ]
+
+
+rememberControl : Model -> List (Html Msg)
+rememberControl model =
+    if model.accountName == Nothing then
+        []
+
+    else
+        [ button
+            [ type_ "button"
+            , disabled (model.sessionCredentialIssuance == Session.CredentialPending)
+            , onClick (App.RuntimeDomainActionRequested (RuntimeDomain.RememberSession (not model.sessionCredentialsRemembered)))
+            ]
+            [ text (if model.sessionCredentialsRemembered then "Stop remembering on this device" else "Remember this session on this device") ]
+        ]
 connectionLabel : Model -> String
 connectionLabel model =
     case model.connection of

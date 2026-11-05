@@ -1,17 +1,18 @@
-/* Onyx Elm shell — abyssal monochrome + single sea-glass accent.
-   System stack, 6px radii, hierarchy via weight/size. No gradients. */
+/* Onyx Elm shell — night-harbor paint shared with the site language:
+   deep ink water, warm paper text, one signal-amber accent, serif display
+   titles over a system-sans working surface. No gradients, no shadows. */
 
 :root {
-  --onyx-bg: #0b0e12;
-  --onyx-panel: #12161c;
-  --onyx-panel-2: #181e27;
-  --onyx-line: #232b36;
-  --onyx-text: #e8e6e1;
-  --onyx-dim: #9aa3ad;
-  --onyx-faint: #5d6670;
-  --onyx-accent: #46c08a;
-  --onyx-accent-ink: #06281a;
-  --onyx-warn: #d9a13b;
+  --onyx-bg: #0e1518;
+  --onyx-panel: #151e22;
+  --onyx-panel-2: #1b252b;
+  --onyx-line: #27343b;
+  --onyx-text: #e9e5d8;
+  --onyx-dim: #9fa9a2;
+  --onyx-faint: #96a39b;
+  --onyx-accent: #e8a33d;
+  --onyx-accent-ink: #14100a;
+  --onyx-warn: #e8a33d;
   --onyx-bad: #e5484d;
   /* Identity-avatar swatch ground (ocean defaults from
      src/styles/tokens.css, so the Avatar gradients resolve). */
@@ -140,7 +141,64 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  min-width: 0;
 }
+
+.onyx-client-panel-toggle { display: none; }
+.onyx-topbar-tools { display: contents; }
+
+.shell-ribbon-inbox { position: relative; flex: none; }
+.shell-ribbon-bell {
+  min-height: 36px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font: inherit;
+  cursor: pointer;
+}
+.shell-ribbon-badge { margin-left: 6px; color: var(--onyx-accent); }
+.notif-center {
+  position: fixed;
+  z-index: 65;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--onyx-panel);
+  color: var(--onyx-text);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+}
+.notif-center__head, .notif-center__filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.notif-center__filters { margin-top: 12px; }
+.notif-center button { min-height: 44px; font: inherit; cursor: pointer; }
+
+/* A consistent control baseline; individual feature classes keep their
+   explicit variants. Low specificity also preserves compact message tools. */
+:where(.onyx-shell) :where(button, input, textarea, select) {
+  font: inherit;
+  color: var(--onyx-text);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  background: var(--onyx-panel-2);
+  padding: 6px 10px;
+}
+:where(.onyx-shell) :where(button) { cursor: pointer; }
+:where(.onyx-shell) :where(button):disabled { cursor: default; opacity: 0.5; }
+:where(.onyx-shell) :where(input, textarea)::placeholder { color: var(--onyx-dim); opacity: 1; }
+.onyx-shell :focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-shell a { color: var(--onyx-accent); text-underline-offset: 3px; }
+.onyx-shell :where(p, h2, h3) { overflow-wrap: anywhere; }
+.onyx-thread-msg-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.notif-center__head h2 { margin: 0; flex: 1; font-size: 18px; }
+.notif-center__head button, .notif-center__filters button { background: var(--onyx-panel-2); }
+.notif-center__filters button[aria-pressed='true'] { border-color: var(--onyx-accent); }
+.onyx-thread-head { flex-wrap: wrap; }
 
 /* Top bar */
 
@@ -156,10 +214,16 @@ html, body {
 .onyx-brand { display: flex; align-items: center; gap: 10px; }
 
 .onyx-brand h1 {
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: 0.02em;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
   margin: 0;
+}
+
+.onyx-shell :focus-visible {
+  outline: 2px solid var(--onyx-accent);
+  outline-offset: 2px;
 }
 
 .onyx-gem {
@@ -182,17 +246,20 @@ html, body {
 }
 
 .onyx-conn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--onyx-dim);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--onyx-text);
   border: 1px solid var(--onyx-line);
   border-radius: 999px;
-  padding: 4px 12px 4px 10px;
+  padding: 6px 14px 6px 10px;
   white-space: nowrap;
+  background: var(--onyx-panel-2);
 }
+.onyx-conn-name { letter-spacing: 0.01em; }
+.onyx-conn-state { color: var(--onyx-dim); font-weight: 600; font-size: 12px; }
 
 .onyx-dot {
   width: 8px;
@@ -339,7 +406,7 @@ html, body {
 .onyx-main {
   flex: 1;
   display: grid;
-  grid-template-columns: 220px 1fr 220px;
+  grid-template-columns: 220px minmax(0, 1fr) 220px;
   min-height: 0;
 }
 
@@ -419,6 +486,7 @@ html, body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px 16px;
 }
@@ -426,6 +494,28 @@ html, body {
 .onyx-thread { display: flex; flex-direction: column; gap: 2px; }
 
 .onyx-message { padding: 3px 0; overflow-wrap: anywhere; }
+/* Skip layout and paint for off-screen rows: a full transcript otherwise costs
+   seconds of main-thread layout per burst on a phone. Containment would clip the
+   focus outline, so a focused row opts out. Menus inside a row are in-flow. */
+.onyx-message:not(:focus-within):not(:focus) { content-visibility: auto; contain-intrinsic-size: auto 48px; }
+
+/* Ruled transcript: full rows open with a hairline, continuations stay
+   tight under their parent. */
+.onyx-message:not(.onyx-continuation) {
+  border-top: 1px solid var(--onyx-line);
+  padding: 8px 0 6px;
+}
+
+.onyx-message:first-child { border-top: 0; }
+
+.onyx-continuation { padding: 1px 0; }
+
+.onyx-message time {
+  color: var(--onyx-faint);
+  font-size: 11px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
 
 .onyx-whisper { border-left: 2px solid var(--onyx-accent); padding-left: 8px; }
 
@@ -461,7 +551,7 @@ html, body {
 
 .onyx-away { opacity: 0.55; }
 
-.onyx-body { color: var(--onyx-text); }
+.onyx-body { color: var(--onyx-text); overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; }
 
 .onyx-locked .onyx-body { color: var(--onyx-dim); font-style: italic; }
 
@@ -474,7 +564,9 @@ html, body {
 
 .onyx-empty h2 {
   color: var(--onyx-text);
-  font-size: 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  font-size: 24px;
   margin: 0 0 8px;
 }
 
@@ -499,6 +591,8 @@ html, body {
 
 .onyx-composer {
   display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
@@ -514,6 +608,7 @@ html, body {
 
 .onyx-composer input {
   flex: 1;
+  min-width: 0;
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
   border-radius: 6px;
@@ -529,6 +624,33 @@ html, body {
 
 .onyx-composer input:disabled { color: var(--onyx-faint); }
 .onyx-composer-error { margin: 0; font-size: 12px; color: var(--onyx-warn); }
+
+.runtime-services-disclosure {
+  flex: 0 0 auto;
+  min-width: 0;
+  border-top: 1px solid var(--onyx-line);
+}
+.runtime-services-disclosure > summary {
+  min-height: 44px;
+  padding: 10px 16px;
+  background: var(--onyx-panel);
+  color: var(--onyx-dim);
+  cursor: pointer;
+  font-weight: 600;
+}
+.runtime-services-disclosure[open] {
+  max-height: min(55dvh, 34rem);
+  overflow-y: auto;
+  background: var(--onyx-panel);
+}
+.runtime-services-disclosure[open] > summary {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+}
+.runtime-services { padding: 12px 16px 20px; }
+.runtime-services-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.runtime-services-actions > button { min-height: 40px; }
 
 .onyx-composer button {
   background: var(--onyx-accent);
@@ -606,9 +728,10 @@ html, body {
 .onyx-calls-where { color: var(--onyx-text); font-weight: 650; }
 
 .onyx-calls-title {
-  font-size: 28px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: 0;
   margin: 12px 0 0;
 }
 
@@ -659,167 +782,6 @@ html, body {
   gap: 8px;
   margin: 16px 0 0;
 }
-
-/* Public landing */
-
-.onyx-landing {
-  margin: 0 auto;
-  max-width: 880px;
-  padding: 64px 24px 96px;
-}
-
-.onyx-land-h1 {
-  font-size: 44px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  margin: 0;
-}
-
-.onyx-land-h1 span { display: block; }
-
-.onyx-land-lede {
-  color: var(--onyx-dim);
-  font-size: 17px;
-  margin: 16px 0 0;
-  max-width: 52ch;
-}
-
-.onyx-land-cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  margin-top: 28px;
-}
-
-.onyx-land-open {
-  background: var(--onyx-accent);
-  border-radius: 6px;
-  color: var(--onyx-accent-ink);
-  font-weight: 650;
-  padding: 10px 22px;
-  text-decoration: none;
-}
-
-.onyx-land-link {
-  align-self: center;
-  color: var(--onyx-text);
-  font-weight: 600;
-}
-
-.onyx-land-note {
-  color: var(--onyx-faint);
-  font-size: 13px;
-  margin: 16px 0 0;
-}
-
-.onyx-land-trust { margin-top: 64px; }
-
-.onyx-land-h2 {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 16px;
-}
-
-.onyx-land-claims {
-  display: grid;
-  gap: 16px;
-  margin: 0;
-}
-
-.onyx-land-claims dt { font-weight: 650; }
-.onyx-land-claims dd { color: var(--onyx-dim); margin: 2px 0 0; }
-
-.onyx-land-detail { color: var(--onyx-dim); margin: 16px 0 0; }
-.onyx-land-detail a { color: var(--onyx-text); }
-
-.onyx-land-board { margin-top: 64px; }
-
-.onyx-land-board-head p {
-  color: var(--onyx-dim);
-  margin: 8px 0 0;
-  max-width: 62ch;
-}
-
-.onyx-land-tabs {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.onyx-land-tabs button {
-  background: transparent;
-  border: 1px solid var(--onyx-line);
-  border-radius: 6px;
-  color: var(--onyx-dim);
-  cursor: pointer;
-  font: inherit;
-  padding: 8px 16px;
-}
-
-.onyx-land-tabs button[aria-selected="true"] {
-  border-color: var(--onyx-accent);
-  color: var(--onyx-text);
-}
-
-.onyx-land-panel {
-  border-top: 1px solid var(--onyx-line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px 48px;
-  margin-top: 20px;
-  padding-top: 20px;
-}
-
-.onyx-land-panel-copy { flex: 1 1 320px; }
-.onyx-land-panel-copy p { color: var(--onyx-dim); }
-
-.onyx-land-h3 {
-  font-size: 17px;
-  font-weight: 700;
-  margin: 0 0 8px;
-}
-
-.onyx-land-action {
-  color: var(--onyx-accent);
-  display: inline-block;
-  font-weight: 650;
-  margin-top: 12px;
-}
-
-.onyx-land-panel-note { font-size: 13px; }
-
-.onyx-land-links {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 200px;
-}
-
-.onyx-land-links a { color: var(--onyx-text); }
-
-.onyx-land-footnote { color: var(--onyx-faint); font-size: 13px; }
-.onyx-land-footnote a { color: var(--onyx-text); }
-
-.onyx-land-shelf { margin-top: 64px; }
-
-.onyx-land-shelf-label {
-  color: var(--onyx-faint);
-  font-size: 13px;
-  font-weight: 650;
-  margin: 0 0 12px;
-}
-
-.onyx-land-shelf-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.onyx-land-shelf-list a { color: var(--onyx-text); }
 
 .onyx-toaster {
   position: fixed;
@@ -1683,3 +1645,302 @@ html, body {
   background: color-mix(in oklab, var(--shu) 10%, transparent);
   color: var(--shu-bright);
 }
+
+/* Phone/tablet client: keep the conversation readable and open sidebars
+   explicitly instead of reserving two desktop columns. */
+@media (max-width: 60rem) {
+  .onyx-topbar {
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    gap: 8px;
+    padding: max(8px, env(safe-area-inset-top)) 12px 8px max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .onyx-brand { order: 0; }
+  .onyx-topbar > .onyx-conn {
+    order: 1;
+    margin-left: auto;
+    min-height: 44px;
+    padding-inline: 14px 12px;
+  }
+  .onyx-topbar > .onyx-ident {
+    order: 2;
+    max-width: 40%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .onyx-ident-nick { overflow: hidden; text-overflow: ellipsis; }
+  .onyx-topic { order: 3; flex-basis: 100%; }
+  .onyx-topbar-tools {
+    order: 4;
+    display: flex;
+    gap: 6px;
+    flex: 1 1 100%;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 2px;
+  }
+  .onyx-topbar-tools > button {
+    flex: none;
+    min-height: 44px;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  .shell-ribbon-bell { min-height: 44px; }
+  .onyx-client-panel-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--onyx-line);
+    border-radius: 6px;
+    color: var(--onyx-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .onyx-client-panel-toggle[aria-expanded='true'] { border-color: var(--onyx-accent); }
+
+  .onyx-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .onyx-main > .onyx-rail,
+  .onyx-main > .onyx-roster { display: none; }
+  /* Rooms and members cover the conversation as a thumb-reachable sheet
+     instead of squeezing the transcript into the leftover half. */
+  .onyx-main-rooms-open > .onyx-rail,
+  .onyx-main-members-open > .onyx-roster {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 45;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    max-height: min(72dvh, 34rem);
+    padding: 16px 12px max(16px, env(safe-area-inset-bottom));
+    background: var(--onyx-panel);
+    border: 0;
+    border-top: 1px solid var(--onyx-line);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 48px #000a;
+    overflow: auto;
+  }
+  .onyx-rail button,
+  .onyx-member { min-height: 44px; }
+  .onyx-member { align-items: center; }
+  .onyx-member-nick { min-width: 0; overflow-wrap: anywhere; }
+  .onyx-thread-pane {
+    padding: 12px 14px 8px;
+    /* The inner transcript stays chronological; reversing its single flex
+       wrapper anchors the latest rows when the phone viewport gets shorter. */
+    flex-direction: column-reverse;
+  }
+  .onyx-message:not(.onyx-continuation) { padding: 12px 0 8px; }
+  .onyx-thread-msg-text, .onyx-body { font-size: 16px; line-height: 1.55; }
+  .onyx-thread-pane > div { flex-shrink: 0; }
+  .onyx-topbar button,
+  .onyx-reconnect,
+  .onyx-shell .guest-claim-chip { flex-wrap: wrap; }
+  .onyx-shell .guest-claim-chip { flex-shrink: 0; }
+  .shell-topic-create { flex-wrap: wrap; min-width: 0; }
+  .shell-topic-create-input { min-width: 0; max-width: 100%; }
+
+  .onyx-composer {
+    gap: 6px;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  }
+  .onyx-composer > * { max-width: 100%; }
+  .onyx-composer-target {
+    order: 0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .onyx-composer > .onyx-schedule { order: 0; }
+  .onyx-composer > input {
+    order: 1;
+    flex: 1 1 calc(100% - 80px);
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .onyx-composer > button[type='submit'] { order: 1; min-height: 44px; }
+  .onyx-composer > div:not(.onyx-schedule),
+  .onyx-composer-error { order: 2; flex-basis: 100%; min-width: 0; }
+  /* Keep the Send later and attachment controls together on the toolbar.
+     Status copy remains visible below them instead of splitting that row. */
+  .onyx-composer > div.onyx-outbox-chrome,
+  .onyx-composer > p.onyx-composer-error { order: 3; flex-basis: 100%; min-width: 0; }
+  .onyx-composer .onyx-schedule-open { min-height: 44px; }
+  .onyx-schedule-pop { max-width: calc(100vw - 24px); }
+  .onyx-schedule-custom { flex-wrap: wrap; }
+  .onyx-schedule-when { min-width: 0; }
+  .onyx-shell input,
+  .onyx-shell textarea,
+  .onyx-shell select { font-size: 16px; }
+  .onyx-calls { padding: 20px 12px; }
+  .chb-filter { min-width: 0; }
+  .chb-row,
+  .chb-header,
+  .chb-create-actions,
+  .onyx-account-actions { flex-wrap: wrap; }
+}
+
+/* Comfortable touch controls without widening the conversation viewport. */
+@media (max-width: 60rem) {
+  .onyx-shell :where(button, select) { min-height: 44px; }
+  .onyx-shell :where(input:not([type='checkbox']):not([type='radio']), textarea) { min-height: 44px; }
+  .onyx-thread-sheet { width: min(420px, 100vw); padding: 16px 12px; }
+  .onyx-thread-msg-text { font-size: 15px; }
+}
+
+/* Conversation and discovery surfaces share the same working language. */
+.onyx-message { display: flow-root; }
+.onyx-row-avatar { float: left; margin: 2px 10px 0 0; }
+.onyx-row-avatar .onyx-avatar { background: var(--onyx-panel-2); }
+.onyx-message .onyx-body { display: block; margin-left: 38px; }
+.onyx-continuation { padding-left: 38px; }
+.onyx-continuation .onyx-body { display: inline; margin-left: 0; }
+.onyx-composer .onyx-attach-open,
+.onyx-composer .onyx-attach-remove {
+  background: transparent; color: var(--onyx-text); border: 1px solid var(--onyx-line);
+}
+.onyx-topbar-tools button[aria-pressed='true'] { border-color: var(--onyx-accent); color: var(--onyx-text); }
+.onyx-message-search {
+  flex-shrink: 0; max-height: 35vh; max-height: 35dvh; overflow-y: auto;
+  padding: 12px 16px; background: var(--onyx-panel); border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-message-search__surface, .onyx-message-search__query-field,
+.onyx-message-search__controls, .onyx-message-search__body {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0;
+}
+.onyx-message-search__query-field { flex: 1; }
+.onyx-message-search__input { width: 100%; min-width: 0; }
+.onyx-message-search__body { margin-top: 10px; }
+.onyx-message-search__count, .onyx-message-search__status { color: var(--onyx-dim); font-size: 12px; }
+.onyx-pins-veil, .onyx-media-veil {
+  position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.55);
+}
+.pins-panel, .room-media-index {
+  width: min(460px, 100%); height: 100%; overflow-y: auto;
+  padding: 20px; background: var(--onyx-panel); border-left: 1px solid var(--onyx-line);
+  overflow-wrap: anywhere;
+}
+.pins-head, .room-media-index-head {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.pins-title, .room-media-index-title { font-size: 18px; font-weight: 600; flex: 1; }
+.pins-context, .room-media-index-context { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.room-media-index-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.room-media-index-filter[aria-selected='true'] { border-color: var(--onyx-accent); }
+.room-media-index-list { list-style: none; padding: 0; margin: 0; }
+.room-media-index-item { padding: 16px 0; border-top: 1px solid var(--onyx-line); }
+.room-media-index-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.room-media-index-picture-frame img { max-width: 100%; max-height: 200px; object-fit: contain; }
+.onyx-account-nav { flex-wrap: wrap; }
+@media (max-width: 60rem) {
+  .onyx-message-search { padding: 10px 12px; }
+  .pins-panel, .room-media-index { padding: 16px 12px max(16px, env(safe-area-inset-bottom)); }
+  .onyx-account { max-height: calc(100dvh - 24px); }
+  .onyx-account-facts { grid-template-columns: minmax(0, 1fr); }
+  .onyx-account-fact__value { margin-bottom: 8px; }
+}
+
+.shell-msg-lightbox {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 12px;
+}
+.shell-msg-lightbox-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.8); }
+.shell-msg-lightbox-dialog {
+  position: relative; width: min(960px, 100%); max-height: calc(100dvh - 24px);
+  overflow: auto; background: var(--onyx-panel); border: 1px solid var(--onyx-line); padding: 12px;
+}
+.shell-msg-lightbox-img { display: block; width: auto; max-width: 100%; max-height: calc(100dvh - 100px); margin: auto; object-fit: contain; }
+.shell-msg-lightbox-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* Connection: one status, one identity choice, one clear next action. */
+.onyx-connect-veil {
+  position: fixed; inset: 0; z-index: 75; display: grid; place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.72);
+}
+.onyx-connect-dialog {
+  width: min(480px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
+  padding: clamp(20px, 4vw, 32px); background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line); border-radius: 16px;
+  box-shadow: 0 24px 80px #000c;
+}
+@media (max-width: 40rem) {
+  .onyx-connect-veil { align-items: end; padding: 0; }
+  .onyx-connect-dialog {
+    width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 18px 18px 0 0;
+    border-bottom: 0;
+    padding: 18px 16px max(20px, env(safe-area-inset-bottom));
+  }
+  .onyx-connect-head { position: sticky; top: 0; z-index: 1; background: var(--onyx-panel); padding-bottom: 8px; }
+  .onyx-connect-head h2 { font-size: 26px; }
+  .onyx-connect-modes { flex-direction: column; }
+  .onyx-connect-form .onyx-connect-primary,
+  .onyx-connect-status button { width: 100%; min-height: 48px; }
+}
+.onyx-connect-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.onyx-connect-head h2 { margin: 0; font-family: Georgia, serif; font-size: 28px; font-weight: 400; line-height: 1.2; }
+.onyx-connect-kicker { margin: 0 0 6px; color: var(--onyx-accent); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.onyx-connect-status { margin: 24px 0; padding: 16px; border: 1px solid var(--onyx-line); border-radius: 8px; }
+.onyx-connect-status-title { font-size: 16px; font-weight: 650; }
+.onyx-connect-status p { margin: 6px 0 12px; color: var(--onyx-dim); }
+.onyx-connect-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.onyx-connect-facts dt { color: var(--onyx-dim); }
+.onyx-connect-facts dd { margin: 0; overflow-wrap: anywhere; }
+.onyx-connect-modes { display: flex; gap: 8px; margin-bottom: 20px; }
+.onyx-connect-modes button { flex: 1; }
+.onyx-connect-modes button[aria-pressed='true'] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+.onyx-connect-form { display: flex; flex-direction: column; gap: 10px; }
+.onyx-connect-form label { font-weight: 600; }
+.onyx-connect-form input { width: 100%; min-height: 44px; background: var(--onyx-bg); }
+.onyx-connect-hint, .onyx-connect-footnote { color: var(--onyx-dim); font-size: 13px; line-height: 1.6; margin: 0 0 8px; }
+.onyx-connect-footnote { margin: 24px 0 0; border-top: 1px solid var(--onyx-line); padding-top: 16px; }
+.onyx-connect-form .onyx-connect-primary { background: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; min-height: 44px; border-color: var(--onyx-accent); }
+.onyx-connect-error { color: var(--onyx-warn); margin: 16px 0 0; }
+.onyx-connect-status button { margin-top: 12px; }
+.onyx-conn { cursor: pointer; }
+
+/* Conversation rhythm and compact phone composer. */
+.onyx-empty { max-width: 38rem; margin-inline: auto; padding: clamp(24px, 6vw, 64px); }
+.onyx-empty p { color: var(--onyx-dim); line-height: 1.6; }
+.onyx-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
+.onyx-empty-actions button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--onyx-line); border-radius: 8px; background: var(--onyx-panel); color: var(--onyx-text); cursor: pointer; }
+.onyx-day-divider { justify-content: center; margin: 18px 0 12px; }
+.onyx-day-divider::before, .onyx-day-divider::after { content: ''; height: 1px; flex: 1; background: var(--onyx-line); }
+.onyx-day-divider-label { white-space: nowrap; }
+.onyx-earlier, .onyx-latest { display: flex; justify-content: center; padding: 12px 0; }
+.onyx-earlier-button, .onyx-latest-button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--onyx-line); border-radius: 24px; background: var(--onyx-panel); color: var(--onyx-text); cursor: pointer; }
+.onyx-latest { position: sticky; bottom: 0; pointer-events: none; }
+.onyx-latest-button { pointer-events: auto; box-shadow: 0 4px 20px #0006; }
+.onyx-connect-recovery { padding: 10px; border: 1px solid var(--onyx-line); border-radius: 8px; font-size: 13px; line-height: 1.5; }
+@media (max-width: 60rem) {
+  .onyx-composer-target { flex-basis: 100%; }
+  .onyx-composer > .onyx-schedule { order: 2; }
+  .onyx-composer > div.onyx-attachments { order: 2; flex: 0 1 auto; }
+  .onyx-empty { padding: 24px 16px; }
+}
+
+.onyx-connect-success { padding: 10px 12px; border: 1px solid var(--onyx-line); border-radius: 8px; color: var(--onyx-accent); font-size: 14px; }
+.onyx-earlier-button:disabled { opacity: .65; cursor: default; }
+.onyx-message:focus-visible, .onyx-system:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 4px; }
+
+.onyx-filter-empty { padding: 20px 12px; color: var(--onyx-dim); line-height: 1.6; border: 1px solid var(--onyx-line); border-radius: 8px; }
+
+.onyx-reading-bar { display: flex; flex: 1 1 100%; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--onyx-dim); }
+.onyx-reading-bar button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--onyx-line); border-radius: 8px; color: var(--onyx-accent); background: var(--onyx-panel); cursor: pointer; }
+.onyx-suggest { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--onyx-line); border-radius: 8px; background: var(--onyx-panel); }
+.onyx-suggest-row button, .onyx-unread-jump, .onyx-first-hour button { min-height: 44px; }
+.onyx-first-hour { display: flex; gap: 12px; align-items: center; padding: 8px 0; }
+@media (max-width: 60rem) { .onyx-composer > div.onyx-reading-bar { order: -1; } }

@@ -20,10 +20,14 @@ export default tseslint.config(
       '.zig-cache/**',
       'coverage/**',
       'dist/**',
+      // Elm compiler output (generated test harness JS, never hand-edited).
+      'elm/elm-stuff/**',
       'test-results/**',
       'public/opcodec_wasm.js',
       'public/sw.js',
       'tools/**',
+      // Immutable, source-reviewed roadmap evidence is not application code.
+      'docs/elm-roadmap/evidence/**',
       'node_modules/**',
     ],
   },
@@ -32,6 +36,63 @@ export default tseslint.config(
   {
     files: ['src/**/*.{ts,tsx}'],
     ...solid,
+  },
+  {
+    // Elm port bridge + smoke scripts: dual browser/node environment by
+    // design (ports.js guards node requires behind typeof checks; the smoke
+    // files drive browser shims from node). Declare both environments'
+    // globals explicitly — no new packages can be added here, so extend
+    // this list if a new global starts being used.
+    files: ['elm/**/*.js', 'elm/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        Blob: 'readonly',
+        BroadcastChannel: 'readonly',
+        Buffer: 'readonly',
+        CryptoKey: 'readonly',
+        CustomEvent: 'readonly',
+        File: 'readonly',
+        FileReader: 'readonly',
+        FormData: 'readonly',
+        HTMLElement: 'readonly',
+        IDBKeyRange: 'readonly',
+        MutationObserver: 'readonly',
+        MessageChannel: 'readonly',
+        Response: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        XMLHttpRequest: 'readonly',
+        __ONYX_SW_BUILD_CONFIG__: 'readonly',
+        atob: 'readonly',
+        btoa: 'readonly',
+        caches: 'readonly',
+        clearTimeout: 'readonly',
+        crypto: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        indexedDB: 'readonly',
+        localStorage: 'readonly',
+        location: 'readonly',
+        module: 'readonly',
+        navigator: 'readonly',
+        performance: 'readonly',
+        process: 'readonly',
+        require: 'readonly',
+        self: 'readonly',
+        setTimeout: 'readonly',
+        structuredClone: 'readonly',
+        WebSocket: 'readonly',
+        window: 'readonly',
+      },
+    },
+    rules: {
+      // Dual-env bridge by design; node requires ride behind typeof guards.
+      '@typescript-eslint/no-require-imports': 'off',
+    },
   },
   {
     rules: {

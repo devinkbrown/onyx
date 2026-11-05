@@ -1,119 +1,50 @@
-/* Scheduled-queue smoke test — `onyx:scheduled` slot:
-   Elm owns validation, owner scoping, and encoding; the bridge writes
-   the rows array (always writing, even empty, mirroring
-   `_persistScheduledMessages`) and reports the write back so Elm can
-   mark `scheduledProjectionDegraded`. Run with:
-     node --test elm/scheduledSave.smoke.mjs
-   (from the repo root). Zero dependencies beyond node itself. */
+/* Legacy scheduled plaintext persistence retirement smoke.
+   Durable behavior is covered by elm/runtime/scheduled-custody.test.ts;
+   this guard ensures the former localStorage writer cannot be wired back
+   into the production ports. Run with node --test. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 require("./ports.js");
-const { wire } = globalThis.OnyxPorts;
 
-const KEY = "onyx:scheduled";
-
-function harness(store, sent) {
-  let saveHandler = null;
-  const stub = () => ({ subscribe() {} });
-  const app = {
-    ports: {
-      wsConnect: stub(),
-      wsSend: stub(),
-      wsClose: stub(),
-      vaultPut: stub(),
-      vaultGet: stub(),
-      passkeyCreate: stub(),
-      passkeyGet: stub(),
-      dmSealRequest: stub(),
-      dmOpenRequest: stub(),
-      dmPublishKey: stub(),
-      roomSealRequest: stub(),
-      roomOpenRequest: stub(),
-      groupControlInstall: stub(),
-      groupDirectoryDerive: stub(),
-      guidesProgressRequest: stub(),
-      guidesProgressStore: stub(),
-      blocklistsSave: stub(),
-      highlightWordsSave: stub(),
-      dndSave: stub(),
-      passkeySettleRequest: stub(),
-      scheduledSave: { subscribe(fn) { saveHandler = fn; } },
-      scheduledPersisted: { send(payload) { sent.push(payload); } },
-    },
+test("legacy scheduledSave cannot persist plaintext rows", () => {
+  let writes = 0;
+  let legacySubscriber = 0;
+  const legacyStorage = {
+    getItem() { return null; },
+    setItem() { writes += 1; },
+    removeItem() { writes += 1; },
   };
-  globalThis.window = { localStorage: store };
-  wire(app);
-  return { saveHandler };
-}
-
-function memStore(initial, failing) {
-  const data = { ...initial };
-  return {
-    getItem: (k) => (k in data ? data[k] : null),
-    setItem: (k, v) => {
-      if (failing) throw new Error("quota");
-      data[k] = String(v);
+  const ports = new Proxy({}, {
+    get(_target, name) {
+      if (name === "scheduledSave") return { subscribe() { legacySubscriber += 1; } };
+      if (name === "scheduledPersisted") return { send() { writes += 1; } };
+      return { subscribe() {}, send() {} };
     },
-    removeItem: (k) => { delete data[k]; },
-    data,
-  };
-}
-
-const rows = [
-  { id: "s1", channel: "#c", text: "later", sendAt: 5000, owner: { serverUrl: "wss://x.test", identity: "kai" } },
-];
-
-test("save writes rows and acks ok", async () => {
-  const sent = [];
+  });
+  const timers = [];
+  const setTimeout = globalThis.setTimeout;
+  const setInterval = globalThis.setInterval;
+  const BroadcastChannel = globalThis.BroadcastChannel;
+  globalThis.setTimeout = (...args) => { const handle = setTimeout(...args); timers.push(["timeout", handle]); return handle; };
+  globalThis.setInterval = (...args) => { const handle = setInterval(...args); timers.push(["interval", handle]); return handle; };
+  globalThis.BroadcastChannel = undefined;
+  globalThis.window = { localStorage: legacyStorage };
   try {
-    const store = memStore({});
-    const h = harness(store, sent);
-    h.saveHandler({ rows });
-    assert.equal(store.data[KEY], JSON.stringify(rows));
-    assert.deepEqual(sent, [{ ok: true }]);
+    globalThis.OnyxPorts.wire({ ports });
+    assert.equal(legacySubscriber, 0);
+    assert.equal(writes, 0);
+    assert.equal(legacyStorage.getItem("onyx:scheduled"), null);
   } finally {
-    delete globalThis.window;
-  }
-});
-
-test("empty rows still write the key and ack ok", async () => {
-  const sent = [];
-  try {
-    const store = memStore({});
-    const h = harness(store, sent);
-    h.saveHandler({ rows: [] });
-    assert.equal(store.data[KEY], "[]");
-    assert.deepEqual(sent, [{ ok: true }]);
-  } finally {
-    delete globalThis.window;
-  }
-});
-
-test("quota failure acks not-ok", async () => {
-  const sent = [];
-  try {
-    const store = memStore({}, true);
-    const h = harness(store, sent);
-    h.saveHandler({ rows });
-    assert.deepEqual(sent, [{ ok: false }]);
-  } finally {
-    delete globalThis.window;
-  }
-});
-
-test("malformed requests write nothing and ack not-ok", async () => {
-  const sent = [];
-  try {
-    const store = memStore({ [KEY]: "[]" });
-    const h = harness(store, sent);
-    h.saveHandler({ rows: undefined });
-    h.saveHandler(null);
-    assert.equal(store.data[KEY], "[]");
-    assert.deepEqual(sent, [{ ok: false }, { ok: false }]);
-  } finally {
+    globalThis.setTimeout = setTimeout;
+    globalThis.setInterval = setInterval;
+    globalThis.BroadcastChannel = BroadcastChannel;
+    for (const [kind, handle] of timers) {
+      if (kind === "interval") globalThis.clearInterval(handle);
+      else globalThis.clearTimeout(handle);
+    }
     delete globalThis.window;
   }
 });

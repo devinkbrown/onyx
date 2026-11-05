@@ -47,8 +47,8 @@ import { TopicReadRuntime } from '@/lib/topics/TopicReadRuntime';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
-const ChannelBrowser = retryableLazy<any>(() => import('./ChannelBrowser'), 'channel browser');
-const WhoisSheet = retryableLazy<any>(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })), 'whois');
+const ChannelBrowser = retryableLazy(() => import('./ChannelBrowser'), 'channel browser');
+const WhoisSheet = retryableLazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })), 'whois');
 import { PresenceRibbon } from './PresenceRibbon';
 import { RoomInviteShareHost } from './RoomInviteShare';
 import { HarborConfirmHost } from './HarborConfirmSheet';
@@ -67,10 +67,10 @@ import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
 import { ContextRail } from './ContextRail';
-const ModerationCockpit = retryableLazy<any>(() => import('./ModerationCockpit').then((m) => ({ default: m.ModerationCockpit })), 'moderation desk');
-const OperDesk = retryableLazy<any>(() => import('./OperDesk').then((m) => ({ default: m.OperDesk })), 'operator desk');
-const OperEventConsole = retryableLazy<any>(() => import('./OperEventConsole').then((m) => ({ default: m.OperEventConsole })), 'operator events');
-const RoomInsightsStrip = retryableLazy<any>(() => import('./RoomInsightsStrip').then((m) => ({ default: m.RoomInsightsStrip })), 'room insights');
+const ModerationCockpit = retryableLazy(() => import('./ModerationCockpit').then((m) => ({ default: m.ModerationCockpit })), 'moderation desk');
+const OperDesk = retryableLazy(() => import('./OperDesk').then((m) => ({ default: m.OperDesk })), 'operator desk');
+const OperEventConsole = retryableLazy(() => import('./OperEventConsole').then((m) => ({ default: m.OperEventConsole })), 'operator events');
+const RoomInsightsStrip = retryableLazy(() => import('./RoomInsightsStrip').then((m) => ({ default: m.RoomInsightsStrip })), 'room insights');
 import { RoomSwitcherSheet } from './RoomSwitcherSheet';
 import { NewMessageSheet } from './NewMessageSheet';
 type MediaModule = Pick<typeof import('@/media/useCadenceMedia'), 'mountMedia'>;
@@ -83,48 +83,48 @@ export function _setMediaModuleLoaderForTests(loader?: () => Promise<MediaModule
 // Voice/video UI is lazy: it (plus its ~76kB CADENCE media/worker/wasm graph)
 // is only rendered once a call is signalled, so it stays out of the initial
 // /app payload and loads on first voice activity. Gated below by voiceUiActive.
-const VoiceStage = retryableLazy<any>(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })), 'voice stage');
-const VoiceBar = retryableLazy<any>(() => import('./voice/VoiceBar').then((m) => ({ default: m.VoiceBar })), 'voice bar');
-const VoicePip = retryableLazy<any>(() => import('./voice/VoicePip').then((m) => ({ default: m.VoicePip })), 'voice controls');
-const VoiceSettings = retryableLazy<any>(() =>
+const VoiceStage = retryableLazy(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })), 'voice stage');
+const VoiceBar = retryableLazy(() => import('./voice/VoiceBar').then((m) => ({ default: m.VoiceBar })), 'voice bar');
+const VoicePip = retryableLazy(() => import('./voice/VoicePip').then((m) => ({ default: m.VoicePip })), 'voice controls');
+const VoiceSettings = retryableLazy(() =>
   import('./voice/settings/VoiceSettings').then((m) => ({ default: m.VoiceSettings })),
   'voice settings',
 );
-const IncomingCallOverlay = retryableLazy<any>(() =>
+const IncomingCallOverlay = retryableLazy(() =>
   import('./voice/overlays/IncomingCallOverlay').then((m) => ({ default: m.IncomingCallOverlay })),
   'incoming call controls',
 );
-const OutgoingCallOverlay = retryableLazy<any>(() =>
+const OutgoingCallOverlay = retryableLazy(() =>
   import('./voice/overlays/OutgoingCallOverlay').then((m) => ({ default: m.OutgoingCallOverlay })),
   'outgoing call controls',
 );
-const CaptionsOverlay = retryableLazy<any>(() =>
+const CaptionsOverlay = retryableLazy(() =>
   import('./voice/overlays/CaptionsOverlay').then((m) => ({ default: m.CaptionsOverlay })),
   'captions controls',
 );
-const ReactionsOverlay = retryableLazy<any>(() =>
+const ReactionsOverlay = retryableLazy(() =>
   import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
   'reaction controls',
 );
 import { MemberList } from './MemberList';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
-const CallsHub = retryableLazy<any>(() => import('./CallsHub').then((m) => ({ default: m.CallsHub })), 'calls');
+const CallsHub = retryableLazy(() => import('./CallsHub').then((m) => ({ default: m.CallsHub })), 'calls');
 // Panels are entered from explicit controls and should not inflate the initial
 // connected-shell bundle. Each preserves its existing Suspense boundary below.
-const AccountPanel = retryableLazy<any>(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })), 'account settings');
-const AppearancePanel = retryableLazy<any>(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })), 'appearance settings');
-const PreferencesPanel = retryableLazy<any>(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })), 'preferences');
-const YouNotifications = retryableLazy<any>(() => import('./YouNotifications').then((m) => ({ default: m.YouNotifications })), 'notifications');
-const PinnedMessages = retryableLazy<any>(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })), 'pinned messages');
-const ScheduledMessagesSheet = retryableLazy<any>(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })), 'scheduled messages');
-const JumpToDateSheet = retryableLazy<any>(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })), 'jump to date');
+const AccountPanel = retryableLazy(() => import('@/app/Account').then((m) => ({ default: m.AccountPanel })), 'account settings');
+const AppearancePanel = retryableLazy(() => import('./AppearancePanel').then((m) => ({ default: m.AppearancePanel })), 'appearance settings');
+const PreferencesPanel = retryableLazy(() => import('./PreferencesPanel').then((m) => ({ default: m.PreferencesPanel })), 'preferences');
+const YouNotifications = retryableLazy(() => import('./YouNotifications').then((m) => ({ default: m.YouNotifications })), 'notifications');
+const PinnedMessages = retryableLazy(() => import('./PinnedMessages').then((m) => ({ default: m.PinnedMessages })), 'pinned messages');
+const ScheduledMessagesSheet = retryableLazy(() => import('./ScheduledMessagesSheet').then((m) => ({ default: m.ScheduledMessagesSheet })), 'scheduled messages');
+const JumpToDateSheet = retryableLazy(() => import('./JumpToDateSheet').then((m) => ({ default: m.JumpToDateSheet })), 'jump to date');
 import { applyPreferences, closePreferences, isPreferencesOpen, preferences, setPreference as writePreference } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { closeNotifications, isNotificationsOpen } from '@/lib/notifications/youNotificationsState';
-const ShortcutsOverlay = retryableLazy<any>(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })), 'keyboard shortcuts');
+const ShortcutsOverlay = retryableLazy(() => import('./ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })), 'keyboard shortcuts');
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
-const MessageSearch = retryableLazy<any>(() => import('./search/MessageSearch').then((m) => ({ default: m.MessageSearch })), 'message search');
+const MessageSearch = retryableLazy(() => import('./search/MessageSearch').then((m) => ({ default: m.MessageSearch })), 'message search');
 import { closeMessageSearch, isMessageSearchOpen, openMessageSearch } from './search/useMessageSearch';
 import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
@@ -140,6 +140,7 @@ import { createVirtualKeyboardOverlayController } from '@/lib/mobile/virtualKeyb
 import { focusJoinRoomInput, registerStartRoomHandler } from './startRoom';
 import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 import { callJoinFailedToast } from '@/lib/media/callJoinCopy';
+import type { CallOutcome } from './CallsHub';
 import { CallJoinBanner } from './voice/CallJoinBanner';
 import {
   clearRejoinChannel,
@@ -179,7 +180,7 @@ function LazySurface(props: {
 }): JSX.Element {
   const [attempt, setAttempt] = createSignal(0);
   const MAX_RETRIES = 2;
-  const [loaded] = createResource(attempt, () => props.load ? props.load() : Promise.resolve(null));
+  const [loaded] = createResource(attempt, () => untrack(() => props.load ? props.load() : Promise.resolve(null)));
   return (
     <ErrorBoundary
       fallback={(_error, reset) => (
@@ -390,6 +391,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const [callSurfaceChannel, setCallSurfaceChannel] = createSignal<string | null>(null);
   const [joinFailedChannel, setJoinFailedChannel] = createSignal<string | null>(null);
   const [rejoinChannel, setRejoinChannel] = createSignal<string | null>(null);
+  const [lastCallOutcome, setLastCallOutcome] = createSignal<CallOutcome | null>(null);
+  /** Remembers an established call so its end is acknowledged, not vanished. */
+  let sawEstablishedCall = false;
   // Update continuity is shell-scoped: navigation can remove VoiceBar (and
   // ringing states may never mount it), but the call itself remains live.
   let releaseVoiceUpdateHold: (() => void) | null = null;
@@ -444,14 +448,29 @@ export function AppShell(props: AppShellProps): JSX.Element {
   });
   createEffect(() => {
     const current = voice();
+    if (current.callState === 'in_call' && current.callStartedAt !== null) {
+      sawEstablishedCall = true;
+    }
     if (current.callState === 'idle') {
       setCallSurfaceChannel(null);
+      // Derive the CallsHub outcome from shell-owned evidence only: a failed
+      // join, a transport drop with a rejoin pending, or a lived call that
+      // ended. A declined/cancelled ring goes quiet (null).
+      if (joinFailedChannel()) setLastCallOutcome('failed');
+      else if (rejoinChannel() ?? peekRejoinChannel()) setLastCallOutcome('dropped');
+      else if (sawEstablishedCall) setLastCallOutcome('ended');
+      else setLastCallOutcome(null);
+      sawEstablishedCall = false;
     } else if (current.callChannel) {
       setCallSurfaceChannel(current.callChannel);
       noteLiveCall(current.callChannel);
       setJoinFailedChannel(null);
       setRejoinChannel(null);
       clearRejoinChannel();
+      setLastCallOutcome(null);
+    } else {
+      // A fresh ring without a channel clears a stale outcome.
+      setLastCallOutcome(null);
     }
   });
   createEffect(() => {
@@ -999,6 +1018,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
 
   function openMobileCollection(mode: 'rooms' | 'messages'): void {
     selectSidebarMode(mode);
+    // Desktop already shows the collection column. Opening the phone drawer
+    // here steals focus and leaves Home and Messages both looking selected.
+    if (!isMobile()) return;
     if (mobileSidebarOpen()) {
       focusFirstInMobileDrawer(sidebarDrawerRef);
       return;
@@ -1517,6 +1539,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                 callChannel={voice().callChannel}
                 callWith={voice().callWith}
                 callStartedAt={voice().callStartedAt}
+                lastCallOutcome={lastCallOutcome()}
                 onOpenRooms={openRoomsFromCalls}
                 onReturnToCall={returnToCall}
               />

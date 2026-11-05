@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-lab-runtime",
+  "startedAt": "2026-11-05T20:43:58.965Z",
+  "finishedAt": "2026-11-05T20:45:03.245Z",
+  "commandArgsRedacted": [
+    "--server-bin",
+    "[path-redacted]",
+    "--server-source",
+    "[path-redacted]",
+    "--server-build-receipt",
+    "[path-redacted]",
+    "--scratch-parent",
+    "/tmp",
+    "--topology",
+    "two",
+    "--suite",
+    "group",
+    "--scenario",
+    "logical",
+    "--receipt",
+    "[path-redacted]"
+  ],
+  "client": {
+    "gitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03",
+    "dirty": true,
+    "sourceManifestSha256": "0158414a7d1da8e8f607fcfef18c30756429753f0089c8ee93d46ed2f6a63770",
+    "stageSha256": "d238b952afb58373f45cca16f5fd3b5f2b9006a60aa29c7603f1ed047c0fd598"
+  },
+  "server": {
+    "binarySha256": "dd85c018b7427fff2c2689e6af0fb327371c7ac96ddfeea9e82037418bc448fc",
+    "version": "0.9.0+unknown",
+    "sourceGitHead": "b9be884cce57dadf91d415f61e703de95e521757",
+    "sourceDirty": true,
+    "sourceManifestSha256": "cba4f2ea88d499e044f671f12ea367d8f1a072df54a2f8c5f5b726c2b149ff8c",
+    "sourceBinding": "build-proven",
+    "buildReceipt": {
+      "compilerVersion": "0.17.0",
+      "compilerSha256": "7c61539af19fa4082c94848f1c2b57b89e76dc6cfd5bd4c57764c3caf8f82272",
+      "command": [
+        "zig",
+        "build",
+        "-j2",
+        "-Dtarget=x86_64-linux",
+        "-Dcpu=baseline",
+        "--prefix",
+        "[path-redacted]",
+        "--cache-dir",
+        "[path-redacted]",
+        "--summary",
+        "all"
+      ],
+      "sourceManifestSha256": "cba4f2ea88d499e044f671f12ea367d8f1a072df54a2f8c5f5b726c2b149ff8c",
+      "binarySha256": "dd85c018b7427fff2c2689e6af0fb327371c7ac96ddfeea9e82037418bc448fc"
+    }
+  },
+  "environment": {
+    "node": "v24.18.1",
+    "python": "not-used",
+    "openssl": "OpenSSL 3.5.9",
+    "browser": "Chromium 155.0.8059.39",
+    "os": "linux"
+  },
+  "topology": {
+    "kind": "two",
+    "nodes": [
+      {
+        "id": "A",
+        "host": "127.0.0.1",
+        "ircPort": 35329,
+        "tlsPort": 33187,
+        "wsPort": 39153,
+        "s2sPort": 45115,
+        "metricsPort": 42939,
+        "configSha256": "99d580c49b11e964d6566ac8ef828c5dde9248cba4557aa7a5b5158b420f528a"
+      },
+      {
+        "id": "B",
+        "host": "127.0.0.1",
+        "ircPort": 36207,
+        "tlsPort": 36103,
+        "wsPort": 39025,
+        "s2sPort": 43437,
+        "metricsPort": 35281,
+        "configSha256": "f4749f61d053c06a44a3dae26b9d1ff560df33b88850ed754321fda090ca682b"
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "group-signin",
+      "scenarioIds": [
+        "elm-browser-registration",
+        "elm-private-identify",
+        "reusable-session"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-room-policy",
+      "scenarioIds": [
+        "ircx-create",
+        "encryption-policy-required"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-enroll",
+      "scenarioIds": [
+        "device-enrollment"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-genesis",
+      "scenarioIds": [
+        "founder-genesis",
+        "group-commit-relay"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-author-ciphertext",
+      "scenarioIds": [
+        "ciphertext-on-wire",
+        "author-render"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-member-bootstrap",
+      "scenarioIds": [
+        "member-join",
+        "member-enrollment",
+        "device-trust-review",
+        "key-rotation",
+        "welcome-delivery",
+        "bootstrap-preview",
+        "bootstrap-approve"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-encrypted-delivery",
+      "scenarioIds": [
+        "ciphertext-on-wire",
+        "peer-decrypt-render",
+        "member-send"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    },
+    {
+      "id": "group-device-removal",
+      "scenarioIds": [
+        "remove-device",
+        "epoch-advance",
+        "removed-device-excluded"
+      ],
+      "driver": "elm-browser",
+      "status": "pass",
+      "assertions": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0
+      },
+      "reasonCode": null,
+      "evidenceRefs": []
+    }
+  ],
+  "compatibleLabObservation": "pass",
+  "currentSourceAcceptance": "pass",
+  "limitations": [
+    "both browsers attach to node A; cross-node group delivery is not exercised"
+  ],
+  "teardown": {
+    "trackedChildrenStopped": true,
+    "tempRemoved": true
+  }
+}

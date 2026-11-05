@@ -183,9 +183,9 @@ account→oper class) — there is no `OPER` command (`491` says so).
 ### 5.1 Passkeys (WebAuthn)
 
 Passwordless login via the `WEBAUTHN` command, paired with browser
-`navigator.credentials`. This is a **standard-reply-driven** exchange, not a SASL
-mechanism: challenges/results arrive as `NOTE WEBAUTHN <SUBCODE> …` (and `FAIL
-WEBAUTHN …` / `WARN WEBAUTHN …` on error), the client answers with `WEBAUTHN
+`navigator.credentials`. This is an Event-Spine exchange, not a SASL mechanism:
+challenges/results arrive as caller-targeted `EVENT <nick> WEBAUTHN <SUBCODE> …`
+messages, and failures use `FAIL WEBAUTHN …`. The client answers with `WEBAUTHN
 <SUBCOMMAND> …`. All binary fields on the wire are **base64url, no padding**
 (IRC-token-safe). Onyx's half is `src/lib/webauthn/passkey.ts`; the store handler
 is `src/lib/store/store.ts:4710`.
@@ -194,17 +194,17 @@ is `src/lib/store/store.ts:4710`.
 
 ```
 → WEBAUTHN REGISTER [label]
-← NOTE WEBAUTHN REGISTER-CHALLENGE <chal_b64url> <rp_id> :<account>
+← :<server> EVENT <nick> WEBAUTHN REGISTER-CHALLENGE <chal_b64url> <rp_id> :<account>
 → WEBAUTHN REGISTER-FINISH <credId_b64url> <clientDataJSON_b64url> <authData_b64url>
-← NOTE WEBAUTHN REGISTERED <credId_b64url> :<label>
+← :<server> EVENT <nick> WEBAUTHN REGISTERED <credId_b64url> :<label>
 ```
 
 **Sign in with a passkey** (passwordless; no prior login):
 
 ```
 → WEBAUTHN AUTH <account>
-← NOTE WEBAUTHN AUTH-CHALLENGE <chal_b64url> <rp_id> :<account>
-← NOTE WEBAUTHN ALLOW-CRED <credId_b64url>            (0..n, one per allowed credential)
+← :<server> EVENT <nick> WEBAUTHN AUTH-CHALLENGE <chal_b64url> <rp_id> :<account>
+← :<server> EVENT <nick> WEBAUTHN ALLOW-CRED <credId_b64url> (0..n, one per allowed credential)
 → WEBAUTHN AUTH-FINISH <credId_b64url> <clientDataJSON_b64url> <authData_b64url> <sig_b64url>
 ← (IDENTIFY login side effects — you are now logged in)
 ```
@@ -225,8 +225,9 @@ Onyx should reconnect instantly into its live session instead of a JOIN storm.
 - **`SESSION`** command: `SESSION LIST` (live sessions for your account),
   `SESSION TOKEN` (reveals this session's local reclaim token, plus an optional
   mesh `MTOKEN` for cross-node reclaim), `SESSION RESUME <token>` (resume a detached
-  session). Replies are `NOTE SESSION LIST|TOKEN|MTOKEN`. Failures
-  `FAIL SESSION INVALID_TOKEN|NO_SESSION`.
+  session). Responses are `NOTICE SESSION LIST ...`, `NOTICE SESSION TOKEN ...`,
+  and optional `NOTICE SESSION MTOKEN ...`; the server sends no `SESSION MTOKEN`
+  request command. Failures use `FAIL SESSION INVALID_TOKEN|NO_SESSION`.
 - **`SESSION-TOKEN` SASL mech**: reconnect by presenting the token from
   `SESSION TOKEN` — re-attaches to the same account session.
 - **`onyx/session-sync` cap**: multi-client "keep both" — when set, on login the
@@ -267,8 +268,8 @@ Onyx should reconnect instantly into its live session instead of a JOIN storm.
 | `CERTADD` / `CERTLIST` / `CERTDEL <fp>` | Bind/list/remove TLS client-cert fingerprints for SASL EXTERNAL |
 
 Service failures use IRCv3 `FAIL <CMD> <CODE>` (e.g. `ACCOUNT_REQUIRED`,
-`TEMPORARILY_UNAVAILABLE`, `NEED_MORE_PARAMS`). Many service replies are server
-`NOTICE`s or `NOTE <CMD>` lines.
+`TEMPORARILY_UNAVAILABLE`, `NEED_MORE_PARAMS`). Command-specific service replies
+use server `NOTICE`; server/service events use the Event Spine.
 
 ---
 
@@ -405,7 +406,7 @@ operator/admin view.)
   Pushes `:<origin-server> EVENT <you> OBSERVE <action> <nick>!<user>@<host> acct=…`
   with the subject's **real, uncloaked** host. Matches subjects network-wide.
 - **Broadcast / WALLOPS:** `EVENT BROADCAST :<text>` → rendered as
-  `:<server> NOTE EVENT <CATEGORY> :<sender-mask>: <text>`. WALLOPS rides this; there
+  a server Event Spine message for the subscribed operators. WALLOPS rides this; there
   is **no `+w` user-mode WALLOPS path**.
 
 ---
@@ -490,8 +491,9 @@ Onyx Server is a CRDT **mesh** (not a TS6 tree). What a client sees:
 481 no privileges · 491 OPER disabled (use SASL).
 
 ### Standard replies (not numerics)
-`FAIL <command> <CODE> [context] :<desc>` · `WARN …` · `NOTE …` (and Event-Spine
-`:<server> NOTE EVENT <CATEGORY> :…`). Common codes: `ACCOUNT_REQUIRED`,
+`FAIL <command> <CODE> [context] :<desc>` · `WARN …` · `NOTICE <target> :…`.
+Server/service events use the Event Spine `:<server> EVENT <target> <payload>`.
+Common codes: `ACCOUNT_REQUIRED`,
 `NEED_MORE_PARAMS`, `INVALID_PARAMS`, `TEMPORARILY_UNAVAILABLE`, `INVALID_UTF8`,
 `PERMISSION_DENIED`, `ACCOUNT_EXISTS`, `BAD_ACCOUNT_NAME`, `INVALID_PASSWORD`,
 `INVALID_TOKEN`, `NO_SESSION`, plus the full catalog in the Onyx Server numerics doc.
@@ -545,7 +547,7 @@ Onyx Server is a CRDT **mesh** (not a TS6 tree). What a client sees:
       (base64url, ≥16 bytes, host-label `rp_id`) before calling `navigator.credentials`.
 - [ ] Parse `time=`/`msgid=`/`account=` tags; render typing/react/reply TAGMSG tags.
 - [ ] Honor `MODES` (combine modes per line per the advertised value; live = 1).
-- [ ] Map service `FAIL`/`NOTE`/`NOTICE` replies to UI (REGISTER/IDENTIFY/CHANNEL/…).
+- [ ] Map source-shaped service `FAIL`/`WARN`/`NOTICE` replies and Event Spine payloads to UI.
 - [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native CADENCEVOX/CADENCEVIS WASM
       codec; render roster/speaking/mute from `EVENT ... MEDIA ...`.
-- [ ] Treat `:server NOTE EVENT <CAT> :…` and `EVENT … OBSERVE …` as the oper feed.
+- [ ] Treat `EVENT … OBSERVE …` as the oper feed.

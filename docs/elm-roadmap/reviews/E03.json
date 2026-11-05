@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "itemId": "E03",
+  "scope": {
+    "kind": "package",
+    "id": "E03"
+  },
+  "reviewer": {
+    "name": "Sol",
+    "role": "independent source reviewer"
+  },
+  "verdict": "accepted",
+  "summary": "Accept the bounded support and planning package: the approved support matrix and implementation waves state tab, credential, cohort, unsupported-case, and proposed-budget decisions. Budget enforcement remains future measured work; this review does not accept E90 performance, browser/OS cohorts, M0, scenarios, or release readiness.",
+  "sourceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/support-matrix.md",
+      "sha256": "69187f6832063f3ca08a4ec010705ebd5a6f3a996a8b634544819c7c03af9295"
+    }
+  ],
+  "evidenceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/evidence/E03-support-matrix-approved.md",
+      "sha256": "69187f6832063f3ca08a4ec010705ebd5a6f3a996a8b634544819c7c03af9295"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E03-implementation-waves-approved.md",
+      "sha256": "f725fe716484376931324f50cb69b8d23e48856cca539d225ffa214d0cc8f7f4"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/candidate-27-source-manifest.json",
+      "sha256": "2a23322a2a67832d8c35f457a0cbe64a1cbfb08b70bfaa9d1708e733a11c1ee2"
+    }
+  ],
+  "applicability": {
+    "configuration": {
+      "status": "not-applicable",
+      "reason": "This package accepts written support and planning decisions only; it does not report observations from a configured browser or endpoint."
+    },
+    "deployment": {
+      "status": "not-applicable",
+      "reason": "This bounded planning review makes no deployed-cohort or release-readiness claim."
+    }
+  }
+}

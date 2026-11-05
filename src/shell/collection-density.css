@@ -1,0 +1,116 @@
+/* Collection sidebar calm-density layer (overhaul W4 slice 1).
+ *
+ * Goal: Discord-class density with a quieter reading order — one clear
+ * section rhythm, matte rows, calm selection. Scoped to owned collection
+ * surfaces only; shell grid, ribbon, and composer stay untouched.
+ *
+ * Contracts preserved: 44px row/target floors, sans non-uppercase labels,
+ * visible focus, reduced-motion, forced-colors. No gradients, no glow. */
+
+.shell-collection-sidebar .shell-sidebar-section {
+  padding: 20px 12px 4px;
+}
+
+.shell-collection-sidebar .shell-sidebar-section:first-child {
+  padding-top: 12px;
+}
+
+.shell-collection-sidebar .shell-sidebar-section-label {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--paper-mute);
+  padding: 0 10px 6px;
+}
+
+/* Room + DM rows: keep the 44px floor, tighten chrome around it. */
+.shell-collection-sidebar .shell-channel-item {
+  min-height: 44px;
+  padding: 6px 10px;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+/* Matte hover — a flat wash, never a glow or border shift. */
+.shell-collection-sidebar .shell-channel-item:hover {
+  background: color-mix(in oklab, var(--paper) 7%, transparent);
+  border-color: transparent;
+}
+
+/* Selected: calm wash; the existing 3px bar keeps carrying "here". */
+.shell-collection-sidebar .shell-channel-item--active {
+  background: color-mix(in oklab, var(--lapis-deep) 28%, transparent);
+  border-color: transparent;
+}
+
+/* Unread: brighter name only — no extra chrome. */
+.shell-collection-sidebar .shell-channel-item--unread:not(.shell-channel-item--active) {
+  background: transparent;
+}
+
+/* Mention badge keeps the coral semantic; shape stays a quiet pill. */
+.shell-collection-sidebar .shell-channel-badge {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* DM avatar: a calm circle with presence carried by the row, not the disc. */
+.shell-collection-sidebar .shell-dm-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--paper) 10%, transparent);
+  color: var(--paper-dim);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+/* Section actions (New, Browse) sit inline and quiet. */
+.shell-collection-sidebar .shell-new-conversation-button,
+.shell-collection-sidebar .shell-sidebar-browse {
+  min-height: var(--target-min, 44px);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+}
+
+/* Star stays reachable but visually quiet until hover/active. */
+.shell-collection-sidebar .shell-channel-star {
+  opacity: 0;
+}
+
+.shell-collection-sidebar .shell-channel-row:hover .shell-channel-star,
+.shell-collection-sidebar .shell-channel-star:focus-visible,
+.shell-collection-sidebar .shell-channel-star--on {
+  opacity: 1;
+}
+
+/* One visible focus language for every row and control in scope. */
+.shell-collection-sidebar .shell-channel-item:focus-visible,
+.shell-collection-sidebar .shell-new-conversation-button:focus-visible,
+.shell-collection-sidebar .shell-sidebar-browse:focus-visible,
+.shell-collection-sidebar .shell-channel-star:focus-visible,
+.shell-collection-sidebar .shell-sidebar-folder-toggle:focus-visible {
+  outline: 2px solid var(--lapis-bright, #65adf5);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-collection-sidebar .shell-channel-item,
+  .shell-collection-sidebar .shell-channel-star {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-collection-sidebar .shell-channel-item--active {
+    outline: 2px solid ButtonText;
+    outline-offset: -2px;
+  }
+
+  .shell-collection-sidebar .shell-dm-avatar {
+    border: 1px solid ButtonText;
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "kind": "e90-candidate40-source-cost-attribution",
+  "scope": "Read-only attribution of the candidate40 desktop long-task and raw heap measurements to the captured paired E90 driver/source. No new probes, tests, builds, or main edits.",
+  "provenance": {
+    "terminalCheckpoint": {
+      "path": "/tmp/onyx-elm-verification-final/wave40-terminal-checkpoint.json",
+      "sha256": "22c37085d77d313fcb0e81ba0608b25ab7d29b0f68f82138860d939eeaed7de3",
+      "candidate": 40,
+      "handleTerminal": true,
+      "sourceUnchanged": true,
+      "performanceStatus": "observed-with-open-failures",
+      "runnerExitStatus": 1,
+      "runnerPrintError": "TypeError: flush passed to json.dumps after final receipt persistence; observations and terminal source guard were already saved"
+    },
+    "affectedReceipt": {
+      "path": "/tmp/onyx-elm-verification-final/affected-candidate-40.json",
+      "sha256": "95977316242e200e12bfb995729015b4c9335b3b19bdbe530c9c810080f9eedf",
+      "sourceManifestDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "sourceArchiveSha256": "91f2651ed5d7ab8776e5d11ece4effaf621772ed9ca123b9379286439dc8ed97"
+    },
+    "sourceManifest": {
+      "path": "/tmp/onyx-elm-verification-final/source-candidate-40.json",
+      "sha256": "ca8c6dcd48db2fcfb3e90f61ce823b97f6727d9751d3b5b168ccdeb87d01d553",
+      "manifestDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "archivePath": "/tmp/onyx-elm-verification-final/source-candidate-40.tar.gz",
+      "archiveSha256": "91f2651ed5d7ab8776e5d11ece4effaf621772ed9ca123b9379286439dc8ed97",
+      "fileCount": 2080,
+      "restoreVerified": true
+    },
+    "pairedObservation": {
+      "path": "/tmp/onyx-elm-verification-final/paired-observation-candidate-40.json",
+      "sha256": "1f944b3e5cbf5afddcecf6c32546bbe8bb46bacd7c64b29cf623a52c9866a1fa",
+      "status": "observed-with-open-failures",
+      "sourceBeforeDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "sourceAfterDigest": "aead384e05e87212f40c190cc5fcddb05fcb93da7bf8582bb263910b9d6304be",
+      "sourceUnchanged": true,
+      "externalPerformanceInputsDigest": "29357b31808ec08739163fc4d730c5314e21fe93b9b4a60d35098e8e0610cf72",
+      "externalPerformanceInputsUnchanged": true
+    },
+    "candidateResult": {
+      "path": "/tmp/onyx-elm-verification-final/paired-29376-e2358e59-dddd-4b8a-a5c4-b692bfd91ab5/candidate-results.jsonl",
+      "sha256": "1f8e6d067e13cbae739809640857ce88e8e9c4d70d2ecab3c73ec22a90809505",
+      "bytes": 2950,
+      "rows": 1
+    },
+    "baselineResult": {
+      "path": "/tmp/onyx-elm-verification-final/paired-29376-e2358e59-dddd-4b8a-a5c4-b692bfd91ab5/baseline-results.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "rows": 0
+    },
+    "capturedDriverInputs": {
+      "tests/e2e/elm-performance.measure.spec.ts": "422d5674938cb494927e5a7e40edbf15d02168f7f44ee912332f96524b0cf179",
+      "elm/tools/perf/fixtures.ts": "c4a56d2e84cfdbe286d4237a9d0ac9b484ad4f158c4705a37da20c3bdc0af05e",
+      "elm/tools/perf/receipt.ts": "d627ae5ce7d47311a7de1d3459af96acf5c4f934c947e7678fc5851a935d794d",
+      "paired-observe37.mjs": "0d1f75ba14f50b9453af4c1e119922f62fda11bbfb5bb1a5fde6774c0f901f1f"
+    }
+  },
+  "actualObservation": {
+    "candidate": "current-candidate-measured-now",
+    "mode": "desktop",
+    "viewport": "1280x900",
+    "cpuThrottle": 1,
+    "status": "Paired receipt observed-with-open-failures. Candidate40 desktop observation was emitted. Candidate40 emulated-mobile failed the exact item499 visibility assertion with its 10,000ms locator timeout after dataset-ready; the test took 2.6m, not the 180,000ms Playwright test timeout. Candidate24 baseline emitted zero rows; its desktop item999 locator failed at 10,000ms and its mobile test separately hit the 180,000ms Playwright timeout after dataset-ready.",
+    "measurements": {
+      "requestedInputKeystrokes": 50,
+      "actualInputEvents": 50,
+      "actualInputSamples": 50,
+      "inputP95Ms": 39.799999952316284,
+      "inputP95ThresholdMs": 100,
+      "maxIngestLongTaskMs": 248,
+      "maxIngestLongTaskThresholdMs": 200,
+      "lastThreeCycleRawHeapGrowthPercent": 75.41094789427389,
+      "rawHeapGrowthThresholdPercent": 10,
+      "heapUsedBytesByCycle": [
+        69351980,
+        66235388,
+        39839844,
+        77955160,
+        69883448
+      ],
+      "longTaskDurationsMsByCycle": [
+        [
+          211,
+          73,
+          56
+        ],
+        [
+          225,
+          58,
+          50,
+          234,
+          55,
+          55
+        ],
+        [
+          54,
+          225,
+          54,
+          50,
+          61,
+          51,
+          226,
+          66,
+          53,
+          240
+        ],
+        [
+          223,
+          225,
+          52,
+          226
+        ],
+        [
+          55,
+          228,
+          60,
+          234,
+          59,
+          231,
+          248,
+          120
+        ]
+      ],
+      "longTaskMaximumsMsByCycle": [
+        211,
+        234,
+        240,
+        226,
+        248
+      ],
+      "ingestionEvents": 5000,
+      "ingestionElapsedMsByCycle": [
+        11696.300000011921,
+        12135.600000023842,
+        12500.599999964237,
+        12325.5,
+        12186.5
+      ],
+      "datasetPreparationMs": 36383,
+      "postCleanupForcedGc": {
+        "available": true,
+        "requested": true,
+        "usedSizeBytes": 9008256,
+        "totalSizeBytes": 11218944
+      },
+      "thresholdFailures": [
+        "ingest long task > 200ms",
+        "last-three-cycle heap growth > 10%"
+      ]
+    },
+    "comparison": {
+      "baselineObservationCount": 0,
+      "baselineDesktopFailure": "Exact item999 locator received zero matches at the 10,000ms wait.",
+      "baselineMobileFailure": "Candidate24 baseline stdout records dataset-ready, then the emulated-mobile test hit the 180,000ms Playwright test timeout. Captured failure is browserContext.close after timeout; no more specific underlying assertion was recorded.",
+      "validBaselineComparison": "unavailable; all baseline metric values/deltas are null or non-comparable",
+      "candidateMobileFailure": "Candidate40 stdout records dataset-ready, then exact locator getByText('fixture event cycle 0 item 499', { exact: true }) expected count 1 but received 0 at the 10,000ms locator timeout. The mobile test duration was 2.6m. This is not a 180,000ms Playwright test timeout."
+    }
+  },
+  "sourceAttribution": [
+    {
+      "status": "proven",
+      "finding": "The measured long-task window starts in the browser page immediately before the two 500-event `wire.serverMessage` send loops and is sampled after the exact item999 visibility wait plus the per-cycle page-side IDB count and metadata sample.",
+      "anchors": [
+        "tests/e2e/elm-performance.measure.spec.ts:97-109 (performance.now start; first and second 500-event send loops; item499/item999 waits)",
+        "tests/e2e/elm-performance.measure.spec.ts:111-139 (page-side IDB count/sample and start-time-filtered long-task collection)",
+        "elm/tools/perf/fixtures.ts:253 (serverMessage constructs a fixture line and calls Playwright WebSocketRoute.send)"
+      ],
+      "impact": "The reported 248ms is a browser-page long task whose start falls inside the ingestion observation window. It is not time spent constructing fixture strings in the Playwright Node process. The observer has no call-stack attribution, so the receipt cannot identify which page task caused the 248ms."
+    },
+    {
+      "status": "proven",
+      "finding": "Setup/hydration work is outside each ingestion window: authentication, room joins, the 100000-row seed, initial rows, roster checks, and the 50-key input cohort complete before the first cycle timestamp. The separate IndexedDB batch benchmark runs after all five cycles.",
+      "anchors": [
+        "tests/e2e/elm-performance.measure.spec.ts:47-94",
+        "tests/e2e/elm-performance.measure.spec.ts:141-181"
+      ],
+      "impact": "Candidate40 datasetPreparationMs=36383 is not included in the per-cycle long-task sample. The 248ms value still aggregates any browser-page long task beginning after cycle start and before that cycle sample is read, including app event handling/rendering and other page work in that bounded window."
+    },
+    {
+      "status": "proven",
+      "finding": "Raw heap samples are CDP Performance.getMetrics JSHeapUsedSize values read after each cycle sample; cycle3 and cycle5 values are the endpoints of the reported formula. The explicit HeapProfiler.collectGarbage runs only after all cycles, after navigating away for cleanup.",
+      "anchors": [
+        "tests/e2e/elm-performance.measure.spec.ts:132-139",
+        "tests/e2e/elm-performance.measure.spec.ts:193-208"
+      ],
+      "details": {
+        "cycle3HeapUsedBytes": 39839844,
+        "cycle5HeapUsedBytes": 69883448,
+        "formula": "(cycle5 - cycle3) / cycle3 * 100",
+        "calculatedPercent": 75.41094789427389,
+        "reportedPercent": 75.41094789427389,
+        "forcedGcAfterCleanup": {
+          "available": true,
+          "requested": true,
+          "usedSizeBytes": 9008256,
+          "totalSizeBytes": 11218944
+        }
+      },
+      "impact": "The 75.4109479% result is consistent with captured raw heap values and is not a retained-after-GC measurement. Natural collection/heap growth can affect it; the post-cleanup GC result does not alter the earlier cycle snapshots."
+    },
+    {
+      "status": "not-found",
+      "finding": "No source-proven attribution/measurement defect was found that would invalidate the candidate40 desktop 248ms page-task maximum, 50/50 input cohort, or raw cycle3-to-cycle5 heap calculation.",
+      "decision": "No scratch tool patch prepared. Do not change workload, thresholds, deadlines, GC placement, or baseline on this evidence."
+    }
+  ],
+  "limits": [
+    "The full paired receipt is observed-with-open-failures. Candidate24 produced no rows: desktop failed exact item999 after 10,000ms, and mobile hit the 180,000ms Playwright timeout after dataset-ready. Candidate40 mobile failed exact item499 after its 10,000ms locator timeout (2.6m test duration); this differs from the baseline mobile timeout. Candidate40 values are not a before/after comparison.",
+    "The candidate40 measurement runner exited 1 after persisting the terminal receipt due to its final json.dumps flush TypeError. The terminal checkpoint binds both result receipts and records sourceUnchanged=true. Do not rerun the lanes to repair that print error.",
+    "This is source attribution of existing receipt values only; it does not establish which exact application function produced any long task or establish a heap leak."
+  ],
+  "verdict": "Measured cost attribution is source-consistent: 248ms is a browser-page long task inside the ingestion window; 75.4109479% is uncollected raw JS heap growth from cycle3 to cycle5. No remaining measurement bug is proven. Baseline failure leaves comparison unavailable."
+}

@@ -16,7 +16,14 @@ import Test exposing (Test, describe, test)
 
 guest : Model
 guest =
-    { blank | ourNick = "kai", endpoint = Just "wss://irc.example" }
+    { blank | ourNick = "kai", endpoint = Just "wss://irc.example", runtimeOwnerStamp = Just guestOwnerStamp }
+
+
+{-| Guest device memory is keyed by the physical runtime owner plus the
+nick (audit 2026-11-05). -}
+guestOwnerStamp : App.RuntimeOwnerStamp
+guestOwnerStamp =
+    { ownerRef = "guest_owner_test_00000000000000000", networkId = "test_network", accountId = Nothing, accountGeneration = 1, connectionGeneration = 1 }
 
 
 withPassword : Model -> Model
@@ -373,7 +380,7 @@ suite =
                         [ \m -> Expect.equal True m.guestClaimDismissed
                         , \_ ->
                             Expect.equal
-                                [ GuestClaimDismissSave { serverUrl = "wss://irc.example", identity = "kai" } ]
+                                [ GuestClaimDismissSave { serverUrl = "wss://irc.example", identity = "guest:guest_owner_test_00000000000000000:kai" } ]
                                 out
                         ]
                         dismissed

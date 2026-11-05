@@ -32,7 +32,7 @@ module Media exposing
     , MediaReaction
     )
 
-{-| Voice/video/screen control plane — Elm port of the `store.ts` NOTE
+{-| Voice/video/screen control plane — Elm port of the `store.ts` EVENT
 MEDIA fold and the `MEDIA JOIN/OFFER/LEAVE/BREAKOUT` builders
 (protocol §12).
 
@@ -140,11 +140,9 @@ blankMediaState =
     }
 
 
-{-| Fold one MEDIA standard-reply line. Both the legacy service shape
-and the EVENT-plane reshape arrive as
-`['MEDIA', '#chan', VERB, nick?, ...extra]` straight in `msg.params`
-(the standard-reply command occupies params[0]; there is no `<me>`
-target on this plane).
+{-| Fold one typed MEDIA Event Spine payload. `msg.params` contains
+`['MEDIA', '#chan', VERB, nick?, ...extra]`; the recipient has already
+been removed by the family dispatcher.
 `knownChannels` holds lowercase joined channels; unknown channels
 never allocate state. Channel sigils follow the advertised chantypes.
 -}

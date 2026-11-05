@@ -17,6 +17,7 @@ import {
   type SpatialAudioPosition,
 } from './spatialAudio';
 import type { CadencePeerState, MediaKind } from './types';
+import { BoundedPlayoutClock } from './PlayoutClock';
 
 // -------------------------------------------------------------------
 // Per-peer decoder state
@@ -47,6 +48,19 @@ export interface PeerMedia {
   vidImageData:   ImageData | null;
   /** Cached ImageData for screen video rendering — avoids per-frame allocation. */
   screenImageData: ImageData | null;
+  playout: BoundedPlayoutClock;
+  outputState: 'applied' | 'unsupported' | 'rejected' | 'pending' | 'deferred';
+}
+export interface AudioOutputEffect {
+  /** Output-device selection result. */
+  readonly state: 'applied' | 'unsupported' | 'rejected' | 'deferred';
+  readonly reason: string | null;
+  readonly contexts: number;
+  /** Private device ID used only to bind observations to their request. */
+  readonly deviceId: string | null;
+  /** Gain is set synchronously and is independent from setSinkId support. */
+  readonly volumeState: 'applied' | 'deferred';
+  readonly volume: number;
 }
 
 type PeerPannerNode = PannerNode | StereoPannerNode;
@@ -119,9 +133,11 @@ export class PeerRegistry {
       audDec: null, vidDec: null, audCtx: null,
       screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
       panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+      outputState: 'deferred',
       videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
       videoFps: 60, screenFps: 60,
       vidImageData: null, screenImageData: null,
+      playout: new BoundedPlayoutClock(),
     };
   }
 
@@ -237,13 +253,32 @@ export class PeerRegistry {
     return this.peers.get(nick.toLowerCase())?.screenStream ?? null;
   }
 
-  setOutput(deviceId: string | null, volume: number): void {
+  async setOutput(deviceId: string | null, volume: number): Promise<AudioOutputEffect> {
     this.outputDeviceId = deviceId;
     this.outputVolume = Math.max(0, Math.min(1, volume));
+    const pending: Promise<PeerMedia['outputState']>[] = [];
     for (const pm of this.peers.values()) {
       if (pm.outputGain) pm.outputGain.gain.value = this.deafened ? 0 : this.outputVolume;
-      this.applySink(pm);
+      if (pm.audCtx) pending.push(this.applySink(pm));
     }
+    if (pending.length === 0) return { state: 'deferred', reason: null, contexts: 0, deviceId, volumeState: 'deferred', volume: this.outputVolume };
+    const results = await Promise.all(pending);
+    const state = results.every(result => result === 'applied') ? 'applied'
+      : results.some(result => result === 'rejected') ? 'rejected'
+        : results.some(result => result === 'unsupported') ? 'unsupported' : 'deferred';
+    return { state, reason: state === 'unsupported' ? 'set-sink-id-unavailable' : state === 'rejected' ? 'set-sink-id-rejected' : null,
+      contexts: pending.length, deviceId, volumeState: 'applied', volume: this.outputVolume };
+  }
+
+  outputEffect(): AudioOutputEffect {
+    const peers = Array.from(this.peers.values()).filter(peer => peer.audCtx);
+    if (!peers.length) return { state: 'deferred', reason: null, contexts: 0, deviceId: this.outputDeviceId, volumeState: 'deferred', volume: this.outputVolume };
+    const results = peers.map(peer => peer.outputState);
+    const state = results.every(result => result === 'applied') ? 'applied'
+      : results.some(result => result === 'rejected') ? 'rejected'
+        : results.some(result => result === 'unsupported') ? 'unsupported' : 'deferred';
+    return { state, reason: state === 'unsupported' ? 'set-sink-id-unavailable' : state === 'rejected' ? 'set-sink-id-rejected' : null,
+      contexts: peers.length, deviceId: this.outputDeviceId, volumeState: 'applied', volume: this.outputVolume };
   }
 
   setDeafened(deafened: boolean): void {
@@ -299,6 +334,11 @@ export class PeerRegistry {
     for (const pm of this.peers.values()) n += pm.audDec?.framesDecoded ?? 0;
     return n;
   }
+  totalVideoFramesDecoded(): number {
+    let n = 0;
+    for (const pm of this.peers.values()) n += (pm.vidDec?.framesDecoded ?? 0) + (pm.screenVidDec?.framesDecoded ?? 0);
+    return n;
+  }
 
   // ----------------------------------------------------------------
   // Decode helpers
@@ -307,7 +347,10 @@ export class PeerRegistry {
   async decodeAudio(pm: PeerMedia, frame: Uint8Array): Promise<void> {
     if (!this.wasm || this.isDetached(pm)) return;
     if (!pm.audDec) pm.audDec = this.wasm.audioDecoder(this.sampleRate, this.audioQuality());
-    if (!pm.audCtx) pm.audCtx = new AudioContext({ sampleRate: this.sampleRate });
+    if (!pm.audCtx) {
+      pm.audCtx = new AudioContext({ sampleRate: this.sampleRate });
+      void this.applySink(pm);
+    }
 
     let pcm: Int16Array;
     try {
@@ -319,7 +362,6 @@ export class PeerRegistry {
     }
 
     const ctx = pm.audCtx;
-    this.applySink(pm);
     // CadenceVoxDecoder returns CADENCEVOX_FRAME_48K mono Int16 samples.
     // Create a stereo AudioBuffer and copy the same mono data to both channels.
     const buf = ctx.createBuffer(2, CADENCEVOX_FRAME_48K, this.sampleRate);
@@ -364,14 +406,46 @@ export class PeerRegistry {
       pm.outputGain.connect(ctx.destination);
     }
     src.connect(pm.panner);
-    src.start(ctx.currentTime);
+    const duration = monoSamples / this.sampleRate;
+    const decision = pm.playout.enqueue(ctx.currentTime, duration);
+    if (decision.action === 'drop') return;
+    src.onended = () => pm.playout.complete();
+    src.start(decision.at);
   }
 
-  private applySink(pm: PeerMedia): void {
-    if (!pm.audCtx) return;
+  getAudioPlayoutCounters() {
+    let underruns = 0, late = 0, dropped = 0, queued = 0;
+    for (const peer of this.peers.values()) {
+      const value = peer.playout.snapshot(); underruns += value.underruns; late += value.late; dropped += value.dropped; queued += value.queued;
+    }
+    return { underruns, late, dropped, queued };
+  }
+
+  private async applySink(pm: PeerMedia): Promise<PeerMedia['outputState']> {
+    if (!pm.audCtx) { pm.outputState = 'deferred'; return pm.outputState; }
     const ctxWithSink = pm.audCtx as AudioContext & { setSinkId?: (sinkId: string) => Promise<void> };
-    if (typeof ctxWithSink.setSinkId !== 'function') return;
-    ctxWithSink.setSinkId(this.outputDeviceId ?? '').catch(() => {});
+    if (typeof ctxWithSink.setSinkId !== 'function') {
+      pm.outputState = this.outputDeviceId === null ? 'applied' : 'unsupported';
+      return pm.outputState;
+    }
+    pm.outputState = 'pending';
+    try { await ctxWithSink.setSinkId(this.outputDeviceId ?? ''); pm.outputState = 'applied'; }
+    catch { pm.outputState = 'rejected'; }
+    return pm.outputState;
+  }
+
+  async recoverAudio(): Promise<{ readonly state: 'applied' | 'deferred' | 'rejected'; readonly reason: string | null }> {
+    if (this.deafened) return { state: 'deferred', reason: 'deafened' };
+    const observed = Array.from(this.peers.entries()).flatMap(([key, peer]) => peer.audCtx ? [{ key, peer, context: peer.audCtx }] : []);
+    if (!observed.length) return { state: 'deferred', reason: null };
+    try {
+      await Promise.all(observed.map(({ context }) => context.state === 'closed' ? Promise.reject(new Error('closed')) : context.resume()));
+      if (this.deafened) return { state: 'deferred', reason: 'deafened' };
+      const stillOwnedAndRunning = observed.every(({ key, peer, context }) => this.peers.get(key) === peer && !this.isDetached(peer)
+        && peer.audCtx === context && context.state === 'running');
+      return stillOwnedAndRunning ? { state: 'applied', reason: null } : { state: 'rejected', reason: 'playout-context-changed' };
+    }
+    catch { return { state: 'rejected', reason: 'playout-context-resume-failed' }; }
   }
 
   async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {

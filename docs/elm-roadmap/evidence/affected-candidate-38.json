@@ -1,0 +1,479 @@
+{
+  "sourceManifestDigest": "1167bb359e1084b8d24b3736cd448d78ab9ac3b23f909fe2178c68344e60cb1d",
+  "sourceArchiveSha256": "9a592c8c7a469630d2288a2b51bf1c695b0d998fc839242c84cb737c6275e09e",
+  "changedSince37": [
+    "docs/elm-roadmap/module-ownership.md",
+    "elm/tools/isolated-network.mjs",
+    "elm/tools/media/webrtc-server-investigation.mjs",
+    "elm/tools/media/webrtc-server-investigation.ts",
+    "elm/tools/transport/webtransport-server-investigation.mjs",
+    "elm/tools/transport/webtransport-server-investigation.ts"
+  ],
+  "stages": [
+    {
+      "id": "e84-typecheck",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "-p",
+        "elm/tools/media/tsconfig.json",
+        "--noEmit"
+      ],
+      "exitStatus": 0,
+      "startedAtUtc": "2026-11-05T02:58:48.170127+00:00",
+      "finishedAtUtc": "2026-11-05T02:58:50.501863+00:00",
+      "elapsedSeconds": 2.33,
+      "log": "/tmp/onyx-elm-verification-final/e84-typecheck-candidate-38.log"
+    },
+    {
+      "id": "e91-typecheck",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "-p",
+        "elm/tools/transport/tsconfig.json",
+        "--noEmit"
+      ],
+      "exitStatus": 0,
+      "startedAtUtc": "2026-11-05T02:58:50.502688+00:00",
+      "finishedAtUtc": "2026-11-05T02:58:54.828182+00:00",
+      "elapsedSeconds": 4.33,
+      "log": "/tmp/onyx-elm-verification-final/e91-typecheck-candidate-38.log"
+    },
+    {
+      "id": "e84-standards",
+      "command": [
+        "node",
+        "elm/tools/media/webrtc-server-investigation.mjs",
+        "--server-bin",
+        "/tmp/onyx-elm-server-build/bin/onyx-server",
+        "--server-source",
+        "/home/kain/onyx-server",
+        "--server-build-receipt",
+        "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+        "--receipt",
+        "/tmp/onyx-elm-verification-final/e84-standards-candidate-38.json",
+        "--probe",
+        "standards"
+      ],
+      "exitStatus": 1,
+      "startedAtUtc": "2026-11-05T02:58:54.828863+00:00",
+      "finishedAtUtc": "2026-11-05T02:59:17.671655+00:00",
+      "elapsedSeconds": 22.84,
+      "log": "/tmp/onyx-elm-verification-final/e84-standards-candidate-38.log"
+    },
+    {
+      "id": "e84-cadence-dtls",
+      "command": [
+        "node",
+        "elm/tools/media/webrtc-server-investigation.mjs",
+        "--server-bin",
+        "/tmp/onyx-elm-server-build/bin/onyx-server",
+        "--server-source",
+        "/home/kain/onyx-server",
+        "--server-build-receipt",
+        "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+        "--receipt",
+        "/tmp/onyx-elm-verification-final/e84-cadence-dtls-candidate-38.json",
+        "--probe",
+        "cadence-dtls"
+      ],
+      "exitStatus": 1,
+      "startedAtUtc": "2026-11-05T02:59:17.672708+00:00",
+      "finishedAtUtc": "2026-11-05T02:59:40.143825+00:00",
+      "elapsedSeconds": 22.47,
+      "log": "/tmp/onyx-elm-verification-final/e84-cadence-dtls-candidate-38.log"
+    },
+    {
+      "id": "e91-investigation",
+      "command": [
+        "node",
+        "elm/tools/transport/webtransport-server-investigation.mjs",
+        "--server-bin",
+        "/tmp/onyx-elm-server-build/bin/onyx-server",
+        "--server-source",
+        "/home/kain/onyx-server",
+        "--server-build-receipt",
+        "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+        "--receipt",
+        "/tmp/onyx-elm-verification-final/e91-investigation-candidate-38.json"
+      ],
+      "exitStatus": 1,
+      "startedAtUtc": "2026-11-05T02:59:40.145210+00:00",
+      "finishedAtUtc": "2026-11-05T03:00:00.242159+00:00",
+      "elapsedSeconds": 20.1,
+      "log": "/tmp/onyx-elm-verification-final/e91-investigation-candidate-38.log"
+    }
+  ],
+  "source37Evidence": {
+    "receipt": "/tmp/onyx-elm-verification-final/affected-candidate-37.json",
+    "sha256": "494246fe23e41e188a696fef241aecd63ca8a7e4795ded3a6ab8c73f6352872c",
+    "sourceManifestDigest": "5ec98ba79e58903f894ef05aea77c94b18b079b14f5fa09b7098d90c5b5b5bc6",
+    "sourceUnchanged": true,
+    "scopeGuard": "All source paths and file records outside the six listed transport-tool/documentation corrections are identical. Existing root, Elm, runtime, smoke, browser and lab observations are preserved from source37, not rerun or promoted to acceptance.",
+    "observations": [
+      {
+        "id": "host-bridge-design-schema",
+        "command": [
+          "/tmp/onyx-elm-jsonschema/bin/python",
+          "docs/elm-roadmap/validate-host-management-bridge-v1-vectors.py"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:32:28.634221+00:00",
+        "finishedAtUtc": "2026-11-05T02:32:36.377806+00:00",
+        "elapsedSeconds": 7.74,
+        "log": "/tmp/onyx-elm-verification-final/host-bridge-design-schema-candidate-37.log"
+      },
+      {
+        "id": "root-typecheck",
+        "command": [
+          "pnpm",
+          "typecheck"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:32:36.378319+00:00",
+        "finishedAtUtc": "2026-11-05T02:33:12.672377+00:00",
+        "elapsedSeconds": 36.29,
+        "log": "/tmp/onyx-elm-verification-final/root-typecheck-candidate-37.log"
+      },
+      {
+        "id": "root-lint",
+        "command": [
+          "pnpm",
+          "lint"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:33:12.673114+00:00",
+        "finishedAtUtc": "2026-11-05T02:33:17.129016+00:00",
+        "elapsedSeconds": 4.46,
+        "log": "/tmp/onyx-elm-verification-final/root-lint-candidate-37.log"
+      },
+      {
+        "id": "runtime-typecheck",
+        "command": [
+          "pnpm",
+          "exec",
+          "tsc",
+          "-p",
+          "elm/runtime/tsconfig.json",
+          "--noEmit"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:33:17.129965+00:00",
+        "finishedAtUtc": "2026-11-05T02:33:33.368689+00:00",
+        "elapsedSeconds": 16.24,
+        "log": "/tmp/onyx-elm-verification-final/runtime-typecheck-candidate-37.log"
+      },
+      {
+        "id": "runtime-unit",
+        "command": [
+          "pnpm",
+          "test:elm-runtime"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:33:33.369336+00:00",
+        "finishedAtUtc": "2026-11-05T02:34:03.023157+00:00",
+        "elapsedSeconds": 29.65,
+        "log": "/tmp/onyx-elm-verification-final/runtime-unit-candidate-37.log"
+      },
+      {
+        "id": "elm-full",
+        "command": [
+          "node",
+          "elm/tools/run-roadmap-checks.mjs",
+          "elm-full"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:34:03.024155+00:00",
+        "finishedAtUtc": "2026-11-05T02:35:00.808129+00:00",
+        "elapsedSeconds": 57.78,
+        "log": "/tmp/onyx-elm-verification-final/elm-full-candidate-37.log"
+      },
+      {
+        "id": "node-smokes",
+        "command": [
+          "node",
+          "elm/tools/run-roadmap-checks.mjs",
+          "node-smokes"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:35:00.808673+00:00",
+        "finishedAtUtc": "2026-11-05T02:36:01.511587+00:00",
+        "elapsedSeconds": 60.7,
+        "log": "/tmp/onyx-elm-verification-final/node-smokes-candidate-37.log"
+      },
+      {
+        "id": "expected-failure",
+        "command": [
+          "node",
+          "elm/tools/run-roadmap-checks.mjs",
+          "expected-failure"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:36:01.512566+00:00",
+        "finishedAtUtc": "2026-11-05T02:36:21.700877+00:00",
+        "elapsedSeconds": 20.19,
+        "log": "/tmp/onyx-elm-verification-final/expected-failure-candidate-37.log"
+      },
+      {
+        "id": "chromium-mock",
+        "command": [
+          "node",
+          "elm/tools/run-roadmap-checks.mjs",
+          "chromium-mock"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:36:21.701550+00:00",
+        "finishedAtUtc": "2026-11-05T02:36:45.520299+00:00",
+        "elapsedSeconds": 23.82,
+        "log": "/tmp/onyx-elm-verification-final/chromium-mock-candidate-37.log"
+      },
+      {
+        "id": "stress-browser",
+        "command": [
+          "node",
+          "elm/tools/perf/run.mjs",
+          "--suite=stress",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/stress-candidate-37.json"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:36:45.521404+00:00",
+        "finishedAtUtc": "2026-11-05T02:37:33.978164+00:00",
+        "elapsedSeconds": 48.46,
+        "log": "/tmp/onyx-elm-verification-final/stress-browser-candidate-37.log"
+      },
+      {
+        "id": "lab-foundation-auth",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "two",
+          "--suite",
+          "foundation",
+          "--scenario",
+          "logical",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-foundation-auth-candidate-37.json"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:37:33.979286+00:00",
+        "finishedAtUtc": "2026-11-05T02:38:15.863601+00:00",
+        "elapsedSeconds": 41.88,
+        "log": "/tmp/onyx-elm-verification-final/lab-foundation-auth-candidate-37.log"
+      },
+      {
+        "id": "lab-sessions-two-logical",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "two",
+          "--suite",
+          "sessions",
+          "--scenario",
+          "logical",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-sessions-two-logical-candidate-37.json"
+        ],
+        "exitStatus": 1,
+        "startedAtUtc": "2026-11-05T02:38:15.864705+00:00",
+        "finishedAtUtc": "2026-11-05T02:39:09.626996+00:00",
+        "elapsedSeconds": 53.76,
+        "log": "/tmp/onyx-elm-verification-final/lab-sessions-two-logical-candidate-37.log"
+      },
+      {
+        "id": "lab-sessions-two-exact",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "two",
+          "--suite",
+          "sessions",
+          "--scenario",
+          "exact",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-sessions-two-exact-candidate-37.json"
+        ],
+        "exitStatus": 2,
+        "startedAtUtc": "2026-11-05T02:39:09.628108+00:00",
+        "finishedAtUtc": "2026-11-05T02:39:48.209852+00:00",
+        "elapsedSeconds": 38.58,
+        "log": "/tmp/onyx-elm-verification-final/lab-sessions-two-exact-candidate-37.log"
+      },
+      {
+        "id": "lab-sessions-line3-logical",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "line3",
+          "--suite",
+          "sessions",
+          "--scenario",
+          "logical",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-sessions-line3-logical-candidate-37.json"
+        ],
+        "exitStatus": 2,
+        "startedAtUtc": "2026-11-05T02:39:48.211095+00:00",
+        "finishedAtUtc": "2026-11-05T02:41:02.416438+00:00",
+        "elapsedSeconds": 74.21,
+        "log": "/tmp/onyx-elm-verification-final/lab-sessions-line3-logical-candidate-37.log"
+      },
+      {
+        "id": "lab-sessions-line3-exact",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "line3",
+          "--suite",
+          "sessions",
+          "--scenario",
+          "exact",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-sessions-line3-exact-candidate-37.json"
+        ],
+        "exitStatus": 1,
+        "startedAtUtc": "2026-11-05T02:41:02.417626+00:00",
+        "finishedAtUtc": "2026-11-05T02:41:41.228433+00:00",
+        "elapsedSeconds": 38.81,
+        "log": "/tmp/onyx-elm-verification-final/lab-sessions-line3-exact-candidate-37.log"
+      },
+      {
+        "id": "lab-history-two-logical",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "two",
+          "--suite",
+          "history",
+          "--scenario",
+          "logical",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-history-two-logical-candidate-37.json"
+        ],
+        "exitStatus": 2,
+        "startedAtUtc": "2026-11-05T02:41:41.229452+00:00",
+        "finishedAtUtc": "2026-11-05T02:42:18.533753+00:00",
+        "elapsedSeconds": 37.3,
+        "log": "/tmp/onyx-elm-verification-final/lab-history-two-logical-candidate-37.log"
+      },
+      {
+        "id": "lab-history-line3-logical",
+        "command": [
+          "node",
+          "elm/tools/lab/run.mjs",
+          "--server-bin",
+          "/tmp/onyx-elm-server-build/bin/onyx-server",
+          "--server-source",
+          "/home/kain/onyx-server",
+          "--server-build-receipt",
+          "/tmp/onyx-elm-verification-final/server-build-receipt.json",
+          "--scratch-parent",
+          "/tmp",
+          "--topology",
+          "line3",
+          "--suite",
+          "history",
+          "--scenario",
+          "logical",
+          "--receipt",
+          "/tmp/onyx-elm-verification-final/lab-history-line3-logical-candidate-37.json"
+        ],
+        "exitStatus": 2,
+        "startedAtUtc": "2026-11-05T02:42:18.534897+00:00",
+        "finishedAtUtc": "2026-11-05T02:42:59.261082+00:00",
+        "elapsedSeconds": 40.73,
+        "log": "/tmp/onyx-elm-verification-final/lab-history-line3-logical-candidate-37.log"
+      },
+      {
+        "id": "source-closure-regression",
+        "command": [
+          "node",
+          "--test",
+          "elm/tools/source-closure.test.mjs"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:42:59.262409+00:00",
+        "finishedAtUtc": "2026-11-05T02:42:59.512204+00:00",
+        "elapsedSeconds": 0.25,
+        "log": "/tmp/onyx-elm-verification-final/source-closure-regression-candidate-37.log"
+      },
+      {
+        "id": "root-unit",
+        "command": [
+          "pnpm",
+          "test"
+        ],
+        "exitStatus": 0,
+        "startedAtUtc": "2026-11-05T02:44:20.014731+00:00",
+        "finishedAtUtc": "2026-11-05T02:56:35.391831+00:00",
+        "elapsedSeconds": 735.38,
+        "log": "/tmp/onyx-elm-verification-final/root-unit-candidate-37.log"
+      }
+    ]
+  },
+  "knownUnresolvedPriorObservations": [
+    "two-logical session channel delivery cardinality",
+    "line3 exact local restore TEMPORARILY_UNAVAILABLE",
+    "deterministic rate/equal-time/spoofing triggers unavailable"
+  ],
+  "sourcePostDigest": "1167bb359e1084b8d24b3736cd448d78ab9ac3b23f909fe2178c68344e60cb1d",
+  "sourceUnchanged": true,
+  "outcome": "incomplete"
+}

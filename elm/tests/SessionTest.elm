@@ -11,6 +11,7 @@ Float-expiry vectors (`NaN`, infinities) are representable as Elm
 -}
 
 import Expect
+import Ids
 import Session exposing (..)
 import Test exposing (Test, describe, test)
 
@@ -20,14 +21,20 @@ nowMs =
     1783857600000
 
 
-meshBearer : String
-meshBearer =
-    "mesh-token-abcdef0123456789"
+credential : String -> CredentialKind -> Maybe Float -> CredentialMetadata
+credential raw kind expiresAtMs =
+    { credentialRef = mustCredentialRef raw
+    , kind = kind
+    , expiresAtMs = expiresAtMs
+    , restorable = kind /= UnknownCredential
+    }
 
 
-localBearer : String
-localBearer =
-    "0123456789abcdef0123456789abcdef"
+mustCredentialRef : String -> Ids.CredentialRef
+mustCredentialRef raw =
+    case Ids.credentialRefFromRuntime raw of
+        Just reference -> reference
+        Nothing -> Debug.todo "fixture credential reference must be valid"
 
 
 held : ReclaimTokens -> ReclaimPlan
@@ -45,6 +52,40 @@ suite =
                         [ \_ -> Expect.equal (Just { name = "sasl", value = "PLAIN" }) (parseCapToken "sasl=PLAIN")
                         , \_ -> Expect.equal (Just { name = "message-tags", value = "" }) (parseCapToken "message-tags")
                         , \_ -> Expect.equal (Just { name = "a", value = "b=c" }) (parseCapToken "a=b=c")
+                        , \_ -> Expect.equal (Just { name = "max-bytes", value = "12,max-lines=2" }) (parseCapToken "max-bytes=12,max-lines=2")
+                        ]
+                        ()
+            , test "cap name and value limits count checked UTF-8 bytes" <|
+                \_ ->
+                    let
+                        exactName =
+                            String.repeat 64 "é"
+
+                        longName =
+                            String.repeat 65 "é"
+
+                        exactValue =
+                            String.repeat 2048 "é"
+
+                        longValue =
+                            String.repeat 2048 "é" ++ "a"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (parseCapToken exactName /= Nothing)
+                        , \_ -> Expect.equal Nothing (parseCapToken longName)
+                        , \_ -> Expect.equal (Just { name = "x", value = exactValue }) (parseCapToken ("x=" ++ exactValue))
+                        , \_ -> Expect.equal Nothing (parseCapToken ("x=" ++ longValue))
+                        ]
+                        ()
+            , test "cap parsing rejects malformed surrogate strings" <|
+                \_ ->
+                    let
+                        malformed =
+                            String.fromChar (Char.fromCode 0xD800)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (parseCapToken ("x=" ++ malformed))
+                        , \_ -> Expect.equal Nothing (parseCapToken (malformed ++ "=x"))
                         ]
                         ()
             , test "rejects hostile tokens" <|
@@ -62,14 +103,30 @@ suite =
                     Expect.all
                         [ \_ ->
                             Expect.equal
-                                [ "draft/multiline", "message-tags" ]
-                                (wantedCaps False [ "sasl", "tls", "sts", "no-implicit-names", "draft/file-upload", "bot", "draft/multiline", "message-tags", "draft/multiline" ])
+                                [ "no-implicit-names", "draft/multiline", "message-tags", "onyx/session-sync" ]
+                                (wantedCaps False [ "sasl", "tls", "sts", "no-implicit-names", "draft/file-upload", "bot", "draft/multiline", "message-tags", "draft/multiline", "onyx/session-sync", "unknown/server-cap" ])
                         , \_ ->
                             Expect.equal
                                 [ "sasl", "draft/multiline" ]
-                                (wantedCaps True [ "sasl", "tls", "draft/multiline" ])
+                                (wantedCaps True [ "sasl", "tls", "draft/multiline", "unknown/server-cap" ])
                         ]
                         ()
+            , test "accepts server canonical capability names and client draft aliases" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "multiline", "chathistory", "read-marker", "channel-rename", "typing", "react", "reply", "message-editing", "message-redaction", "msgid", "draft/no-implicit-names" ]
+                                (wantedCaps True [ "multiline", "chathistory", "read-marker", "channel-rename", "typing", "react", "reply", "message-editing", "message-redaction", "msgid", "draft/no-implicit-names" ])
+                        , \_ -> Expect.equal True (hasCapability [ "read-marker" ] "draft/read-marker")
+                        , \_ -> Expect.equal True (hasCapability [ "draft/multiline" ] "multiline")
+                        ]
+                        ()
+            , test "requests only one spelling for the shared no-implicit-names capability" <|
+                \_ ->
+                    Expect.equal
+                        [ "draft/no-implicit-names" ]
+                        (wantedCaps False [ "no-implicit-names", "draft/no-implicit-names" ])
             , test "chunkCapReq splits past 380 chars" <|
                 \_ ->
                     let
@@ -89,131 +146,63 @@ suite =
                 \_ ->
                     Expect.equal [ "a b c" ] (chunkCapReq [ "a", "b", "c" ])
             ]
-        , describe "planSessionReclaim preference"
-            [ test "prefers the mesh Bearer [REDACTED] both are held" <|
-                \_ ->
-                    Expect.equal
-                        (Attempt { token = meshBearer, kind = MeshBearer, meshExpired = False })
-                        (held { sessionToken = Just localBearer, meshToken = Just meshBearer, meshTokenExpiresAt = Nothing })
-            , test "uses the local Bearer [REDACTED] no mesh token is held" <|
-                \_ ->
-                    Expect.equal
-                        (Attempt { token = localBearer, kind = LocalBearer, meshExpired = False })
-                        (held { sessionToken = Just localBearer, meshToken = Nothing, meshTokenExpiresAt = Nothing })
-            , test "uses the mesh Bearer [REDACTED] no local token is held" <|
-                \_ ->
-                    Expect.equal
-                        (Attempt { token = meshBearer, kind = MeshBearer, meshExpired = False })
-                        (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Nothing })
-            , test "treats an absent expiry as a live mesh bearer" <|
-                \_ ->
-                    case held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Nothing } of
-                        Attempt _ ->
-                            Expect.pass
-
-                        Skip _ ->
-                            Expect.fail "expected an attempt"
-            ]
-        , describe "expiry falls through instead of torching"
-            [ test "falls back to a valid local token when the mesh Bearer [REDACTED] lapsed" <|
-                \_ ->
-                    Expect.equal
-                        (Attempt { token = localBearer, kind = LocalBearer, meshExpired = True })
-                        (held { sessionToken = Just localBearer, meshToken = Just meshBearer, meshTokenExpiresAt = Just (nowMs - 1) })
-            , test "refuses a mesh Bearer [REDACTED] inside the safety skew" <|
-                \_ ->
-                    Expect.equal
-                        (Skip { reason = Expired, meshExpired = True })
-                        (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (nowMs + reclaimExpirySkewMs - 1) })
-            , test "offers a mesh Bearer [REDACTED] outlives the safety skew" <|
-                \_ ->
-                    Expect.equal
-                        (Attempt { token = meshBearer, kind = MeshBearer, meshExpired = False })
-                        (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (nowMs + reclaimExpirySkewMs + 1) })
-            , test "fails closed on a non-finite expiry" <|
-                \_ ->
-                    Expect.all
-                        [ \_ ->
-                            Expect.equal
-                                (Skip { reason = Expired, meshExpired = True })
-                                (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (0 / 0) })
-                        , \_ ->
-                            Expect.equal
-                                (Skip { reason = Expired, meshExpired = True })
-                                (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (1 / 0) })
-                        , \_ ->
-                            Expect.equal
-                                (Skip { reason = Expired, meshExpired = True })
-                                (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (-1 / 0) })
-                        ]
-                        ()
-            , test "reports expired when a lapsed mesh token was the only bearer" <|
-                \_ ->
-                    Expect.equal
-                        (Skip { reason = Expired, meshExpired = True })
-                        (held { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (nowMs - 1) })
-            ]
-        , describe "fail-closed gates"
-            [ test "never offers a Bearer [REDACTED] the socket has account proof" <|
-                \_ ->
-                    Expect.equal
-                        (Skip { reason = Unauthenticated, meshExpired = False })
-                        (planSessionReclaim
-                            { sessionToken = Just localBearer, meshToken = Just meshBearer, meshTokenExpiresAt = Nothing }
-                            { now = nowMs, authenticated = False }
-                        )
-            , test "reports none-held for a guest with no saved bearer" <|
-                \_ ->
-                    Expect.equal
-                        (Skip { reason = NoneHeld, meshExpired = False })
-                        (held { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing })
-            , test "refuses structurally invalid bearers" <|
+        , describe "credential reference planning"
+            [ test "prefers mesh exact metadata and returns only its opaque reference" <|
                 \_ ->
                     let
-                        bad =
-                            [ "", "   ", "two words", "tab\there", "nl\nhere", "cr\rhere", "\u{0000}nul" ]
+                        local = credential "CCCCCCCCCCCCCCCCCCCCCCCC" Session.LocalExact Nothing
+                        mesh = credential "DDDDDDDDDDDDDDDDDDDDDDDD" Session.MeshExact Nothing
                     in
-                    Expect.equal True
-                        (List.all
-                            (\token ->
-                                case held { sessionToken = Just token, meshToken = Nothing, meshTokenExpiresAt = Nothing } of
-                                    Attempt _ ->
-                                        False
-
-                                    Skip _ ->
-                                        True
-                            )
-                            bad
-                            && List.all
-                                (\token ->
-                                    case held { sessionToken = Nothing, meshToken = Just token, meshTokenExpiresAt = Nothing } of
-                                        Attempt _ ->
-                                            False
-
-                                        Skip _ ->
-                                            True
-                                )
-                                bad
-                        )
-            , test "falls through to a valid local token when the mesh token is malformed" <|
+                    Expect.equal
+                        (Attempt { credentialRef = mesh.credentialRef, kind = MeshBearer, credentialKind = Session.MeshExact, meshExpired = False })
+                        (held { credentials = [ local, mesh ] })
+            , test "prefers exact local metadata over logical metadata" <|
+                \_ ->
+                    let
+                        logical = credential "EEEEEEEEEEEEEEEEEEEEEEEE" Session.LocalLogical Nothing
+                        exact = credential "FFFFFFFFFFFFFFFFFFFFFFFF" Session.LocalExact Nothing
+                    in
+                    Expect.equal
+                        (Attempt { credentialRef = exact.credentialRef, kind = LocalBearer, credentialKind = Session.LocalExact, meshExpired = False })
+                        (held { credentials = [ logical, exact ] })
+            , test "expired mesh metadata falls through to a local reference" <|
+                \_ ->
+                    let
+                        expired = credential "GGGGGGGGGGGGGGGGGGGGGGGG" Session.MeshExact (Just (nowMs - 1))
+                        local = credential "HHHHHHHHHHHHHHHHHHHHHHHH" Session.LocalLogical Nothing
+                    in
+                    Expect.equal
+                        (Attempt { credentialRef = local.credentialRef, kind = LocalBearer, credentialKind = Session.LocalLogical, meshExpired = True })
+                        (held { credentials = [ expired, local ] })
+            , test "expiry inside safety skew is refused" <|
                 \_ ->
                     Expect.equal
-                        (Attempt { token = localBearer, kind = LocalBearer, meshExpired = False })
-                        (held { sessionToken = Just localBearer, meshToken = Just "bad token", meshTokenExpiresAt = Nothing })
-            ]
-        , describe "reclaimOffered"
-            [ test "is true only when a Bearer [REDACTED] actually held and live" <|
+                        (Skip { reason = Expired, meshExpired = True })
+                        (held { credentials = [ credential "IIIIIIIIIIIIIIIIIIIIIIII" Session.MeshLogical (Just (nowMs + reclaimExpirySkewMs - 1)) ] })
+            , test "unauthenticated state never sends a credential reference" <|
+                \_ ->
+                    let
+                        local = credential "JJJJJJJJJJJJJJJJJJJJJJJJ" Session.LocalLogical Nothing
+                    in
+                    Expect.equal
+                        (Skip { reason = Unauthenticated, meshExpired = False })
+                        (planSessionReclaim { credentials = [ local ] } { now = nowMs, authenticated = False })
+            , test "unknown credential metadata is never restorable authority" <|
+                \_ ->
+                    let
+                        unknown = credential "KKKKKKKKKKKKKKKKKKKKKKKK" Session.UnknownCredential Nothing
+                    in
+                    Expect.equal
+                        (Skip { reason = NoneHeld, meshExpired = False })
+                        (held { credentials = [ unknown ] })
+            , test "reclaim offered uses metadata presence and expiry" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> Expect.equal True (reclaimOffered { sessionToken = Just localBearer, meshToken = Nothing, meshTokenExpiresAt = Nothing } nowMs)
-                        , \_ -> Expect.equal True (reclaimOffered { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Nothing } nowMs)
-                        , \_ -> Expect.equal False (reclaimOffered { sessionToken = Nothing, meshToken = Nothing, meshTokenExpiresAt = Nothing } nowMs)
+                        [ \_ -> Expect.equal True (reclaimOffered { credentials = [ credential "LLLLLLLLLLLLLLLLLLLLLLLL" Session.LocalLogical Nothing ] } nowMs)
+                        , \_ -> Expect.equal False (reclaimOffered { credentials = [ credential "MMMMMMMMMMMMMMMMMMMMMMMM" Session.MeshExact (Just (nowMs - 1)) ] } nowMs)
+                        , \_ -> Expect.equal False (reclaimOffered { credentials = [] } nowMs)
                         ]
                         ()
-            , test "is false once the only mesh Bearer [REDACTED] lapsed" <|
-                \_ ->
-                    Expect.equal False
-                        (reclaimOffered { sessionToken = Nothing, meshToken = Just meshBearer, meshTokenExpiresAt = Just (nowMs - 1) } nowMs)
             ]
         , describe "sessionList parse helpers"
             [ test "parses attached current and detached sibling rows" <|

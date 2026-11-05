@@ -3,8 +3,8 @@ module MessageWindowTest exposing (suite)
 {-| Mirror vectors for `MessageWindow` over the oracle
 `src/shell/messageWindow.test.ts` pure suites: trailing slices,
 two-sided anchor pages, explicit paging, tail/aria-live signals,
-and fail-closed hardening. Rendering/paging state stays ahead;
-this pins the math only.
+and fail-closed hardening. Thread paging state lives in `App` /
+`View.Thread` (Show earlier, New unread jump). This module pins the math.
 -}
 
 import Expect

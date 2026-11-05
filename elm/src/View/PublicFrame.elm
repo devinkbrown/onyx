@@ -6,23 +6,21 @@ module View.PublicFrame exposing
     , primaryNav
     )
 
-{-| Shared public-route chrome, mirroring `src/ui/public/PublicFrame`
-(header, primary navigation, skip link, footer) with nav items from
-the canonical manifest (`publicRouteManifest`: About + Download carry
-`primary` placement, ordered About then Download). The brand lockup,
-mark, and footer identity copy the oracle class and asset contract;
-`SceneAtmosphere` stays a CSS concern (the `public-atmosphere`
-landmark is rendered for it to hydrate).
+{-| Shared public-route chrome in the Elm-first site language: serif
+wordmark with the brand mark, quiet primary navigation, skip link,
+optional context line, labelled main, footer.
 
-Narrowings: the mobile focus-trap and toggle refocus are JS
-behaviours with no pure equivalent — the toggle keeps full ARIA
-semantics (`aria-expanded` / `aria-controls` / labelled), closes on
-navigation, and closes on Escape (wired in `Main.subscriptions`).
+Behavior is unchanged from the old frame: the mobile toggle keeps full
+ARIA semantics (`aria-expanded` / `aria-controls` / labelled labelled),
+closes on navigation, and closes on Escape (wired in
+`Main.subscriptions`). The animated atmosphere landmark is gone with
+the old site — nothing hydrates it anymore.
+
 -}
 
 import App exposing (Model, Msg(..))
 import Html exposing (Html, a, button, div, footer, header, img, main_, nav, p, span, text)
-import Html.Attributes exposing (alt, attribute, class, classList, height, href, id, src, tabindex, width)
+import Html.Attributes exposing (alt, attribute, class, classList, height, href, id, src, width)
 import Html.Events exposing (onClick)
 
 
@@ -103,8 +101,8 @@ navLink currentPath item =
         [ text item.label ]
 
 
-{-| Shared document framing for public routes: atmosphere landmark,
-skip link, header, optional context line, labelled main, footer. -}
+{-| Shared document framing for public routes: skip link, masthead,
+optional context line, labelled main, footer. -}
 frame : Model -> String -> String -> Maybe (Html Msg) -> List (Html Msg) -> Html Msg
 frame model currentPath mainLabel context children =
     let
@@ -114,88 +112,74 @@ frame model currentPath mainLabel context children =
         brandCurrent =
             normalised == "/"
     in
-    div [ class "public-frame" ]
-        [ div [ class "public-atmosphere", attribute "aria-hidden" "true", attribute "data-testid" "public-atmosphere" ] []
-        , a [ class "public-frame__skip", href "#public-main" ] [ text "Skip to content" ]
-        , header [ class "public-frame__header" ]
-            [ div [ class "public-frame__header-inner" ]
-                [ a
-                    ([ class "public-frame__brand", href "/", Html.Attributes.attribute "aria-label" "Onyx home" ]
-                        ++ (if brandCurrent then
-                                [ attribute "aria-current" "page" ]
+    div [ class "site-frame" ]
+        [ a [ class "site-skip", href "#site-main" ] [ text "Skip to content" ]
+        , header [ class "site-mast" ]
+            [ a
+                ([ class "site-brand", href "/" ]
+                    ++ (if brandCurrent then
+                            [ attribute "aria-current" "page"
+                            , attribute "aria-label" "Onyx home"
+                            ]
 
-                            else
-                                []
-                           )
-                    )
-                    [ span [ class "public-frame__brand-visual", attribute "aria-hidden" "true" ]
-                        [ img [ class "public-frame__lockup", src "/brand/lockup.png", width 200, height 78, alt "", attribute "decoding" "async" ] []
-                        , img [ class "public-frame__mark", src "/brand/mark.png", width 40, height 40, alt "", attribute "decoding" "async" ] []
-                        , img [ class "public-frame__wordmark", src "/brand/wordmark.png", width 86, height 37, alt "", attribute "decoding" "async" ] []
-                        , span [ class "public-frame__name" ] [ text "Onyx" ]
-                        ]
+                        else
+                            [ attribute "aria-label" "Onyx home" ]
+                       )
+                )
+                [ img [ class "site-brand-mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
+                , span [ class "site-brand-name" ] [ text "Onyx" ]
+                ]
+            , div [ class "site-mast-nav" ]
+                [ nav
+                    [ id "public-primary-navigation"
+                    , class "site-nav"
+                    , classList [ ( "is-open", model.navMenuOpen ) ]
+                    , attribute "aria-label" "Primary navigation"
                     ]
-                , div [ class "public-frame__nav-cluster" ]
-                    [ div [ class "public-frame__nav-links" ]
-                        [ nav
-                            [ id "public-primary-navigation"
-                            , class "public-frame__nav"
-                            , classList [ ( "is-open", model.navMenuOpen ) ]
-                            , attribute "aria-label" "Primary navigation"
-                            ]
-                            (List.map (navLink currentPath) primaryNav)
-                        ]
-                    , div [ class "public-frame__nav-actions" ]
-                        [ a [ class "public-frame__open", href "/app/" ] [ text "Open Onyx" ]
-                        , button
-                            [ class "public-frame__menu-toggle"
-                            , attribute "type" "button"
-                            , attribute "aria-expanded"
-                                (if model.navMenuOpen then
-                                    "true"
+                    (List.map (navLink currentPath) primaryNav)
+                , a [ class "site-mast-open", href "/app/" ] [ text "Open Onyx" ]
+                , button
+                    [ class "site-menu-toggle"
+                    , attribute "type" "button"
+                    , attribute "aria-expanded"
+                        (if model.navMenuOpen then
+                            "true"
 
-                                 else
-                                    "false"
-                                )
-                            , attribute "aria-controls" "public-primary-navigation"
-                            , attribute "aria-label"
-                                (if model.navMenuOpen then
-                                    "Close navigation menu"
+                         else
+                            "false"
+                        )
+                    , attribute "aria-controls" "public-primary-navigation"
+                    , attribute "aria-label"
+                        (if model.navMenuOpen then
+                            "Close navigation menu"
 
-                                 else
-                                    "Open navigation menu"
-                                )
-                            , onClick ToggleNavMenu
-                            ]
-                            [ span [ attribute "aria-hidden" "true" ] []
-                            , span [ attribute "aria-hidden" "true" ] []
-                            ]
-                        ]
+                         else
+                            "Open navigation menu"
+                        )
+                    , onClick ToggleNavMenu
                     ]
+                    [ text "Menu" ]
                 ]
             ]
         , case context of
             Just current ->
-                div [ class "public-frame__context" ] [ current ]
+                div [ class "site-context" ] [ current ]
 
             Nothing ->
                 text ""
-        , main_ [ id "public-main", class "public-frame__main", tabindex -1, attribute "aria-label" mainLabel ] children
-        , footer [ class "public-frame__footer" ]
-            [ div [ class "public-frame__footer-inner" ]
-                [ div [ class "public-frame__footer-identity" ]
-                    [ a [ class "public-frame__footer-brand", href "/" ]
-                        [ img [ class "public-frame__mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
-                        , span [] [ text "Onyx" ]
-                        ]
-                    , p [] [ text "Rooms, messages, and calls for friends, clubs, and creators." ]
+        , main_ [ id "site-main", class "site-body", attribute "aria-label" mainLabel ] children
+        , footer [ class "site-foot" ]
+            [ div [ class "site-foot-identity" ]
+                [ a [ class "site-brand", href "/" ]
+                    [ img [ class "site-brand-mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
+                    , span [ class "site-brand-name" ] [ text "Onyx" ]
                     ]
-                , nav [ attribute "aria-label" "Footer navigation" ]
-                    [ p [ class "public-frame__footer-title" ] [ text "Explore Onyx" ]
-                    , div [ class "public-frame__footer-links" ]
-                        (List.map (\link -> a [ href link.href ] [ text link.label ]) footerLinks)
-                    ]
+                , p [] [ text "Rooms, messages, and calls for friends, clubs, and creators." ]
+                ]
+            , nav [ attribute "aria-label" "Footer navigation" ]
+                [ p [ class "site-foot-title" ] [ text "Explore Onyx" ]
+                , div [ class "site-foot-links" ]
+                    (List.map (\link -> a [ href link.href ] [ text link.label ]) footerLinks)
                 ]
             ]
         ]
-

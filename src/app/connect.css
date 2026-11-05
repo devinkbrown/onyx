@@ -36,14 +36,39 @@
   display: none;
 }
 
+.conn-brand {
+  position: absolute;
+  z-index: 2;
+  top: max(0.65rem, env(safe-area-inset-top, 0px));
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  color: var(--conn-text);
+  font: 750 1.2rem/1 var(--font-sans);
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+.conn-brand:focus-visible {
+  outline: 2px solid var(--conn-current);
+  outline-offset: 3px;
+}
+.conn-brand .public-frame__mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.55rem;
+}
+
 .conn-stage {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(26.25rem, 30rem);
-  align-items: start;
-  gap: clamp(2rem, 4vw, 4rem);
-  width: min(74rem, 100%);
+  grid-template-columns: minmax(16rem, 22rem) minmax(26.25rem, 30rem);
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 3vw, 3rem);
+  width: min(56rem, 100%);
   min-width: 0;
 }
 
@@ -147,10 +172,19 @@
   position: relative;
   width: min(30rem, 100%);
   max-width: 30rem;
+  overflow: hidden;
   border: 1px solid var(--conn-edge);
-  border-radius: 0.7rem;
+  border-radius: 1rem;
   color: var(--conn-text);
   background: var(--conn-surface);
+  box-shadow: 0 28px 70px -40px rgb(0 0 0 / 0.72);
+}
+.conn-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--conn-action);
 }
 
 .conn-body {
@@ -324,8 +358,10 @@
 
 .conn .onyx-button--primary {
   border-color: var(--conn-action);
+  border-radius: 0.7rem;
   color: var(--conn-action-text);
   background: var(--conn-action);
+  font-weight: 800;
 }
 
 .conn .onyx-button--primary:hover:not(:disabled),
@@ -519,6 +555,7 @@
   .conn {
     display: block;
     min-height: 100svh;
+    padding-top: calc(3.4rem + env(safe-area-inset-top, 0px));
     padding-inline: 0;
   }
 
@@ -538,7 +575,9 @@
     min-height: 0;
     border-inline: 0;
     border-radius: 0;
+    box-shadow: none;
   }
+  .conn-card::before { display: none; }
   .conn-body { gap: 1rem; padding: max(1.5rem, env(safe-area-inset-top, 0px)) max(1.25rem, env(safe-area-inset-right, 0px)) 1.25rem max(1.25rem, env(safe-area-inset-left, 0px)); }
   .conn-foot { padding-inline: max(1.25rem, env(safe-area-inset-left, 0px)); padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)); }
   .conn-actions { position: sticky; bottom: 0; padding-bottom: 0.3rem; background: var(--conn-surface); }
@@ -565,6 +604,7 @@
 }
 
 @media (forced-colors: active) {
+  .conn-card::before { display: none; }
   .conn-card,
   .conn-room-mark,
   .conn-invite,

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "id": "contract-observations",
+  "command": [
+    {
+      "cmd": "/usr/bin/node",
+      "args": [
+        "/home/kain/onyx/elm/tools/source-manifest.mjs"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "/usr/local/bin/pnpm",
+      "args": [
+        "--version"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/home/kain/onyx-server",
+      "capture": true
+    },
+    {
+      "runner": [
+        "/usr/bin/node",
+        "/home/kain/onyx/elm/tools/run-roadmap-checks.mjs",
+        "contract-observations"
+      ]
+    }
+  ],
+  "laneObservations": [
+    {
+      "id": "E02-contract-observation",
+      "clientValidator": {
+        "command": [
+          "/usr/local/bin/pnpm",
+          "check:server-contract-v2"
+        ],
+        "exitStatus": 0,
+        "stdout": "\n> onyx@0.1.3 check:server-contract-v2 /home/kain/onyx\n> node tools/check-server-contract-v2.mjs ../onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n\nProtocol contract v2 valid: /home/kain/onyx/docs/protocol/onyx-client-contract.v2.json = /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n",
+        "stderr": "",
+        "error": null
+      },
+      "serverValidator": {
+        "command": [
+          "python3",
+          "-B",
+          "/home/kain/onyx-server/tools/check-client-contract.py"
+        ],
+        "exitStatus": 0,
+        "stdout": "Protocol contract valid: /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json\n",
+        "stderr": "",
+        "error": null
+      },
+      "validatorConcordance": "verified",
+      "e02AcceptanceStatus": "pending",
+      "clientSources": {
+        "checkerSha256": "cbb5b6fbfc1cca7ea5a6449b9632c347f45afed64f59034a991f9448dcb2c3df",
+        "contractV2Sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e",
+        "gitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03"
+      },
+      "serverSources": {
+        "checkerSha256": "db24c5d8ed7f452c99edfa3bbbeb3c44e4165ac40319b50fb75e70dc6053de1e",
+        "contractV1Sha256": "6e375d15dbb503de23720eb0e646e31040155823fef2fd45004cf71dfce5bf38",
+        "contractV2Sha256": "3f18dae0ac35962d6ceff83c131a86106c910569f5f0ffb02b9fe2adbb11808e",
+        "gitHead": "b9be884cce57dadf91d415f61e703de95e521757"
+      },
+      "sourceAndJsonEdits": "none; this lane observes validators and does not mutate either contract"
+    }
+  ],
+  "utcTime": "2026-11-04T11:10:54.887Z",
+  "exitStatus": 0,
+  "outcome": "passed",
+  "acceptanceStatus": "pending",
+  "clientSourceManifestDigest": "1ec2452e0b00b991af5da06a8e07ef8154af05505d8d33e0757398add5289c89",
+  "clientGitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03",
+  "clientWorkingTreeDirty": true,
+  "serverSourceOrArtifactHashesWhenRelevant": "not supplied to this lane",
+  "browser": "not measured",
+  "os": "linux 6.18.57-0-lts (x64)",
+  "network": "local/mock; not a live-server acceptance receipt",
+  "limits": "seed=11031904; fuzz=100; bounded processes; no hidden skips; gates and acceptance remain distinct"
+}

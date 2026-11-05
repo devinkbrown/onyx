@@ -39,7 +39,7 @@ const FAKE_MEDIA_ARGS = [
 // One full-chromium instance shared by every test (durable two-context WSS).
 let mediaBrowser: Browser;
 test.beforeAll(async () => {
-  mediaBrowser = await chromium.launch({ args: FAKE_MEDIA_ARGS });
+  mediaBrowser = await chromium.launch({ executablePath: process.env.ONYX_CHROMIUM_EXECUTABLE ?? '/usr/bin/chromium', args: FAKE_MEDIA_ARGS });
   // Prime the transport: the very first WSS connection after launch can flicker
   // (TLS warm-up / first reconnect). Pay that cost on a throwaway context so the
   // first real test isn't the one that absorbs the flake.

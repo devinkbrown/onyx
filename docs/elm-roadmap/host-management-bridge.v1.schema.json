@@ -1,0 +1,590 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onyx.invalid/design/host-management-bridge.v1.schema.json",
+  "title": "Proposed Onyx host-management bridge v1",
+  "description": "Design-only schema. The root oneOf selects an authenticated application request, challenge bootstrap request/response, or authenticated application response. The service must additionally enforce UTF-8 byte sizes, JCS, duplicate-key rejection, canonical base64url decoding, WebAuthn, freshness, authorization, cross-field equality, operation/status/result bindings, and transaction rules described in host-management-bridge.md.",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{22,43}$",
+      "minLength": 22,
+      "maxLength": 43,
+      "description": "Canonical unpadded base64url for 16–32 random bytes; validator must decode and enforce canonical form."
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Lowercase hexadecimal SHA-256 digest."
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[!-~]{1,128}$",
+      "description": "Opaque printable ASCII revision, compared only for equality."
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "opaqueCursor": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9_-]{2,342}$",
+      "maxLength": 342,
+      "description": "Null at first/end; otherwise canonical unpadded base64url for 1–256 bytes, scoped server-side to principal and host."
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "host.inspect",
+        "config.plan",
+        "config.commit",
+        "service.restart.plan",
+        "service.restart.commit",
+        "operation.inspect",
+        "operation.reconcile",
+        "operation.cancel",
+        "audit.read",
+        "rollback.plan",
+        "rollback.commit"
+      ]
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "invalid-request",
+        "unsupported-version",
+        "unsupported-operation",
+        "unpaired",
+        "unauthenticated",
+        "forbidden",
+        "factor-required",
+        "stale-permission",
+        "stale-host-state",
+        "plan-expired",
+        "plan-mismatch",
+        "idempotency-conflict",
+        "replay",
+        "rate-limited",
+        "unavailable",
+        "internal-error"
+      ]
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "keyId", "signature"],
+      "properties": {
+        "profile": { "const": "Ed25519-JCS-v1" },
+        "keyId": { "$ref": "#/$defs/id" },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{86}$",
+          "description": "Canonical unpadded base64url for exactly 64 Ed25519 signature bytes."
+        }
+      }
+    },
+    "requestProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["challengeRef", "credentialId", "clientDataJSON", "authenticatorData", "signature", "userHandle"],
+      "properties": {
+        "challengeRef": { "$ref": "#/$defs/id" },
+        "credentialId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,342}$",
+          "maxLength": 342,
+          "x-maxDecodedBytes": 256,
+          "description": "Canonical base64url; decoded credential ID is at most 256 bytes."
+        },
+        "clientDataJSON": {
+          "type": "string",
+          "maxLength": 5462,
+          "x-maxDecodedBytes": 4096,
+          "description": "Canonical base64url; decoded bytes at most 4096."
+        },
+        "authenticatorData": {
+          "type": "string",
+          "maxLength": 5462,
+          "x-maxDecodedBytes": 4096,
+          "description": "Canonical base64url; decoded bytes at most 4096."
+        },
+        "signature": {
+          "type": "string",
+          "maxLength": 1366,
+          "x-maxDecodedBytes": 1024,
+          "description": "Canonical base64url; decoded bytes at most 1024."
+        },
+        "userHandle": {
+          "type": ["string", "null"],
+          "maxLength": 86,
+          "x-maxDecodedBytes": 64,
+          "description": "Canonical base64url; non-null decoded bytes at most 64."
+        }
+      }
+    },
+    "unsignedRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "version", "installationId", "hostRef", "principalRef", "requestId", "idempotencyKey", "issuedAtMs", "expiresAtMs", "permissionRevision", "operation", "body"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "idempotencyKey": { "$ref": "#/$defs/id" },
+        "issuedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "body": { "type": "object", "maxProperties": 64 }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/hostInspectBody" },
+        { "$ref": "#/$defs/configPlanBody" },
+        { "$ref": "#/$defs/configCommitBody" },
+        { "$ref": "#/$defs/restartPlanBody" },
+        { "$ref": "#/$defs/restartCommitBody" },
+        { "$ref": "#/$defs/operationReadBody" },
+        { "$ref": "#/$defs/operationCancelBody" },
+        { "$ref": "#/$defs/auditReadBody" },
+        { "$ref": "#/$defs/rollbackPlanBody" },
+        { "$ref": "#/$defs/rollbackCommitBody" }
+      ]
+    },
+    "hostInspectBody": {
+      "if": { "properties": { "operation": { "const": "host.inspect" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "maxProperties": 0, "additionalProperties": false } } }
+    },
+    "configPlanBody": {
+      "if": { "properties": { "operation": { "const": "config.plan" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["candidateToml", "expectedHostRevision"], "properties": { "candidateToml": { "type": "string", "maxLength": 262144, "x-maxUtf8Bytes": 262144, "description": "Secret-free TOML candidate; service must validate against pinned server TOML schema, reject unknown/secret keys and includes/env interpolation/executable content, and bind the accepted schema revision." }, "expectedHostRevision": { "$ref": "#/$defs/revision" } } } } }
+    },
+    "configCommitBody": {
+      "if": { "properties": { "operation": { "const": "config.commit" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "$ref": "#/$defs/commitBody" } } }
+    },
+    "restartPlanBody": {
+      "if": { "properties": { "operation": { "const": "service.restart.plan" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["expectedHostRevision"], "properties": { "expectedHostRevision": { "$ref": "#/$defs/revision" } } } } }
+    },
+    "restartCommitBody": {
+      "if": { "properties": { "operation": { "const": "service.restart.commit" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "$ref": "#/$defs/commitBody" } } }
+    },
+    "operationReadBody": {
+      "if": { "properties": { "operation": { "enum": ["operation.inspect", "operation.reconcile"] } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["operationRef", "originalIdempotencyKey"], "properties": { "operationRef": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "originalIdempotencyKey": { "$ref": "#/$defs/id" } } } } }
+    },
+    "operationCancelBody": {
+      "if": { "properties": { "operation": { "const": "operation.cancel" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["operationRef", "originalIdempotencyKey"], "properties": { "operationRef": { "$ref": "#/$defs/id" }, "originalIdempotencyKey": { "$ref": "#/$defs/id" } } } } }
+    },
+    "auditReadBody": {
+      "if": { "properties": { "operation": { "const": "audit.read" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["cursor", "limit"], "properties": { "cursor": { "$ref": "#/$defs/opaqueCursor" }, "limit": { "type": "integer", "minimum": 1, "maximum": 100 } } } } }
+    },
+    "rollbackPlanBody": {
+      "if": { "properties": { "operation": { "const": "rollback.plan" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "type": "object", "additionalProperties": false, "required": ["operationRef", "expectedHostRevision"], "properties": { "operationRef": { "$ref": "#/$defs/id" }, "expectedHostRevision": { "$ref": "#/$defs/revision" } } } } }
+    },
+    "rollbackCommitBody": {
+      "if": { "properties": { "operation": { "const": "rollback.commit" } }, "required": ["operation"] },
+      "then": { "properties": { "body": { "$ref": "#/$defs/commitBody" } } }
+    },
+    "commitBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planRef", "planDigest", "expectedHostRevision", "confirmationRef"],
+      "properties": {
+        "planRef": { "$ref": "#/$defs/id" },
+        "planDigest": { "$ref": "#/$defs/digest" },
+        "expectedHostRevision": { "$ref": "#/$defs/revision" },
+        "confirmationRef": { "$ref": "#/$defs/id" }
+      }
+    },
+    "applicationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "version", "installationId", "hostRef", "principalRef", "requestId", "idempotencyKey", "issuedAtMs", "expiresAtMs", "permissionRevision", "operation", "body", "proof"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "idempotencyKey": { "$ref": "#/$defs/id" },
+        "issuedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "body": { "type": "object", "maxProperties": 64 },
+        "proof": { "$ref": "#/$defs/requestProof" }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/hostInspectBody" },
+        { "$ref": "#/$defs/configPlanBody" },
+        { "$ref": "#/$defs/configCommitBody" },
+        { "$ref": "#/$defs/restartPlanBody" },
+        { "$ref": "#/$defs/restartCommitBody" },
+        { "$ref": "#/$defs/operationReadBody" },
+        { "$ref": "#/$defs/operationCancelBody" },
+        { "$ref": "#/$defs/auditReadBody" },
+        { "$ref": "#/$defs/rollbackPlanBody" },
+        { "$ref": "#/$defs/rollbackCommitBody" }
+      ]
+    },
+    "challengeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "version", "installationId", "hostRef", "principalRef", "requestId", "requestDigest", "operation"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "operation": { "$ref": "#/$defs/operation" }
+      }
+    },
+    "challengeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol", "version", "installationId", "hostRef", "principalRef", "requestId", "requestDigest", "operation", "challengeRef", "challenge", "issuedAtMs", "expiresAtMs", "rpId", "origin", "permissionRevision", "credentialSelection", "status", "error", "proof"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "challengeRef": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "challenge": { "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$", "description": "Canonical base64url for 32 random bytes." }, { "type": "null" }] },
+        "issuedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "rpId": { "type": ["string", "null"], "maxLength": 253 },
+        "origin": { "type": ["string", "null"], "maxLength": 2048 },
+        "permissionRevision": { "oneOf": [{ "$ref": "#/$defs/revision" }, { "type": "null" }] },
+        "credentialSelection": { "const": "discoverable" },
+        "status": { "enum": ["challenge", "rejected"] },
+        "error": { "oneOf": [{ "$ref": "#/$defs/errorCode" }, { "type": "null" }] },
+        "proof": { "$ref": "#/$defs/proof" }
+      },
+      "oneOf": [
+        { "properties": { "status": { "const": "challenge" }, "challengeRef": { "$ref": "#/$defs/id" }, "challenge": { "type": "string" }, "rpId": { "type": "string" }, "origin": { "type": "string" }, "permissionRevision": { "$ref": "#/$defs/revision" }, "error": { "type": "null" } } },
+        { "properties": { "status": { "const": "rejected" }, "challengeRef": { "type": "null" }, "challenge": { "type": "null" }, "rpId": { "type": "null" }, "origin": { "type": "null" }, "permissionRevision": { "type": "null" }, "error": { "$ref": "#/$defs/errorCode" } } }
+      ]
+    },
+    "grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principalRef", "hostRef", "installationId", "permissionRevision", "issuedAtMs", "expiresAtMs", "capabilities", "factors"],
+      "properties": {
+        "principalRef": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "installationId": { "$ref": "#/$defs/id" },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "issuedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "capabilities": { "type": "array", "uniqueItems": true, "maxItems": 11, "items": { "$ref": "#/$defs/operation" } },
+        "roles": { "type": "array", "uniqueItems": true, "maxItems": 4, "items": { "enum": ["viewer", "config-admin", "service-admin", "auditor"] }, "description": "Optional informational labels; never authorization facts." },
+        "factors": {
+          "type": "object", "additionalProperties": false,
+          "required": ["userPresent", "userVerified", "verifiedAtMs", "credentialRef"],
+          "properties": {
+            "userPresent": { "const": true },
+            "userVerified": { "const": true },
+            "verifiedAtMs": { "$ref": "#/$defs/safeInteger" },
+            "credentialRef": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planRef", "kind", "planDigest", "hostRevision", "permissionRevision", "expiresAtMs", "changes", "warnings", "rollback", "requiredCapability", "confirmationRef"],
+      "properties": {
+        "planRef": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["config", "restart", "rollback"] },
+        "planDigest": { "$ref": "#/$defs/digest" },
+        "hostRevision": { "$ref": "#/$defs/revision" },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "changes": {
+          "type": "array", "maxItems": 128,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "action", "oldSummary", "newSummary"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1, "maxLength": 4096, "x-maxUtf8Bytes": 4096, "description": "Logical TOML key, never a filesystem path." },
+              "action": { "enum": ["set", "remove", "restart", "restore"] },
+              "oldSummary": { "type": ["string", "null"], "maxLength": 256, "x-maxUtf8Bytes": 256 },
+              "newSummary": { "type": ["string", "null"], "maxLength": 256, "x-maxUtf8Bytes": 256 }
+            }
+          }
+        },
+        "warnings": { "type": "array", "uniqueItems": true, "maxItems": 16, "items": { "enum": ["service-restart-required", "connection-interruption", "rollback-unavailable", "configuration-replaced"] } },
+        "rollback": { "enum": ["available", "unavailable"] },
+        "requiredCapability": { "$ref": "#/$defs/operation", "description": "Exact commit capability; constrained by plan.kind to config.commit, service.restart.commit, or rollback.commit." },
+        "confirmationRef": { "$ref": "#/$defs/id" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "config" } }, "required": ["kind"] }, "then": { "properties": { "requiredCapability": { "const": "config.commit" } } } },
+        { "if": { "properties": { "kind": { "const": "restart" } }, "required": ["kind"] }, "then": { "properties": { "requiredCapability": { "const": "service.restart.commit" } } } },
+        { "if": { "properties": { "kind": { "const": "rollback" } }, "required": ["kind"] }, "then": { "properties": { "requiredCapability": { "const": "rollback.commit" } } } }
+      ]
+    },
+    "operationRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operationRef", "originalIdempotencyKey", "operation", "requestDigest", "planDigest", "state", "acceptedAtMs", "updatedAtMs", "finishedAtMs", "hostRevisionBefore", "hostRevisionAfter", "resultDigest", "cancellationRequested", "rollback", "error"],
+      "properties": {
+        "operationRef": { "$ref": "#/$defs/id" },
+        "originalIdempotencyKey": { "$ref": "#/$defs/id" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "planDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "state": { "enum": ["accepted", "running", "applied", "rejected", "cancelled", "outcome-unknown"] },
+        "acceptedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "updatedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "finishedAtMs": { "oneOf": [{ "$ref": "#/$defs/safeInteger" }, { "type": "null" }] },
+        "hostRevisionBefore": { "$ref": "#/$defs/revision" },
+        "hostRevisionAfter": { "oneOf": [{ "$ref": "#/$defs/revision" }, { "type": "null" }] },
+        "resultDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "cancellationRequested": { "type": "boolean" },
+        "rollback": { "enum": ["available", "unavailable"] },
+        "error": { "oneOf": [{ "$ref": "#/$defs/errorCode" }, { "type": "null" }] }
+      }
+    },
+    "auditRow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["auditRef", "operationRef", "principalRef", "hostRef", "installationId", "operation", "requestDigest", "planDigest", "permissionRevision", "authorization", "factor", "event", "atMs", "error"],
+      "properties": {
+        "auditRef": { "$ref": "#/$defs/id" },
+        "operationRef": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "installationId": { "$ref": "#/$defs/id" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "planDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "authorization": { "enum": ["allowed", "denied"] },
+        "factor": {
+          "type": "object", "additionalProperties": false,
+          "required": ["userPresent", "userVerified", "verifiedAtMs", "credentialRef"],
+          "properties": {
+            "userPresent": { "type": "boolean" },
+            "userVerified": { "type": "boolean" },
+            "verifiedAtMs": { "oneOf": [{ "$ref": "#/$defs/safeInteger" }, { "type": "null" }] },
+            "credentialRef": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }
+          }
+        },
+        "event": { "enum": ["admitted", "started", "applied", "rejected", "cancel-requested", "cancelled", "reconciled", "outcome-unknown"] },
+        "atMs": { "$ref": "#/$defs/safeInteger" },
+        "error": { "oneOf": [{ "$ref": "#/$defs/errorCode" }, { "type": "null" }] }
+      }
+    },
+    "hostInspectResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hostRevision", "configDigest", "serviceState", "grant"],
+      "properties": {
+        "hostRevision": { "$ref": "#/$defs/revision" },
+        "configDigest": { "$ref": "#/$defs/digest" },
+        "serviceState": { "enum": ["running", "stopped", "starting", "stopping", "unknown"] },
+        "grant": { "$ref": "#/$defs/grant" }
+      }
+    },
+    "planResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["plan", "grant"],
+      "properties": { "plan": { "$ref": "#/$defs/plan" }, "grant": { "$ref": "#/$defs/grant" } }
+    },
+    "operationResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["record"],
+      "properties": { "record": { "$ref": "#/$defs/operationRecord" } }
+    },
+    "notFoundResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["record", "absence"],
+      "properties": { "record": { "type": "null" }, "absence": { "const": "durable-no-reservation" } }
+    },
+    "auditResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rows", "nextCursor"],
+      "properties": {
+        "rows": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/auditRow" } },
+        "nextCursor": { "$ref": "#/$defs/opaqueCursor" }
+      }
+    },
+    "preAdmissionFailure": {
+      "type": "object",
+      "required": ["status", "operationRef", "result", "error"],
+      "properties": {
+        "status": { "enum": ["rejected", "expired", "conflict"] },
+        "operationRef": { "type": "null" },
+        "result": { "type": "null" },
+        "error": { "$ref": "#/$defs/errorCode" }
+      },
+      "allOf": [
+        { "if": { "properties": { "status": { "const": "expired" } }, "required": ["status"] }, "then": { "properties": { "error": { "enum": ["plan-expired", "stale-permission"] } } } },
+        { "if": { "properties": { "status": { "const": "conflict" } }, "required": ["status"] }, "then": { "properties": { "error": { "enum": ["idempotency-conflict", "plan-mismatch"] } } } }
+      ]
+    },
+    "hostInspectSuccess": {
+      "type": "object", "required": ["status", "operationRef", "result", "error"],
+      "properties": { "status": { "const": "ready" }, "operationRef": { "type": "null" }, "result": { "$ref": "#/$defs/hostInspectResult" }, "error": { "type": "null" } }
+    },
+    "configPlanResult": {
+      "allOf": [
+        { "$ref": "#/$defs/planResult" },
+        { "properties": { "plan": { "properties": { "kind": { "const": "config" } } } } }
+      ]
+    },
+    "restartPlanResult": {
+      "allOf": [
+        { "$ref": "#/$defs/planResult" },
+        { "properties": { "plan": { "properties": { "kind": { "const": "restart" } } } } }
+      ]
+    },
+    "rollbackPlanResult": {
+      "allOf": [
+        { "$ref": "#/$defs/planResult" },
+        { "properties": { "plan": { "properties": { "kind": { "const": "rollback" } } } } }
+      ]
+    },
+    "plannedResponse": {
+      "type": "object", "required": ["status", "operationRef", "result", "error"],
+      "properties": { "status": { "const": "planned" }, "operationRef": { "type": "null" }, "result": { "$ref": "#/$defs/planResult" }, "error": { "type": "null" } }
+    },
+    "commitResponse": {
+      "oneOf": [
+        { "properties": { "status": { "const": "accepted" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "accepted" } } } } } } }] },
+        { "properties": { "status": { "const": "running" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "running" } } } } } } }] },
+        { "properties": { "status": { "const": "applied" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "applied" } } } } } } }] },
+        { "properties": { "status": { "const": "cancelled" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "cancelled" } } } } } } }] },
+        { "properties": { "status": { "const": "outcome-unknown" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "oneOf": [{ "type": "null" }, { "enum": ["unavailable", "internal-error"] }] } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "outcome-unknown" } } } } } } }] },
+        { "properties": { "status": { "const": "rejected" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "$ref": "#/$defs/errorCode" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "rejected" } } } } } } }] }
+      ]
+    },
+    "operationReadSuccess": {
+      "type": "object", "required": ["status", "operationRef", "result", "error"],
+      "properties": { "status": { "const": "ready" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }
+    },
+    "operationNotFound": {
+      "type": "object", "required": ["status", "operationRef", "result", "error"],
+      "properties": { "status": { "const": "not-found" }, "operationRef": { "type": "null" }, "result": { "$ref": "#/$defs/notFoundResult" }, "error": { "type": "null" } }
+    },
+    "cancelSuccess": {
+      "oneOf": [
+        { "properties": { "status": { "const": "cancelled" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "type": "null" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "const": "cancelled" }, "cancellationRequested": { "const": true } } } } } } }] },
+        { "properties": { "status": { "const": "outcome-unknown" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "oneOf": [{ "type": "null" }, { "const": "unavailable" }] } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "enum": ["running", "outcome-unknown"] }, "cancellationRequested": { "const": true } } } } } } }] },
+        { "properties": { "status": { "const": "rejected" }, "operationRef": { "$ref": "#/$defs/id" }, "result": { "$ref": "#/$defs/operationResult" }, "error": { "const": "stale-host-state" } }, "required": ["status", "operationRef", "result", "error"], "allOf": [{ "properties": { "result": { "properties": { "record": { "properties": { "state": { "enum": ["applied", "rejected", "cancelled"] } } } } } } }] }
+      ]
+    },
+    "auditSuccess": {
+      "type": "object", "required": ["status", "operationRef", "result", "error"],
+      "properties": { "status": { "const": "ready" }, "operationRef": { "type": "null" }, "result": { "$ref": "#/$defs/auditResult" }, "error": { "type": "null" } }
+    },
+    "hostInspectResponseRules": { "if": { "properties": { "operation": { "const": "host.inspect" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "$ref": "#/$defs/hostInspectSuccess" }] } },
+    "configPlanResponseRules": { "if": { "properties": { "operation": { "const": "config.plan" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/plannedResponse" }, { "properties": { "result": { "$ref": "#/$defs/configPlanResult" } } }] }] } },
+    "restartPlanResponseRules": { "if": { "properties": { "operation": { "const": "service.restart.plan" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/plannedResponse" }, { "properties": { "result": { "$ref": "#/$defs/restartPlanResult" } } }] }] } },
+    "rollbackPlanResponseRules": { "if": { "properties": { "operation": { "const": "rollback.plan" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/plannedResponse" }, { "properties": { "result": { "$ref": "#/$defs/rollbackPlanResult" } } }] }] } },
+    "configCommitResponseRules": { "if": { "properties": { "operation": { "const": "config.commit" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/commitResponse" }, { "properties": { "result": { "properties": { "record": { "properties": { "operation": { "const": "config.commit" } } } } } } }] }] } },
+    "restartCommitResponseRules": { "if": { "properties": { "operation": { "const": "service.restart.commit" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/commitResponse" }, { "properties": { "result": { "properties": { "record": { "properties": { "operation": { "const": "service.restart.commit" } } } } } } }] }] } },
+    "rollbackCommitResponseRules": { "if": { "properties": { "operation": { "const": "rollback.commit" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "allOf": [{ "$ref": "#/$defs/commitResponse" }, { "properties": { "result": { "properties": { "record": { "properties": { "operation": { "const": "rollback.commit" } } } } } } }] }] } },
+    "operationInspectResponseRules": { "if": { "properties": { "operation": { "const": "operation.inspect" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "$ref": "#/$defs/operationReadSuccess" }, { "$ref": "#/$defs/operationNotFound" }] } },
+    "operationReconcileResponseRules": { "if": { "properties": { "operation": { "const": "operation.reconcile" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "$ref": "#/$defs/operationReadSuccess" }, { "$ref": "#/$defs/operationNotFound" }] } },
+    "operationCancelResponseRules": { "if": { "properties": { "operation": { "const": "operation.cancel" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "$ref": "#/$defs/cancelSuccess" }] } },
+    "auditResponseRules": { "if": { "properties": { "operation": { "const": "audit.read" } }, "required": ["operation"] }, "then": { "oneOf": [{ "$ref": "#/$defs/preAdmissionFailure" }, { "$ref": "#/$defs/auditSuccess" }] } },
+    "applicationResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "version", "installationId", "hostRef", "principalRef", "requestId", "idempotencyKey", "operation", "requestDigest", "serverTimeMs", "permissionRevision", "operationRef", "status", "result", "error", "proof"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "principalRef": { "$ref": "#/$defs/id" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "idempotencyKey": { "$ref": "#/$defs/id" },
+        "operation": { "$ref": "#/$defs/operation" },
+        "requestDigest": { "$ref": "#/$defs/digest" },
+        "serverTimeMs": { "$ref": "#/$defs/safeInteger" },
+        "permissionRevision": { "$ref": "#/$defs/revision" },
+        "operationRef": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "status": { "enum": ["ready", "planned", "accepted", "running", "applied", "rejected", "expired", "cancelled", "outcome-unknown", "not-found", "conflict"] },
+        "result": { "oneOf": [{ "$ref": "#/$defs/hostInspectResult" }, { "$ref": "#/$defs/planResult" }, { "$ref": "#/$defs/operationResult" }, { "$ref": "#/$defs/notFoundResult" }, { "$ref": "#/$defs/auditResult" }, { "type": "null" }] },
+        "error": { "oneOf": [{ "$ref": "#/$defs/errorCode" }, { "type": "null" }] },
+        "proof": { "$ref": "#/$defs/proof" }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/hostInspectResponseRules" },
+        { "$ref": "#/$defs/configPlanResponseRules" },
+        { "$ref": "#/$defs/restartPlanResponseRules" },
+        { "$ref": "#/$defs/rollbackPlanResponseRules" },
+        { "$ref": "#/$defs/configCommitResponseRules" },
+        { "$ref": "#/$defs/restartCommitResponseRules" },
+        { "$ref": "#/$defs/rollbackCommitResponseRules" },
+        { "$ref": "#/$defs/operationInspectResponseRules" },
+        { "$ref": "#/$defs/operationReconcileResponseRules" },
+        { "$ref": "#/$defs/operationCancelResponseRules" },
+        { "$ref": "#/$defs/auditResponseRules" }
+      ],
+      "description": "Response validation binds operation/status/result/error combinations. Service/client additionally compare exact request digests, record refs and operations, and outer status to record state."
+    },
+    "keyRotationStatement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "version", "profile", "installationId", "hostRef", "origin", "oldKeyId", "oldPublicKey", "newKeyId", "newPublicKey", "keyEpoch", "activateAtMs", "expiresAtMs", "oldProof", "newProof"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "profile": { "const": "Ed25519-JCS-v1" },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "origin": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "oldKeyId": { "$ref": "#/$defs/id" },
+        "oldPublicKey": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$", "description": "Canonical base64url for 32 Ed25519 public-key bytes." },
+        "newKeyId": { "$ref": "#/$defs/id" },
+        "newPublicKey": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$", "description": "Canonical base64url for 32 Ed25519 public-key bytes." },
+        "keyEpoch": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "activateAtMs": { "$ref": "#/$defs/safeInteger" },
+        "expiresAtMs": { "$ref": "#/$defs/safeInteger" },
+        "oldProof": { "$ref": "#/$defs/proof" },
+        "newProof": { "$ref": "#/$defs/proof" }
+      },
+      "description": "Both proofs sign UTF-8 JCS with both proof fields removed. Validator binds proof keyIds to oldKeyId/newKeyId, exact origin/installation/host, next epoch, and <=120-second expiry."
+    },
+    "keyRevocationStatement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["protocol", "version", "profile", "installationId", "hostRef", "origin", "keyId", "keyEpoch", "revokedAtMs", "reason", "proof"],
+      "properties": {
+        "protocol": { "const": "onyx-host-bridge" },
+        "version": { "const": 1 },
+        "profile": { "const": "Ed25519-JCS-v1" },
+        "installationId": { "$ref": "#/$defs/id" },
+        "hostRef": { "$ref": "#/$defs/id" },
+        "origin": { "type": "string", "format": "uri", "maxLength": 2048 },
+        "keyId": { "$ref": "#/$defs/id" },
+        "keyEpoch": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "revokedAtMs": { "$ref": "#/$defs/safeInteger" },
+        "reason": { "const": "retired" },
+        "proof": { "$ref": "#/$defs/proof" }
+      },
+      "description": "Graceful revocation proof signs UTF-8 JCS with proof removed and must verify under the currently trusted key. Compromise revocation is out of band."
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/applicationRequest" },
+    { "$ref": "#/$defs/challengeRequest" },
+    { "$ref": "#/$defs/challengeResponse" },
+    { "$ref": "#/$defs/applicationResponse" }
+  ]
+}

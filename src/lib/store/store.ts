@@ -28,7 +28,7 @@ import {
   storeSessionToken,
   type CredentialTokenTarget,
 } from '@/lib/credentials';
-import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenCredential, parseSessionTokenCredential, parseStandardReply } from '@/lib/irc/parser';
 import {
   isSessionListEnd,
   parseSessionDropOk,
@@ -2236,7 +2236,7 @@ export interface OnyxState {
   loadPendingKeySafetyNumber(peer: string): Promise<string | null>;
   /** channel.toLowerCase() → rolling caption transcript for the live media session */
   mediaTranscripts: Map<string, Array<{ nick: string; text: string; time: Date }>>;
-  /** sender.toLowerCase() → offline memo (wire: MEMO) delivery aggregate */
+  /** sender.toLowerCase() → server NOTICE MEMO delivery aggregate */
   offlineMemo: Map<string, { count: number; firstMsgId: string }>;
   /** target.toLowerCase() → server-side read marker (ISO 8601 timestamp) */
   readMarkers: Map<string, string>;
@@ -5021,7 +5021,7 @@ function _stopScheduledDispatch(): void {
 }
 
 // ── Account-management standard-reply commands ───────────────────────────────
-/** Commands whose FAIL/WARN/NOTE replies the account layer routes to state. */
+/** Commands whose FAIL/WARN replies the account layer routes to state. */
 const ACCOUNT_COMMANDS = new Set([
   'ACCOUNTINFO',
   'ACCOUNTSET',
@@ -5035,6 +5035,56 @@ const ACCOUNT_COMMANDS = new Set([
   'CERTLIST',
   'CERTDEL',
 ]);
+
+type NativeServiceEvent = {
+  kind: 'EVENT';
+  command: 'MEDIA' | 'WEBAUTHN';
+  code: string;
+  context: string[];
+  description: string;
+  params: string[];
+};
+
+function parseNativeServiceEvent(
+  msg: IRCMessage,
+  ourNick: string,
+  learnedServerPrefix: string | null,
+): NativeServiceEvent | null {
+  if (
+    msg.command !== 'EVENT'
+    || !learnedServerPrefix
+    || msg.prefix !== learnedServerPrefix
+  ) return null;
+  const [recipient, rawPlane, ...payload] = msg.params;
+  if (!recipient || recipient.toLowerCase() !== ourNick.toLowerCase()) return null;
+  const plane = rawPlane?.toUpperCase();
+  if (plane === 'MEDIA') {
+    if (payload.length < 3 || payload.some(value => value.length > 4 * 1024)) return null;
+    const [verb, channel, actor, ...tail] = payload;
+    return {
+      kind: 'EVENT',
+      command: 'MEDIA',
+      code: verb?.toUpperCase() ?? '',
+      context: [],
+      description: '',
+      params: ['MEDIA', channel ?? '', verb ?? '', actor ?? '', ...tail],
+    };
+  }
+  if (plane === 'WEBAUTHN') {
+    if (payload.length === 0 || payload.length > 31 || payload.some(value => value.length > 4 * 1024)) return null;
+    const code = payload[0]?.toUpperCase() ?? '';
+    const description = payload.length > 1 ? payload[payload.length - 1]! : '';
+    return {
+      kind: 'EVENT',
+      command: 'WEBAUTHN',
+      code,
+      context: payload.slice(1, -1),
+      description,
+      params: ['WEBAUTHN', ...payload],
+    };
+  }
+  return null;
+}
 
 type AccountSecurityReplyKind = 'e2ee-key' | 'key-transparency' | 'certificate';
 
@@ -7067,7 +7117,7 @@ export const store = createStore<OnyxState>()(
       _pendingCreateRoomTimer = setTimeout(() => {
         if (_pendingCreateRoom?.expiresAt === expiresAt) _clearPendingCreateRoom();
       }, 15_000);
-      let admitted = false;
+      let admitted: boolean;
       try {
         admitted = client.join(channel, undefined);
       } catch {
@@ -10432,19 +10482,66 @@ export const store = createStore<OnyxState>()(
     _handleMessage(msg: IRCMessage) {
       const { command, params, nick, tags } = msg;
       const { ourNick } = get();
+      const ownerClient = get().client;
 
       // Use server-advertised CHANTYPES for channel detection; fall back to '#&'.
       const chanPfx = get().client?.isupport.CHANTYPES ?? '#&';
       const isChan = (t: string): boolean => t.length > 0 && chanPfx.includes(t[0]!);
-      const standard = parseStandardReply(msg);
+      const foldOfflineMemo = (body: string): boolean => {
+        const memoMatch = body.match(/^MEMO from (\S+) :([\s\S]*)$/);
+        if (!memoMatch) return false;
+        const memoFrom = memoMatch[1]!;
+        if (
+          !_validInboundWireToken(memoFrom, MAX_VAULT_SENDER_LENGTH)
+          || memoFrom.startsWith(':')
+          || memoFrom.includes(',')
+        ) return true;
+        const memoMsg: ChatMessage = {
+          id: _validInboundWireToken(tags['msgid'] ?? '', MAX_VAULT_MESSAGE_ID_LENGTH)
+            ? tags['msgid']!
+            : uid(),
+          time: eventTime(tags),
+          from: memoFrom,
+          text: _boundedInboundMessageText(memoMatch[2]!),
+          type: 'msg',
+          target: memoFrom,
+          highlight: true,
+        };
+        const memoKey = memoFrom.toLowerCase();
+        set(s => _addDMMessage(s, memoFrom, memoMsg));
+        if (!get().dms.has(memoKey)) return true;
+        const prev = get().offlineMemo.get(memoKey);
+        const agg = {
+          count: Math.min((prev?.count ?? 0) + 1, MAX_OFFLINE_MEMO_COUNT),
+          firstMsgId: prev?.firstMsgId ?? memoMsg.id,
+        };
+        set(s => {
+          const offlineMemo = new Map(s.offlineMemo);
+          offlineMemo.delete(memoKey);
+          offlineMemo.set(memoKey, agg);
+          while (offlineMemo.size > MAX_OFFLINE_MEMO_CONVERSATIONS) {
+            const oldest = offlineMemo.keys().next().value;
+            if (oldest === undefined) break;
+            offlineMemo.delete(oldest);
+          }
+          return { offlineMemo };
+        });
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('onyx:offlineMemo', {
+            detail: { channel: memoFrom, count: agg.count, firstMsgId: agg.firstMsgId },
+          }));
+        }
+        return true;
+      };
+      const standard = parseStandardReply(msg)
+        ?? (ownerClient ? parseNativeServiceEvent(msg, ourNick, ownerClient.learnedServerPrefix) : null);
       if (standard) {
         if (standard.command === 'WEBAUTHN') {
           // Two envelopes converge here: real `FAIL`/`WARN WEBAUTHN …` standard
           // replies (errors), and the service's success replies, which the daemon
           // now delivers on the IRCX EVENT plane (`:server EVENT <me> WEBAUTHN
-          // <SUBTYPE> …`) and the EVENT handler re-dispatches into this switch as
-          // a `WEBAUTHN <SUBTYPE> …` reply. The NOTE verb was removed daemon-side,
-          // so the success codes below no longer arrive as external NOTEs.
+          // <SUBTYPE> …`). Native events fold through this typed internal view;
+          // no alternate wire verb is accepted.
           const waClient = get().client;
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
             const ownsList = _replyAccountIsCurrent(_passkeyListReplyContext, get);
@@ -10699,46 +10796,6 @@ export const store = createStore<OnyxState>()(
           return;
         }
 
-        if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
-          const cred = parseSessionTokenNote(msg);
-          if (cred && _canAcceptSessionToken(get)) {
-            _confirmRememberedSessionAccount(get, set);
-            const canonicalNick = _saslAccount ?? undefined;
-            const target = _liveCredentialTokenTarget(get, true);
-            if (target) storeSessionToken(cred.token, cred.expiresAt, canonicalNick, target);
-            // Push the freshly-issued token into the LIVE client so an auto-reconnect
-            // (same IRCClient instance) resumes with it, not the stale construction-time value.
-            get().client?.updateResumeTokens({ sessionToken: cred.token });
-          }
-          return;
-        }
-        if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'MTOKEN') {
-          // Mesh-sealed reclaim token: persist it so a reconnect that lands on a
-          // different mesh node can still resume via SESSION RESUME <mtoken>
-          // (server.zig handleSession TOKEN → handleMeshReclaim). When the server
-          // advertises `expires=<unix>` (portable 12h lifetime), pass it through
-          // so purgeExpiredTokens can drop stale MTOKENs without decoding them.
-          const cred = parseSessionMeshTokenNote(msg);
-          if (cred && _canAcceptSessionToken(get)) {
-            _confirmRememberedSessionAccount(get, set);
-            const canonicalNick = _saslAccount ?? undefined;
-            const target = _liveCredentialTokenTarget(get, false);
-            // Pass canonicalNick so a collision alias (Alice_) is re-keyed to the
-            // authenticated account when MTOKEN arrives without a preceding TOKEN.
-            if (target) storeMeshToken(cred.token, cred.expiresAt, target, canonicalNick);
-            // Prefer the mesh token on the live client so a reconnect landing on a
-            // different node resumes correctly (updateResumeTokens merges, not clobbers).
-            // Forward the deadline too — sessionReclaim.ts falls through to the local
-            // bearer once this expires, and a stale/undefined deadline here would
-            // make a lapsed mesh token look live forever on this live instance.
-            // cred.expiresAt is unix-SECONDS off the wire; the client field is epoch-ms.
-            get().client?.updateResumeTokens({
-              meshToken: cred.token,
-              meshTokenExpiresAt: cred.expiresAt === undefined ? undefined : cred.expiresAt * 1000,
-            });
-          }
-          return;
-        }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           // SESSION is also the namespace for LIST and DROP failures. Those do
           // not say anything about the resume bearer and must never erase it.
@@ -10757,7 +10814,7 @@ export const store = createStore<OnyxState>()(
             // A terminal resume failure invalidates the stale bearer, but a 900
             // may already have authenticated this socket independently. Keep
             // accepting the freshly-queued SESSION TOKEN only for that proven
-            // account; an ordinary guest remains unable to persist token notes.
+          // account; an ordinary guest remains unable to persist token notices.
             _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
             _credentialTokenCanonicalOnly = true;
             get().client?.clearResumeTokens?.();
@@ -10780,9 +10837,8 @@ export const store = createStore<OnyxState>()(
         }
         // ── Account management standard replies ──────────────────────────
         // ACCOUNTINFO / ACCOUNTSET / IDENTIFY / LOGOUT / RECOVER / DROP.
-        // Errors arrive as `FAIL <cmd> <code>`; success for ACCOUNTINFO may
-        // arrive either as a NOTICE (handled below) or, on some deployments,
-        // as a `NOTE ACCOUNTINFO :account=… flags=…`.
+        // Errors arrive as `FAIL <cmd> <code>`; success for ACCOUNTINFO arrives
+        // as a server NOTICE handled below.
         if (ACCOUNT_COMMANDS.has(standard.command)) {
           if (
             standard.command === 'IDENTIFY'
@@ -10853,92 +10909,12 @@ export const store = createStore<OnyxState>()(
             });
             return;
           }
-          if (standard.kind === 'NOTE') {
-            // ACCOUNTINFO payload can land in any trailing param depending on
-            // how the server framed it (`NOTE ACCOUNTINFO :account=… flags=…`
-            // puts it in the code slot; a contextual form spreads it). Join the
-            // raw params after the command name and let the parser find the
-            // key=value pairs wherever they sit. params = ['ACCOUNTINFO', …].
-            const infoBody = msg.params.slice(1).join(' ');
-            const parsed = parseAccountInfo(infoBody);
-            if (parsed) {
-              _applyAccountInfo(set, get, parsed);
-            } else {
-              // A confirmation NOTE with no key=value payload (e.g. a successful
-              // ACCOUNTSET). Clear any prior error and, when the change touched a
-              // displayed setting, re-fetch ACCOUNTINFO so the panel reflects it.
-              set({ accountActionError: null });
-              if (standard.command === 'ACCOUNTSET' && get().server?.account) {
-                get().accountInfo_fetch();
-              }
-            }
-            return;
-          }
         }
         if (standard.kind === 'FAIL' && standard.command === 'RENAME') {
           get().addNotification({
             type: 'error',
             text: standard.description || `RENAME failed (${standard.code})`,
           });
-          return;
-        }
-        if (
-          standard.kind === 'NOTE'
-          && standard.command === 'MEMO'
-        ) {
-          // Onyx Server deliverOfflineMemo: `:server NOTE MEMO :from <nick> :<text>`.
-          // The whole `from <nick> :<text>` arrives as one trailing param.
-          const body = msg.params[1] ?? '';
-          const memoMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
-          if (memoMatch) {
-            const memoFrom = memoMatch[1]!;
-            if (
-              !_validInboundWireToken(memoFrom, MAX_VAULT_SENDER_LENGTH)
-              || memoFrom.startsWith(':')
-              || memoFrom.includes(',')
-            ) return;
-            const memoText = _boundedInboundMessageText(memoMatch[2]!);
-            const memoKey = memoFrom.toLowerCase();
-            const memoMsg: ChatMessage = {
-              id: _validInboundWireToken(tags['msgid'] ?? '', MAX_VAULT_MESSAGE_ID_LENGTH)
-                ? tags['msgid']!
-                : uid(),
-              time: eventTime(tags),
-              from: memoFrom,
-              text: memoText,
-              type: 'msg',
-              target: memoFrom,
-              highlight: true,
-            };
-            set(s => _addDMMessage(s, memoFrom, memoMsg));
-            // A saturated live DM working set refuses a new unsolicited
-            // conversation rather than evicting an unread one. Keep the
-            // offline-message aggregate aligned with what the user can open.
-            if (!get().dms.has(memoKey)) return;
-            const prev = get().offlineMemo.get(memoKey);
-            const agg = {
-              count: Math.min((prev?.count ?? 0) + 1, MAX_OFFLINE_MEMO_COUNT),
-              firstMsgId: prev?.firstMsgId ?? memoMsg.id,
-            };
-            set(s => {
-              const offlineMemo = new Map(s.offlineMemo);
-              // Refresh insertion order so a bounded overflow forgets the
-              // least recently updated aggregate, never the new notice.
-              offlineMemo.delete(memoKey);
-              offlineMemo.set(memoKey, agg);
-              while (offlineMemo.size > MAX_OFFLINE_MEMO_CONVERSATIONS) {
-                const oldest = offlineMemo.keys().next().value;
-                if (oldest === undefined) break;
-                offlineMemo.delete(oldest);
-              }
-              return { offlineMemo };
-            });
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('onyx:offlineMemo', {
-                detail: { channel: memoFrom, count: agg.count, firstMsgId: agg.firstMsgId },
-              }));
-            }
-          }
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'CHATHISTORY') {
@@ -11026,7 +11002,7 @@ export const store = createStore<OnyxState>()(
           // The standard-reply context/description split mis-attributes the
           // actor when there is no trailing kind (e.g. LEAVE), so parse the raw
           // params directly. params = ['MEDIA', '#chan', verb, nick?, ...extra].
-          const mediaParams = msg.params;
+          const mediaParams = standard.kind === 'EVENT' ? standard.params : msg.params;
           const mediaChannel = mediaParams[1] ?? '';
           const mediaVerb = (mediaParams[2] ?? '').toUpperCase();
           const mediaActor = mediaParams[3] ?? '';
@@ -11224,28 +11200,8 @@ export const store = createStore<OnyxState>()(
 
         // ── IRCX EVENT plane (MEDIA presence + WEBAUTHN service replies) ──
         case 'EVENT': {
-          const plane = (params[1] ?? '').toUpperCase();
-          // The server surfaces real-time voice/video presence on the IRCX EVENT
-          // plane: `:server EVENT <me> MEDIA <verb> <#chan> <nick> [detail]`.
-          // Re-shape it into the MEDIA service-reply param order and re-dispatch
-          // so the single media handler processes both broadcast state and
-          // caller-targeted replies (MACKEY, ROSTER, STATS, TRANSPORT, PROFILE).
-          if (plane === 'MEDIA') {
-            get()._handleMessage({
-              ...msg,
-              command: 'NOTE',
-              params: ['MEDIA', params[3] ?? '', params[2] ?? '', params[4] ?? '', ...params.slice(5)],
-            });
-          } else if (plane === 'WEBAUTHN') {
-            // The WEBAUTHN service moved off the (now-removed) NOTE verb onto this
-            // EVENT plane: `:server EVENT <me> WEBAUTHN <SUBTYPE> <args...>`. The
-            // SUBTYPE + body is byte-for-byte what the passkey fold-in already
-            // parsed as a standard reply, so drop the `<me>` target and re-dispatch
-            // as `WEBAUTHN <SUBTYPE> <args...>` — the existing standard-reply
-            // handler is the single source of truth for passkey state. (Errors
-            // still arrive as real `FAIL WEBAUTHN …` standard replies.)
-            get()._handleMessage({ ...msg, command: 'NOTE', params: params.slice(1) });
-          }
+          // Only a current client, server prefix, exact recipient, and known
+          // service plane can reach the typed fold above. Unknown events drop.
           return;
         }
 
@@ -12226,17 +12182,26 @@ export const store = createStore<OnyxState>()(
           // A pure server prefix (`:server.name NOTICE …`) parses to an empty
           // sender (msg.nick === null). Account replies always come from the
           // server, so requiring an empty sender keeps peer PMs out.
+          const currentOwner = get().client;
+          if (
+            command === 'NOTICE'
+            && !text.startsWith('\x01')
+            && target.toLowerCase() === ourNick.toLowerCase()
+            && currentOwner?.learnedServerPrefix
+            && msg.prefix === currentOwner.learnedServerPrefix
+            && foldOfflineMemo(rawText)
+          ) break;
+
           if (
             command === 'NOTICE' &&
             !text.startsWith('\x01') &&
             !isChan(target) &&
             !sender
           ) {
+
             // Current Onyx Server delivers fresh resume credentials via server
             // NOTICEs (`SESSION TOKEN …` / `SESSION MTOKEN … expires=<unix>`).
-            // Older nodes used NOTE standard replies, handled above. Keep both
-            // paths so a rolling mesh upgrade cannot strand reconnect state.
-            const sessionCred = parseSessionTokenNote(msg);
+            const sessionCred = parseSessionTokenCredential(msg);
             if (sessionCred && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, true);
@@ -12251,11 +12216,11 @@ export const store = createStore<OnyxState>()(
               get().client?.updateResumeTokens({ sessionToken: sessionCred.token });
               break;
             }
-            const meshCred = parseSessionMeshTokenNote(msg);
+            const meshCred = parseSessionMeshTokenCredential(msg);
             if (meshCred && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, false);
-              // Same canonical re-key as the NOTE MTOKEN path — MTOKEN alone must
+              // Same canonical re-key as the mesh MTOKEN path — MTOKEN alone must
               // still migrate a collision alias onto the authenticated account.
               if (target) {
                 storeMeshToken(
@@ -12265,7 +12230,7 @@ export const store = createStore<OnyxState>()(
                   _saslAccount ?? undefined,
                 );
               }
-              // Forward the deadline alongside the token — see the NOTE MTOKEN
+              // Forward the deadline alongside the token — see the mesh MTOKEN
               // path above for why an unforwarded expiry defeats the fall-through.
               // meshCred.expiresAt is unix-SECONDS off the wire; the client field is epoch-ms.
               get().client?.updateResumeTokens({
@@ -18604,7 +18569,7 @@ export const selectUserMetadata = (nick: string) => (s: OnyxState): Record<strin
 export const selectMediaTranscript = (channel: string) => (s: OnyxState): Array<{ nick: string; text: string; time: Date }> =>
   s.mediaTranscripts.get(channel.toLowerCase()) ?? [];
 
-/** Offline-memo aggregate (wire MEMO) for a DM target, or null. */
+/** Offline-memo aggregate (server NOTICE MEMO) for a DM target, or null. */
 export const selectOfflineMemo = (target: string) => (s: OnyxState): { count: number; firstMsgId: string } | null =>
   s.offlineMemo.get(target.toLowerCase()) ?? null;
 

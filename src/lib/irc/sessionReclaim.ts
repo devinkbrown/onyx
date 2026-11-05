@@ -4,7 +4,7 @@
  * Onyx — which reclaim bearer (if any) a reconnect should replay.
  *
  * Onyx Server issues two reclaim credentials after account authentication:
- *   NOTE   SESSION TOKEN  :<hex>                      — node-local, no expiry
+ *   NOTICE SESSION TOKEN <hex>                        — node-local, no expiry
  *   NOTICE SESSION MTOKEN <hex> expires=<unix-seconds> — mesh-sealed, portable
  *
  * `SESSION RESUME <token>` reattaches a detached session. The mesh bearer is

@@ -28,10 +28,6 @@ function memDeps(extra) {
   };
 }
 
-function toB64url(bytes) {
-  return Buffer.from(bytes).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
 function fromB64url(text) {
   return new Uint8Array(Buffer.from(text.replace(/-/g, "+").replace(/_/g, "/"), "base64"));
 }

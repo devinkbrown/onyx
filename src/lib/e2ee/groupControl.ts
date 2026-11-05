@@ -101,8 +101,10 @@ export function parseGroupControlMessage(message: IRCMessage): GroupControlRecor
     payload: message.params[expectedParams - 1] ?? '',
   };
   if (kind === 'welcome') {
-    record.toAccount = message.params[3];
-    record.toDevice = message.params[4];
+    const toAccount = message.params[3]; const toDevice = message.params[4];
+    if (toAccount === undefined || toDevice === undefined) return null;
+    record.toAccount = toAccount;
+    record.toDevice = toDevice;
   }
   return validRecord(record) ? record : null;
 }

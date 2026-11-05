@@ -564,7 +564,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     const owner = memoryOwner();
     const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
     setIsSending(true);
-    let admitted = false;
+    let admitted: boolean;
     try { admitted = await getState().scheduleMessage(t, body, epoch); } catch { admitted = false; }
     setIsSending(false);
     if (!admitted) {

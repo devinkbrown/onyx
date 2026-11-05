@@ -79,6 +79,7 @@ import {
 } from '@/shell/message/rowGesture';
 import '@/shell/message/row-gesture.css';
 import './message-view-commercial.css';
+import './transcript-calm.css';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';

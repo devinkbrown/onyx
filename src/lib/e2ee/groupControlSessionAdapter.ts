@@ -16,8 +16,11 @@ import {
   type GroupControlDelivery,
 } from './groupControlInbound';
 import {
+  buildGroupCommitContext,
   decodeGroupCommit,
   encodeGroupCommit,
+  hashGroupCommit,
+  type GroupCommit,
 } from './groupCommit';
 import {
   consumeOpenedGroupWelcome,
@@ -29,6 +32,7 @@ import {
   GroupSession,
   type GroupSessionApplyResult,
   type GroupSessionBootstrapResult,
+  type VerifiedGroupEpochMaterial,
 } from './groupSession';
 import {
   resolveTrustedGroupControl,
@@ -62,6 +66,7 @@ export type GroupControlAdapterReason =
   | 'evicted'
   | 'invalid-commit'
   | 'invalid-welcome'
+  | 'unverified-control'
   | 'epoch-gap'
   | 'recipient-key-unavailable'
   | 'welcome-open-failed'
@@ -69,7 +74,8 @@ export type GroupControlAdapterReason =
   | 'commit-apply-failed'
   | 'destroyed'
   | 'stale'
-  | 'internal-error';
+  | 'internal-error'
+  | 'author-unauthorized';
 
 export type GroupControlAdapterOutcome = {
   status: GroupControlAdapterStatus;
@@ -80,6 +86,26 @@ export type GroupControlAdapterOutcome = {
   fromDevice?: string;
   epoch?: number;
 };
+
+/** Private callback evidence from the verified GroupSession state transition.
+ * This is never rendered or emitted as an Elm event. */
+export type GroupControlAppliedEvidence = {
+  readonly room: string; readonly fromAccount: string; readonly fromDevice: string;
+  readonly epoch: number; readonly commitId: Uint8Array; readonly commitHash: Uint8Array;
+  readonly priorEpoch: number; readonly priorCommitHash: Uint8Array; readonly membershipDigest: Uint8Array;
+  readonly newEpochKeyCommitment: Uint8Array; readonly inputKind: 'commit' | 'welcome';
+  readonly signedCommitPayload: string;
+  readonly acceptedSignerPublicKey?: Uint8Array;
+  readonly acceptedSignerTrust?: 'first-use' | 'pinned';
+};
+export type VerifiedGroupCommitCandidate = { readonly room: string; readonly fromAccount: string; readonly fromDevice: string; readonly commit: GroupCommit; readonly commitHash: Uint8Array };
+
+function zeroCommitRecord(record: GroupCommit): void {
+  record.priorCommitHash.fill(0);
+  record.commitId.fill(0);
+  record.membershipDigest.fill(0);
+  record.newEpochKeyCommitment.fill(0);
+}
 
 export type GroupControlSession = Pick<
   GroupSession,
@@ -110,10 +136,17 @@ export type GroupControlSessionAdapterOptions = {
    * (stale). The adapter never retains the session after this call.
    */
   adoptBootstrappedSession?: (session: GroupSession) => boolean | Promise<boolean>;
+  /** Called synchronously with copies before the adapter zeroes apply results. */
+  onAppliedEvidence?: (evidence: GroupControlAppliedEvidence) => void | Promise<void>;
+  /** Private provider escrow hook; called only after the pure session verifies key commitment. */
+  onVerifiedEpochMaterial?: (input: { material: VerifiedGroupEpochMaterial; evidence: GroupControlAppliedEvidence }) => void | Promise<void>;
+  /** Current server-authorized room membership fact. Called only after OGC1 and directory verification. */
+  onVerifiedCommit?: (candidate: VerifiedGroupCommitCandidate) => boolean | 'checkpoint-required' | Promise<boolean | 'checkpoint-required'>;
 };
 
 export type GroupControlSessionAdapter = {
   accept(message: IRCMessage | string): Promise<GroupControlAdapterOutcome>;
+  retryPendingBootstrap(commitHashHex: string): Promise<GroupControlAdapterOutcome>;
   destroy(): Promise<void>;
   readonly isDestroyed: boolean;
 };
@@ -128,6 +161,8 @@ type SafePart = {
   /** Exact signed body copy. This is control/ciphertext, never a room key. */
   body: Uint8Array;
   resolution: SafeVerifiedResolution;
+  checkpointRequired?: boolean;
+  checkpointExpiresAt?: number;
 };
 
 type PendingPair = {
@@ -390,6 +425,7 @@ export function createGroupControlSessionAdapter(
   const activePairs = new Map<string, PendingPair>();
   const lanes = new Map<string, Promise<void>>();
   const abortController = new AbortController();
+  const bootstrapApprovals = new Map<string, number>();
   let sequence = 0;
   let destroyed = false;
   let destroyPromise: Promise<void> | null = null;
@@ -464,6 +500,11 @@ export function createGroupControlSessionAdapter(
    * without evicting an active pair is rejected by the caller.
    */
   function enforceBounds(pair: PendingPair): boolean {
+    const now = Date.now();
+    for (const [key, expiry] of bootstrapApprovals) if (expiry <= now) bootstrapApprovals.delete(key);
+    for (const entry of [...pending.values()]) if (entry.commit?.checkpointRequired && (entry.commit.checkpointExpiresAt ?? 0) <= now) zeroPendingEntry(entry.key);
+    const checkpointPairs = [...allLiveEntries().values()].filter((entry) => entry.commit?.checkpointRequired);
+    if (checkpointPairs.length > 8 || checkpointPairs.some((entry) => new TextEncoder().encode(`${entry.commit?.payload ?? ''}${entry.welcome?.payload ?? ''}`).byteLength > 64 * 1024)) return false;
     const bucket = senderBucket(pair);
     while ([...allLiveEntries().values()].filter((entry) => senderBucket(entry) === bucket).length > GROUP_CONTROL_ADAPTER_MAX_PENDING_PER_SENDER) {
       const oldest = oldestInBucket(bucket);
@@ -492,8 +533,18 @@ export function createGroupControlSessionAdapter(
     return result;
   }
 
-  function mapSessionResult(result: GroupSessionApplyResult, pair: PendingPair): GroupControlAdapterOutcome {
-    if (result.ok) return outcome('applied', undefined, pair);
+  async function mapSessionResult(result: GroupSessionApplyResult, pair: PendingPair): Promise<GroupControlAdapterOutcome> {
+    if (result.ok) {
+      const record = pair.commit ? decodeGroupCommit(pair.commit.body) ?? decodeGroupCommit(new TextDecoder().decode(pair.commit.body)) : null;
+      if (record) await options.onAppliedEvidence?.({ room: pair.room, fromAccount: pair.fromAccount, fromDevice: pair.fromDevice,
+        epoch: Number(result.epoch), commitId: copyBytes(result.commitId), commitHash: copyBytes(result.commitHash),
+        priorEpoch: Number(record.priorEpoch), priorCommitHash: copyBytes(record.priorCommitHash), membershipDigest: copyBytes(record.membershipDigest),
+        newEpochKeyCommitment: copyBytes(record.newEpochKeyCommitment), inputKind: pair.welcome ? 'welcome' : 'commit', signedCommitPayload: pair.commit?.payload ?? '',
+        ...(pair.commit?.resolution.signer ? { acceptedSignerPublicKey: copyBytes(pair.commit.resolution.signer) } : {}),
+        ...(pair.commit?.resolution.trust ? { acceptedSignerTrust: pair.commit.resolution.trust } : {}) });
+      record?.commitId.fill(0); record?.priorCommitHash.fill(0); record?.membershipDigest.fill(0); record?.newEpochKeyCommitment.fill(0);
+      return outcome('applied', undefined, pair);
+    }
     if (result.reason === 'destroyed' || destroyed) return outcome('ignored', 'destroyed', pair);
     if (result.reason === 'epoch-gap' || result.reason === 'welcome-epoch-mismatch') {
       return outcome('queued', 'epoch-gap', pair);
@@ -525,6 +576,21 @@ export function createGroupControlSessionAdapter(
     }
     if (!localAccount || !localDevice) return outcome('rejected', 'welcome-stage-failed', pair);
     if (destroyed) return outcome('ignored', 'destroyed', pair);
+    const escrow = async (material: VerifiedGroupEpochMaterial) => {
+      if (!options.onVerifiedEpochMaterial) return;
+      const record = pair.commit ? decodeGroupCommit(pair.commit.body) ?? decodeGroupCommit(new TextDecoder().decode(pair.commit.body)) : null;
+      if (!record) throw new Error('invalid-commit');
+      const evidence: GroupControlAppliedEvidence = { room: pair.room, fromAccount: pair.fromAccount, fromDevice: pair.fromDevice,
+        epoch: Number(material.epoch), commitId: copyBytes(material.commitId), commitHash: copyBytes(material.commitHash),
+        priorEpoch: Number(record.priorEpoch), priorCommitHash: copyBytes(record.priorCommitHash), membershipDigest: copyBytes(material.membershipDigest),
+        newEpochKeyCommitment: copyBytes(record.newEpochKeyCommitment), inputKind: 'welcome', signedCommitPayload: pair.commit?.payload ?? '',
+        ...(pair.commit?.resolution.signer ? { acceptedSignerPublicKey: copyBytes(pair.commit.resolution.signer) } : {}),
+        ...(pair.commit?.resolution.trust ? { acceptedSignerTrust: pair.commit.resolution.trust } : {}) };
+      try { await options.onVerifiedEpochMaterial({ material, evidence }); }
+      finally { evidence.commitId.fill(0); evidence.commitHash.fill(0); evidence.priorCommitHash.fill(0); evidence.membershipDigest.fill(0);
+        evidence.newEpochKeyCommitment.fill(0); evidence.acceptedSignerPublicKey?.fill(0); record.commitId.fill(0); record.priorCommitHash.fill(0);
+        record.membershipDigest.fill(0); record.newEpochKeyCommitment.fill(0); }
+    };
     let bootstrapped: GroupSessionBootstrapResult;
     try {
       if (pair.epoch === 1) {
@@ -538,6 +604,7 @@ export function createGroupControlSessionAdapter(
           account: localAccount,
           deviceId: localDevice,
           signal: abortController.signal,
+          onVerifiedEpochMaterial: escrow,
         });
       } else {
         bootstrapped = await GroupSession.bootstrapVerifiedEpoch({
@@ -551,6 +618,7 @@ export function createGroupControlSessionAdapter(
           deviceId: localDevice,
           expectedEpoch: pair.epoch,
           signal: abortController.signal,
+          onVerifiedEpochMaterial: escrow,
         });
       }
     } catch {
@@ -558,7 +626,7 @@ export function createGroupControlSessionAdapter(
         ? outcome('ignored', 'destroyed', pair)
         : outcome('rejected', 'commit-apply-failed', pair);
     }
-    if (!bootstrapped.ok) return mapSessionResult(bootstrapped, pair);
+    if (!bootstrapped.ok) return await mapSessionResult(bootstrapped, pair);
     let adopted = false;
     try {
       if (options.adoptBootstrappedSession) {
@@ -572,6 +640,14 @@ export function createGroupControlSessionAdapter(
       zeroApplyResult(bootstrapped);
       return destroyed ? outcome('ignored', 'destroyed', pair) : outcome('ignored', 'stale', pair);
     }
+    const genesisRecord = pair.commit ? decodeGroupCommit(pair.commit.body) ?? decodeGroupCommit(new TextDecoder().decode(pair.commit.body)) : null;
+    if (genesisRecord) await options.onAppliedEvidence?.({ room: pair.room, fromAccount: pair.fromAccount, fromDevice: pair.fromDevice,
+      epoch: Number(bootstrapped.epoch), commitId: copyBytes(bootstrapped.commitId), commitHash: copyBytes(bootstrapped.commitHash),
+      priorEpoch: Number(genesisRecord.priorEpoch), priorCommitHash: copyBytes(genesisRecord.priorCommitHash), membershipDigest: copyBytes(genesisRecord.membershipDigest),
+      newEpochKeyCommitment: copyBytes(genesisRecord.newEpochKeyCommitment), inputKind: 'welcome', signedCommitPayload: pair.commit?.payload ?? '',
+      ...(pair.commit?.resolution.signer ? { acceptedSignerPublicKey: copyBytes(pair.commit.resolution.signer) } : {}),
+      ...(pair.commit?.resolution.trust ? { acceptedSignerTrust: pair.commit.resolution.trust } : {}) });
+    genesisRecord?.commitId.fill(0); genesisRecord?.priorCommitHash.fill(0); genesisRecord?.membershipDigest.fill(0); genesisRecord?.newEpochKeyCommitment.fill(0);
     const result = outcome('applied', undefined, pair);
     zeroApplyResult(bootstrapped);
     return result;
@@ -658,8 +734,26 @@ export function createGroupControlSessionAdapter(
           commitResolution: commit.resolution,
           commitRouting: commit.routing,
           signal: abortController.signal,
+          onVerifiedEpochMaterial: async (material) => {
+            if (!options.onVerifiedEpochMaterial) return;
+            const record = decodeGroupCommit(commit.body) ?? decodeGroupCommit(new TextDecoder().decode(commit.body));
+            if (!record) throw new Error('invalid-commit');
+            const hash = await hashGroupCommit(record, buildGroupCommitContext({ room: pair.room, fromAccount: pair.fromAccount,
+              fromDevice: pair.fromDevice, priorEpoch: record.priorEpoch, nextEpoch: record.nextEpoch, commitId: record.commitId })!);
+            if (!hash) throw new Error('invalid-commit');
+            const evidence: GroupControlAppliedEvidence = { room: pair.room, fromAccount: pair.fromAccount, fromDevice: pair.fromDevice,
+              epoch: Number(material.epoch), commitId: copyBytes(material.commitId), commitHash: copyBytes(hash),
+              priorEpoch: Number(record.priorEpoch), priorCommitHash: copyBytes(record.priorCommitHash), membershipDigest: copyBytes(material.membershipDigest),
+              newEpochKeyCommitment: copyBytes(record.newEpochKeyCommitment), inputKind: 'welcome', signedCommitPayload: commit.payload,
+              acceptedSignerPublicKey: copyBytes(commit.resolution.signer), acceptedSignerTrust: commit.resolution.trust };
+            hash.fill(0);
+            try { await options.onVerifiedEpochMaterial({ material, evidence }); }
+            finally { evidence.commitId.fill(0); evidence.commitHash.fill(0); evidence.priorCommitHash.fill(0); evidence.membershipDigest.fill(0);
+              evidence.newEpochKeyCommitment.fill(0); evidence.acceptedSignerPublicKey?.fill(0); record.commitId.fill(0); record.priorCommitHash.fill(0);
+              record.membershipDigest.fill(0); record.newEpochKeyCommitment.fill(0); }
+          },
         });
-        const result = mapSessionResult(applied, pair);
+        const result = await mapSessionResult(applied, pair);
         zeroApplyResult(applied);
         return result;
       }
@@ -685,7 +779,7 @@ export function createGroupControlSessionAdapter(
       zeroApplyResult(staged);
       if (destroyed) return outcome('ignored', 'destroyed', pair);
       const applied = await session.applyVerifiedCommit(commit.resolution, commit.routing, abortController.signal);
-      const result = mapSessionResult(applied, pair);
+      const result = await mapSessionResult(applied, pair);
       zeroApplyResult(applied);
       return result;
     } catch {
@@ -727,6 +821,25 @@ export function createGroupControlSessionAdapter(
   }
 
   async function launchPair(entry: PendingPair): Promise<GroupControlAdapterOutcome> {
+    const checkpointCommit = entry.commit;
+    if (checkpointCommit?.checkpointRequired) {
+      const record = decodeCommitRecord(checkpointCommit.body);
+      const expiresAt = checkpointCommit.checkpointExpiresAt ?? 0;
+      const context = record ? buildGroupCommitContext({ room: entry.room, fromAccount: checkpointCommit.routing.fromAccount,
+        fromDevice: checkpointCommit.routing.fromDevice, priorEpoch: record.priorEpoch, nextEpoch: record.nextEpoch, commitId: record.commitId }) : null;
+      const commitHash = record && context ? await hashGroupCommit(record, context) : null;
+      context?.fill(0);
+      const hashHex = commitHash ? [...commitHash].map((byte) => byte.toString(16).padStart(2, '0')).join('') : '';
+      let authorization: boolean | 'checkpoint-required' = false;
+      if (record && commitHash && expiresAt > Date.now() && options.onVerifiedCommit) {
+        try { authorization = await options.onVerifiedCommit({ room: entry.room, fromAccount: checkpointCommit.routing.fromAccount,
+          fromDevice: checkpointCommit.routing.fromDevice, commit: record, commitHash }); } catch { authorization = false; }
+      }
+      commitHash?.fill(0);
+      if (record) { record.priorCommitHash.fill(0); record.commitId.fill(0); record.membershipDigest.fill(0); record.newEpochKeyCommitment.fill(0); }
+      if (expiresAt <= Date.now()) { zeroPendingEntry(entry.key); return outcome('ignored', 'evicted', entry); }
+      if (authorization !== true || (bootstrapApprovals.get(hashHex) ?? 0) <= Date.now()) return outcome('queued', 'epoch-gap', entry);
+    }
     pending.delete(entry.key);
     const readyCommit = entry.commit;
     const readyWelcome = entry.welcome;
@@ -803,7 +916,7 @@ export function createGroupControlSessionAdapter(
           payload: delivery.payload,
           routing: delivery,
           locked: delivery.locked,
-          lockReason: delivery.lockReason,
+          ...(delivery.lockReason ? { lockReason: delivery.lockReason } : {}),
         },
         directory: complete,
         store: options.trustedSignerStore,
@@ -832,6 +945,7 @@ export function createGroupControlSessionAdapter(
       return outcome('ignored', 'key-package', initial);
     }
 
+    let checkpointRequired = false;
     if (delivery.command === 'E2EE.COMMIT' && !canonicalCommitBody(resolution.parts.body)) {
       zeroResolution(resolution);
       return outcome('rejected', 'invalid-commit', initial);
@@ -839,20 +953,36 @@ export function createGroupControlSessionAdapter(
     if (delivery.command === 'E2EE.COMMIT') {
       const record = decodeCommitRecord(resolution.parts.body);
       const epochMatches = record !== null && record.nextEpoch === BigInt(resolution.parts.epoch);
-      if (record) {
-        record.priorCommitHash.fill(0);
-        record.commitId.fill(0);
-        record.membershipDigest.fill(0);
-        record.newEpochKeyCommitment.fill(0);
-      }
       if (!epochMatches) {
+        if (record) zeroCommitRecord(record);
         zeroResolution(resolution);
         return outcome('rejected', 'invalid-commit', initial);
       }
+      if (record && options.onVerifiedCommit) {
+        const context = buildGroupCommitContext({ room: delivery.channel, fromAccount: delivery.fromAccount, fromDevice: delivery.fromDevice,
+          priorEpoch: record.priorEpoch, nextEpoch: record.nextEpoch, commitId: record.commitId });
+        const commitHash = context ? await hashGroupCommit(record, context) : null;
+        context?.fill(0);
+        if (destroyed) {
+          commitHash?.fill(0);
+          zeroCommitRecord(record);
+          zeroResolution(resolution);
+          return outcome('ignored', 'destroyed', initial);
+        }
+        let authorized: boolean | 'checkpoint-required' = false;
+        try { authorized = commitHash !== null ? await options.onVerifiedCommit({ room: delivery.channel, fromAccount: delivery.fromAccount, fromDevice: delivery.fromDevice, commit: record, commitHash }) : false; }
+        catch { authorized = false; }
+        commitHash?.fill(0);
+        zeroCommitRecord(record);
+        if (destroyed) { zeroResolution(resolution); return outcome('ignored', 'destroyed', initial); }
+        if (!authorized) { zeroResolution(resolution); return outcome('rejected', 'author-unauthorized', initial); }
+        checkpointRequired = authorized === 'checkpoint-required';
+      } else if (record) zeroCommitRecord(record);
     }
 
     const pair = pairKey(delivery);
     const part = controlPart(delivery, resolution);
+    if (delivery.command === 'E2EE.COMMIT' && checkpointRequired) { part.checkpointRequired = true; part.checkpointExpiresAt = Date.now() + 5 * 60_000; }
     zeroResolution(resolution);
     const currentInFlight = inFlight.get(pair.key);
     if (currentInFlight) {
@@ -909,6 +1039,7 @@ export function createGroupControlSessionAdapter(
     abortController.abort();
     for (const entry of pending.values()) zeroPair(entry);
     pending.clear();
+      bootstrapApprovals.clear();
     const activePromises = [...inFlight.values()].map((entry) => entry.promise);
     const lanePromises = [...lanes.values()];
     destroyPromise = (async () => {
@@ -926,6 +1057,23 @@ export function createGroupControlSessionAdapter(
 
   return {
     accept,
+    async retryPendingBootstrap(commitHashHex: string): Promise<GroupControlAdapterOutcome> {
+      if (destroyed || !/^[0-9a-f]{64}$/u.test(commitHashHex)) return outcome('rejected', 'unverified-control');
+      let selected: PendingPair | undefined;
+      for (const candidate of pending.values()) {
+        if (!candidate.commit?.checkpointRequired || (candidate.commit.checkpointExpiresAt ?? 0) <= Date.now()) continue;
+        const record = decodeCommitRecord(candidate.commit.body); if (!record) continue;
+        const context = buildGroupCommitContext({ room: candidate.room, fromAccount: candidate.commit.routing.fromAccount,
+          fromDevice: candidate.commit.routing.fromDevice, priorEpoch: record.priorEpoch, nextEpoch: record.nextEpoch, commitId: record.commitId });
+        const hash = context ? await hashGroupCommit(record, context) : null; context?.fill(0);
+        const matches = hash !== null && [...hash].map((byte) => byte.toString(16).padStart(2, '0')).join('') === commitHashHex;
+        hash?.fill(0); record.priorCommitHash.fill(0); record.commitId.fill(0); record.membershipDigest.fill(0); record.newEpochKeyCommitment.fill(0);
+        if (matches) { selected = candidate; break; }
+      }
+      if (!selected) return outcome('rejected', 'unverified-control');
+      bootstrapApprovals.set(commitHashHex, Date.now() + 5 * 60_000);
+      return selected.welcome ? launchPair(selected) : outcome('queued', 'epoch-gap', selected);
+    },
     destroy,
     get isDestroyed(): boolean { return destroyed; },
   };

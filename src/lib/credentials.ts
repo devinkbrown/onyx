@@ -9,15 +9,15 @@
  *   entries     — saved credentials keyed by normalized server + nick
  *
  * Session tokens are issued by Onyx Server after successful account authentication via:
- *   NOTE SESSION TOKEN :<token>
+ *   NOTICE <nick> :SESSION TOKEN <token>
  * Saved tokens are reused with SESSION RESUME after IRC registration. They are
  * bearer reclaim credentials, not SASL mechanisms, so a current token can
  * restore a passwordless/passkey account without rerunning SASL.
  *
  * On mesh deployments Onyx Server additionally emits:
  *   NOTICE <nick> :SESSION MTOKEN <token> expires=<unix-seconds>
- * (legacy: NOTE SESSION MTOKEN :<token>) — a mesh-sealed reclaim token usable
- * to resume the session from ANY node in the mesh (server.zig handleSession
+ * A mesh-sealed reclaim token usable to resume the session from ANY node in
+ * the mesh (server.zig handleSession
  * TOKEN). It is longer than the 32-hex local token; `SESSION RESUME <mtoken>`
  * routes through handleMeshReclaim, which either reclaims a detached session
  * held locally or redirects to the owning node. When `expires=` is present it

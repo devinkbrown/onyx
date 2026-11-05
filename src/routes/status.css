@@ -241,13 +241,19 @@
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
+  .status-route .r-wrap { padding-inline: 12px; }
+
   .status-route,
   .status-route .r-wrap,
   .status-observation,
   .status-quiet { min-width: 0; max-width: 100%; }
 
   .status-route .status-hero h1,
-  .status-quiet h2 { font-size: 2.75rem; overflow-wrap: anywhere; }
+  .status-quiet h2 { font-size: min(2.75rem, 20vw); overflow-wrap: anywhere; }
+
+  .status-lede,
+  .status-observation__detail,
+  .status-quiet p { font-size: 16px !important; line-height: 1.5; }
 
   .status-scroll-surface {
     max-height: calc(100svh - 1rem);

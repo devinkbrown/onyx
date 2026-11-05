@@ -3,15 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Onyx</title>
-<link rel="stylesheet" href="app.css">
+<title>Onyx — good company. Great nights.</title>
+<meta name="description" content="A place for your friends to talk, play, and catch up. Open a room in your browser." />
+<link rel="canonical" href="https://eshmaki.me/" />
+<meta property="og:title" content="Onyx — good company. Great nights." />
+<meta property="og:description" content="A place for your friends to talk, play, and catch up. Open a room in your browser." />
+<meta property="og:url" content="https://eshmaki.me/" />
+<meta name="twitter:title" content="Onyx — good company. Great nights." />
+<meta name="twitter:description" content="A place for your friends to talk, play, and catch up. Open a room in your browser." />
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/rail.css">
+<link rel="stylesheet" href="/site.css">
+<meta name="onyx-shell-ref" content="__ONYX_PUBLIC_INDEX_SHELL_REF__">
 </head>
 <body>
 <div id="app"></div>
-<script src="app.js"></script>
-<script src="ports.js"></script>
+<div id="onyx-private-runtime-presentation" aria-live="polite"></div>
+<div id="onyx-private-account-security" aria-live="polite"></div>
+<div id="onyx-platform-update-status" aria-live="polite"></div>
+<div id="onyx-platform-status" role="status" aria-live="polite"></div>
+<noscript><p style="background:#0e1518;color:#e9e5d8;font-family:system-ui,sans-serif;padding:2rem">Onyx needs JavaScript to run. Enable it and reload.</p></noscript>
 <script>
+/* Boot splash + watchdog. Paints immediately (before the client bundles
+   finish downloading) so a slow network never looks like a black screen,
+   and converts any boot failure into readable on-screen diagnostics
+   instead of an empty dark viewport. Dependency-free by design. */
 (function () {
+  var app = document.getElementById("app");
+  if (!app) return;
+  var splash = document.createElement("div");
+  splash.id = "onyx-boot-splash";
+  splash.setAttribute("style", "background:#0e1518;color:#e9e5d8;font-family:Georgia,serif;min-height:60vh;padding:4rem 1.5rem;max-width:44rem;margin:0 auto");
+  splash.innerHTML = "<p style=\"font-size:1.5rem;margin:0 0 0.5rem\">Onyx</p><p id=\"onyx-boot-status\" style=\"font-family:system-ui,sans-serif;color:#9fa9a2;margin:0\">Loading…</p>";
+  app.appendChild(splash);
+  window.__onyxBootError = null;
+  window.addEventListener("error", function (e) {
+    if (!e || (e.target && e.target !== window)) return;
+    if (!window.__onyxBootError) window.__onyxBootError = e.message || "script error";
+  }, true);
+  window.addEventListener("unhandledrejection", function (e) {
+    if (!window.__onyxBootError) {
+      var r = e && e.reason;
+      window.__onyxBootError = "unhandled: " + ((r && r.message) || r || "rejection");
+    }
+  });
+  window.__onyxShowBootError = function (message) {
+    var status = document.getElementById("onyx-boot-status");
+    var detail = message || window.__onyxBootError || "still loading — check your connection and reload";
+    var info = "";
+    try { info = navigator.userAgent + " · " + location.href; } catch (u) {}
+    splash.innerHTML = "<p style=\"font-size:1.5rem;margin:0 0 0.5rem\">Onyx could not start</p>"
+      + "<p style=\"font-family:ui-monospace,monospace;font-size:0.85rem;color:#e8a33d;overflow-wrap:anywhere\">" + detail.replace(/</g, "&lt;") + "</p>"
+      + "<p style=\"font-family:system-ui,sans-serif;color:#9fa9a2;font-size:0.8rem;overflow-wrap:anywhere\">" + String(info).replace(/</g, "&lt;") + "</p>"
+      + "<p style=\"font-family:system-ui,sans-serif\"><a style=\"color:#e8a33d\" href=\"\" onclick=\"location.reload();return false\">Reload</a></p>";
+    if (status) status.textContent = detail;
+  };
+  setTimeout(function () {
+    if (!window.__onyxBooted) window.__onyxShowBootError(null);
+  }, 10000);
+})();
+</script>
+<script src="/app.js"></script>
+<script src="/ports.js"></script>
+<script src="/runtime.js"></script>
+<script>
+(async function () {
+  try {
+  if (!window.OnyxRuntime || typeof window.OnyxRuntime.createBrowserRuntime !== "function"
+    || typeof window.OnyxRuntime.createBrowserPlatform !== "function"
+    || typeof window.OnyxRuntime.loadBrowserBuildCompatibility !== "function") {
+    throw new Error("The private client runtime is unavailable. Restore the runtime bundle and reload before connecting.");
+  }
+  var shellMeta = document.querySelector('meta[name="onyx-shell-ref"]');
+  var indexShellRef = shellMeta && shellMeta.getAttribute("content");
+  var buildCompatibility = await window.OnyxRuntime.loadBrowserBuildCompatibility({
+    fetch: window.fetch.bind(window), origin: window.location.origin,
+    expectedShellRef: typeof indexShellRef === "string" ? indexShellRef : "",
+    runtimeShellRef: window.OnyxRuntime.shellRef
+  });
+  // The browser platform receives the actual private runtime snapshot. The
+  // Elm owner-state port intentionally omits the physical socket epoch.
+  var runtime = null;
+  var browserPlatform = window.OnyxRuntime.createBrowserPlatform({
+    serviceWorker: navigator.serviceWorker || null, applicationOrigin: window.location.origin,
+    allowedPaths: buildCompatibility ? buildCompatibility.publicNavigationPaths : [],
+    getCurrentOwner: function () { return runtime ? runtime.ownerSnapshot() : { networkId: "", accountId: null, accountGeneration: -1, connectionGeneration: -1, physicalRef: null, ownerRef: "" }; },
+    isCurrent: function (owner) { return !!runtime && runtime.isCurrent(owner); },
+    now: Date.now
+  });
+  if (!buildCompatibility) {
+    var platformStatus = document.getElementById("onyx-platform-status");
+    if (platformStatus) platformStatus.textContent = "Background updates and notification routing are unavailable for this shell.";
+  }
   var params = new URLSearchParams(window.location.search);
   // Mirror preferences.ts: `onyx:preferences` JSON, `e2eeDms` boolean,
   // default true on missing/unreadable store or non-boolean value.
@@ -113,40 +198,22 @@
     var parsedUntil = Number(window.localStorage.getItem("onyx:dnd-until"));
     if (isFinite(parsedUntil) && parsedUntil > Date.now()) dndUntil = Math.floor(parsedUntil);
   } catch (e) {}
-  // Resume Bearer [REDACTED] persisted by the session-token capture path
-  // (ports.js `resumeCredentials`, `onyx:credentials` localStorage).
-  // Slot key mirrors credentialSlotKey: "<host>|<nick>", lowercased.
-  // Invalid or missing slots restore as nulls; the reclaim plan then
-  // skips RESUME and the socket registers fresh.
-  var resumeTokens = { sessionToken: null, meshToken: null, meshExpiresAtMs: null };
+  var dndQuietStart = 22;
+  var dndQuietEnd = 8;
+  var firstHourSeen = false;
   try {
-    var wsUrl = params.get("ws") || "wss://irc.onyx.example/ws";
-    var bootNick = params.get("nick") || "guest";
-    var slotKey = "";
-    try {
-      slotKey = new URL(wsUrl).host.toLowerCase() + "|" + bootNick.toLowerCase();
-    } catch (u) { slotKey = ""; }
-    var rawCreds = window.localStorage.getItem("onyx:credentials");
-    if (rawCreds && slotKey) {
-      var credStore = JSON.parse(rawCreds);
-      var slot = credStore && credStore.slots && credStore.slots[slotKey];
-      if (slot && typeof slot === "object") {
-        if (typeof slot.sessionToken === "string" && slot.sessionToken) {
-          resumeTokens.sessionToken = slot.sessionToken;
-        }
-        if (typeof slot.meshToken === "string" && slot.meshToken) {
-          resumeTokens.meshToken = slot.meshToken;
-        }
-        if (typeof slot.meshExpiresAtMs === "number" && isFinite(slot.meshExpiresAtMs)) {
-          resumeTokens.meshExpiresAtMs = slot.meshExpiresAtMs;
-        }
-      }
-    }
-  } catch (e) { /* no durable resume state; register fresh */ }
+    var parsedQuietStart = Number(window.localStorage.getItem("onyx:dnd-quiet-start"));
+    var parsedQuietEnd = Number(window.localStorage.getItem("onyx:dnd-quiet-end"));
+    if (Number.isInteger(parsedQuietStart) && parsedQuietStart >= 0 && parsedQuietStart <= 23) dndQuietStart = parsedQuietStart;
+    if (Number.isInteger(parsedQuietEnd) && parsedQuietEnd >= 0 && parsedQuietEnd <= 23) dndQuietEnd = parsedQuietEnd;
+    firstHourSeen = window.localStorage.getItem("onyx:first-hour-seen") === "1";
+  } catch (e) {}
+  var defaultWsUrl = "wss://ircx.us:8080";
+  var initialWsUrl = params.get("ws") || defaultWsUrl;
   var app = Elm.Main.init({
     node: document.getElementById("app"),
     flags: {
-      wsUrl: params.get("ws") || "wss://irc.onyx.example/ws",
+      wsUrl: initialWsUrl,
       wsPin: params.get("ws"),
       mediaUrl: null,
       nick: params.get("nick") || "guest",
@@ -172,12 +239,70 @@
       soundVolume: soundVolume,
       dndEnabled: dndEnabled,
       dndUntil: dndUntil,
-      sessionToken: resumeTokens.sessionToken,
-      meshToken: resumeTokens.meshToken,
-      meshExpiresAtMs: resumeTokens.meshExpiresAtMs
+      dndQuietStart: dndQuietStart,
+      dndQuietEnd: dndQuietEnd,
+      firstHourSeen: firstHourSeen,
     }
   });
-  OnyxPorts.wire(app);
+  var endpointId = "custom";
+  var networkId = "custom-endpoint";
+  try {
+    var normalizedWs = new URL(initialWsUrl);
+    if (normalizedWs.protocol !== "wss:" || normalizedWs.username || normalizedWs.password
+      || normalizedWs.search || normalizedWs.hash || /[\u0000-\u0020\u007f]/u.test(initialWsUrl)) {
+      throw new Error("The configured WebSocket endpoint is not a supported secure endpoint.");
+    }
+    var known = { [new URL(defaultWsUrl).href]: ["onyx-main", "a"], "wss://eshmaki.me:8080/": ["onyx-main", "b"] };
+    var trusted = known[normalizedWs.href];
+    if (trusted) { networkId = trusted[0]; endpointId = trusted[1]; }
+    else {
+      var customScope = "custom:" + normalizedWs.origin + normalizedWs.pathname;
+      endpointId = customScope;
+      networkId = customScope;
+    }
+  } catch (badUrl) { throw new Error("The configured WebSocket endpoint is invalid."); }
+  var runtimeConfig = {
+    networkId: networkId,
+    endpointId: endpointId,
+    trustedEndpoints: ["a", "b"],
+    endpointRegistry: [
+      { url: defaultWsUrl, networkId: "onyx-main", endpointId: "a" },
+      { url: "wss://eshmaki.me:8080", networkId: "onyx-main", endpointId: "b" }
+    ],
+    initialUrl: initialWsUrl,
+    buildCompatibility: buildCompatibility || undefined,
+    browserPlatform: browserPlatform,
+    onLines: function (lines, at) { app.ports.wsLines.send({ at: at, lines: lines }); },
+    onCredentialState: function (state) { app.ports.runtimeCredentialState.send({ credentials: state.credentials, issuance: state.issuance, remembered: state.remembered }); },
+    onOwnerState: function (state) {
+      app.ports.runtimeOwnerState.send(state);
+    },
+    onPrivateWebhookResult: function (event) { app.ports.runtimePrivateWebhookResult.send(event); },
+    onNotificationNavigation: function (event) {
+      if (app.ports.runtimeNotificationNavigation) app.ports.runtimeNotificationNavigation.send(event);
+    },
+    onFeatureReadiness: function (state) { app.ports.runtimeFeatureReadiness.send(state); },
+    onCapabilityResolution: function (state) { app.ports.runtimeCapabilityResolution.send(state); },
+    onConnectionState: function (state, url) {
+      if (state === "live") app.ports.wsOpened.send({ url: url });
+      else if (state === "offline") app.ports.wsClosed.send({ clean: false, reason: "connection closed" });
+    }
+  };
+  if (app.ports.wsFrames && typeof app.ports.wsFrames.send === "function") {
+    runtimeConfig.onFrames = function (batch) { app.ports.wsFrames.send(batch); };
+  }
+  runtime = window.OnyxRuntime.createBrowserRuntime(runtimeConfig);
+  if (!OnyxPorts.wire(app, { runtime: runtime, requirePrivateRuntime: true })) {
+    throw new Error("The private client runtime is unavailable. Restore the runtime bundle and reload before connecting.");
+  }
+  window.__onyxBooted = true;
+  var splash = document.getElementById("onyx-boot-splash");
+  if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+  } catch (err) {
+    var message = (err && err.message) || String(err);
+    if (window.__onyxShowBootError) window.__onyxShowBootError(message);
+    throw err;
+  }
 })();
 </script>
 </body>

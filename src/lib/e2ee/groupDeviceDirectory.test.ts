@@ -126,6 +126,23 @@ describe('E2EEKEY snapshot collector', () => {
     expect(alias?.devices[0]?.legacy).toBe(true);
   });
 
+  it('trusts a server ASCII-folded device id that still derives from the key and keeps the derived id', async () => {
+    const derived = await deriveGroupDeviceId(entryA);
+    expect(derived).not.toBe(derived!.toLowerCase());
+    const snapshot = await collectGroupDeviceDirectorySnapshot([
+      deviceLine('alice', derived!.toLowerCase(), entryA, 'onyx-ogc1-v1'),
+      'E2EEKEY END account=alice devices=1',
+    ]);
+    expect(snapshot?.trusted).toHaveLength(1);
+    expect(snapshot?.devices[0]?.deviceId).toBe(derived);
+    // A different id that only shares the folded spelling of another key stays untrusted.
+    const other = await collectGroupDeviceDirectorySnapshot([
+      deviceLine('alice', derived!.toLowerCase(), entryB, 'onyx-ogc1-v1'),
+      'E2EEKEY END account=alice devices=1',
+    ]);
+    expect(other?.trusted).toHaveLength(0);
+  });
+
   it.each([
     ['missing END', [deviceLine('Alice', 'first', entryA)]],
     ['duplicate device', [deviceLine('Alice', 'first', entryA), deviceLine('Alice', 'first', entryB), 'E2EEKEY END account=Alice devices=2']],

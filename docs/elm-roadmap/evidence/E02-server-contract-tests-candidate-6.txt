@@ -1,0 +1,9 @@
+error: Protocol contract drift: /tmp/tmp54tchp1p/onyx-client-contract.v2.json is not byte-identical to /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json
+....error: Protocol contract drift: /tmp/tmpxgv54_v_/bad.json is not byte-identical to /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json
+....................
+----------------------------------------------------------------------
+Ran 24 tests in 0.049s
+
+OK
+Protocol contract valid: /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json
+Protocol contract valid: /home/kain/onyx-server/docs/reference/protocol/onyx-client-contract.v2.json = /tmp/tmpx2ms232f/onyx-client-contract.v2.json

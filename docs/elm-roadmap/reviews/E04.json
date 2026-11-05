@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "itemId": "E04",
+  "scope": {
+    "kind": "package",
+    "id": "E04"
+  },
+  "reviewer": {
+    "name": "root integrator",
+    "role": "independent bounded package reviewer"
+  },
+  "verdict": "accepted",
+  "summary": "Accept the bounded E04 deterministic runner package: current-source37 Elm and smoke lanes passed; the transcript baseline passed 4/4; and an isolated output mutant caused one actual Expect.equal assertion failure (3/4), not a compile failure. Broader session failures and blocked stages remain open. This does not accept T scenarios, M milestones, the wider security lifecycle, or release readiness.",
+  "sourceArtifacts": [
+    {
+      "path": "elm/tools/run-roadmap-checks.mjs",
+      "sha256": "df047a4b75c6f47e5339b16fe95acb8e8bb31ca210fd2ccb89e2668d8bf3863a"
+    },
+    {
+      "path": "elm/tests/RoadmapTranscriptTest.elm",
+      "sha256": "d9341fc80c7db1254249953f7d9c426ee2718207108a1eeb0d6701bebc2337af"
+    },
+    {
+      "path": "elm/fixtures/roadmap/catalog.json",
+      "sha256": "ffa7604b88b69c9114effd5537091b08f526352240979998242c580874a55151"
+    },
+    {
+      "path": "elm/tests/RoadmapFixtures.elm",
+      "sha256": "b9f3602093694fc7fbc2fcf7fab00c877b9de171b3b1fcb8ac7cbd18d9ee211b"
+    },
+    {
+      "path": "elm/tools/generate-roadmap-fixtures.mjs",
+      "sha256": "6d26e33a6cf6360ec59cd87c20c379692a271dd84c7f62f2f484a31985e3c665"
+    },
+    {
+      "path": "elm/tools/source-manifest.mjs",
+      "sha256": "39b9661237bd4e0bf4cfe3055296cc0f67f2359931f82b4125f0d75bc0135e10"
+    },
+    {
+      "path": ".github/workflows/elm-client.yml",
+      "sha256": "62c346315899149237245ce5d51b4839bbf45fbb3b96d61c4b2a084c14ae74cf"
+    },
+    {
+      "path": "elm/scheduleClock.smoke.mjs",
+      "sha256": "1390d2499605177bbd54a9bf08cb6417bc26dbed48a1a6f026fe9be249fd3e52"
+    },
+    {
+      "path": "docs/elm-roadmap/implementation-status.json",
+      "sha256": "cb0452defe26ced611274deb28f676abe6e701581905792c63b51f64c9416cee"
+    }
+  ],
+  "evidenceArtifacts": [
+    {
+      "path": "docs/elm-roadmap/evidence/wave38-E00-E04-row-review.json",
+      "sha256": "8ead5b4f4a79cba79826369d925e50c9606082ec2391468c086882067df21895"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E04-candidate37-evidence.json",
+      "sha256": "0166afa52a9c7e5b251c2c14d516c87a9329dfaf1eca7b5c61e39d42f48ffd29"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/source-candidate-37.json",
+      "sha256": "608fca80bfc1767e6d87dba2d78de64855a939ad93f715045f1c2f4898e020c9"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/affected-candidate-37.json",
+      "sha256": "494246fe23e41e188a696fef241aecd63ca8a7e4795ded3a6ab8c73f6352872c"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/elm-full-candidate-37.txt",
+      "sha256": "962ec9362179fb3e5b85f028f159e6fff7b69d3ac8bb341a4ebb3cebe1625040"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/node-smokes-candidate-37.txt",
+      "sha256": "7098c7edaa0179895e3c4097563e83505cfa77141fb150ecffbd9d96f4af7c8b"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/expected-failure-candidate-37.txt",
+      "sha256": "05bd5daf1d34866090de11d17d65b772b29db2dcc78e696de49e62273d06a808"
+    },
+    {
+      "path": "docs/elm-roadmap/evidence/E04-expected-failure-candidate-37-receipt.json",
+      "sha256": "aadabfe13b49018468d2393a690ce9127a6bbeddebcfafed39c339a6dfb1181f"
+    }
+  ],
+  "applicability": {
+    "configuration": {
+      "status": "applicable",
+      "evidenceArtifacts": [
+        "docs/elm-roadmap/evidence/E04-candidate37-evidence.json",
+        "docs/elm-roadmap/evidence/affected-candidate-37.json",
+        "docs/elm-roadmap/evidence/elm-full-candidate-37.txt",
+        "docs/elm-roadmap/evidence/node-smokes-candidate-37.txt",
+        "docs/elm-roadmap/evidence/expected-failure-candidate-37.txt",
+        "docs/elm-roadmap/evidence/E04-expected-failure-candidate-37-receipt.json"
+      ]
+    },
+    "deployment": {
+      "status": "not-applicable",
+      "reason": "This deterministic runner package makes no deployment or release-readiness claim."
+    }
+  }
+}

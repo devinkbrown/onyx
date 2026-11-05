@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "wave": 37,
+  "package": "E63",
+  "status": "source-clear-for-bounded-fix",
+  "execution": "Read-only actual diff/source review; no tests, checks, builds, main/product or daemon edits. Only this /tmp artifact written.",
+  "priorFinding": "E63-KEY-RETIREMENT-1 in wave37-crypto-source-review.json",
+  "files": {
+    "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.ts": "df4de3708c8512cb4c80042d1aa3e57ba72d69dfe8cd01e44b129afdb734686a",
+    "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.test.ts": "2b545a5726824d5d82dfeff9828da2f2c3234795e50db0db61f52e9bc85fb642"
+  },
+  "findings": [],
+  "conclusions": [
+    {
+      "topic": "Exact cache lifetime fix",
+      "anchors": [
+        "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.ts:1984",
+        "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.ts:1990",
+        "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.ts:2332"
+      ],
+      "result": "One intentMacCacheKey helper now supplies identical suffixed key for lookup/population and workspace retirement. retireWorkspace removes the actual private HMAC entry; it does not clear another workspace or delete durable IndexedDB material. This closes the specific retained-reference defect."
+    },
+    {
+      "topic": "Regression detects the prior bug",
+      "anchor": "/tmp/onyx-elm-wave37-writers/crypto/elm/runtime/private-crypto-provider.test.ts:246-291",
+      "result": "Test uses indexedDB:null from existing deps, so no durable key reload can hide the cache behavior. Both pre/post intents use the same canonical operation/target/body/clientIntent and stable owner scope; requestId and workspace epoch change do not enter queuedIntentCommitment bytes. That MAC covers only fixed domain, stable scope and canonical bytes. With the old bare-key deletion, the same cached HMAC key signs identical bytes and commitments remain equal, failing the new inequality. With exact cache deletion, volatile key is newly generated and commitment differs. AES-GCM random IV cannot make this comparison pass because payloadCommitment is the deterministic HMAC, not ciphertext hash."
+    },
+    {
+      "topic": "Negative and scope controls",
+      "result": "Old grant becomes invalid before retireWorkspace and its local seal returns stale-owner. Separate workspace commitment is unchanged after original workspace retirement, detecting a broad intentMacKeys.clear workaround. Ciphertext/plaintext test buffers are wiped and provider disposed. Existing persistent reload tests remain unchanged; the correction preserves intentional durable key reload."
+    },
+    {
+      "topic": "No authority or protocol expansion",
+      "result": "Only helper naming and exact cache deletion changed in production. workspaceGrantValid, localRequestCurrent, owner/generation rechecks around awaits, nonextractable key generation, purpose/target AAD and durable IDB key names/rows are preserved. No new crypto primitive, wire/envelope version, public getter, storage schema or namespace migration introduced."
+    }
+  ],
+  "acceptanceBoundary": "The prior defect was private capability retention, not demonstrated cross-owner signing. This source review finds the bounded correction and regression appropriate, but supplies no execution receipt and does not promote full E60/E63/E64 or M6 acceptance. Root must run focused regression/current gates against integrated source; existing external welcome/recovery and named lifecycle execution prerequisites remain open.",
+  "recommendedDisposition": "Integrate the isolated two-file correction after parent source ownership checks; no further changes requested by this bounded review."
+}

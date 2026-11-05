@@ -39,6 +39,7 @@ fetch elm url 1.0.0
 fetch elm time 1.0.0
 fetch elm virtual-dom 1.0.3
 # Test-only closure (elm-explorations/test 2.2.0 needs elm/random).
+fetch elm bytes 1.0.8
 fetch elm random 1.0.0
 fetch elm-explorations test 2.2.0
 

@@ -39,9 +39,9 @@ Documented narrowings: case folds with `String.toLower` (not locale
 UTF-16 units; buffers keep append order (rows carry no timestamps, so
 no time sort); recall tiebreaks compare code points (not locale);
 ASCII-exact recall runs, non-ASCII letters pass except separator
-ranges (other scripts' punctuation may over-merge); server SEARCH
-and vault recall stay ahead — this tier covers the live conversation
-plus the device-saved list.
+ranges (other scripts' punctuation may over-merge). Server SEARCH
+and vault recall live in `App` / `View.Search` (`vaultHits`); this
+module is the live-conversation tier plus the device-saved list.
 -}
 
 import Dict exposing (Dict)

@@ -26,6 +26,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: {
+          executablePath: process.env.ONYX_CHROMIUM_EXECUTABLE ?? '/usr/bin/chromium',
           args: [
             '--use-fake-device-for-media-stream',
             '--use-fake-ui-for-media-stream',

@@ -29,9 +29,13 @@ const REQUIRED_CAPABILITIES = [
 
 const SESSION_COMMANDS = [
   'SESSION TOKEN',
-  'SESSION MTOKEN',
   'SESSION RESUME <token>',
 ];
+const SESSION_RESPONSES = [
+  'SESSION TOKEN <credential>',
+  'SESSION MTOKEN <credential> expires=<unix>',
+];
+const WEBSOCKET_TRANSPORT = 'Client text sends contain one complete IRC line per WebSocket application message without CR, LF, or NUL; text.ircv3.net is text-only; onyx.irc-media.v1 permits binary Cadence media; WebSocket application messages may use fragmented frames';
 
 const CONTROL_RECORDS = ['key-package', 'welcome', 'commit'];
 
@@ -323,8 +327,8 @@ export function validContract(value) {
   const presence = contract.presence;
 
   return contract.schema === 'onyx-client-server-contract/v2'
-    && contract.revision === 3
-    && contract.transport?.websocket === 'one IRC message per frame; no trailing frame bytes'
+    && contract.revision === 4
+    && contract.transport?.websocket === WEBSOCKET_TRANSPORT
     && exactArray(caps?.required_for_first_party_client, REQUIRED_CAPABILITIES)
     && isDeepStrictEqual(caps?.vendor, VENDOR_CAPABILITIES)
     && server?.group_control === 'production_active'
@@ -341,6 +345,7 @@ export function validContract(value) {
     && eligibility?.authenticated_no_reusable_session?.negotiation === AUTH_NEGOTIATION
     && eligibility?.authenticated_no_reusable_session?.authoring_defense === AUTH_AUTHORING_DEFENSE
     && exactArray(session?.commands, SESSION_COMMANDS)
+    && exactArray(session?.responses, SESSION_RESPONSES)
     && isDeepStrictEqual(session?.resume, SESSION_RESUME_FIELDS)
     && session?.replay_live_separation?.live_commands === LIVE_COMMANDS
     && session?.replay_live_separation?.history_replay === HISTORY_REPLAY

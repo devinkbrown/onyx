@@ -371,6 +371,54 @@ suite =
                         , \m -> Expect.equal (m.nowMs + browserJoinTimeoutMs) m.browserJoinDueMs
                         ]
                         entered
+            , test "confirmed browser join opens the room and closes mobile navigation" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "kai", browserOpen = True, clientRoomsOpen = True }
+
+                        ( entered, _ ) =
+                            update (BrowserEnterRoom "#new") base
+
+                        joined =
+                            feed entered ":kai!u@h JOIN #NEW"
+                    in
+                    Expect.all
+                        [ \m -> Expect.equal (Just "#NEW") m.activeChannel
+                        , \m -> Expect.equal False m.browserOpen
+                        , \m -> Expect.equal False m.clientRoomsOpen
+                        , \m -> Expect.equal Nothing m.browserPendingJoin
+                        ]
+                        joined
+            , test "a late join never steals a newer browser attempt" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "kai", browserOpen = True, activeChannel = Just "#current" }
+
+                        ( first, _ ) =
+                            update (BrowserEnterRoom "#old") base
+
+                        uncertain =
+                            fireBrowserJoinTimeout (first.browserJoinDueMs + 1) first
+
+                        ( newer, _ ) =
+                            update (BrowserEnterRoom "#new") uncertain
+
+                        oldJoined =
+                            feed newer ":kai!u@h JOIN #old"
+                    in
+                    Expect.all
+                        [ \m -> Expect.equal (Just "#current") m.activeChannel
+                        , \m -> Expect.equal True m.browserOpen
+                        , \m -> Expect.equal (Just "#new") m.browserPendingJoin
+                        ]
+                        oldJoined
+            , test "unsolicited self-join preserves the active conversation" <|
+                \_ ->
+                    feed { blank | ourNick = "kai", activeChannel = Just "#current" } ":kai!u@h JOIN #other"
+                        |> .activeChannel
+                        |> Expect.equal (Just "#current")
             , test "enter while offline is silent" <|
                 \_ ->
                     let
@@ -455,6 +503,7 @@ suite =
                     Expect.all
                         [ \m -> Expect.equal BrowserJoinIdle m.browserJoinPhase
                         , \m -> Expect.equal Nothing m.browserAttemptedJoin
+                        , \m -> Expect.equal (Just "#new") m.activeChannel
                         ]
                         settled
             , test "a join prompt rejects the attempted room" <|

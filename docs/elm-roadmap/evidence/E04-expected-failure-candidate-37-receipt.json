@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "id": "expected-failure",
+  "command": [
+    {
+      "cmd": "/usr/bin/node",
+      "args": [
+        "/home/kain/onyx/elm/tools/source-manifest.mjs"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "/tmp/onyx-elm-tools/elm",
+      "args": [
+        "--version"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "/tmp/onyx-elm-tools/node_modules/.bin/elm-test",
+      "args": [
+        "--version"
+      ],
+      "cwd": "/home/kain/onyx",
+      "capture": true
+    },
+    {
+      "cmd": "/tmp/onyx-elm-tools/node_modules/.bin/elm-test",
+      "args": [
+        "--seed",
+        "11031904",
+        "--fuzz",
+        "100",
+        "--report",
+        "json",
+        "tests/RoadmapTranscriptTest.elm"
+      ],
+      "cwd": "/tmp/onyx-elm-expected-failure-ahKOLo/elm",
+      "phase": "known-good baseline"
+    },
+    {
+      "cmd": "/usr/bin/node",
+      "args": [
+        "/tmp/onyx-elm-expected-failure-ahKOLo/elm/tools/generate-roadmap-fixtures.mjs"
+      ],
+      "cwd": "/tmp/onyx-elm-expected-failure-ahKOLo",
+      "phase": "mutated catalog fixture generation"
+    },
+    {
+      "cmd": "/tmp/onyx-elm-tools/node_modules/.bin/elm-test",
+      "args": [
+        "--seed",
+        "11031904",
+        "--fuzz",
+        "100",
+        "--report",
+        "json",
+        "tests/RoadmapTranscriptTest.elm"
+      ],
+      "cwd": "/tmp/onyx-elm-expected-failure-ahKOLo/elm",
+      "phase": "mutated assertion"
+    },
+    {
+      "runner": [
+        "/usr/bin/node",
+        "/home/kain/onyx/elm/tools/run-roadmap-checks.mjs",
+        "expected-failure"
+      ]
+    }
+  ],
+  "laneObservations": [
+    {
+      "id": "expected-failure-proof",
+      "targetId": "E04.cap-ping-known-good",
+      "seed": "11031904",
+      "fuzz": "100",
+      "originalCatalogSha256": "ffa7604b88b69c9114effd5537091b08f526352240979998242c580874a55151",
+      "originalGeneratedModuleSha256": "b9f3602093694fc7fbc2fcf7fab00c877b9de171b3b1fcb8ac7cbd18d9ee211b",
+      "mutatedGeneratedModuleSha256": "ef0f3f6b6bc7b5439887149bed9ae969ae9544824132b5be007887ca971bc3f8",
+      "baseline": {
+        "exitStatus": 0,
+        "testCount": 4,
+        "passed": 4,
+        "failed": 0
+      },
+      "mutant": {
+        "exitStatus": 2,
+        "testCount": 4,
+        "passed": 3,
+        "failed": 1,
+        "targetFailures": [
+          {
+            "given": null,
+            "message": "Expect.equal",
+            "reason": {
+              "type": "Equality",
+              "data": {
+                "expected": "[\"CAP REQ mutated-message-tags\\r\\n\",\"CAP END\\r\\n\",\"PONG fixture-cookie\\r\\n\"]",
+                "actual": "[\"CAP REQ message-tags\\r\\n\",\"CAP END\\r\\n\",\"PONG fixture-cookie\\r\\n\"]",
+                "comparison": "Expect.equal"
+              }
+            }
+          }
+        ],
+        "passedOthers": true
+      }
+    }
+  ],
+  "utcTime": "2026-11-05T02:36:21.689Z",
+  "exitStatus": 0,
+  "outcome": "passed",
+  "acceptanceStatus": "pending",
+  "clientSourceManifestDigest": "5ec98ba79e58903f894ef05aea77c94b18b079b14f5fa09b7098d90c5b5b5bc6",
+  "clientGitHead": "55bfa9cf2d37aed5523ea021d06e4e951d907e03",
+  "clientWorkingTreeDirty": true,
+  "serverSourceOrArtifactHashesWhenRelevant": "not supplied to this lane",
+  "browser": "not measured",
+  "os": "linux 6.18.57-0-lts (x64)",
+  "network": "local/mock; not a live-server acceptance receipt",
+  "limits": "seed=11031904; fuzz=100; bounded processes; no hidden skips; gates and acceptance remain distinct"
+}

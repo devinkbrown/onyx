@@ -73,13 +73,14 @@ describe('CadenceMediaEngine control payload boundary', () => {
     expect(internals.localKind).toBe('voice');
   });
 
-  it('keeps peer stream routes when MACKEY is re-issued after peer JOIN', () => {
+  it('keeps peer stream routes when MACKEY is re-issued after peer JOIN and ignores retired NOTE syntax', async () => {
     const client = mediaClient();
     const engine = new CadenceMediaEngine(callbacks(), { kind: 'voice' });
     engine.setClient(client);
     const internals = engine as unknown as {
       activeRoom: string | null;
       wsMyNick: string;
+      wsMediaKey: CryptoKey | null;
       streamRouter: {
         setRoster(channel: string, nicks: readonly string[]): void;
         addParticipant(nick: string): void;
@@ -94,6 +95,11 @@ describe('CadenceMediaEngine control payload boundary', () => {
     internals.wsMyNick = 'alice';
     internals.streamRouter.setRoster('#root', ['alice']);
     internals.streamRouter.addParticipant('bob');
+    const existingKey = await importMediaMacKey(new Uint8Array(32).fill(7));
+    internals.wsMediaKey = existingKey;
+    internals.handleMediaServerMessage({ command: 'NOTE', params: ['MEDIA', '#root', 'MACKEY', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='] });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(internals.wsMediaKey).toBe(existingKey);
     const bobAudio = mediaStreamId('#root', 'bob', 'audio');
     expect(internals.streamRouter.resolve(bobAudio)?.nick).toBe('bob');
 

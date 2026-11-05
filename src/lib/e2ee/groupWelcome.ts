@@ -315,14 +315,19 @@ export async function hashGroupWelcomeBody(body: Uint8Array): Promise<Uint8Array
 }
 
 async function deriveWelcomeKey(sharedBits: ArrayBuffer, context: Uint8Array): Promise<CryptoKey> {
-  const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', toArrayBuffer(context)));
+  const contextBytes = toArrayBuffer(context);
+  const saltBuffer = await crypto.subtle.digest('SHA-256', contextBytes);
+  new Uint8Array(contextBytes).fill(0);
+  const salt = new Uint8Array(saltBuffer);
   const hkdf = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
   const info = new Uint8Array(HKDF_INFO_PREFIX.byteLength + context.byteLength);
   info.set(HKDF_INFO_PREFIX, 0);
   info.set(context, HKDF_INFO_PREFIX.byteLength);
+  const saltBytes = toArrayBuffer(salt);
+  const infoBytes = toArrayBuffer(info);
   try {
     return await crypto.subtle.deriveKey(
-      { name: 'HKDF', hash: 'SHA-256', salt: toArrayBuffer(salt), info: toArrayBuffer(info) },
+      { name: 'HKDF', hash: 'SHA-256', salt: saltBytes, info: infoBytes },
       hkdf,
       { name: 'AES-GCM', length: 256 },
       false,
@@ -331,6 +336,8 @@ async function deriveWelcomeKey(sharedBits: ArrayBuffer, context: Uint8Array): P
   } finally {
     salt.fill(0);
     info.fill(0);
+    new Uint8Array(saltBytes).fill(0);
+    new Uint8Array(infoBytes).fill(0);
   }
 }
 
@@ -362,9 +369,12 @@ export async function prepareGroupWelcome(input: {
     recipient.fill(0);
     return null;
   }
+  let nonceBytes: ArrayBuffer | null = null; let aadBytes: ArrayBuffer | null = null; let plaintextBytes: ArrayBuffer | null = null;
   try {
     const recipientKey = await crypto.subtle.importKey('raw', toArrayBuffer(recipient), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
-    const ephemeralPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    // WebCrypto keeps the ephemeral private key non-extractable while the
+    // generated public key remains exportable for the recipient envelope.
+    const ephemeralPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
     const ephemeralPublicKey = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeralPair.publicKey));
     const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: recipientKey }, ephemeralPair.privateKey, 256);
     let key: CryptoKey;
@@ -374,7 +384,8 @@ export async function prepareGroupWelcome(input: {
       new Uint8Array(sharedBits).fill(0);
     }
     const nonce = crypto.getRandomValues(new Uint8Array(GROUP_WELCOME_NONCE_BYTES));
-    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: toArrayBuffer(nonce), additionalData: toArrayBuffer(context) }, key, toArrayBuffer(plaintext)));
+    nonceBytes = toArrayBuffer(nonce); aadBytes = toArrayBuffer(context); plaintextBytes = toArrayBuffer(plaintext);
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonceBytes, additionalData: aadBytes }, key, plaintextBytes));
     const bytes = encodeGroupWelcome({ ephemeralPublicKey, nonce, ciphertext });
     if (!bytes) {
       context.fill(0);
@@ -401,6 +412,9 @@ export async function prepareGroupWelcome(input: {
   } finally {
     plaintext.fill(0);
     recipient.fill(0);
+    if (nonceBytes) new Uint8Array(nonceBytes).fill(0);
+    if (aadBytes) new Uint8Array(aadBytes).fill(0);
+    if (plaintextBytes) new Uint8Array(plaintextBytes).fill(0);
   }
 }
 

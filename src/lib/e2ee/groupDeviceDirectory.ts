@@ -255,6 +255,8 @@ function isOddAlgorithm(algorithm: string): boolean {
   return algorithm === GROUP_DEVICE_DIRECTORY_ALGORITHM;
 }
 
+function asciiLower(value: string): string { return value.replace(/[A-Z]/gu, (c) => c.toLowerCase()); }
+
 async function materializeRecord(
   line: Extract<GroupDeviceDirectorySnapshotLine, { kind: 'device' }>,
 ): Promise<GroupDeviceDirectoryRecord> {
@@ -262,10 +264,14 @@ async function materializeRecord(
     ? decodeGroupDeviceDirectoryEntry(line.publicKey)
     : null;
   const derivedId = entry ? await deriveGroupDeviceId(entry) : null;
-  const trusted = Boolean(entry && derivedId === line.deviceId);
+  // Onyx Server stores device ids as ASCII-folded IRCX prop keys, so LIST may
+  // return the folded spelling (server e2ee_policy: the id must still derive
+  // from the payload, compared ignoring ASCII case). Trust requires that
+  // derivation; the row then carries the key-derived, case-exact id.
+  const trusted = Boolean(entry && derivedId !== null && asciiLower(derivedId) === asciiLower(line.deviceId));
   return {
     account: line.account,
-    deviceId: line.deviceId,
+    deviceId: trusted ? derivedId! : line.deviceId,
     algorithm: line.algorithm,
     publicKey: line.publicKey,
     directoryKey: entry ? toB64url(entry.signerPub) : null,

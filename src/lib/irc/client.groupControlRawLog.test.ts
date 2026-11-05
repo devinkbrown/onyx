@@ -45,7 +45,6 @@ describe('group-control raw-log secrecy', () => {
     `:server.example NOTICE alice :E2EEKEY DEVICE alice phone ${sentinel}`,
     `:server.example FAIL E2EEGROUP BAD_CONTROL :${sentinel}`,
     `:server.example WARN e2eekey BAD_DIRECTORY :${sentinel}`,
-    `:server.example NOTE E2EEKEY INFO :${sentinel}`,
   ];
 
   it('redacts inbound tagged, prefixed, mixed-case, wrapped and error forms', () => {
@@ -107,13 +106,25 @@ describe('group-control raw-log secrecy', () => {
       `NOTICE alice :E2EE\0KEY DEVICE ${sentinel}`,
       `FAIL E2EE\0GROUP BAD :${sentinel}`,
       `WARN E2EE\0KEY BAD :${sentinel}`,
-      `NOTE \0E2EEKEY INFO :${sentinel}`,
+      `XUNSUPPORTED \0E2EEKEY INFO :${sentinel}`,
     ];
     for (const line of nulCases) feed(line);
     expect(raw.map((entry) => entry.line).join('\n')).not.toContain(sentinel);
     expect(raw.every((entry) => entry.line.includes('<redacted>'))).toBe(true);
+    expect(raw).toHaveLength(nulCases.length);
     expect(commands).toContain('AUTHENTICATE');
     expect(commands).toContain('NOTICE');
+  });
+
+  it('keeps unknown secret-shaped envelopes out of callbacks while generically redacting the raw log', () => {
+    const messages: IRCMessage[] = [];
+    const { raw, feed } = harness((message) => messages.push(message));
+    feed(`:server.example XUNSUPPORTED E2EEKEY INFO :${sentinel}`);
+    feed(`:server.example FOO alice MEDIA MACKEY #room ${sentinel}`);
+    feed(`:server.example XUNSUPPORTED SESSION TOKEN :${sentinel}`);
+    feed(`:server.example 799 alice :SESSION TOKEN ${sentinel}`);
+    expect(raw).toEqual(Array.from({ length: 4 }, () => ({ line: '<sensitive> <redacted>', direction: 'in' })));
+    expect(messages).toEqual([]);
   });
 
   it('redacts NUL-split sensitive tokens outbound while preserving exact wire bytes', () => {
@@ -125,7 +136,7 @@ describe('group-control raw-log secrecy', () => {
       `NOTICE alice :E2EE\0KEY DEVICE ${sentinel}`,
       `FAIL E2EE\0GROUP BAD :${sentinel}`,
       `WARN E2EE\0KEY BAD :${sentinel}`,
-      `NOTE \0E2EEKEY INFO :${sentinel}`,
+      `XUNSUPPORTED \0E2EEKEY INFO :${sentinel}`,
     ];
     for (const line of nulCases) expect(client.send(`${line}\r\n`)).toBe(true);
     expect(raw.map((entry) => entry.line).join('\n')).not.toContain(sentinel);

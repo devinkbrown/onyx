@@ -142,20 +142,20 @@ suite =
                         (parseOperSlash "kill" [ "troll", "being", "rude" ])
             ]
         , describe "folds"
-            [ test "MEDIA events reshape into NOTE param order" <|
+            [ test "MEDIA events dispatch as typed MEDIA params" <|
                 \_ ->
                     Expect.equal
-                        (EventAsNote { params = [ "MEDIA", "#c", "JOIN", "alice", "detail" ] })
+                        (EventAsMedia { params = [ "MEDIA", "#c", "JOIN", "alice", "detail" ] })
                         (foldEventLine (Wire.parseIrcMessage ":s EVENT me MEDIA JOIN #c alice detail"))
-            , test "MEDIA reshape tolerates missing params" <|
+            , test "MEDIA event dispatch tolerates missing params" <|
                 \_ ->
                     Expect.equal
-                        (EventAsNote { params = [ "MEDIA", "", "JOIN", "" ] })
+                        (EventAsMedia { params = [ "MEDIA", "", "JOIN", "" ] })
                         (foldEventLine (Wire.parseIrcMessage ":s EVENT me MEDIA JOIN"))
-            , test "WEBAUTHN drops the target for the passkey fold" <|
+            , test "WEBAUTHN dispatch drops the target for the passkey fold" <|
                 \_ ->
                     Expect.equal
-                        (EventAsPasskey { params = [ "WEBAUTHN", "REGISTER", "challenge" ] })
+                        (EventAsWebAuthn { params = [ "WEBAUTHN", "REGISTER", "challenge" ] })
                         (foldEventLine (Wire.parseIrcMessage ":s EVENT me WEBAUTHN REGISTER challenge"))
             , test "category bodies and other planes are ignored" <|
                 \_ ->

@@ -6,6 +6,10 @@ module Session exposing
     , ReclaimPlan(..)
     , ReclaimSkipReason(..)
     , ReclaimTokenKind(..)
+    , ResumeOutcome(..)
+    , CredentialKind(..)
+    , CredentialMetadata
+    , CredentialIssuance(..)
     , ReclaimTokens
     , SessionState(..)
     , buildCapabilityMatrix
@@ -18,12 +22,14 @@ module Session exposing
     , parseCapToken
     , wantedCaps
     , formatSessionAge
+    , hasCapability
     , isSessionDropSuccess
     , isSessionListEnd
     , otherAttachedSessions
     , parseSessionDropOk
     , parseSessionListLine
     , planSessionReclaim
+    , resumeSuccessOutcome
     , productCaps
     , reclaimExpirySkewMs
     , reclaimOffered
@@ -47,6 +53,7 @@ the caller's `now`.
 -}
 
 import Wire
+import Ids
 
 
 
@@ -65,6 +72,72 @@ reclaimExpirySkewMs =
 type ReclaimTokenKind
     = MeshBearer
     | LocalBearer
+    | UnknownBearer
+
+
+type ResumeOutcome
+    = ResumePending
+    | ExactRestored
+    | LogicalRestored
+    | NewLegacyAttachment
+    | AttachmentBusy
+    | MissingAttachment
+    | ResumeRetryable
+    | ResumeRevoked
+    | ResumeInvalid
+    | ResumeUnknown
+
+
+resumeSuccessOutcome : String -> Maybe ResumeOutcome
+resumeSuccessOutcome body =
+    if List.member body exactResumeNotices then
+        Just ExactRestored
+
+    else if List.member body legacyResumeNotices then
+        Just NewLegacyAttachment
+
+    else if List.member body logicalResumeNotices then
+        Just LogicalRestored
+
+    else
+        Nothing
+
+
+exactResumeNotices : List String
+exactResumeNotices =
+    [ "SESSION RESUME: already attached to this exact session"
+    , "SESSION RESUME: exact session restored"
+    , "SESSION RESUME: exact session reclaimed"
+    , "SESSION RESUME: exact session restored (cross-server)"
+    , "SESSION RESUME: exact session reclaimed (cross-server)"
+    ]
+
+
+legacyResumeNotices : List String
+legacyResumeNotices =
+    [ "SESSION RESUME: legacy session state cloned into a new attachment"
+    , "SESSION RESUME: legacy session attached as a new attachment"
+    ]
+
+
+logicalResumeNotices : List String
+logicalResumeNotices =
+    [ "SESSION RESUME: already attached to this session"
+    , "SESSION RESUME: attached to live session"
+    , "SESSION RESUME: already attached to this mesh session"
+    , "SESSION RESUME: attached to live mesh session"
+    , "SESSION RESUME: attached to replicated mesh session"
+    , "SESSION RESUME: session restored (cross-server)"
+    , "SESSION RESUME: session reclaimed (cross-server)"
+    ]
+
+
+type CredentialKind
+    = MeshLogical
+    | MeshExact
+    | LocalLogical
+    | LocalExact
+    | UnknownCredential
 
 
 type ReclaimSkipReason
@@ -73,11 +146,22 @@ type ReclaimSkipReason
     | NoneHeld
 
 
-type alias ReclaimTokens =
-    { sessionToken : Maybe String
-    , meshToken : Maybe String
-    , meshTokenExpiresAt : Maybe Float
+type alias CredentialMetadata =
+    { credentialRef : Ids.CredentialRef
+    , kind : CredentialKind
+    , expiresAtMs : Maybe Float
+    , restorable : Bool
     }
+
+
+type alias ReclaimTokens =
+    { credentials : List CredentialMetadata }
+
+
+type CredentialIssuance
+    = CredentialIdle
+    | CredentialPending
+    | CredentialUnknown
 
 
 type alias ReclaimClock =
@@ -87,7 +171,7 @@ type alias ReclaimClock =
 
 
 type ReclaimPlan
-    = Attempt { token : String, kind : ReclaimTokenKind, meshExpired : Bool }
+    = Attempt { credentialRef : Ids.CredentialRef, kind : ReclaimTokenKind, credentialKind : CredentialKind, meshExpired : Bool }
     | Skip { reason : ReclaimSkipReason, meshExpired : Bool }
 
 
@@ -99,27 +183,22 @@ type MeshStatus
 
 meshStatus : ReclaimTokens -> Float -> MeshStatus
 meshStatus tokens now =
-    if not (Wire.isValidSessionCredential tokens.meshToken) then
+    let
+        mesh = List.filter (\credential -> isMeshKind credential.kind && credential.restorable) tokens.credentials
+
+        usable credential =
+            case credential.expiresAtMs of
+                Nothing -> True
+                Just expiresAt -> not (isNaN expiresAt || isInfinite expiresAt) && now < expiresAt - reclaimExpirySkewMs
+    in
+    if List.any usable mesh then
+        Usable
+
+    else if List.isEmpty mesh then
         AbsentMesh
 
     else
-        case tokens.meshTokenExpiresAt of
-            Nothing ->
-                -- A legacy note without `expires=` has no local deadline;
-                -- the server still enforces its own, so offer it rather
-                -- than discarding a working bearer.
-                Usable
-
-            Just expiresAt ->
-                -- Garbage in the deadline is not evidence of freshness.
-                if isNaN expiresAt || isInfinite expiresAt then
-                    ExpiredMesh
-
-                else if now < expiresAt - reclaimExpirySkewMs then
-                    Usable
-
-                else
-                    ExpiredMesh
+        ExpiredMesh
 
 
 {-| Decide which bearer — if any — the next `SESSION RESUME` should carry.
@@ -139,20 +218,14 @@ planSessionReclaim tokens clock =
         Skip { reason = Unauthenticated, meshExpired = meshExpired }
 
     else if mesh == Usable then
-        case tokens.meshToken of
-            Just bearer ->
-                Attempt { token = bearer, kind = MeshBearer, meshExpired = False }
+        case bestCredential isMeshKind tokens.credentials of
+            Just credential -> Attempt { credentialRef = credential.credentialRef, kind = MeshBearer, credentialKind = credential.kind, meshExpired = False }
+            Nothing -> Skip { reason = NoneHeld, meshExpired = meshExpired }
 
-            Nothing ->
-                Skip { reason = NoneHeld, meshExpired = meshExpired }
-
-    else if Wire.isValidSessionCredential tokens.sessionToken then
-        case tokens.sessionToken of
-            Just bearer ->
-                Attempt { token = bearer, kind = LocalBearer, meshExpired = meshExpired }
-
-            Nothing ->
-                Skip { reason = NoneHeld, meshExpired = meshExpired }
+    else if List.any (\credential -> isLocalKind credential.kind && credential.restorable) tokens.credentials then
+        case bestCredential isLocalKind tokens.credentials of
+            Just credential -> Attempt { credentialRef = credential.credentialRef, kind = LocalBearer, credentialKind = credential.kind, meshExpired = meshExpired }
+            Nothing -> Skip { reason = NoneHeld, meshExpired = meshExpired }
 
     else if meshExpired then
         Skip { reason = Expired, meshExpired = meshExpired }
@@ -167,7 +240,24 @@ connection exists.
 -}
 reclaimOffered : ReclaimTokens -> Float -> Bool
 reclaimOffered tokens now =
-    meshStatus tokens now == Usable || Wire.isValidSessionCredential tokens.sessionToken
+    meshStatus tokens now == Usable || List.any (\credential -> isLocalKind credential.kind && credential.restorable) tokens.credentials
+
+
+isMeshKind : CredentialKind -> Bool
+isMeshKind kind = kind == MeshExact || kind == MeshLogical
+
+
+isLocalKind : CredentialKind -> Bool
+isLocalKind kind = kind == LocalExact || kind == LocalLogical
+
+
+bestCredential : (CredentialKind -> Bool) -> List CredentialMetadata -> Maybe CredentialMetadata
+bestCredential matches credentials =
+    let
+        candidates = List.filter (\credential -> matches credential.kind && credential.restorable) credentials
+        exact = List.filter (\credential -> credential.kind == MeshExact || credential.kind == LocalExact) candidates
+    in
+    List.head (if List.isEmpty exact then candidates else exact)
 
 
 
@@ -546,10 +636,10 @@ buildCapabilityMatrix input =
                     String.toLower cap.id
 
                 status =
-                    if List.member id negotiated then
+                    if hasCapability negotiated id then
                         Active
 
-                    else if List.member id available then
+                    else if hasCapability available id then
                         Available
 
                     else if knowNothing then
@@ -603,6 +693,42 @@ isCapControl c =
     code <= 0x20 || code == 0x7F
 
 
+checkedCapUtf8ByteLength : String -> Maybe Int
+checkedCapUtf8ByteLength value =
+    String.foldr
+        (\char tail -> Maybe.map2 (+) (capUtf8CodePointByteLength char) tail)
+        (Just 0)
+        value
+
+
+capUtf8CodePointByteLength : Char -> Maybe Int
+capUtf8CodePointByteLength char =
+    let
+        code =
+            Char.toCode char
+
+        units =
+            String.length (String.fromChar char)
+
+        surrogate =
+            code >= 0xD800 && code <= 0xDFFF
+    in
+    if units == 1 && code >= 0 && code < 0x80 && not surrogate then
+        Just 1
+
+    else if units == 1 && code >= 0x80 && code < 0x800 && not surrogate then
+        Just 2
+
+    else if units == 1 && code >= 0x800 && code < 0x10000 && not surrogate then
+        Just 3
+
+    else if units == 2 && code >= 0x10000 && code <= 0x10FFFF then
+        Just 4
+
+    else
+        Nothing
+
+
 {-| Parse one advertised cap token (`name` or `name=value`),
 mirroring `parseAdvertisedCap`: over-long or control-bearing names
 (commas included) and values are refused. -}
@@ -616,11 +742,17 @@ parseCapToken token =
             let
                 value =
                     String.join "=" rest
+
+                nameByteLength =
+                    checkedCapUtf8ByteLength name
+
+                valueByteLength =
+                    checkedCapUtf8ByteLength value
             in
-            if String.isEmpty name || String.length name > maxCapNameLength then
+            if String.isEmpty name || Maybe.withDefault (maxCapNameLength + 1) nameByteLength > maxCapNameLength then
                 Nothing
 
-            else if String.length value > maxCapValueLength then
+            else if Maybe.withDefault (maxCapValueLength + 1) valueByteLength > maxCapValueLength then
                 Nothing
 
             else if String.any isCapControl name || String.contains "," name then
@@ -647,25 +779,152 @@ dedupeNames names =
         names
 
 
-{-| Caps the client requests, mirroring `_wantedCaps`. Always-off:
-`tls` (WSS already), `sts` (advertised, not negotiated),
-`no-implicit-names` (would suppress the 353 burst the roster
-needs), `draft/file-upload` (unimplemented), `bot` (human client).
-`sasl` joins the request only when a credential is held — the
-secret itself stays ports-side; the flag only says one exists.
-Everything else is requested. -}
+{-| Request only exact capability names in the implemented allowlist below.
+`no-implicit-names` is safe because self-JOIN and reconnect paths issue
+explicit NAMES requests. `tls`/`sts` (WSS is already in use), file-upload,
+bot, and capabilities whose runtime has not passed its identity or transport
+gate (`onyx/e2ee`, `onyx/media`) stay excluded. `sasl` is requested only when
+ports holds a credential; the secret stays ports-side.
+-}
 wantedCaps : Bool -> List String -> List String
 wantedCaps hasCredentials available =
     dedupeNames available
         |> List.filter
             (\cap ->
-                cap /= "tls"
-                    && cap /= "sts"
+                List.member cap supportedClientCaps
                     && (hasCredentials || cap /= "sasl")
-                    && cap /= "no-implicit-names"
-                    && cap /= "draft/file-upload"
-                    && cap /= "bot"
+                    && not (cap == "no-implicit-names" && List.member "draft/no-implicit-names" available)
             )
+
+
+{-| Explicit request allowlist: capabilities whose semantics this client
+actually implements. Capabilities advertised by a server remain visible in
+`capAvailable`, but are never negotiated merely because they were offered.
+-}
+supportedClientCaps : List String
+supportedClientCaps =
+    [ "sasl"
+    , "account-notify"
+    , "account-tag"
+    , "away-notify"
+    , "batch"
+    , "cap-notify"
+    , "chghost"
+    , "channel-rename"
+    , "draft/channel-rename"
+    , "chathistory"
+    , "draft/chathistory"
+    , "multiline"
+    , "draft/multiline"
+    , "read-marker"
+    , "draft/read-marker"
+    , "draft/no-implicit-names"
+    , "no-implicit-names"
+    , "draft/search"
+    , "draft/typing"
+    , "draft/react"
+    , "draft/reply"
+    , "draft/message-editing"
+    , "draft/message-redaction"
+    , "typing"
+    , "react"
+    , "reply"
+    , "message-editing"
+    , "message-redaction"
+    , "msgid"
+    , "draft/webpush"
+    , "echo-message"
+    , "extended-join"
+    , "invite-notify"
+    , "labeled-response"
+    , "message-tags"
+    , "multi-prefix"
+    , "draft/netsplit"
+    , "draft/netjoin"
+    , "onyx/session-sync"
+    , "server-time"
+    , "setname"
+    , "standard-replies"
+    , "userhost-in-names"
+    , "account-extban"
+    , "utf8-only"
+    ]
+
+
+{-| Test a negotiated capability by either its canonical server token or
+its client-era `draft/` spelling. The server ACKs whichever token it was
+asked for; this helper keeps feature gates interoperable across both.
+-}
+hasCapability : List String -> String -> Bool
+hasCapability negotiated name =
+    List.any (\candidate -> List.member candidate negotiated) (capabilitySpellings name)
+
+
+capabilitySpellings : String -> List String
+capabilitySpellings name =
+    case name of
+        "multiline" ->
+            [ "multiline", "draft/multiline" ]
+
+        "draft/multiline" ->
+            [ "multiline", "draft/multiline" ]
+
+        "chathistory" ->
+            [ "chathistory", "draft/chathistory" ]
+
+        "draft/chathistory" ->
+            [ "chathistory", "draft/chathistory" ]
+
+        "read-marker" ->
+            [ "read-marker", "draft/read-marker" ]
+
+        "draft/read-marker" ->
+            [ "read-marker", "draft/read-marker" ]
+
+        "channel-rename" ->
+            [ "channel-rename", "draft/channel-rename" ]
+
+        "draft/channel-rename" ->
+            [ "channel-rename", "draft/channel-rename" ]
+
+        "no-implicit-names" ->
+            [ "no-implicit-names", "draft/no-implicit-names" ]
+
+        "draft/no-implicit-names" ->
+            [ "no-implicit-names", "draft/no-implicit-names" ]
+
+        "typing" ->
+            [ "typing", "draft/typing" ]
+
+        "draft/typing" ->
+            [ "typing", "draft/typing" ]
+
+        "react" ->
+            [ "react", "draft/react" ]
+
+        "draft/react" ->
+            [ "react", "draft/react" ]
+
+        "reply" ->
+            [ "reply", "draft/reply" ]
+
+        "draft/reply" ->
+            [ "reply", "draft/reply" ]
+
+        "message-editing" ->
+            [ "message-editing", "draft/message-editing" ]
+
+        "draft/message-editing" ->
+            [ "message-editing", "draft/message-editing" ]
+
+        "message-redaction" ->
+            [ "message-redaction", "draft/message-redaction" ]
+
+        "draft/message-redaction" ->
+            [ "message-redaction", "draft/message-redaction" ]
+
+        _ ->
+            [ name ]
 
 
 {-| Split wanted caps into 380-char `CAP REQ` chunks, mirroring

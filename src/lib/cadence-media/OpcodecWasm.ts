@@ -423,6 +423,7 @@ export class CadenceVisEncoder {
   /** Target frame rate requested by the capture pipeline. */
   readonly targetFps: number;
   private frameCount = 0;
+  get framesEncoded(): number { return this.frameCount; }
 
   constructor(m: EmModule, width: number, height: number, quality: number, profile: CadenceVisProfile = 'camera', fps = 60) {
     this.m       = m;
@@ -493,6 +494,7 @@ export class CadenceVisDecoder {
   private vPtr: number;
   readonly width: number;
   readonly height: number;
+  framesDecoded = 0;
 
   constructor(m: EmModule, width: number, height: number) {
     this.m = m; this.width = width; this.height = height;
@@ -515,6 +517,7 @@ export class CadenceVisDecoder {
                               this.yPtr, this.uPtr, this.vPtr]) as number;
     this.m.ccall('opcodec_free', null, ['number'], [inPtr]);
     if (ret !== 0) return null;
+    this.framesDecoded++;
     const uvSize = (this.width >> 1) * (this.height >> 1);
     return {
       y: this.m.HEAPU8.slice(this.yPtr, this.yPtr + this.width * this.height),

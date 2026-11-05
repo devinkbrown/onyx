@@ -28,6 +28,11 @@ Two documented narrowings follow from the Elm vault's flat row model
 (`VaultRow`: id/target/from/body/at/rowType — the same shape
 `ports.js` `exportSnapshot` emits, in oracle field names):
 
+`VaultRow` also carries the optional runtime `wireMessageId` used to
+reconcile server echoes. It is intentionally absent from portable
+exports, so imported rows receive no wire id unless a future export
+format carries server proof.
+
   - Display extras the oracle revives (reactions, replyTo, flags,
     topic) are not carried: they never reject a message in the oracle
     either, and the flat store cannot persist them. Replayed
