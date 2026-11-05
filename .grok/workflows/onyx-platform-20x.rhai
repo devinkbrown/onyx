@@ -77,7 +77,7 @@ phase("Audit");
 log("Auditing Onyx platform for 20x expansion opportunities…");
 
 let audit_prompt = "";
-audit_prompt += "You are auditing /home/kain/onyx (SolidJS client, branch onyx-solid) and optionally ";
+audit_prompt += "You are auditing /home/kain/onyx (Elm client) and optionally ";
 audit_prompt += "/home/kain/onyx-server for a 20x product expansion wave.\n\n";
 audit_prompt += "READ-ONLY. Use read_file, grep, list_dir, and bash git/status only.\n\n";
 audit_prompt += "Known in-progress uncommitted partials (must note):\n";
@@ -93,7 +93,7 @@ audit_prompt += "channel folders/stars, multi-device E2EE, Oper EVENT REPLAY.\n\
 audit_prompt += "Return up to 24 slices with status one of: READY (implement now), PARTIAL ";
 audit_prompt += "(narrow gap), SHIPPED (skip), BLOCKED (needs design).\n";
 audit_prompt += "priority_ids: ordered list of up to 16 READY/PARTIAL ids to implement this wave.\n";
-audit_prompt += "agent_hint: solidjs-coder | onyx-store | onyx-crypto | onyx-notify | onyx-render | ";
+audit_prompt += "agent_hint: onyx-coder-leaf | onyx-store | onyx-crypto | onyx-notify | onyx-render | ";
 audit_prompt += "onyx-cmdk | zig-coder | general-purpose.\n";
 audit_prompt += "Do NOT invent files — cite real paths from the tree.";
 
@@ -199,7 +199,7 @@ for id in work {
     p += "RULES:\n";
     p += "1. Read LIVE code first (grep/read_file). Prefer wiring EXISTING modules over rewrites.\n";
     p += "2. Onyx Server product name only — never orochi/legacy codenames in user-facing text.\n";
-    p += "3. SolidJS: never destructure props; immutable store updates; onCleanup discipline.\n";
+    p += "3. Elm: effects as data; ports only in Main.elm; new logic in its own module wired via a -- v3/<slice> block.\n";
     p += "4. Security: fail closed on E2EE/unfurl/hostile input; no plaintext fallback for E2EE DMs.\n";
     p += "5. Tests first or with implementation for pure modules; extend existing *.test.ts when possible.\n";
     p += "6. Stay inside this slice's files. Do not rewrite roadmaps wholesale.\n";

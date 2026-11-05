@@ -4,7 +4,7 @@ const native_sdk = @import("native_sdk");
 
 pub const panic = std.debug.FullPanic(native_sdk.debug.capturePanic);
 
-/// Minimal Zig desktop host for the existing Onyx SolidJS/Vite SPA.
+/// Minimal Zig desktop host for the Onyx Elm web client (the static site in `dist/`).
 /// Production loads packaged assets from `dist/` via `zero://app`
 /// (`native_sdk.frontend.productionSource` default origin).
 /// Development uses `NATIVE_SDK_FRONTEND_URL` (set by `native dev` /
@@ -85,7 +85,7 @@ fn runtimeDistDir(allocator: std.mem.Allocator, io: std.Io) ![]u8 {
 
 // Keep allowlist exact (see https://native-sdk.dev/security).
 // productionSource does not use zero://inline — do not allow it.
-// Dev origin matches Vite (port 3000); origin form has no path/slash.
+// Dev origin matches `pnpm dev` (tools/serve.mjs, port 3000); origin form has no path/slash.
 const allowed_origins = [_][]const u8{
     "zero://app",
     "http://127.0.0.1:3000",
@@ -119,7 +119,7 @@ test "desktop host app name is onyx" {
     try std.testing.expectEqualStrings("onyx", "onyx");
 }
 
-test "allowed origins are packaged zero://app and exact vite loopback only" {
+test "allowed origins are packaged zero://app and exact dev-server loopback only" {
     try std.testing.expectEqual(@as(usize, 2), allowed_origins.len);
     try std.testing.expectEqualStrings("zero://app", allowed_origins[0]);
     try std.testing.expectEqualStrings("http://127.0.0.1:3000", allowed_origins[1]);

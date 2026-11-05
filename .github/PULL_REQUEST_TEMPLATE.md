@@ -11,8 +11,9 @@ Link the issue or explain the user/protocol problem this solves.
 - [ ] `pnpm typecheck`
 - [ ] `pnpm lint`
 - [ ] `pnpm test`
-- [ ] Relevant focused Vitest
-- [ ] Relevant Playwright journey, with connected prerequisites named
+- [ ] `elm-test` and the relevant `elm/*.smoke.mjs` suites (Elm changes)
+- [ ] Relevant focused Vitest (engine / site changes)
+- [ ] Real-browser screenshots (`elm/tools/screens.mjs`) for UI changes
 - [ ] `git diff --check`
 
 ## Security and release boundaries

@@ -14,7 +14,7 @@ cannot drift into sector skins, premature downloads, or comparison theatre.
 
 | Rule | Contract |
 |------|----------|
-| One product | **Onyx** — one public communication service, one SolidJS client, one quiet-harbor visual system |
+| One product | **Onyx** — one public communication service, one web client, one quiet-harbor visual system |
 | Engine name | **Onyx Server** — daemon/engine under the glass; not a separate consumer brand |
 | No sector skins | Do **not** ship gaming-theme, enterprise-theme, or “creator edition” alternate UIs or landing skins |
 | Same client for all | Browser SPA is the product; PWA and future Zig desktop host the **same** SPA when ready |

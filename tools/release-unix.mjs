@@ -785,7 +785,7 @@ export function bsdHonestyNotice(os, opts = {}) {
     'What this is:',
     `  - Zig-native desktop host (desktop/bsd_host.zig) for ${triple}`,
     '  - Dynamically loads GTK + WebKitGTK at runtime (clear error if missing)',
-    '  - Embeds the SolidJS SPA under resources/dist (same pnpm build dist/)',
+    '  - Embeds the Elm web client under resources/dist (same pnpm build dist/)',
     '  - One-install surface: ./install.sh (idempotent, fail-closed, no curl|sh)',
     '  - Single tar.gz — NOT signed, NO auto-updater, NO store installer claim',
     '',

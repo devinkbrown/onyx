@@ -9,6 +9,8 @@ covers the local UI first, then the pieces needed for a real server connection.
 
 - Node.js 20 or newer.
 - pnpm. Do not mix npm/yarn lockfile changes into this repository.
+- The Elm 0.19.1 compiler on `PATH` (see [`../elm/README.md`](../elm/README.md) for a
+  sandbox-friendly bootstrap).
 - A browser with WebSocket, IndexedDB, Web Crypto, and (for calls) microphone
   or camera support.
 - An Onyx Server endpoint if you want to connect to chat. A static build can
@@ -20,13 +22,10 @@ covers the local UI first, then the pieces needed for a real server connection.
 git clone https://github.com/devinkbrown/onyx.git
 cd onyx
 pnpm install
-cp .env.example .env.local
 ```
 
-The checked-in lockfile is the reproducible dependency input. Do not commit
-`.env.local`; Vite exposes only `VITE_*` values to browser code, and anything
-placed in one of those variables must be treated as public build configuration,
-not a secret.
+The checked-in lockfile is the reproducible dependency input. The client has no
+build-time environment variables; see [`configuration.md`](configuration.md).
 
 ## Start a development session
 
@@ -34,21 +33,15 @@ not a secret.
 pnpm dev
 ```
 
-Open <http://localhost:3000>. The development entry point exposes a
-`window.__onyx` store handle for local QA; production builds do not expose that
-handle.
+`pnpm dev` builds the Elm client and the static site (`dist/`), then serves it
+on <http://127.0.0.1:3000>. Rebuild after changing Elm, CSS or TypeScript
+sources (`pnpm build`); for quick Elm-only feedback use `elm make` from `elm/`.
 
-Without `VITE_IRC_WS`, the client probes the node registry in
-`src/app/nodes.ts` and chooses the fastest reachable public node. For a local
-or private server, set a WebSocket endpoint in `.env.local`, for example:
-
-```dotenv
-VITE_IRC_WS=wss://irc.example.test:8080
-```
-
-Restart Vite after changing environment values. A browser page cannot use an
-`irc://` endpoint here; the client transport is WebSocket, normally `wss://`
-outside local development.
+Without a pin, the client probes the node registry in `elm/src/Nodes.elm` and
+chooses the fastest reachable public node. For a local or private server, open
+`/app/?ws=wss://irc.example.test:8080`, which pins that WebSocket endpoint and
+disables probing. A browser page cannot use an `irc://` endpoint here; the
+client transport is WebSocket, normally `wss://` outside local development.
 
 ## First connection
 
@@ -85,24 +78,28 @@ pnpm build
 pnpm preview
 ```
 
-The build output is `dist/`; preview runs on port 4173. The client is a static
-SPA, so a generic host must serve the materialized route documents or fall back
-to the SPA entry point for client routes. See
+The build output is `dist/`; preview serves it on port 3000. The client is a
+static SPA, and the build emits one real document per route (plus a flat
+`404.html`), so a generic host needs no rewrite rule: serve the files and answer
+unknown paths with `404.html` and a 404 status. See
 [`configuration.md`](configuration.md) for the production boundary.
 
 ## Useful checks while learning the codebase
 
 ```bash
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)
+pnpm test:smoke
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm site:check
 ```
 
-Use a focused test while iterating, then the complete gate before handing off a
-change. `pnpm test:e2e` uses Playwright and a production preview; connected
-browser specs additionally need the development app and a reachable test
-server. Their required environment is documented in the spec itself.
+Use a focused test while iterating (`elm-test tests/SomeTest.elm`,
+`node elm/<name>.smoke.mjs`, `pnpm exec vitest run <file>`), then the complete
+gate before handing off a change. Real-browser checks
+(`node elm/tools/screens.mjs`) run Chromium against a local fake IRC server, never
+the live network.
 
 ## Troubleshooting
 
@@ -110,8 +107,8 @@ server. Their required environment is documented in the spec itself.
 
 Check the browser console for the selected WebSocket URL, verify that the
 endpoint is reachable from the browser, and confirm the server's TLS
-certificate is trusted. For a self-hosted node, set `VITE_IRC_WS` explicitly
-instead of relying on the first-party node registry.
+certificate is trusted. For a self-hosted node, pin it with `?ws=` instead of
+relying on the first-party node registry.
 
 ### History is empty after a reload
 
@@ -131,5 +128,5 @@ does not pretend that an unavailable server feature works.
 
 Grant the browser permission for the requested microphone/camera, use HTTPS or
 localhost, and check the media capability/security indicators. Cadence media
-is lazy-loaded from the `/app` path, so a landing-page-only smoke test does not
-prove a call path.
+runs in the `voice.js` bundle and starts on join, so a landing-page-only smoke test
+does not prove a call path.

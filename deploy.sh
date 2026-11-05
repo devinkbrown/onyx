@@ -34,10 +34,10 @@
 #   DEPLOY_DRY_RUN  Exactly 0 or 1 (default 0). If 1, build/stage/assert only —
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
-#   ONYX_CLIENT     Which client to ship: `solid` (default, Vite build) or `elm`
-#                   (Elm rewrite via tools/build-elm-site.mjs; requires `elm`
-#                   0.19.1 on PATH). Either way only dist/ is staged and only
-#                   this script writes out/.
+#   ONYX_CLIENT     Which client to ship: `elm` (default; tools/build-elm-site.mjs,
+#                   requires `elm` 0.19.1 on PATH) or legacy `solid` (Vite build;
+#                   its sources were removed, so it now fails closed). Either way
+#                   only dist/ is staged and only this script writes out/.
 #   ONYX_LANDING    Override path to the legacy landing tree (default: /home/kain/landing)
 #   ONYX_STAGE_RELEASE_DOWNLOADS  If 1, copy unsigned public release archives
 #                   (Windows zip + Linux/FreeBSD/OpenBSD tar.gz + macOS Intel/ARM DMGs)
@@ -650,7 +650,7 @@ verify_live_out() {
     echo "FAIL: live sw.js missing after sync" >&2
     return 1
   fi
-  if [[ "${ONYX_CLIENT:-solid}" == "elm" ]]; then
+  if [[ "${ONYX_CLIENT:-elm}" == "elm" ]]; then
     # Elm sw.js carries a content-addressed build envelope; the live copy must
     # be byte-identical to the staged one.
     if ! cmp -s "${ROOT}/dist/sw.js" "${live_out}/sw.js"; then
@@ -810,7 +810,7 @@ deploy_main() {
 
   assert_no_spa_owned_in_landing_dist "${LANDING}/dist" || exit 1
 
-  client="${ONYX_CLIENT:-solid}"
+  client="${ONYX_CLIENT:-elm}"
   if [[ "${client}" == "elm" ]]; then
     build_elm_site || exit 1
   elif [[ "${client}" == "solid" ]]; then
@@ -862,7 +862,7 @@ deploy_main() {
     echo "==> skipping release download artifact staging (set ONYX_STAGE_RELEASE_DOWNLOADS=1 to enable)"
   fi
 
-  if [[ "${ONYX_CLIENT:-solid}" == "elm" ]]; then
+  if [[ "${ONYX_CLIENT:-elm}" == "elm" ]]; then
     # The Elm service worker carries a content-addressed build envelope written
     # by tools/build-elm-site.mjs. sw.js is part of the hashed shell, so it must
     # not be rewritten here; verify the envelope was stamped instead.

@@ -213,19 +213,17 @@ describe('Onyx client/server contract v2 schema', () => {
   });
 
   it('keeps the client status and security claims grounded in source evidence', async () => {
-    const [routingSource, payloadSource, envelopeSource, keyringSource] = await Promise.all([
-      readFile(resolve('src/lib/e2ee/groupControl.ts'), 'utf8'),
-      readFile(resolve('src/lib/e2ee/groupControlPayload.ts'), 'utf8'),
-      readFile(resolve('src/lib/e2ee/groupEnvelope.ts'), 'utf8'),
-      readFile(resolve('src/lib/e2ee/groupKeyring.ts'), 'utf8'),
+    // The first-party client is the Elm app (elm/src); the claims the contract
+    // makes about it must still be visible in the modules that implement them.
+    const [controlSource, keyringSource] = await Promise.all([
+      readFile(resolve('elm/src/GroupControl.elm'), 'utf8'),
+      readFile(resolve('elm/src/Keyring.elm'), 'utf8'),
     ]);
 
-    expect(routingSource).toContain("export const GROUP_CONTROL_COMMAND = 'E2EEGROUP';");
-    expect(routingSource).toContain('export const MAX_GROUP_CONTROL_PAYLOAD = 4096;');
-    expect(payloadSource).toContain('verification requires an **explicit trusted signer**');
-    expect(payloadSource).toContain('wire `signer_pub` must **exactly equal** that trusted key');
-    expect(payloadSource).toContain('Non-goals: MLS/RFC 9420 wire interop');
-    expect(envelopeSource).toContain('No RFC-9420 compliance claim');
-    expect(keyringSource).toContain('never writes a room secret to IndexedDB');
+    expect(controlSource).toMatch(/groupControlCommand : String\ngroupControlCommand =\n    "E2EEGROUP"/);
+    expect(controlSource).toMatch(/maxGroupControlPayloadChars : Int\nmaxGroupControlPayloadChars =\n    4096/);
+    expect(controlSource).toContain('signer trust (device directory / trusted signer)');
+    expect(controlSource).toContain('`signer_pub` is covered so the wire discovery field cannot be swapped');
+    expect(keyringSource).toContain('room secrets are never serialized');
   });
 });

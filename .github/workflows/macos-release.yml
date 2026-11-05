@@ -96,7 +96,16 @@ jobs:
             tools/release-unix.test.mjs \
             tools/desktop-zig.test.mjs
 
-      - name: Build SPA (package resources)
+      - name: Install the Elm 0.19.1 compiler
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "${RUNNER_TEMP}/elm.gz" \
+            https://github.com/elm/compiler/releases/download/0.19.1/binary-for-mac-64-bit.gz
+          gunzip -f "${RUNNER_TEMP}/elm.gz"
+          chmod +x "${RUNNER_TEMP}/elm"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Build the Elm client and static site (package resources)
         run: pnpm build
 
       - name: Produce macOS unsigned DMG (genuine Darwin host arch only)

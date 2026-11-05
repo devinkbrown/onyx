@@ -79,21 +79,21 @@ Client-relevant rows are bolded.
 
 | ID | Feature | Cx | Target | Owning agents |
 |----|---------|----|--------|---------------|
-| GC-01 | **store.ts Strangler** — 18,225-line store → domain facades, reactivity unchanged | XL | **0.7 P0** | onyx-store, solidjs-coder |
-| GC-02 | **Extension Sandbox Host** — worker/iframe isolation + deny-by-default permissions | L | **0.7 P0** | onyx-render, solidjs-coder, onyx-crypto |
+| GC-01 | **store.ts Strangler** — 18,225-line store → domain facades, reactivity unchanged | XL | **0.7 P0** | onyx-store, onyx-coder-leaf |
+| GC-02 | **Extension Sandbox Host** — worker/iframe isolation + deny-by-default permissions | L | **0.7 P0** | onyx-render, onyx-coder-leaf, onyx-crypto |
 | GC-03 | **Vault Worker Offload** — embedding/index/search off the main thread | M | 0.7 P1 | onyx-vault, onyx-perf |
-| GC-04 | **Composer Command Surface** — chainable, saveable, bindable macros | M | 0.7 P1 | onyx-cmdk, solidjs-coder |
-| GC-05 | **Offline-First Outbox** — compose offline, reconcile with visible conflicts | L | 0.7 P1 | onyx-vault, solidjs-coder, onyx-store |
-| GC-06 | **Render Budget Governor** — 60fps under raid load by deferring cosmetic work | M | 0.7 P1 | onyx-perf, solidjs-coder |
-| GC-07 | **Formation Mode** — complete keyboard-modal navigation | M | 0.7 P1 | onyx-cmdk, onyx-a11y, solidjs-coder |
-| GC-08 | **Accessibility Conformance** — WCAG 2.2 AA verified, not asserted | M | **0.7 P0** | onyx-a11y, solidjs-coder |
-| GC-09 | **Vault Encryption at Rest** — encrypt IndexedDB under a non-extractable device key, fail-closed | L | **0.7 P0** | onyx-vault, onyx-crypto, solidjs-coder |
-| GC-10 | **Provenance-Labeled Translation** — on-device, honestly labeled | M | 0.7 P1 | solidjs-coder, onyx-render, onyx-a11y |
-| GC-11 | **Trust Center** — who can read this, on which devices, verified how | M | 0.7 P1 | onyx-crypto, solidjs-coder, onyx-a11y |
-| GC-12 | **Multi-Network Workspace** — several networks side by side, state isolated | L | post-0.7 | onyx-store, solidjs-coder, onyx-irc |
-| GC-13 | **Catch-Up Digest v2** — one ranked briefing, not forty badges | M | 0.7 P1 | solidjs-coder, onyx-store |
+| GC-04 | **Composer Command Surface** — chainable, saveable, bindable macros | M | 0.7 P1 | onyx-cmdk, onyx-coder-leaf |
+| GC-05 | **Offline-First Outbox** — compose offline, reconcile with visible conflicts | L | 0.7 P1 | onyx-vault, onyx-coder-leaf, onyx-store |
+| GC-06 | **Render Budget Governor** — 60fps under raid load by deferring cosmetic work | M | 0.7 P1 | onyx-perf, onyx-coder-leaf |
+| GC-07 | **Formation Mode** — complete keyboard-modal navigation | M | 0.7 P1 | onyx-cmdk, onyx-a11y, onyx-coder-leaf |
+| GC-08 | **Accessibility Conformance** — WCAG 2.2 AA verified, not asserted | M | **0.7 P0** | onyx-a11y, onyx-coder-leaf |
+| GC-09 | **Vault Encryption at Rest** — encrypt IndexedDB under a non-extractable device key, fail-closed | L | **0.7 P0** | onyx-vault, onyx-crypto, onyx-coder-leaf |
+| GC-10 | **Provenance-Labeled Translation** — on-device, honestly labeled | M | 0.7 P1 | onyx-coder-leaf, onyx-render, onyx-a11y |
+| GC-11 | **Trust Center** — who can read this, on which devices, verified how | M | 0.7 P1 | onyx-crypto, onyx-coder-leaf, onyx-a11y |
+| GC-12 | **Multi-Network Workspace** — several networks side by side, state isolated | L | post-0.7 | onyx-store, onyx-coder-leaf, onyx-irc |
+| GC-13 | **Catch-Up Digest v2** — one ranked briefing, not forty badges | M | 0.7 P1 | onyx-coder-leaf, onyx-store |
 | GC-14 | **Media Room UX** — spatial pad, active speaker, captions in place | M | 0.7 P1 | onyx-media, onyx-ui, onyx-a11y |
-| GC-15 | **Portability Suite** — guided import/export wizard, verified round trip | M | 0.7 P1 | onyx-vault, solidjs-coder |
+| GC-15 | **Portability Suite** — guided import/export wizard, verified round trip | M | 0.7 P1 | onyx-vault, onyx-coder-leaf |
 
 Per-entry rationale, implementation paths, dependencies, and guard rails: see the master catalog.
 

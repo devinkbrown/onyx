@@ -9,7 +9,7 @@ description: >
 
 ## Design rules
 - **Token-lean agents** — bodies ≤~3 KiB; deep knowledge in skills (`onyx-agent-core` + domain).
-- **One implementer gate** — `solidjs-coder` / project `onyx-coder-leaf` writes general code; specialists own deep sinks (crypto, render, wire, vault, media).
+- **One implementer gate** — project `onyx-coder-leaf` writes general code; specialists own deep sinks (crypto, render, wire, vault, media).
 - **Reviewers never edit** — project `onyx-*-reviewer` / auditor agents are read-only.
 - **Deploy is separate** — no agent deploys unless user explicitly authorizes `./deploy.sh`.
 - **Never touch `out/`** from agents.

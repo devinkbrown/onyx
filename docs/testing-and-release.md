@@ -10,10 +10,13 @@ Run the repository gate from a clean-enough working tree (unrelated user work
 may remain dirty, but the diff must be understood):
 
 ```bash
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)
+pnpm test:smoke
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm build
+node elm/tools/css-coverage.mjs
 git diff --check
 ```
 
@@ -30,30 +33,32 @@ The gate builds `dist/` and must not write `out/`.
 While changing a narrow subsystem, run the smallest relevant test first:
 
 ```bash
-pnpm exec vitest run src/lib/e2ee
-pnpm exec vitest run src/lib/vault/historyVault.test.ts
-pnpm exec vitest run src/shell/MessageView.test.ts
+(cd elm && elm-test tests/DmCipherTest.elm)
+node elm/e2ee.smoke.mjs
+pnpm exec vitest run elm/engine/lib/e2ee
+pnpm exec vitest run tools/site
 ```
 
-Then rerun the full typecheck, lint, and test gate before publication. Strict
-TypeScript uses `noUncheckedIndexedAccess`; tests should exercise malformed
-wire input, missing keys, empty state, and failure paths rather than only the
-happy path.
+Then rerun the full gate before publication. Strict TypeScript uses
+`noUncheckedIndexedAccess`; tests should exercise malformed wire input, missing
+keys, empty state, and failure paths rather than only the happy path.
 
 ## Browser tests
 
-The Playwright config runs Chromium against a production preview on port 4173:
+`elm/tools/screens.mjs` runs headless Chromium against the built Elm client
+(`elm/dist-elm`) and a throwaway local fake IRC server, over the 15-viewport
+aspect-ratio matrix, and reports page errors and horizontal overflow as
+`PROBLEM` lines (the gate is zero):
 
 ```bash
-pnpm test:e2e
+bash elm/tools/build.sh
+node elm/tools/screens.mjs --vp all --out <dir>
 ```
 
 This is the right surface for route, responsive, keyboard, accessibility, and
-PWA behavior. Connected tests are different: `tests/e2e/dm-e2ee.spec.ts` uses
-the development-only `window.__onyx` handle and needs a development app plus a
-reachable test WebSocket. Run that contract explicitly with the environment
-documented at the top of the spec. Do not report a connected test as green if
-the test server or development app was absent.
+PWA behavior. `elm/tools/call-e2e.mjs` runs a real two-browser call against a
+throwaway local node (never the live network). Do not report a connected check as
+green if the local server was absent.
 
 For connected journeys, record:
 
@@ -86,8 +91,8 @@ Before pushing a public release:
 1. Review `git status`, `git diff --stat`, and the complete staged file list.
 2. Confirm generated output, backups, credentials, `.env*`, and local machine
    paths are not being added accidentally.
-3. Run typecheck, lint, unit tests, build, and `git diff --check`.
-4. Run the relevant Playwright route and connected tests with their real
+3. Run the full gate above, including `git diff --check`.
+4. Run the relevant screenshot scenarios and any connected checks with their real
    prerequisites; preserve failures as failures.
 5. Check the package description, README opening paragraph, license, security
    policy, and public links for consistency.
@@ -97,7 +102,8 @@ Before pushing a public release:
 
 ## First-party deployment
 
-Only the authorized operator should run `./deploy.sh`. It overlays a separate
-community site, materializes route documents, stamps the service worker, and
-syncs to the nginx-served `out/` directory. A successful GitHub push is not
+Only the authorized operator should run `./deploy.sh`. It builds the Elm client
+and static site, overlays a separate community site, stamps the service worker,
+and syncs to the nginx-served `out/` directory. Rehearse it into a temporary live
+directory first: `ONYX_LIVE_OUT=/tmp/…/out ONYX_LANDING=<copy> ./deploy.sh`. A successful GitHub push is not
 evidence that the hosted site changed.

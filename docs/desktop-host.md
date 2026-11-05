@@ -1,7 +1,8 @@
 # Onyx desktop host (Zig + Native SDK)
 
-Minimal **Zig** desktop shell that loads the **same** SolidJS/Vite SPA
-(`pnpm build` → `dist/`). No Tauri, Electron, or Rust host.
+Minimal **Zig** desktop shell that loads the **same** Elm web client and
+static site (`pnpm build` → `dist/`; `pnpm dev` serves it on `127.0.0.1:3000`
+for `native dev`). No Tauri, Electron, or Rust host.
 
 Onyx host/application code is **Zig**. The Native SDK platform backend still
 includes **native platform glue**, and the Windows cross-build compiles SDK
@@ -18,9 +19,9 @@ Public-launch tracking: **[`PUBLIC_LAUNCH_ROADMAP.md`](./PUBLIC_LAUNCH_ROADMAP.m
 |-------|------|
 | Manifest | `app.zon` (`.version` currently `0.1.3`) |
 | Host entry | `desktop/main.zig` (Native SDK: macOS/Linux/Windows) |
-| Host runner | `desktop/runner.zig` (from `@native-sdk/cli` vite scaffold) |
+| Host runner | `desktop/runner.zig` (from the `@native-sdk/cli` scaffold) |
 | BSD host | `desktop/bsd_host.zig` (Zig-native FreeBSD/OpenBSD; GTK/WebKitGTK dlopen) |
-| Build graph | `build.zig` / `build.zig.zon` (CLI `--full` Vite scaffold, adapted) |
+| Build graph | `build.zig` / `build.zig.zon` (CLI `--full` scaffold, adapted) |
 | Frontend | existing repo root (not a forked `frontend/`) |
 | Surface detect | `src/lib/platform.ts` (`browser` \| `pwa` \| `zig-desktop`) |
 
@@ -68,9 +69,9 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   longer depends on its process working directory.
 - The pinned Native SDK patch loads packaged assets through **`zero://app/`**
   while still serving the configured `index.html` entry. This keeps SPA router
-  location `/`; loading `zero://app/index.html` leaves Solid Router unmatched
+  location `/`; loading `zero://app/index.html` leaves the client router unmatched
   and produces a background-only window.
-- Dev source: `NATIVE_SDK_FRONTEND_URL` + existing Vite on
+- Dev source: `NATIVE_SDK_FRONTEND_URL` + `pnpm dev` (`tools/serve.mjs`) on
   **`http://127.0.0.1:3000`** (exact allowlisted origin; no path).
 - External links: **deny** in **both** `app.zon` and runtime
   `SecurityPolicy` in `desktop/main.zig` (not one side only).
@@ -103,7 +104,7 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   AppImage/Flatpak/deb; the runtime libraries remain distro-managed. On the
   current Linux verification host, the packaged binary was launched under
   Xvfb from a working directory with no `dist/`: WebKitGTK opened the packaged
-  HTML/JS/CSS, the Solid landing route rendered, and the window produced a
+  HTML/JS/CSS, the landing route rendered (recorded against the SolidJS-era client, tag `solid-client-final`; not re-run on the Elm build), and the window produced a
   nonblank Onyx capture. This is a real WebKitGTK/GTK runtime smoke, not proof
   of a physical interactive desktop session.
 - **FreeBSD / OpenBSD native Zig host (v0.1.3):** `pnpm desktop:release:freebsd`
@@ -180,7 +181,7 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
 | Zig **0.17.0-dev** pin x86_64-windows cross-build | **PASS** artifact production (`onyx.exe` + `WebView2Loader.dll`); offline runtime installer is hash-verified, GUI launch is **not verified** here |
 | `pnpm desktop:release:windows` | **Tooling present** — unsigned zip with pinned full offline WebView2 x64 installer + install-and-run command; Windows GUI runtime **not** verified here |
 | `pnpm desktop:release:linux` | **PASS** — one unsigned tar.gz with `install.sh` after ELF/manifest/resources validation; apt/dnf/pacman resolve distro-managed GTK4 + WebKitGTK 6 |
-| Packaged Linux WebKit runtime from unrelated cwd | **PASS under Xvfb** — executable-relative `resources/dist`; packaged HTML/modules/CSS opened; Solid route rendered at `zero://app/`; nonblank Onyx window capture |
+| Packaged Linux WebKit runtime from unrelated cwd | **PASS under Xvfb** — executable-relative `resources/dist`; packaged HTML/modules/CSS opened; landing route rendered at `zero://app/` (SolidJS-era run, tag `solid-client-final`; not re-run on the Elm build); nonblank Onyx window capture |
 | `pnpm desktop:release:freebsd` / `:openbsd` | **Tooling present** — Zig-native `bsd_host` x86_64 ELF + `resources/dist` tar.gz; runtime needs GTK/WebKitGTK on BSD; **GUI not claimed** from Linux cross-build |
 | `pnpm desktop:release:macos` | **Fail-closed on non-Darwin** — host arch → `macos-x86_64` or `macos-arm64`; GHA matrix `macos-15-intel` + `macos-15`; unsigned/unnotarized |
 | GUI launch on real FreeBSD/OpenBSD / signing / updater | **Not done / not verified** |
@@ -238,7 +239,7 @@ pnpm desktop:doctor                # host WebView / GTK checks
 pnpm desktop:check                 # native check (structural)
 pnpm desktop:build                 # zig build (auto platform; needs Zig 0.17 pin)
 pnpm desktop:test                  # zig build test (auto platform)
-pnpm desktop:dev                   # zig build dev (Vite + shell when host links)
+pnpm desktop:dev                   # zig build dev (pnpm dev server + shell when host links)
 pnpm desktop:build:null            # zig build -Dplatform=null (no WebKit link)
 pnpm desktop:test:null             # zig build test -Dplatform=null
 pnpm desktop:build:linux           # zig build -Dplatform=linux (diagnostic)
@@ -296,9 +297,9 @@ checked-in pnpm patch (`pnpm exec native …` or scripts that resolve
 
 ## SPA invariants
 
-- Keep `vite` `build.outDir: 'dist'`.
+- Keep the site build output at `dist/` (`tools/build-site.mjs`).
 - Do not point builds at `out/` (only `deploy.sh` writes production `out/`).
 - Same routes, assets, and tests for browser, PWA, and zig-desktop host.
 - Packaged entry URL stays `zero://app/` so the browser router starts at `/`;
   `index.html` remains an implementation entry file, not a public route.
-- Vite dev port **3000** (`strictPort: true`) matches the host allowlist.
+- The dev server port **3000** (`tools/serve.mjs`) matches the host allowlist.

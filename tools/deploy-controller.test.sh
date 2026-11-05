@@ -6,6 +6,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Fixtures below stamp the legacy `onyx-shell-<version>` service worker, so
+# exercise that verifier; the Elm byte-compare path has its own case.
+export ONYX_CLIENT=solid
 DEPLOY="${ROOT}/deploy.sh"
 PASS=0
 FAIL=0
@@ -277,7 +280,22 @@ echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
 assert_ok "verify_live_out accepts good tree" \
   verify_live_out "${TMP}/verify" "vtest"
 assert_ok "pre-deploy title guard accepts current source title" \
-  verify_public_title "${ROOT}/index.html"
+  verify_public_title "${ROOT}/elm/index.html"
+# Elm: the live sw.js must be byte-identical to the staged dist/sw.js.
+elm_sw_case() {
+  local staged_dir="${TMP}/elm-dist"; mkdir -p "${staged_dir}/dist"
+  echo 'const BUILD_ENVELOPE = {"buildId":"0123456789abcdef0123456789abcdef"};' >"${staged_dir}/dist/sw.js"
+  cp "${staged_dir}/dist/sw.js" "${TMP}/verify/sw.js"
+  ( ROOT="${staged_dir}" ONYX_CLIENT=elm verify_live_out "${TMP}/verify" "vtest" )
+}
+elm_sw_mismatch_case() {
+  local staged_dir="${TMP}/elm-dist"
+  echo 'const BUILD_ENVELOPE = {"buildId":"ffffffffffffffffffffffffffffffff"};' >"${TMP}/verify/sw.js"
+  ( ROOT="${staged_dir}" ONYX_CLIENT=elm verify_live_out "${TMP}/verify" "vtest" )
+}
+assert_ok "elm post-sync verifier accepts byte-identical sw.js" elm_sw_case
+assert_fail "elm post-sync verifier rejects a different sw.js" elm_sw_mismatch_case
+echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
 for wrong_title in \
   'Onyx — a room for your people' \
   'Onyx — unrelated page' \
