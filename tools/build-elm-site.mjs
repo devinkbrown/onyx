@@ -71,7 +71,11 @@ async function stampServiceWorker(outDir, mediaAssetPaths) {
     '/icon-512.png', '/icon-512-maskable.png', '/og.png', '/opcodec_wasm.js', '/opcodec_wasm.wasm', '/runtime-manifest.json', ...mediaAssetPaths,
   ];
   const entries = await readdir(outDir, { withFileTypes: true });
-  const routes = entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !['brand', 'assets'].includes(entry.name))
+  // `/onyxos/` is served by the standalone legacy onyxOS site that deploy.sh
+  // stages beside the app, not by this route document, so its bytes never match
+  // a precache hash. One mismatched shell asset fails the whole worker install
+  // and strands every returning visitor on their old build, so keep it out.
+  const routes = entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !['brand', 'assets', 'onyxos'].includes(entry.name))
     .map(entry => `/${entry.name}/`).sort();
   const paths = [
     { path: '/', file: 'index.html' },
