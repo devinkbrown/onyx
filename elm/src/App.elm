@@ -1,4 +1,4 @@
-module App exposing (connectGateVisible, navSelect, ServiceIntegrationForm, emptyServiceIntegrationForm, mediaConsentScope, runtimeDomainActionIsAuthoring, serviceIntegrationFormIsDirty, AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), RuntimeOwnerStamp, StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, slashSuggestionCommands, nickSuggestionMatches, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, ircCaseKey, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, messageAccessibleLabelFor, isDeliveryUnknown, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, editOutcomeUnknown, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNotice, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, threadWindowForRows, threadVisibleRows, captureUnreadDivider, historyReferenceRow, requestRewindHistory, requestCatchUpHistory, requestHistoryBetween, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, activeConversationKeep, messageRetentionFor)
+module App exposing (connectGateVisible, navSelect, ServiceIntegrationForm, emptyServiceIntegrationForm, mediaConsentScope, runtimeDomainActionIsAuthoring, serviceIntegrationFormIsDirty, AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), RuntimeOwnerStamp, StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, slashSuggestionCommands, nickSuggestionMatches, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, initialInviteParams, initialInviteName, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, ircCaseKey, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, messageAccessibleLabelFor, isDeliveryUnknown, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), NotificationExtras, noExtras, addNotification, addNotificationWith, InboxDestination(..), notificationDestination, isNavigableNotification, notificationKindToken, inboxFilterMatches, inboxDismissId, markNotificationsReadFor, settleInbox, connectionLostKey, sanitizeRoomTopic, maxRoomTopicChars, inboxTargetFocused, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, editOutcomeUnknown, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNotice, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, threadWindowForRows, threadVisibleRows, captureUnreadDivider, historyReferenceRow, requestRewindHistory, requestCatchUpHistory, requestHistoryBetween, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, activeConversationKeep, messageRetentionFor)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -858,6 +858,16 @@ type alias Model =
   , showNotificationCenter : Bool
   , inboxFilter : InboxFilter
   , notifSeq : Int
+  , inboxStash : Dict String InboxStash
+  , notifyOnOpen : Set Int
+  , quietNextClose : Bool
+  , roomDetailsOpen : Bool
+  , roomTopicDraft : Maybe String
+  , roomToolsOpen : Bool
+  , mediaEventsSubscribed : Bool
+  , advancedOpen : Bool
+  , serverNotices : List String
+  , composerToolsOpen : Bool
     , userStatus : UserStatus
     , customStatus : String
     , customStatusExpiry : Maybe Float
@@ -2986,6 +2996,17 @@ type Msg
     | InboxFilterSet InboxFilter
     | NotificationDismissed String
     | NotificationActivated String
+    | NotificationJoin String
+    | RoomDetailsToggle
+    | RoomDetailsClose
+    | RoomTopicEditStart
+    | RoomTopicEditInput String
+    | RoomTopicEditSubmit
+    | RoomTopicEditCancel
+    | RoomToolsToggle
+    | AdvancedOpen
+    | AdvancedClose
+    | ComposerToolsToggle
     | NotificationsMarkedRead
     | TopicHistoryLoaded Decode.Value
     | TopicReadLoaded Decode.Value
@@ -3335,6 +3356,23 @@ boundSystemEventText value =
     dropTrailingHighSurrogate (String.slice 0 maxSystemEventTextLength value)
 
 
+{-| The invite query as the first page load sees it. -}
+initialInviteParams : Url.Url -> Dict String String
+initialInviteParams url =
+    Invite.parseQueryParams (Maybe.withDefault "" url.query)
+
+
+{-| A guest name suggested by an invite link (`as=`), seated on the
+first load of the invite route. -}
+initialInviteName : Url.Url -> String
+initialInviteName url =
+    if Route.fromUrl url == Route.Invite then
+        Maybe.withDefault "" (Invite.parseGuestName (Dict.get "as" (initialInviteParams url)))
+
+    else
+        ""
+
+
 init : String -> Url.Url -> Model
 init nick url =
     let
@@ -3616,6 +3654,16 @@ init nick url =
     , showNotificationCenter = False
     , inboxFilter = InboxAll
     , notifSeq = 0
+    , inboxStash = Dict.empty
+    , notifyOnOpen = Set.empty
+    , quietNextClose = False
+    , roomDetailsOpen = False
+    , roomTopicDraft = Nothing
+    , roomToolsOpen = False
+    , mediaEventsSubscribed = False
+    , advancedOpen = False
+    , serverNotices = []
+    , composerToolsOpen = False
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callSelfDeafened = False
@@ -3631,8 +3679,11 @@ init nick url =
     , roadmapPriority = Nothing
     , origin = ""
     , mediaUrl = Nothing
-    , inviteParams = Dict.empty
-    , inviteName = ""
+    , -- The invite card reads its query on the first load too (a
+      -- shared `/invite/?join=%23room` link), not only on in-app
+      -- navigation (`UrlChanged`).
+      inviteParams = initialInviteParams url
+    , inviteName = initialInviteName url
     , inviteNameError = Nothing
     , inviteCopy = CopyIdle
     , onyxosStage = "oracle"
@@ -4197,6 +4248,16 @@ blank =
     , showNotificationCenter = False
     , inboxFilter = InboxAll
     , notifSeq = 0
+    , inboxStash = Dict.empty
+    , notifyOnOpen = Set.empty
+    , quietNextClose = False
+    , roomDetailsOpen = False
+    , roomTopicDraft = Nothing
+    , roomToolsOpen = False
+    , mediaEventsSubscribed = False
+    , advancedOpen = False
+    , serverNotices = []
+    , composerToolsOpen = False
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callSelfDeafened = False
@@ -4973,6 +5034,16 @@ foldLine model message =
                                                                                                             if isPrivateServerControlNotice withAttr message then
                                                                                                                 ( withAttr, [] )
 
+                                                                                                            else if isServerNoticeToSelf withAttr message then
+                                                                                                                -- Connect banners and service replies
+                                                                                                                -- ("connecting from…", "secured (TLS…)",
+                                                                                                                -- non-standard-replies FAIL text) go to
+                                                                                                                -- the server-messages list (Advanced),
+                                                                                                                -- never the account log, a DM bucket
+                                                                                                                -- named after us, a mention, or an
+                                                                                                                -- inbox "Direct message" row.
+                                                                                                                ( recordServerNotice withAttr (trailingParam message.params), [] )
+
                                                                                                             else
                                                                                                                 foldChat withAttr message True
             in
@@ -5067,7 +5138,7 @@ foldLine model message =
                     GroupPublisher.registered model.publisher
 
                 publishFx =
-                    if model.e2eeDms then
+                    if model.e2eeDms && hasMetadataCap model then
                         [ DmPublishKey ]
 
                     else
@@ -5147,11 +5218,10 @@ foldLine model message =
                         :: publishFx
                         ++ runPublisherEffects pubFx
                         ++ [ flushRequest model
-                           -- Subscribe to live voice/video presence,
-                           -- mirroring the oracle's `EVENT ADD MEDIA *`
-                           -- on 001 (a re-subscribe after reconnect is
-                           -- a harmless server-ignored duplicate).
-                           , SendLine (Wire.formatIrcLine "EVENT" [ "ADD", "MEDIA", "*" ])
+                           -- `EVENT ADD MEDIA *` (live voice/video
+                           -- presence) waits for RPL_IRCX 800: EVENT is
+                           -- an IRCX command, answered 421 until the
+                           -- server confirms IRCX mode.
                            -- Server stats for the home widget, mirroring
                            -- the oracle's `LUSERS` on 001.
                            , SendLine (Wire.formatIrcLine "LUSERS" [])
@@ -5798,6 +5868,28 @@ foldLine model message =
 
         "421" ->
             foldErrorNumeric model message
+
+        "800" ->
+            -- RPL_IRCX `<state> …`: state 1 confirms IRCX mode on this
+            -- socket, which is when EVENT is accepted — subscribe to
+            -- live voice/video presence then (once per socket). The
+            -- reply still lands in the numeric log like any other.
+            let
+                logged =
+                    logNumeric model message
+            in
+            case message.params of
+                _ :: "1" :: _ ->
+                    if model.connection == Live && not model.mediaEventsSubscribed then
+                        ( { logged | mediaEventsSubscribed = True }
+                        , [ SendLine (Wire.formatIrcLine "EVENT" [ "ADD", "MEDIA", "*" ]) ]
+                        )
+
+                    else
+                        ( logged, [] )
+
+                _ ->
+                    ( logged, [] )
 
         "431" ->
             foldErrorNumeric model message
@@ -9779,8 +9871,14 @@ setOwnMetadata model key value =
                         else
                             Wire.formatIrcLine "METADATA" [ "*", "SET", key, normalized ]
                 in
+                -- Applied locally either way; the line goes out only
+                -- when the server negotiated metadata.
                 ( applyUserMetadata model model.ourNick key normalized
-                , [ SendLine line ]
+                , if hasMetadataCap model then
+                    [ SendLine line ]
+
+                  else
+                    []
                 )
 
 
@@ -9923,8 +10021,9 @@ quarantineOwnerChange model =
             , serverSearchNotice = Nothing
             , serverSearchPending = Nothing
             , threadPageStart = Nothing
-            , notifications = []
-            , readNotificationIds = Set.empty
+            -- Inbox rows are parked per account by `settleInbox`
+            -- (a reconnect must not wipe them); only the open sheet
+            -- and its filter reset here.
             , showNotificationCenter = False
             , inboxFilter = InboxAll
             , customStatus = ""
@@ -19634,6 +19733,9 @@ type NotificationType
     | NotifFollow
     | NotifSystem
     | NotifError
+    | NotifInvite
+    | NotifMemo
+    | NotifKick
 
 
 {-| One inbox notification (mirroring the oracle `Notification`:
@@ -19647,6 +19749,32 @@ type alias InboxNotification =
     , channel : Maybe String
     , topic : Maybe String
     , atMs : Float
+    , msgid : Maybe String
+    , count : Int
+    , key : String
+    }
+
+
+{-| Optional facts a producer can attach to an inbox row: the server
+msgid (so activation can jump to the message), the server time (else
+the model clock), and an explicit de-duplication key (else the
+kind/sender/room/msgid-or-text tuple). -}
+type alias NotificationExtras =
+    { msgid : Maybe String
+    , atMs : Maybe Float
+    , key : Maybe String
+    }
+
+
+noExtras : NotificationExtras
+noExtras =
+    { msgid = Nothing, atMs = Nothing, key = Nothing }
+
+
+{-| One account's parked inbox (see `settleInbox`). -}
+type alias InboxStash =
+    { notifications : List InboxNotification
+    , read : Set String
     }
 
 
@@ -19666,11 +19794,35 @@ maxNotificationEntries =
 
 
 {-| Whether an inbox row needs attention (mirroring
-`isAttentionNotification`: mentions, DMs, and followed
-conversations — system and error rows never badge). -}
+`isAttentionNotification`: mentions, DMs, followed conversations,
+invites, and offline memos — system, error, and kick rows never
+badge). -}
 isAttentionNotification : InboxNotification -> Bool
 isAttentionNotification note =
-    note.kind == NotifMention || note.kind == NotifDm || note.kind == NotifFollow
+    case note.kind of
+        NotifMention ->
+            True
+
+        NotifDm ->
+            True
+
+        NotifFollow ->
+            True
+
+        NotifInvite ->
+            True
+
+        NotifMemo ->
+            True
+
+        NotifSystem ->
+            False
+
+        NotifError ->
+            False
+
+        NotifKick ->
+            False
 
 
 {-| Human context for an inbox row (mirroring `notificationContext`:
@@ -19692,8 +19844,7 @@ notificationContext note =
 
 
 {-| Short display label for a notification kind (mirroring the oracle
-`TYPE_LABEL`: Mention, Direct message, Followed conversation, System,
-Error). -}
+`TYPE_LABEL`, plus the invite, memo, and removal kinds). -}
 notificationKindLabel : NotificationType -> String
 notificationKindLabel kind =
     case kind of
@@ -19711,6 +19862,15 @@ notificationKindLabel kind =
 
         NotifError ->
             "Error"
+
+        NotifInvite ->
+            "Invite"
+
+        NotifMemo ->
+            "Memo"
+
+        NotifKick ->
+            "Removed"
 
 
 {-| Glyph for a notification kind (mirroring the oracle `TYPE_GLYPH`). -}
@@ -19731,6 +19891,87 @@ notificationKindGlyph kind =
 
         NotifError ->
             "!"
+
+        NotifInvite ->
+            "+"
+
+        NotifMemo ->
+            "✉"
+
+        NotifKick ->
+            "×"
+
+
+{-| Stable token for a kind (row `data-type`, de-duplication keys). -}
+notificationKindToken : NotificationType -> String
+notificationKindToken kind =
+    case kind of
+        NotifMention ->
+            "mention"
+
+        NotifDm ->
+            "dm"
+
+        NotifFollow ->
+            "follow"
+
+        NotifSystem ->
+            "system"
+
+        NotifError ->
+            "error"
+
+        NotifInvite ->
+            "invite"
+
+        NotifMemo ->
+            "memo"
+
+        NotifKick ->
+            "kick"
+
+
+{-| Where activating a row goes. -}
+type InboxDestination
+    = InboxRoom String
+    | InboxDm String
+    | InboxJoinRoom String
+
+
+{-| A row's destination, or `Nothing` for rows that only inform (system
+and error rows without a person, and removals — those offer Rejoin as
+a separate action instead of opening on click). -}
+notificationDestination : InboxNotification -> Maybe InboxDestination
+notificationDestination note =
+    case ( note.kind, note.channel, note.from ) of
+        ( NotifMention, Just channel, _ ) ->
+            Just (InboxRoom channel)
+
+        ( NotifFollow, Just channel, _ ) ->
+            Just (InboxRoom channel)
+
+        ( NotifInvite, Just channel, _ ) ->
+            Just (InboxJoinRoom channel)
+
+        ( NotifDm, _, Just peer ) ->
+            Just (InboxDm peer)
+
+        ( NotifMemo, _, Just peer ) ->
+            Just (InboxDm peer)
+
+        -- A person-scoped system row (a screen share) opens their DM.
+        ( NotifSystem, Nothing, Just peer ) ->
+            Just (InboxDm peer)
+
+        _ ->
+            Nothing
+
+
+{-| Whether a row can be opened (the view renders the rest as plain,
+non-interactive rows). -}
+isNavigableNotification : InboxNotification -> Bool
+isNavigableNotification note =
+    notificationDestination note /= Nothing
 
 
 {-| Validate an inbox sender/room (mirroring `_normalizeMetadataTarget`
@@ -19770,49 +20011,220 @@ normalizeInboxTopic topic =
                 Just bounded
 
 
+{-| Whether `target` is the conversation on screen right now: the page
+is visible and focused, a collection (not Home or the calls hub) shows
+it. Rows for it arrive already read, and opening it clears its rows. -}
+inboxTargetFocused : Model -> String -> Bool
+inboxTargetFocused model target =
+    model.pageVisible
+        && model.appFocused
+        && not model.callsOpen
+        && Nav.isCollection model.navSection
+        && (case model.activeChannel of
+                Just active ->
+                    ircCaseKey model active == ircCaseKey model target
+
+                Nothing ->
+                    False
+           )
+
+
+{-| The conversation a row belongs to (room for room rows, the peer
+for person rows). -}
+notificationTarget : InboxNotification -> Maybe String
+notificationTarget note =
+    case note.channel of
+        Just channel ->
+            Just channel
+
+        Nothing ->
+            note.from
+
+
+{-| Whether a sender is on the ignore list (inbox rows never name an
+ignored person — the transcript hides them, so must the inbox). -}
+inboxSenderIgnored : Model -> Maybe String -> Bool
+inboxSenderIgnored model from =
+    case from of
+        Just nick ->
+            Set.member (String.toLower nick) model.ignoredUsers
+
+        Nothing ->
+            False
+
+
 {-| Add an inbox notification (mirroring `addNotification`: empty text
 after bounding stays dropped; sender/room keep their wire form when
-valid; the list keeps the newest 50 and the read set prunes to
-retained ids). Ids come from a model counter (`notif-<n>`) so folds
-stay pure and deterministic. -}
+valid). See `addNotificationWith`. -}
 addNotification :
     Model
     -> { kind : NotificationType, text : String, from : Maybe String, channel : Maybe String, topic : Maybe String }
     -> Model
 addNotification model input =
+    addNotificationWith noExtras model input
+
+
+{-| Add an inbox notification with optional msgid, server time, and
+de-duplication key.
+
+  - Rows from ignored senders are dropped.
+  - Attention rows for the conversation on screen arrive read.
+  - A row whose key matches an existing row replaces it (newest
+    position, bumped `count`, unread again) instead of piling up.
+  - Over the cap, eviction takes the oldest read row first, then the
+    oldest non-attention row, then the oldest row.
+
+Ids come from a model counter (`notif-<n>`) so folds stay pure and
+deterministic.
+
+-}
+addNotificationWith :
+    NotificationExtras
+    -> Model
+    -> { kind : NotificationType, text : String, from : Maybe String, channel : Maybe String, topic : Maybe String }
+    -> Model
+addNotificationWith extras model input =
     let
         text =
             boundSystemEventText input.text
+
+        from =
+            Maybe.andThen (\raw -> validInboxEntity raw 256) input.from
     in
-    if String.isEmpty text then
+    if String.isEmpty text || inboxSenderIgnored model input.from then
         model
 
     else
         let
+            channel =
+                Maybe.andThen (\raw -> validInboxEntity raw 512) input.channel
+
+            msgid =
+                Maybe.andThen (\raw -> validInboxEntity raw 256) extras.msgid
+
+            key =
+                case extras.key of
+                    Just explicit ->
+                        explicit
+
+                    Nothing ->
+                        String.join "|"
+                            [ notificationKindToken input.kind
+                            , String.toLower (Maybe.withDefault "" from)
+                            , String.toLower (Maybe.withDefault "" channel)
+                            , Maybe.withDefault text msgid
+                            ]
+
+            previous =
+                List.filter (\row -> row.key == key) model.notifications
+                    |> List.head
+
+            atMs =
+                case extras.atMs of
+                    Just at ->
+                        if at > 0 then
+                            at
+
+                        else
+                            model.nowMs
+
+                    Nothing ->
+                        model.nowMs
+
             note =
-                { id = "notif-" ++ String.fromInt model.notifSeq
+                { id =
+                    case previous of
+                        Just old ->
+                            old.id
+
+                        Nothing ->
+                            "notif-" ++ String.fromInt model.notifSeq
                 , kind = input.kind
                 , text = text
-                , from = Maybe.andThen (\raw -> validInboxEntity raw 256) input.from
-                , channel = Maybe.andThen (\raw -> validInboxEntity raw 512) input.channel
+                , from = from
+                , channel = channel
                 , topic = normalizeInboxTopic input.topic
-                , atMs = model.nowMs
+                , atMs = atMs
+                , msgid = msgid
+                , count =
+                    case previous of
+                        Just old ->
+                            min 999 (old.count + 1)
+
+                        Nothing ->
+                            1
+                , key = key
                 }
 
+            arrivesRead =
+                isAttentionNotification note
+                    && (case notificationTarget note of
+                            Just target ->
+                                inboxTargetFocused model target
+
+                            Nothing ->
+                                False
+                       )
+
+            readBase =
+                if arrivesRead then
+                    Set.insert note.id model.readNotificationIds
+
+                else
+                    Set.remove note.id model.readNotificationIds
+
             all =
-                model.notifications ++ [ note ]
+                List.filter (\row -> row.key /= key) model.notifications ++ [ note ]
 
             kept =
-                List.drop (List.length all - maxNotificationEntries) all
+                evictNotifications readBase all
 
             retained =
                 List.map .id kept |> Set.fromList
         in
         { model
             | notifications = kept
-            , readNotificationIds = Set.filter (\id -> Set.member id retained) model.readNotificationIds
-            , notifSeq = model.notifSeq + 1
+            , readNotificationIds = Set.filter (\id -> Set.member id retained) readBase
+            , notifSeq =
+                if previous == Nothing then
+                    model.notifSeq + 1
+
+                else
+                    model.notifSeq
         }
+
+
+{-| Trim the inbox to `maxNotificationEntries`: read rows go first,
+then system/error/removal rows, then the oldest. -}
+evictNotifications : Set String -> List InboxNotification -> List InboxNotification
+evictNotifications read rows =
+    if List.length rows <= maxNotificationEntries then
+        rows
+
+    else
+        let
+            firstMatching predicate =
+                List.filter predicate rows |> List.head |> Maybe.map .id
+
+            victim =
+                case firstMatching (\row -> Set.member row.id read) of
+                    Just id ->
+                        Just id
+
+                    Nothing ->
+                        case firstMatching (not << isAttentionNotification) of
+                            Just id ->
+                                Just id
+
+                            Nothing ->
+                                List.head rows |> Maybe.map .id
+        in
+        case victim of
+            Just id ->
+                evictNotifications read (List.filter (\row -> row.id /= id) rows)
+
+            Nothing ->
+                rows
 
 
 {-| Dismiss one inbox row (mirroring `dismissNotification`: unknown ids
@@ -19833,6 +20245,102 @@ dismissNotification model id =
         }
 
 
+{-| Remove every row matching a predicate (ignore purges, the
+connection-lost row on re-registration). -}
+dropNotificationsWhere : (InboxNotification -> Bool) -> Model -> Model
+dropNotificationsWhere predicate model =
+    if List.any predicate model.notifications then
+        let
+            kept =
+                List.filter (not << predicate) model.notifications
+
+            retained =
+                List.map .id kept |> Set.fromList
+        in
+        { model
+            | notifications = kept
+            , readNotificationIds = Set.filter (\id -> Set.member id retained) model.readNotificationIds
+        }
+
+    else
+        model
+
+
+{-| Where focus goes after a row is dismissed: the next visible row's
+dismiss button, else the previous one, else the inbox close button. -}
+focusAfterDismiss : Model -> String -> String
+focusAfterDismiss model id =
+    let
+        visible =
+            List.reverse model.notifications
+                |> List.filter (inboxFilterMatches model.inboxFilter)
+                |> List.map .id
+
+        after =
+            List.drop 1 (dropUntilId id visible)
+
+        before =
+            List.reverse (List.filter (\other -> other /= id) (takeUntilId id visible))
+    in
+    case ( after, before ) of
+        ( next :: _, _ ) ->
+            inboxDismissId next
+
+        ( [], previous :: _ ) ->
+            inboxDismissId previous
+
+        _ ->
+            "inbox-close"
+
+
+dropUntilId : String -> List String -> List String
+dropUntilId id ids =
+    case ids of
+        [] ->
+            []
+
+        first :: rest ->
+            if first == id then
+                ids
+
+            else
+                dropUntilId id rest
+
+
+takeUntilId : String -> List String -> List String
+takeUntilId id ids =
+    case ids of
+        [] ->
+            []
+
+        first :: rest ->
+            if first == id then
+                []
+
+            else
+                first :: takeUntilId id rest
+
+
+{-| DOM id of a row's dismiss button. -}
+inboxDismissId : String -> String
+inboxDismissId id =
+    "inbox-dismiss-" ++ id
+
+
+{-| Whether a row belongs under an inbox filter. -}
+inboxFilterMatches : InboxFilter -> InboxNotification -> Bool
+inboxFilterMatches filter note =
+    case filter of
+        InboxAll ->
+            True
+
+        InboxAttention ->
+            isAttentionNotification note
+
+        InboxOther ->
+            not (isAttentionNotification note)
+
+
 {-| Mark one inbox row read (mirroring `markNotificationRead`:
 already-read or unknown ids are a no-op). -}
 markNotificationRead : Model -> String -> Model
@@ -19850,12 +20358,49 @@ markAllNotificationsRead model =
     { model | readNotificationIds = List.map .id model.notifications |> Set.fromList }
 
 
+{-| Mark a conversation's rows read — opened here, read on another
+device (`MARKREAD`), or reached from a system notification. `upTo`
+bounds the rows by time (a remote read marker); `Nothing` means all. -}
+markNotificationsReadFor : String -> Maybe Float -> Model -> Model
+markNotificationsReadFor target upTo model =
+    let
+        key =
+            ircCaseKey model target
+
+        matches note =
+            (case notificationTarget note of
+                Just t ->
+                    ircCaseKey model t == key
+
+                Nothing ->
+                    False
+            )
+                && (case upTo of
+                        Just bound ->
+                            note.atMs <= bound
+
+                        Nothing ->
+                            True
+                   )
+                && not (Set.member note.id model.readNotificationIds)
+
+        ids =
+            List.filter matches model.notifications |> List.map .id
+    in
+    if List.isEmpty ids then
+        model
+
+    else
+        { model | readNotificationIds = List.foldl Set.insert model.readNotificationIds ids }
+
+
 {-| Activate an inbox row (mirroring `activateNotification`: navigate
 only from the current record — a queued click on a removed row drops;
-the row marks read and the inbox closes; a mention/follow target opens
-its room, a DM target opens the peer conversation, anything else just
-closes. A follow row opens the room and then applies its topic
-(`openChannelConversation`); a stale topic falls back to the whole room. -}
+the row marks read and the inbox closes). A room row opens its room
+(a follow row then applies its topic); a person row opens their DM
+through the cold-tab-safe `openNotificationDm`; an invite joins. A
+row carrying a msgid then lands on that message — focused when it is
+loaded, else fetched around its msgid from history. -}
 activateNotification : Model -> String -> ( Model, List Outbound )
 activateNotification model id =
     case List.filter (\note -> note.id == id) model.notifications of
@@ -19870,33 +20415,86 @@ activateNotification model id =
                 marked =
                     { read | showNotificationCenter = False }
 
-                target =
-                    if (note.kind == NotifMention || note.kind == NotifFollow) && note.channel /= Nothing then
-                        note.channel
+                land target ( opened, outs ) =
+                    case note.msgid of
+                        Just msgid ->
+                            let
+                                ( landed, landOuts ) =
+                                    jumpToNotifiedMessage opened target msgid
+                            in
+                            ( landed, outs ++ landOuts )
 
-                    else if note.kind == NotifDm && note.from /= Nothing then
-                        note.from
-
-                    else
-                        Nothing
+                        Nothing ->
+                            ( opened, outs )
             in
-            case target of
+            case notificationDestination note of
                 Nothing ->
                     ( marked, [] )
 
-                Just name ->
+                Just (InboxRoom name) ->
                     let
                         ( opened, openOuts ) =
                             update (ChannelSelect name) marked
 
                         ( settled, topicOuts ) =
-                            if note.kind == NotifFollow && note.channel /= Nothing then
+                            if note.kind == NotifFollow then
                                 update (ChannelTopicSelect { channel = name, topic = note.topic }) opened
 
                             else
                                 ( opened, [] )
                     in
-                    ( settled, openOuts ++ topicOuts )
+                    land name ( settled, openOuts ++ topicOuts )
+
+                Just (InboxDm peer) ->
+                    case openNotificationDm marked peer of
+                        Just opened ->
+                            land peer opened
+
+                        Nothing ->
+                            ( marked, [] )
+
+                Just (InboxJoinRoom channel) ->
+                    enterBrowserRoom marked channel
+
+
+{-| Join (or rejoin) the room an invite or removal row names. -}
+joinFromNotification : Model -> String -> ( Model, List Outbound )
+joinFromNotification model id =
+    case List.filter (\note -> note.id == id) model.notifications of
+        note :: _ ->
+            case note.channel of
+                Just channel ->
+                    let
+                        read =
+                            markNotificationRead model id
+                    in
+                    enterBrowserRoom { read | showNotificationCenter = False } channel
+
+                Nothing ->
+                    ( model, [] )
+
+        [] ->
+            ( model, [] )
+
+
+{-| Land on a notified message: a loaded row focuses through the
+landing machinery; an unloaded one is fetched around its msgid. -}
+jumpToNotifiedMessage : Model -> String -> String -> ( Model, List Outbound )
+jumpToNotifiedMessage model target msgid =
+    case reactionRow model target msgid of
+        Just _ ->
+            ( focusMessage model msgid, [] )
+
+        Nothing ->
+            let
+                ( requested, out ) =
+                    requestPinnedMessage model target msgid
+            in
+            if List.isEmpty out then
+                ( model, [] )
+
+            else
+                ( requested, out )
 
 
 {-| Attention unread count for the bell badge (mirroring the oracle
@@ -19905,6 +20503,150 @@ unreadAttentionCount : Model -> Int
 unreadAttentionCount model =
     List.filter (\note -> isAttentionNotification note && not (Set.member note.id model.readNotificationIds)) model.notifications
         |> List.length
+
+
+{-| The inbox belongs to an account: `""` for a guest session, else
+the canonical account key. -}
+inboxOwnerOf : Model -> String
+inboxOwnerOf model =
+    Maybe.withDefault "" (accountOwnerKey model.accountName)
+
+
+{-| Longest room topic the header editor sends (servers truncate to
+their own TOPICLEN; this keeps the line well inside the wire cap). -}
+maxRoomTopicChars : Int
+maxRoomTopicChars =
+    390
+
+
+{-| A topic as typed in the header editor: control characters (and
+line breaks) become spaces, the ends are trimmed, and the length is
+bounded. -}
+sanitizeRoomTopic : String -> String
+sanitizeRoomTopic raw =
+    raw
+        |> String.map
+            (\c ->
+                if Char.toCode c < 32 || Char.toCode c == 127 then
+                    ' '
+
+                else
+                    c
+            )
+        |> String.trim
+        |> String.left maxRoomTopicChars
+
+
+{-| v3/room-header settle step: the details panel and topic editor
+belong to one conversation; switching away closes them. -}
+settleRoomHeader : Model -> Model -> Model
+settleRoomHeader before after =
+    if after.activeChannel /= before.activeChannel && (after.roomDetailsOpen || after.roomTopicDraft /= Nothing || after.roomToolsOpen || after.composerToolsOpen) then
+        { after | roomDetailsOpen = False, roomTopicDraft = Nothing, roomToolsOpen = False, composerToolsOpen = False }
+
+    else
+        after
+
+
+{-| Dedupe key of the coalesced connection-lost row. -}
+connectionLostKey : String
+connectionLostKey =
+    "connection-lost"
+
+
+{-| v3/inbox settle step — the inbox invariants that every update
+must keep, checked cheaply (each guard is a reference-equality hit in
+the common case):
+
+  - **Owner.** Rows belong to an account. When the account changes
+    (sign in/out, a different account) the outgoing account's rows
+    are parked and the incoming account's parked rows (if any) come
+    back. A reconnect briefly reports no account before
+    re-authenticating; parking keeps the rows across that gap instead
+    of wiping the inbox on every reconnect. Proving a *different*
+    account drops every other account's parked rows.
+  - **Ignore.** Ignoring someone purges their rows.
+  - **Read elsewhere.** Opening a conversation (or the page regaining
+    focus on it) marks its rows read.
+  - **Reconnect.** Registration clears the connection-lost row.
+
+-}
+settleInbox : Model -> Model -> Model
+settleInbox before after =
+    let
+        outgoing =
+            inboxOwnerOf before
+
+        owner =
+            inboxOwnerOf after
+
+        owned =
+            if owner == outgoing then
+                after
+
+            else
+                let
+                    parked =
+                        if List.isEmpty before.notifications then
+                            Dict.remove outgoing after.inboxStash
+
+                        else
+                            Dict.insert outgoing
+                                { notifications = before.notifications, read = before.readNotificationIds }
+                                after.inboxStash
+
+                    restored =
+                        Dict.get owner parked
+
+                    kept =
+                        if String.isEmpty owner then
+                            parked
+
+                        else
+                            Dict.filter (\k _ -> k == "" || k == owner) parked
+                in
+                { after
+                    | inboxStash = Dict.remove owner kept
+                    , notifications = Maybe.withDefault [] (Maybe.map .notifications restored)
+                    , readNotificationIds = Maybe.withDefault Set.empty (Maybe.map .read restored)
+                }
+
+        unignored =
+            if owned.ignoredUsers == before.ignoredUsers then
+                owned
+
+            else
+                dropNotificationsWhere (\note -> inboxSenderIgnored owned note.from) owned
+
+        focusMoved =
+            unignored.activeChannel /= before.activeChannel
+                || unignored.pageVisible /= before.pageVisible
+                || unignored.appFocused /= before.appFocused
+                || unignored.navSection /= before.navSection
+                || unignored.callsOpen /= before.callsOpen
+
+        readHere =
+            if focusMoved && not (List.isEmpty unignored.notifications) then
+                case unignored.activeChannel of
+                    Just active ->
+                        if inboxTargetFocused unignored active then
+                            markNotificationsReadFor active Nothing unignored
+
+                        else
+                            unignored
+
+                    Nothing ->
+                        unignored
+
+            else
+                unignored
+    in
+    if readHere.connection == Live && (before.connection /= Live || owner /= outgoing) then
+        dropNotificationsWhere (\note -> note.key == connectionLostKey) readHere
+
+    else
+        readHere
+
 
 
 {-| Fetch the block list when a MODE newly grants moderation (mirroring
@@ -22074,9 +22816,29 @@ deliverOfflineMemo model message memoFrom memoText =
                         (String.filter (\c -> let code = Char.toCode c in code >= 0x20 && code /= 0x7F) memoFrom)
                     )
 
+            -- The memo also files one inbox row per sender (repeat memos
+            -- merge into it with a count) so it outlives the toast.
+            filed =
+                if ignored || muted then
+                    aggregated
+
+                else
+                    addNotificationWith
+                        { msgid = Nothing
+                        , atMs = Just (toFloat row.at)
+                        , key = Just ("memo|" ++ key)
+                        }
+                        aggregated
+                        { kind = NotifMemo
+                        , text = memoText
+                        , from = Just memoFrom
+                        , channel = Nothing
+                        , topic = Nothing
+                        }
+
             toasted =
                 if String.isEmpty fromName then
-                    aggregated
+                    filed
 
                 else
                     addToast
@@ -22092,8 +22854,8 @@ deliverOfflineMemo model message memoFrom memoText =
                         , groupKey = Nothing
                         , undo = Nothing
                         }
-                        aggregated.nowMs
-                        aggregated
+                        filed.nowMs
+                        filed
         in
         ( toasted
         , [ OfflineMemoNotice { channel = memoFrom, count = agg.count, firstMsgId = agg.firstMsgId } ]
@@ -25305,6 +26067,12 @@ requestJoinHistory model target =
     if not (hasChatHistoryCap model) then
         ( { model | historyExhausted = Set.insert key model.historyExhausted }, [] )
 
+    else if model.connection /= Live then
+        -- Onyx Server refuses CHATHISTORY before registration
+        -- (`FAIL CHATHISTORY NEED_REGISTRATION`); the post-001 rejoin
+        -- path requests it again.
+        ( model, [] )
+
     else
         fetchJoinHistory model target key
 
@@ -26247,8 +27015,9 @@ foldInvite model message =
                         Maybe.withDefault "someone" message.nick
                 in
                 if String.toLower invitee == String.toLower model.ourNick then
-                    ( addNotification model
-                        { kind = NotifSystem
+                    ( addNotificationWith { noExtras | atMs = Just (toFloat (rowTime model message)) }
+                        model
+                        { kind = NotifInvite
                         , text = inviter ++ " invited you to " ++ channel
                         , from = Just inviter
                         , channel = Just channel
@@ -30181,6 +30950,35 @@ foldKick model message =
                         else
                             model
 
+                    selfRemoved =
+                        String.toLower target == String.toLower model.ourNick && not model.historyMerging
+
+                    -- Being removed from a room files a removal row
+                    -- (with Rejoin) — the room itself is gone from the
+                    -- list, so nothing else would say why.
+                    kickNoticed =
+                        if selfRemoved then
+                            addNotificationWith { noExtras | atMs = Just (toFloat (rowTime model message)) }
+                                afterRoster
+                                { kind = NotifKick
+                                , text =
+                                    actor
+                                        ++ " removed you from "
+                                        ++ ch
+                                        ++ (if String.isEmpty reason then
+                                                ""
+
+                                            else
+                                                ": " ++ reason
+                                           )
+                                , from = Just actor
+                                , channel = Just ch
+                                , topic = Nothing
+                                }
+
+                        else
+                            afterRoster
+
                     withEvent =
                         if removed && String.toLower target /= String.toLower model.ourNick then
                             addChannelEvent
@@ -30195,7 +30993,7 @@ foldKick model message =
                                 (kickEventText target actor reason)
 
                         else
-                            afterRoster
+                            kickNoticed
 
                     withAudit =
                         addAuditEntry withEvent
@@ -32220,7 +33018,12 @@ foldMarkread model maybeNick params =
                                         Nothing ->
                                             ( model, [] )
                             in
-                            ( applyReadMarker marked target iso, markOuts )
+                            -- Read on another device: that conversation's
+                            -- inbox rows up to the marker are read here too.
+                            ( applyReadMarker marked target iso
+                                |> markNotificationsReadFor target (parseIso8601Ms iso)
+                            , markOuts
+                            )
 
 
 {-| The open named conversation for a MARKREAD target, if the target is
@@ -32928,7 +33731,12 @@ topic the row belongs to — with the topic-narrowed destination when
 the row's conversation matches). Mention and DM inbox rows stay with
 the wider producer gap. -}
 recordFollowNotification : Model -> String -> String -> String -> Maybe String -> Model
-recordFollowNotification model target sender body topic =
+recordFollowNotification =
+    recordFollowNotificationWith noExtras
+
+
+recordFollowNotificationWith : NotificationExtras -> Model -> String -> String -> String -> Maybe String -> Model
+recordFollowNotificationWith extras model target sender body topic =
     if String.toLower sender == String.toLower model.ourNick then
         model
 
@@ -32936,17 +33744,22 @@ recordFollowNotification model target sender body topic =
         model
 
     else
-        recordFollowNotificationRow model target sender body topic
+        recordFollowRow extras model target sender body topic
 
 
 recordFollowNotificationRow : Model -> String -> String -> String -> Maybe String -> Model
-recordFollowNotificationRow model target sender body topic =
+recordFollowNotificationRow =
+    recordFollowRow noExtras
+
+
+recordFollowRow : NotificationExtras -> Model -> String -> String -> String -> Maybe String -> Model
+recordFollowRow extras model target sender body topic =
     case followNotifyTopic model target topic of
         Nothing ->
             model
 
         Just narrowed ->
-            addNotification model
+            addNotificationWith extras model
                 { kind = NotifFollow
                 , text = safeNotifyText body
                 , from = Just sender
@@ -32961,8 +33774,16 @@ recordFollowNotificationRow model target sender body topic =
 notify level — and no visibility gate, so an open-room mention still
 records). -}
 recordMentionNotification : Model -> String -> String -> String -> Bool -> Model
-recordMentionNotification model target sender body highlight =
-    if not highlight then
+recordMentionNotification =
+    recordMentionNotificationWith noExtras
+
+
+{-| The mention producer with row facts. Besides the nick highlight,
+`@everyone`/`@here` and saved keywords record a mention row too (the
+same `isHighlightWorthy` pass that counts toward the room badge). -}
+recordMentionNotificationWith : NotificationExtras -> Model -> String -> String -> String -> Bool -> Model
+recordMentionNotificationWith extras model target sender body highlight =
+    if not (highlight || (not (GroupEnvelope.isGroupEnvelope body) && isHighlightWorthy model body)) then
         model
 
     else if String.toLower sender == String.toLower model.ourNick then
@@ -32972,7 +33793,7 @@ recordMentionNotification model target sender body highlight =
         model
 
     else
-        addNotification model
+        addNotificationWith extras model
             { kind = NotifMention
             , text = safeNotifyText body
             , from = Just sender
@@ -32989,8 +33810,18 @@ senders, whose filed row is the placeholder but whose notification
 carries the wire text like the oracle's `displayText`). Muted peers
 stay silent on every arm. -}
 recordDmNotification : Model -> String -> String -> Model
-recordDmNotification model sender body =
-    if String.toLower sender == String.toLower model.ourNick then
+recordDmNotification =
+    recordDmNotificationWith noExtras
+
+
+{-| The DM producer with row facts. A server- or services-shaped sender
+(empty, or a dotted server name) never files a "Direct message" row. -}
+recordDmNotificationWith : NotificationExtras -> Model -> String -> String -> Model
+recordDmNotificationWith extras model sender body =
+    if String.isEmpty (String.trim sender) || String.contains "." sender then
+        model
+
+    else if String.toLower sender == String.toLower model.ourNick then
         model
 
     else if Set.member (String.toLower sender) model.mutedDMs then
@@ -33000,7 +33831,7 @@ recordDmNotification model sender body =
         model
 
     else if GroupEnvelope.isGroupEnvelope body then
-        addNotification model
+        addNotificationWith extras model
             { kind = NotifDm
             , text = GroupEnvelope.groupLockedPlaceholder
             , from = Just sender
@@ -33009,7 +33840,7 @@ recordDmNotification model sender body =
             }
 
     else
-        addNotification model
+        addNotificationWith extras model
             { kind = NotifDm
             , text = body
             , from = Just sender
@@ -33028,9 +33859,8 @@ notifyDmPlaintext model messageId envelope plaintext =
         rowFrom channel =
             List.filter (\m -> m.id == messageId && m.body == envelope) channel.messages
                 |> List.head
-                |> Maybe.map .from
 
-        sender =
+        found =
             List.foldl
                 (\channel acc ->
                     case acc of
@@ -33042,25 +33872,60 @@ notifyDmPlaintext model messageId envelope plaintext =
                 )
                 Nothing
                 (Dict.values model.channels)
-    in
-    case sender of
-        Nothing ->
-            model
 
-        Just peer ->
-            recordDmPlaintextNotification model peer plaintext
+        -- Only a live delivery armed a notification for this open:
+        -- history replays, re-opens after a METADATA key refresh,
+        -- and a second open of the same row stay silent.
+        armed =
+            Set.member messageId model.notifyOnOpen
+
+        disarmed =
+            { model | notifyOnOpen = Set.remove messageId model.notifyOnOpen }
+    in
+    case ( armed, found ) of
+        ( True, Just row ) ->
+            recordDmPlaintextRow { msgid = row.msgid, atMs = Just (toFloat row.at), key = Nothing } disarmed row.from plaintext
+
+        _ ->
+            disarmed
+
+
+{-| Arm one post-decrypt notification for a live envelope row (bounded:
+the oldest arms drop first if opens never come back). -}
+armNotifyOnOpen : Int -> Model -> Model
+armNotifyOnOpen messageId model =
+    let
+        armed =
+            Set.insert messageId model.notifyOnOpen
+    in
+    { model
+        | notifyOnOpen =
+            if Set.size armed > 256 then
+                Set.fromList (List.drop (Set.size armed - 256) (Set.toList armed))
+
+            else
+                armed
+    }
 
 
 recordDmPlaintextNotification : Model -> String -> String -> Model
-recordDmPlaintextNotification model peer plaintext =
-    if String.toLower peer == String.toLower model.ourNick then
+recordDmPlaintextNotification =
+    recordDmPlaintextRow noExtras
+
+
+recordDmPlaintextRow : NotificationExtras -> Model -> String -> String -> Model
+recordDmPlaintextRow extras model peer plaintext =
+    if String.isEmpty (String.trim peer) || String.contains "." peer then
+        model
+
+    else if String.toLower peer == String.toLower model.ourNick then
         model
 
     else if Set.member (String.toLower peer) model.mutedDMs then
         model
 
     else
-        addNotification model
+        addNotificationWith extras model
             { kind = NotifDm
             , text = plaintext
             , from = Just peer
@@ -35684,7 +36549,7 @@ from the last committed sweep minus fuzz — epoch when never — to
 now plus fuzz). -}
 requestHistoryTargetDiscovery : Model -> ( Model, List Outbound )
 requestHistoryTargetDiscovery model =
-    if not (hasChatHistoryCap model) || model.historyTargetsPending || model.historyTargetsBatchRef /= Nothing then
+    if not (hasChatHistoryCap model) || model.connection /= Live || model.historyTargetsPending || model.historyTargetsBatchRef /= Nothing then
         ( model, [] )
 
     else
@@ -36844,6 +37709,48 @@ dmMutateBucket model target actor =
         target
 
 
+{-| A NOTICE from the server itself (no `nick!user@host` source, a
+dotted server name, or no source at all) addressed to us or to `*`
+rather than to a room. -}
+isServerNoticeToSelf : Model -> Wire.IrcMessage -> Bool
+isServerNoticeToSelf model message =
+    let
+        sender =
+            Maybe.withDefault "" message.nick
+
+        serverSource =
+            String.isEmpty sender || message.host == Nothing || String.contains "." sender
+    in
+    case message.params of
+        target :: _ ->
+            serverSource && not (isChannelName model (stripStatusmsgTarget model target))
+
+        [] ->
+            False
+
+
+{-| Keep the newest server notices (bounded) for the Advanced panel. -}
+recordServerNotice : Model -> String -> Model
+recordServerNotice model raw =
+    let
+        text =
+            boundSystemEventText (String.trim raw)
+    in
+    if String.isEmpty text then
+        model
+
+    else
+        { model | serverNotices = List.take 50 (text :: model.serverNotices) }
+
+
+{-| Whether the server negotiated IRCv3 metadata (`draft/metadata-2`):
+without it Onyx Server answers every METADATA with 421, so the client
+sends none. -}
+hasMetadataCap : Model -> Bool
+hasMetadataCap model =
+    List.member "draft/metadata-2" model.caps || List.member "metadata-2" model.caps
+
+
 foldChat : Model -> Wire.IrcMessage -> Bool -> ( Model, List Outbound )
 foldChat model message isNotice =
     -- A REDACT that outran its original (live or replayed) left a
@@ -37001,20 +37908,12 @@ foldChatRow model message isNotice =
                                     of
                                         DeliverDrop ->
                                             -- Ignored-sender channel rows file
-                                            -- nothing, but the oracle notifies
-                                            -- before it files (and drops) — so
-                                            -- mention/follow inbox rows still
-                                            -- record here.
-                                            let
-                                                dropped =
-                                                    recordMentionNotification
-                                                        (recordFollowNotification model bareTarget sender resolvedBody (parseMessageTopic message.tags))
-                                                        bareTarget
-                                                        sender
-                                                        resolvedBody
-                                                        (classifyHighlight model bareTarget sender resolvedBody)
-                                            in
-                                            ( dropped, [] )
+                                            -- nothing — and, unlike the oracle
+                                            -- (which notified before dropping),
+                                            -- record no inbox row either: the
+                                            -- inbox never names someone the
+                                            -- transcript hides.
+                                            ( model, [] )
 
                                         fate ->
                                             let
@@ -37136,24 +38035,45 @@ foldChatRow model message isNotice =
                                                             else
                                                                 ( marked, [] )
 
+                                                        rowExtras =
+                                                            { msgid = msgidOf message
+                                                            , atMs = Just (toFloat (rowTime model message))
+                                                            , key = Nothing
+                                                            }
+
+                                                        -- A NOTICE from a server or services
+                                                        -- source (no user@host, or a dotted
+                                                        -- name) is not a direct message.
+                                                        serverShaped =
+                                                            isNotice && (message.host == Nothing || String.contains "." sender)
+
                                                         recorded =
                                                             if model.historyMerging then
                                                                 alerted
 
                                                             else if isChannelName model bucket then
                                                                 if fate == DeliverNormal then
-                                                                    recordMentionNotification
-                                                                        (recordFollowNotification alerted bucket sender effectiveBody rowTopic)
+                                                                    -- Rows quote the displayed body
+                                                                    -- (flattened webhook JSON, not
+                                                                    -- the raw wire text).
+                                                                    recordMentionNotificationWith rowExtras
+                                                                        (recordFollowNotificationWith rowExtras alerted bucket sender effectiveBody rowTopic)
                                                                         bucket
                                                                         sender
-                                                                        resolvedBody
+                                                                        effectiveBody
                                                                         rowHighlight
 
                                                                 else
                                                                     alerted
 
-                                                            else if fate == DeliverNormal || fate == DeliverPlaceholder then
-                                                                recordDmNotification alerted sender resolvedBody
+                                                            else if fate == DeliverNormal && not serverShaped then
+                                                                if DmCipher.isEnvelope resolvedBody then
+                                                                    -- Arm exactly one notification for
+                                                                    -- the live open of this row.
+                                                                    armNotifyOnOpen model.messageSeq alerted
+
+                                                                else
+                                                                    recordDmNotificationWith rowExtras alerted sender effectiveBody
 
                                                             else
                                                                 alerted
@@ -37905,7 +38825,7 @@ selectChannel model name =
             if not model.e2eeDms then
                 []
 
-            else if isChannelName model name || Dict.member (String.toLower name) model.dmDirectory.primary then
+            else if isChannelName model name || Dict.member (String.toLower name) model.dmDirectory.primary || not (hasMetadataCap model) then
                 []
 
             else
@@ -38911,8 +39831,12 @@ update msg initialModel =
             updateRaw msg initialModel
 
         -- v3/shell-nav + v3/connect-gate settle steps
-        ( next, settleOutbounds ) =
+        ( settled, settleOutbounds ) =
             settleConnectGate (settleNav msg initialModel.activeChannel raw)
+
+        -- v3/inbox settle step
+        next =
+            settleRoomHeader initialModel (settleInbox initialModel settled)
 
         outbounds =
             rawOutbounds ++ settleOutbounds
@@ -41407,6 +42331,7 @@ updateRaw msg initialModel =
                 cleared =
                     { settledBatches
                         | connection = Offline
+                        , mediaEventsSubscribed = False
                         , physicalConnectionGeneration = model.physicalConnectionGeneration + 1
                         , mediaControlView = Nothing
                         , mediaControlViewOwner = Nothing
@@ -41518,14 +42443,27 @@ updateRaw msg initialModel =
                 scheduled =
                     scheduleReconnect unmarked
 
+                -- One coalesced connection-lost row: a socket that was
+                -- already down (a duplicate close for the same drop) or
+                -- a close the person asked for files nothing; repeats
+                -- merge into the same row with a count, and
+                -- re-registration clears it (`settleInbox`).
+                logged =
+                    logService { scheduled | quietNextClose = False } ("Disconnected: " ++ close.reason)
+
                 noticed =
-                    addNotification (logService scheduled ("Disconnected: " ++ close.reason))
-                        { kind = NotifSystem
-                        , text = "Disconnected: " ++ close.reason
-                        , from = Nothing
-                        , channel = Nothing
-                        , topic = Nothing
-                        }
+                    if model.connection == Offline || model.quietNextClose then
+                        logged
+
+                    else
+                        addNotificationWith { noExtras | key = Just connectionLostKey }
+                            logged
+                            { kind = NotifSystem
+                            , text = "Disconnected: " ++ close.reason
+                            , from = Nothing
+                            , channel = Nothing
+                            , topic = Nothing
+                            }
             in
             ( resetGuestClaim noticed, batchOut )
 
@@ -42388,7 +43326,12 @@ updateRaw msg initialModel =
             ( { model | pendingUnban = Nothing }, [] )
 
         NotificationCenterOpened ->
-            ( { model | showNotificationCenter = True, inboxFilter = InboxAll }, [] )
+            -- The bell toggles: a second press closes the sheet.
+            if model.showNotificationCenter then
+                ( { model | showNotificationCenter = False }, [] )
+
+            else
+                ( { model | showNotificationCenter = True, inboxFilter = InboxAll }, [] )
 
         RuntimeNotificationNavigationReceived request ->
             let
@@ -42515,10 +43458,89 @@ updateRaw msg initialModel =
             ( { model | inboxFilter = filter }, [] )
 
         NotificationDismissed id ->
-            ( dismissNotification model id, [] )
+            -- Focus moves to a neighbouring row (or the close button)
+            -- so dismissing never drops focus to the page body.
+            if List.any (\note -> note.id == id) model.notifications then
+                ( dismissNotification model id
+                , if model.showNotificationCenter then
+                    [ FocusElement (focusAfterDismiss model id) ]
+
+                  else
+                    []
+                )
+
+            else
+                ( model, [] )
 
         NotificationActivated id ->
             activateNotification model id
+
+        NotificationJoin id ->
+            joinFromNotification model id
+
+        -- v3/room-header: the conversation header's details panel
+        -- (topic, follow, topics, history tools) and its topic editor.
+        RoomDetailsToggle ->
+            ( { model | roomDetailsOpen = not model.roomDetailsOpen, roomTopicDraft = Nothing }, [] )
+
+        RoomDetailsClose ->
+            ( { model | roomDetailsOpen = False, roomTopicDraft = Nothing }
+            , if model.roomDetailsOpen then
+                [ FocusElement "room-details-toggle" ]
+
+              else
+                []
+            )
+
+        RoomTopicEditStart ->
+            case model.activeChannel |> Maybe.andThen (\name -> Dict.get (String.toLower name) model.channels) of
+                Just channel ->
+                    if isChannelName model channel.name && isChannelOp model channel.name then
+                        ( { model | roomTopicDraft = Just channel.topic }, [ FocusElement "room-topic-input" ] )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        RoomTopicEditInput value ->
+            ( { model | roomTopicDraft = Maybe.map (\_ -> String.left maxRoomTopicChars value) model.roomTopicDraft }, [] )
+
+        -- The local services and recovery controls: an Advanced panel
+        -- opened from You, never docked on Home or a conversation.
+        AdvancedOpen ->
+            ( { model | advancedOpen = True }, [ FocusElement "advanced-panel" ] )
+
+        AdvancedClose ->
+            ( { model | advancedOpen = False }, [] )
+
+        RoomToolsToggle ->
+            ( { model | roomToolsOpen = not model.roomToolsOpen }, [] )
+
+        ComposerToolsToggle ->
+            ( { model | composerToolsOpen = not model.composerToolsOpen }, [] )
+
+        RoomTopicEditCancel ->
+            ( { model | roomTopicDraft = Nothing }, [ FocusElement "room-topic-edit" ] )
+
+        RoomTopicEditSubmit ->
+            case ( model.roomTopicDraft, model.activeChannel ) of
+                ( Just draft, Just name ) ->
+                    let
+                        cleaned =
+                            sanitizeRoomTopic draft
+                    in
+                    if model.connection /= Live || not (isChannelName model name) || not (isChannelOp model name) then
+                        ( model, [] )
+
+                    else
+                        ( { model | roomTopicDraft = Nothing }
+                        , [ SendLine (Wire.formatIrcLine "TOPIC" [ name, cleaned ]), FocusElement "room-topic-edit" ]
+                        )
+
+                _ ->
+                    ( model, [] )
 
         NotificationsMarkedRead ->
             ( markAllNotificationsRead model, [] )
@@ -44199,7 +45221,7 @@ updateRaw msg initialModel =
 
         ConnectionCancelSignIn ->
             if model.identifyReplyAccount /= Nothing || model.connectionNickPending /= Nothing then
-                ( model, [ WsDisconnect ] )
+                ( { model | quietNextClose = True }, [ WsDisconnect ] )
 
             else
                 ( model, [] )

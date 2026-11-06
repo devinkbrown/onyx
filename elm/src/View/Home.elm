@@ -63,7 +63,11 @@ home model =
 {-| Mentions anywhere, or anything unread in a direct conversation. -}
 needsAttention : Model -> Channel -> Bool
 needsAttention model channel =
-    channel.highlights > 0 || (channel.unread > 0 && not (App.isChannelName model channel.name))
+    -- A bucket named after ourselves is never a conversation that needs
+    -- us (server notices addressed to our nick used to land there).
+    String.toLower channel.name
+        /= String.toLower model.ourNick
+        && (channel.highlights > 0 || (channel.unread > 0 && not (App.isChannelName model channel.name)))
 
 
 needsRow : Model -> Channel -> Html Msg

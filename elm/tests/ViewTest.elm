@@ -199,8 +199,8 @@ inboxModel =
     { blank
         | showNotificationCenter = True
         , notifications =
-            [ { id = "notif-0", kind = NotifMention, text = "hey you", from = Just "alice", channel = Just "#c", topic = Nothing, atMs = 1000 }
-            , { id = "notif-1", kind = NotifError, text = "Nickname in use: taken", from = Nothing, channel = Nothing, topic = Nothing, atMs = 2000 }
+            [ { id = "notif-0", kind = NotifMention, text = "hey you", from = Just "alice", channel = Just "#c", topic = Nothing, atMs = 1000, msgid = Nothing, count = 1, key = "m0" }
+            , { id = "notif-1", kind = NotifError, text = "Nickname in use: taken", from = Nothing, channel = Nothing, topic = Nothing, atMs = 2000, msgid = Nothing, count = 1, key = "e1" }
             ]
         , readNotificationIds = Set.singleton "notif-1"
     }
@@ -3624,9 +3624,14 @@ suite =
                     in
                     Expect.all
                         [ \_ ->
-                            Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Nickname in use: taken" ] ] q
+                            Query.find [ Selector.tag "button", Selector.containing [ Selector.text "hey you" ] ] q
                                 |> Event.simulate Event.click
-                                |> Event.expect (NotificationActivated "notif-1")
+                                |> Event.expect (NotificationActivated "notif-0")
+                        , -- Deliberate (audit M9): an error row cannot open
+                          -- anything, so it is not rendered as a button.
+                          \_ ->
+                            Query.findAll [ Selector.tag "button", Selector.class "notif-center__open", Selector.containing [ Selector.text "Nickname in use: taken" ] ] q
+                                |> Query.count (Expect.equal 0)
                         , \_ ->
                             Query.findAll [ Selector.class "notif-center__dismiss" ] q
                                 |> Query.first
@@ -4350,25 +4355,25 @@ suite =
                     |> Event.expect (NavSelect Nav.Calls)
             ]
         , describe "landing"
-            [ test "landing renders intro, ways-in ledger, trust, and shelf" <|
+            [ test "landing renders the hero, stories, how it works, trust, and closer" <|
                 \_ ->
                     let
                         q =
                             query { blank | route = Route.Landing }
                     in
                     Expect.all
-                        [ \_ -> Query.has [ Selector.text "Good company." ] q
-                        , \_ -> Query.has [ Selector.text "Great nights." ] q
-                        , \_ -> Query.has [ Selector.text "Three ways in" ] q
-                        , \_ -> Query.has [ Selector.text "No ads" ] q
-                        , \_ -> Query.has [ Selector.text "More to explore" ] q
+                        [ \_ -> Query.has [ Selector.text "Rooms, DMs, and calls" ] q
+                        , \_ -> Query.has [ Selector.text "for your people." ] q
+                        , \_ -> Query.has [ Selector.text "In a room in under a minute." ] q
+                        , \_ -> Query.has [ Selector.text "No ads, no trackers" ] q
+                        , \_ -> Query.has [ Selector.text "Explore Onyx" ] q
                         , \_ ->
                             Query.find [ Selector.class "site-cta" ] q
                                 |> Query.find [ Selector.tag "a", Selector.containing [ Selector.text "Open Onyx" ] ]
                                 |> Query.has [ Selector.attribute (Attr.href "/app/") ]
                         ]
                         ()
-            , test "landing ledger shows every route at once with no tabs" <|
+            , test "landing shows how it works as three plain steps with no tabs" <|
                 \_ ->
                     let
                         q =
@@ -4376,11 +4381,11 @@ suite =
                     in
                     Expect.all
                         [ \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "ways-in-ledger") ] q
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "how-it-works") ] q
                                 |> Query.has
-                                    [ Selector.text "Walk into the public room."
-                                    , Selector.text "Bring your people along."
-                                    , Selector.text "Get oriented, then join in."
+                                    [ Selector.text "Open Onyx"
+                                    , Selector.text "Pick a name"
+                                    , Selector.text "Join or start a room"
                                     ]
                         , \_ ->
                             Query.hasNot [ Selector.attribute (Attr.attribute "role" "tablist") ] q
@@ -4568,7 +4573,8 @@ suite =
                                 |> Query.has [ Selector.text "Rooms for people you already like." ]
                         , \_ ->
                             q
-                                |> Query.has [ Selector.text "A quiet harbor. The rooms stay open when you come back." ]
+                                |> Query.find [ Selector.class "site-article-shot" ]
+                                |> Query.has [ Selector.tag "img", Selector.attribute (Attr.src "/marketing/room-desktop-1x.jpg") ]
                         , \_ ->
                             q
                                 |> Query.findAll [ Selector.class "site-who-row" ]

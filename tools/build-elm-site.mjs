@@ -65,8 +65,8 @@ async function buildMediaRuntime(outDir) {
 
 async function stampServiceWorker(outDir, mediaAssetPaths) {
   const assets = [
-    '/index.html', '/app.js', '/runtime.js', '/ports.js', '/app.css', '/rail.css', '/site.css',
-    '/brand/mark.png', '/brand/mascot-still.png', '/manifest.json', '/favicon.ico', '/favicon.svg',
+    '/index.html', '/app.js', '/runtime.js', '/ports.js', '/app.css', '/rail.css', '/convo.css', '/site.css',
+    '/brand/mark.png', '/manifest.json', '/favicon.ico', '/favicon.svg',
     '/favicon-32.png', '/apple-touch-icon.png', '/icon-192.png', '/icon-192-maskable.png',
     '/icon-512.png', '/icon-512-maskable.png', '/og.png', '/opcodec_wasm.js', '/opcodec_wasm.wasm', '/runtime-manifest.json', ...mediaAssetPaths,
   ];
@@ -75,7 +75,7 @@ async function stampServiceWorker(outDir, mediaAssetPaths) {
   // stages beside the app, not by this route document, so its bytes never match
   // a precache hash. One mismatched shell asset fails the whole worker install
   // and strands every returning visitor on their old build, so keep it out.
-  const routes = entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !['brand', 'assets', 'onyxos'].includes(entry.name))
+  const routes = entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !['brand', 'assets', 'onyxos', 'marketing'].includes(entry.name))
     .map(entry => `/${entry.name}/`).sort();
   const paths = [
     { path: '/', file: 'index.html' },
@@ -195,8 +195,14 @@ async function main() {
     fail('vendored esbuild is required to bundle the private browser runtime');
   }
 
-  await copyDirFiles(ELM_DIR, outDir, ['index.html', 'ports.js', 'app.css', 'rail.css', 'site.css', 'sw.js']);
-  await copyDirFiles(resolve(ELM_DIR, '..', 'public', 'brand'), resolve(outDir, 'brand'), ['mark.png', 'mascot-still.png']);
+  await copyDirFiles(ELM_DIR, outDir, ['index.html', 'ports.js', 'app.css', 'rail.css', 'convo.css', 'site.css', 'sw.js']);
+  await copyDirFiles(resolve(ELM_DIR, '..', 'public', 'brand'), resolve(outDir, 'brand'), ['mark.png']);
+  // Product screenshots for the public site (captured from the real shell by
+  // elm/tools/marketing-capture.mjs). Deliberately NOT in the service-worker
+  // precache: they are page images, not shell assets, and must never be able
+  // to fail a worker install.
+  await copyDirFiles(resolve(ELM_DIR, 'marketing'), resolve(outDir, 'marketing'),
+    (await readdir(resolve(ELM_DIR, 'marketing'))).filter(name => /\.(webp|jpg)$/.test(name)).sort());
   await copyDirFiles(resolve(ROOT, 'public'), outDir, [
     'manifest.json',
     'favicon.ico',

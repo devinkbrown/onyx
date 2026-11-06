@@ -54,6 +54,8 @@ import View.GuestClaim exposing (guestClaim)
 import View.Account exposing (accountPanel)
 import View.Media exposing (mediaPanel)
 import View.Pins exposing (pinsDrawer)
+import View.Inbox
+import View.RoomHeader
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Toast exposing (toaster)
@@ -254,10 +256,11 @@ shellColumn model =
                  else if model.navSection == Nav.Home then
                     main_
                         [ class "onyx-main onyx-main-home"
-                        , classList [ ( "onyx-main-rooms-open", model.clientRoomsOpen ) ]
+                        , classList [ ( "onyx-main-rooms-open", model.clientRoomsOpen ), ( "onyx-main-advanced", model.advancedOpen ) ]
                         ]
                         [ rail model
                         , home model
+                        , advancedPanel model
                         ]
 
                  else
@@ -266,11 +269,13 @@ shellColumn model =
                         , classList
                             [ ( "onyx-main-rooms-open", model.clientRoomsOpen )
                             , ( "onyx-main-members-open", model.clientMembersOpen )
+                            , ( "onyx-main-advanced", model.advancedOpen )
                             ]
                         ]
                         [ rail model
-                        , div [ class "onyx-convo" ] [ thread model, composer model ]
+                        , div [ class "onyx-convo" ] [ View.RoomHeader.roomHeader model, thread model, composer model ]
                         , roster model
+                        , advancedPanel model
                         ]
                , toaster model
                , stewardPanel model
@@ -279,6 +284,7 @@ shellColumn model =
                , scheduledSheet model
                , accountPanel model
                , pinsDrawer model
+               , View.Inbox.inboxSheet model
                , mediaPanel model
                , profileSheet model
                , profileCard model
@@ -286,6 +292,22 @@ shellColumn model =
                , personSafetySheet model
                , View.Connection.dialog model
                , View.Nav.youDialog model
-               , View.RuntimeServices.view model.runtimeDomainResult model.sessionRecoveryView model.webAuthnObservationView model.privateAccountStatus (model.runtimeDomainPending /= Nothing) model.activeChannel model.composer (model.eventClock + 1) model.accountName (Maybe.map .networkId model.runtimeOwnerStamp) model.groupBackupRoomInput (model.accountName /= Nothing) (model.calls.lifecycle /= Media.Idle) model.callSelfMuted model.callSelfDeafened
+               , if model.callsOpen then
+                    advancedPanel model
+
+                 else
+                    Html.text ""
                ]
         )
+
+
+{-| The Advanced panel (local services and recovery), opened from You:
+a column beside the conversation on wide screens, a non-modal sheet on
+narrow ones — never docked under Home or a conversation. -}
+advancedPanel : Model -> Html Msg
+advancedPanel model =
+    if model.advancedOpen then
+        View.RuntimeServices.view model.runtimeDomainResult model.sessionRecoveryView model.webAuthnObservationView model.privateAccountStatus (model.runtimeDomainPending /= Nothing) model.activeChannel model.composer (model.eventClock + 1) model.accountName (Maybe.map .networkId model.runtimeOwnerStamp) model.groupBackupRoomInput (model.accountName /= Nothing) (model.calls.lifecycle /= Media.Idle) model.callSelfMuted model.callSelfDeafened model.serverNotices
+
+    else
+        Html.text ""

@@ -20,17 +20,24 @@ test.describe('elm redesign', () => {
     expect(errors, 'console/page errors').toEqual([]);
   });
 
-  test('landing shows every way in with no tabs', async ({ page }) => {
+  test('landing is built around the real app with one primary action', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle('Onyx — good company. Great nights.');
     await expect(page.locator('#onyx-boot-splash')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Good company. Great nights.' })).toBeVisible();
-    const ledger = page.getByTestId('ways-in-ledger');
-    await expect(ledger.getByRole('link', { name: 'Open the public room' })).toHaveAttribute('href', '/invite?join=%23root');
-    await expect(ledger.getByRole('link', { name: 'Open Onyx' })).toHaveAttribute('href', '/app/');
-    await expect(ledger.getByRole('link', { name: 'Read the first-room guide' })).toHaveAttribute('href', '/guides');
+    await expect(page.getByRole('heading', { level: 1, name: 'Rooms, DMs, and calls for your people.' })).toBeVisible();
+    const hero = page.locator('.site-hero');
+    await expect(hero.getByRole('link', { name: 'Open Onyx' })).toHaveAttribute('href', '/app/');
+    await expect(hero.getByRole('link', { name: 'Visit the public room' })).toHaveAttribute('href', '/invite?join=%23root');
+    // Product screenshots load from the build (never the live network) and decode.
+    const shots = page.locator('.site-shot-img');
+    expect(await shots.count()).toBeGreaterThanOrEqual(4);
+    const heroShot = hero.locator('.site-shot-img').first();
+    await expect.poll(() => heroShot.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    expect(await heroShot.evaluate((img: HTMLImageElement) => new URL(img.currentSrc).pathname)).toMatch(/^\/marketing\/room-desktop-[12]x\.(webp|jpg)$/);
+    await expect(page.locator('img[src*="mascot"]')).toHaveCount(0);
+    await expect(page.getByTestId('how-it-works').getByRole('listitem')).toHaveCount(3);
     await expect(page.getByRole('tablist')).toHaveCount(0);
-    await expect(page.getByText('No third-party trackers')).toBeVisible();
+    await expect(page.getByText('No ads, no trackers', { exact: true })).toBeVisible();
   });
 
   test('masthead menu toggles and closes on Escape', async ({ page }) => {

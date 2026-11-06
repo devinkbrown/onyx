@@ -173,8 +173,9 @@ contextLine =
         [ text "Community — rooms, messages, and calls" ]
 
 
-{-| The about body: same story, same anchors, new language. The fake
-product-sketch scene is gone; the mascot note carries the warmth. -}
+{-| The about body: same story and anchors, shown with the real app
+(a screenshot of the shell from `elm/marketing/`, framed like the
+landing's devices). -}
 view : Html Msg
 view =
     article [ class "site-article" ]
@@ -185,6 +186,29 @@ view =
         , div [ class "site-cta" ]
             [ a [ class "site-cta-primary", href "/app/" ] [ text "Open Onyx" ]
             , a [ class "site-cta-link", href "/invite/" ] [ text "Join with an invite" ]
+            ]
+        , div [ class "site-article-shot" ]
+            [ div [ class "site-device site-device--browser" ]
+                [ div [ class "site-device-bar", attribute "aria-hidden" "true" ]
+                    [ span [] [], span [] [], span [] [], span [ class "site-device-url" ] [ text "eshmaki.me/app" ] ]
+                , div [ class "site-device-screen" ]
+                    [ Html.node "picture"
+                        []
+                        [ Html.node "source" [ attribute "type" "image/webp", attribute "srcset" "/marketing/room-desktop-1x.webp 1x, /marketing/room-desktop-2x.webp 2x" ] []
+                        , img
+                            [ class "site-shot-img"
+                            , src "/marketing/room-desktop-1x.jpg"
+                            , attribute "srcset" "/marketing/room-desktop-1x.jpg 1x, /marketing/room-desktop-2x.jpg 2x"
+                            , width 1280
+                            , height 800
+                            , alt "The Onyx app on a computer: a room with messages, the room list, and members."
+                            , attribute "loading" "lazy"
+                            , attribute "decoding" "async"
+                            ]
+                            []
+                        ]
+                    ]
+                ]
             ]
         , nav [ class "site-topics", attribute "aria-label" "About topics" ]
             [ a [ href "#rooms" ] [ text "Rooms" ]
@@ -202,7 +226,7 @@ view =
             , ul [ class "site-ruled", attribute "aria-label" "What you get" ]
                 [ li [] [ strong [] [ text "Rooms" ], span [] [ text "Places to hang out that stay open." ] ]
                 , li [] [ strong [] [ text "Messages" ], span [] [ text "Room chat and private DMs." ] ]
-                , li [] [ strong [] [ text "Calls" ], span [] [ text "Voice, video, and screen when you need them." ] ]
+                , li [] [ strong [] [ text "Calls" ], span [] [ text "Voice calls inside the room, joined on purpose." ] ]
                 , li [] [ strong [] [ text "No ads" ], span [] [ text "Nobody is selling your attention here." ] ]
                 ]
             ]
@@ -223,10 +247,6 @@ view =
                     [ h3 [] [ text "Creators" ]
                     , p [] [ text "A room and a stage for the people who already showed up, without ads in the way." ]
                     ]
-                ]
-            , aside [ class "site-quiet-note" ]
-                [ img [ class "site-mascot", src "/brand/mascot-still.png", width 148, height 148, alt "", attribute "decoding" "async" ] []
-                , p [] [ text "A quiet harbor. The rooms stay open when you come back." ]
                 ]
             ]
         , section [ id "join", class "site-section", attribute "aria-labelledby" "join-heading" ]

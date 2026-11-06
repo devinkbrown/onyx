@@ -2629,14 +2629,26 @@
         sendPort(batch);
       }
     });
+    /* One wsClosed per socket: a failing socket fires `error` and then
+       `close`, and reporting both filed two disconnect rows per drop. */
+    var closeReported = false;
     socket.addEventListener("close", function (event) {
       if (!currentSocket()) return;
-      app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
+      if (!closeReported) {
+        closeReported = true;
+        app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
+      }
       if (onClose) { try { onClose(); } catch (err) {} }
     });
     socket.addEventListener("error", function () {
-      if (!currentSocket()) return;
-      app.ports.wsClosed.send({ clean: false, reason: "error" });
+      if (!currentSocket() || closeReported) return;
+      /* `close` normally follows at once and carries the real reason;
+         report the bare error only if it never comes. */
+      setTimeout(function () {
+        if (closeReported || !currentSocket()) return;
+        closeReported = true;
+        app.ports.wsClosed.send({ clean: false, reason: "error" });
+      }, 1000);
     });
     return {
       send: function (line) {

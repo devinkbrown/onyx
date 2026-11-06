@@ -16,8 +16,8 @@ focus (as on the OnyxOS tabs).
 -}
 
 import App exposing (Model, Msg(..), backgroundDirty, renderedBackground)
-import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, label, main_, option, p, section, select, small, span, summary, text)
-import Html.Attributes exposing (attribute, class, disabled, href, selected, style, tabindex, title, value)
+import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, img, label, main_, option, p, section, select, small, span, summary, text)
+import Html.Attributes exposing (alt, attribute, class, disabled, height, href, selected, src, style, tabindex, title, value, width)
 import Html.Events exposing (on, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave)
 import Json.Decode as Decode
 import Prefs
@@ -70,9 +70,14 @@ view model =
             ]
             []
         , header [ class "ap-bar" ]
-            [ a [ class "ap-back", href "/app/" ] [ text "← back to app" ]
-            , span [ class "ap-tag" ] [ text "Appearance" ]
-            , a [ class "ap-home", href "/" ] [ text "home" ]
+            [ a [ class "ap-back", href "/app/" ]
+                [ span [ class "ap-back-icon", attribute "aria-hidden" "true" ] []
+                , text "Back to app"
+                ]
+            , a [ class "ap-home", href "/", attribute "aria-label" "Onyx home" ]
+                [ img [ class "ap-home-mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
+                , text "Onyx"
+                ]
             ]
         , section [ class "ap-wrap" ]
             [ h1 [ class "ap-h1" ] [ text "Appearance" ]

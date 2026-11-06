@@ -116,6 +116,16 @@ for (const width of [320, 390, 768]) {
     await page.getByRole('searchbox', { name: 'Search messages' }).fill('message');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('search', { name: 'Message search', exact: true })).toBeHidden();
+    // UI slice 2: under 768px the room header folds Pins and Media behind
+    // "More conversation tools" (the menu stays open, so focus can return
+    // to the tool after its dialog closes).
+    const moreTools = page.getByRole('button', { name: 'More conversation tools', exact: true });
+    if (phone) {
+      await moreTools.click();
+      await expect(moreTools).toHaveAttribute('aria-expanded', 'true');
+    } else {
+      await expect(moreTools).toBeHidden();
+    }
     await page.getByTestId('ribbon-pins').click();
     await expect(page.getByRole('dialog', { name: 'Pinned messages', exact: true })).toBeInViewport();
     await expect(page.getByRole('dialog', { name: 'Pinned messages', exact: true })).toBeFocused();

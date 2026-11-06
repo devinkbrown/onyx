@@ -68,7 +68,8 @@ function wire(socket) {
       if (nick !== 'guest' && next !== nick) send(`:${nick}!u@onyx.test NICK ${next}`);
       nick = next;
     } else if (cmd === 'CAP' && rest[0] === 'END') {
-      send(`:onyx.test 001 ${nick} :Welcome to Onyx`,
+      send(`:onyx.test NOTICE ${nick} :connecting from Somewhere | AS0 (Fixture)`, `:onyx.test NOTICE ${nick} :secured (TLS1.3) | you are fixture`,
+        `:onyx.test 001 ${nick} :Welcome to Onyx`,
         `:onyx.test 005 ${nick} CASEMAPPING=rfc1459 CHANTYPES=#& PREFIX=(qaohv)~&@%+ NETWORK=Onyx :are supported`,
         `:${nick}!u@onyx.test JOIN #lounge`,
         `:${nick}!u@onyx.test JOIN #design`,
@@ -79,7 +80,12 @@ function wire(socket) {
         `@time=${ago(40)} :mara!m@onyx.test PRIVMSG ${room} :Morning all — the new build is up on staging`,
         `@time=${ago(32)} :jun!j@onyx.test PRIVMSG ${room} :Nice. Release notes are on the roadmap page if anyone wants a look`,
         `@time=${ago(12)} :sol!s@onyx.test PRIVMSG ${room} :${nick}: welcome in! grab a seat`,
-        `@time=${ago(2)} :mara!m@onyx.test PRIVMSG ${room} :Voice call at six, I will set it up.`);
+        `@time=${ago(6)} :mara!m@onyx.test PRIVMSG ${room} :Voice call at six, I will set it up.`,
+        `@time=${ago(5)} :mara!m@onyx.test PRIVMSG ${room} :first or second time I can't really tell`,
+        `@time=${ago(5)} :mara!m@onyx.test PRIVMSG ${room} :ok`,
+        `@time=${ago(4)} :mara!m@onyx.test PRIVMSG ${room} :Went to look at the staging logs and they are full of the same reconnect warning, every few seconds, for about an hour`,
+        `@time=${ago(3)} :mara!m@onyx.test PRIVMSG ${room} :coming back to it after lunch`,
+        `@time=${ago(1)} :iris!i@onyx.test PRIVMSG ${room} :@here release notes are up`);
     } else if (cmd === 'LIST') {
       send(`:onyx.test 321 ${nick} Channel :Users Name`, `:onyx.test 322 ${nick} #root 42 :The front door`,
         `:onyx.test 322 ${nick} #lounge 18 :Hang out, say hi`, `:onyx.test 323 ${nick} :End of /LIST`);
@@ -125,6 +131,10 @@ const scenarios = {
   'rooms-list': async page => { await shell(page); await openRooms(page); },
   room: async page => { await shell(page); await openRoom(page, '#lounge'); },
   dm: async page => { await shell(page); await clickVisible(page, ['[data-testid="nav-messages"]']); await clickVisible(page, ['#client-rooms button[title="nova"]']); },
+  inbox: async page => { await shell(page); await openRoom(page, '#design'); await clickVisible(page, ['[data-testid="inbox-bell"]']); },
+  details: async page => { await shell(page); await openRoom(page, '#lounge'); await clickVisible(page, ['#room-details-toggle']); },
+  tools: async page => { await shell(page); await openRoom(page, '#lounge'); await clickVisible(page, ['#room-tools-more', '.onyx-composer-tools-toggle']); await clickVisible(page, ['.onyx-composer-tools-toggle']); },
+  advanced: async page => { await shell(page); await clickVisible(page, ['[data-testid="nav-you"]']); await clickVisible(page, ['[data-testid="you-advanced"]']); },
   you: async page => { await shell(page); await clickVisible(page, ['[data-testid="nav-you"]', '.onyx-ident']); },
 };
 

@@ -2,7 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ec" data-site="#f7f4ec">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1518" data-site="#0e1518">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Onyx">
+<meta name="format-detection" content="telephone=no">
+<script>
+/* Browser chrome tint. Public pages follow the visitor's light/dark
+   preference (the media-scoped theme-color pair above); the /app shell
+   paints its own palette (dark by default, light only for a light app
+   theme), so on /app both theme-color tags take the shell's resolved
+   background. `data-surface` lets site.css paint the right ground (and
+   boot splash) before Elm renders, so the iOS overscroll band and the
+   status/address bar never flash the other scheme. Dependency-free. */
+(function () {
+  var d = document, root = d.documentElement;
+  function isApp() { return /^\/app(\/|$)/.test(location.pathname); }
+  function sync() {
+    var app = isApp();
+    root.setAttribute("data-surface", app ? "app" : "site");
+    var colour = null;
+    if (app) {
+      var bg = d.body ? getComputedStyle(d.body).backgroundColor : "";
+      colour = bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)" ? bg : "#0e1518";
+    }
+    var metas = d.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) {
+      var next = colour || metas[i].getAttribute("data-site");
+      if (next && metas[i].getAttribute("content") !== next) metas[i].setAttribute("content", next);
+    }
+  }
+  ["pushState", "replaceState"].forEach(function (name) {
+    var original = history[name];
+    if (typeof original !== "function") return;
+    history[name] = function () {
+      var result = original.apply(this, arguments);
+      later();
+      return result;
+    };
+  });
+  /* Elm repaints the new route on the next animation frame; read the
+     shell's ground after that paint, not before it. */
+  function later() {
+    try { sync(); } catch (e) {}
+    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+    raf(function () { raf(function () { try { sync(); } catch (e) {} }); });
+    setTimeout(function () { try { sync(); } catch (e) {} }, 120);
+  }
+  window.addEventListener("popstate", later);
+  d.addEventListener("DOMContentLoaded", sync);
+  try {
+    new MutationObserver(function () { if (isApp()) sync(); })
+      .observe(root, { attributes: true, attributeFilter: ["data-theme", "style"] });
+  } catch (e) {}
+  sync();
+})();
+</script>
 <title>Onyx — good company. Great nights.</title>
 <meta name="description" content="A place for your friends to talk, play, and catch up. Open a room in your browser." />
 <link rel="canonical" href="https://eshmaki.me/" />
@@ -15,6 +74,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/rail.css">
+<link rel="stylesheet" href="/convo.css">
 <link rel="stylesheet" href="/site.css">
 <meta name="onyx-shell-ref" content="__ONYX_PUBLIC_INDEX_SHELL_REF__">
 </head>

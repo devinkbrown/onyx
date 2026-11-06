@@ -307,6 +307,7 @@ youDialog model =
                             )
                         , Just (link "you-appearance" "/appearance" "Appearance" "Theme, text size, and motion")
                         , Just (link "you-guides" "/guides" "Guides" "How Onyx works, step by step")
+                        , Just (door "you-advanced" False "Advanced" "Local services, recovery, devices, and backups" (YouThen AdvancedOpen))
                         ]
                     )
                 ]

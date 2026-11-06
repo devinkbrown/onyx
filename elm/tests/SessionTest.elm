@@ -98,6 +98,11 @@ suite =
                         , \_ -> Expect.equal Nothing (parseCapToken ("ok=" ++ String.repeat 4097 "v"))
                         ]
                         ()
+            , test "wantedCaps requests draft/metadata-2 so METADATA is accepted" <|
+                \_ ->
+                    wantedCaps False [ "draft/metadata-2", "server-time" ]
+                        |> List.member "draft/metadata-2"
+                        |> Expect.equal True
             , test "wantedCaps drops always-off caps and dedupes" <|
                 \_ ->
                     Expect.all

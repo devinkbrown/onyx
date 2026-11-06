@@ -1,6 +1,8 @@
 module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
 
-{-| Shell top bar: brand mark, active-channel topic, connection pill.
+{-| Shell top bar: brand mark (or, on phones, back control and page
+title), the inbox bell, and the connection pill. The conversation
+tools and topic moved to the room header (`View.RoomHeader`).
 -}
 
 import App exposing (Model, Msg(..))
@@ -23,16 +25,10 @@ topbar model =
             , h1 [] [ text "Onyx" ]
             ]
         , p [ class "onyx-topbar-title", attribute "data-testid" "page-title" ] [ text (pageTitle model) ]
-        , div [ class "onyx-topic" ]
-            [ text
-                (if conversationShown model then
-                    activeTopic model
-
-                 else
-                    ""
-                )
-            ]
-        , clientTools model
+        , div [ class "onyx-topbar-spacer" ] []
+        , -- The bell is pinned in the bar (never inside a scrolling tool
+          -- row); the conversation tools live in the room header.
+          inbox model
         , button
             [ type_ "button"
             , attribute "aria-label" ("Connect. " ++ connectionLabel model)
@@ -101,123 +97,6 @@ pageTitle model =
             ( section, _, _ ) ->
                 Nav.label section
 
-
-clientTools : Model -> Html Msg
-clientTools model =
-    div [ class "onyx-topbar-tools", attribute "role" "group", attribute "aria-label" "Conversation tools" ]
-        (if conversationShown model then
-            [ case model.activeChannel of
-                Just name ->
-                    if App.isChannelName model name then
-                        clientPanelToggle "Members" "client-members" model.clientMembersOpen ToggleClientMembers
-
-                    else
-                        text ""
-
-                Nothing ->
-                    text ""
-            , button
-                [ class "onyx-search-toggle onyx-convo-tool"
-                , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
-                , attribute "aria-pressed"
-                    (if model.searchOpen then
-                        "true"
-
-                     else
-                        "false"
-                    )
-                , onClick SearchOpen
-                ]
-                [ text "Search" ]
-            , pinsToggle model
-            , mediaToggle model
-            , inbox model
-            ]
-
-         else
-            [ inbox model ]
-        )
-
-
-clientPanelToggle : String -> String -> Bool -> Msg -> Html Msg
-clientPanelToggle label panelId open message =
-    button
-        [ class "onyx-client-panel-toggle onyx-convo-tool"
-        , type_ "button"
-        , attribute "aria-controls" panelId
-        , attribute "aria-expanded" (if open then "true" else "false")
-        , onClick message
-        ]
-        [ text label ]
-
-
-{-| Pinned-messages toggle (the ribbon overflow entry in the
-oracle: channel-gated, labeled with the live pin count). -}
-pinsToggle : Model -> Html Msg
-pinsToggle model =
-    let
-        count =
-            case model.activeChannel of
-                Nothing ->
-                    0
-
-                Just channel ->
-                    List.length (App.channelPins model channel)
-
-        label =
-            if count > 0 then
-                String.fromInt count ++ " pinned message" ++ (if count == 1 then "" else "s")
-
-            else
-                "Pinned messages"
-    in
-    button
-        [ class "onyx-pins-toggle onyx-convo-tool"
-        , classList [ ( "onyx-pins-toggle-open", model.showPinnedMessages ) ]
-        , attribute "aria-pressed"
-            (if model.showPinnedMessages then
-                "true"
-
-             else
-                "false"
-            )
-        , attribute "aria-label" label
-        , attribute "data-testid" "ribbon-pins"
-        , disabled (model.activeChannel == Nothing)
-        , onClick PinnedMessagesOpen
-        ]
-        [ text "Pins" ]
-
-
-{-| Conversation-media toggle (the ribbon overflow entry in the
-oracle: channel-gated, labelled for the active conversation). -}
-mediaToggle : Model -> Html Msg
-mediaToggle model =
-    let
-        label =
-            case model.activeChannel of
-                Nothing ->
-                    "Pictures, files, and links"
-
-                Just channel ->
-                    "Pictures, files, and links for " ++ channel
-    in
-    button
-        [ class "onyx-media-toggle onyx-convo-tool"
-        , classList [ ( "onyx-media-toggle-open", model.mediaIndexOpen ) ]
-        , attribute "aria-pressed"
-            (if model.mediaIndexOpen then
-                "true"
-
-             else
-                "false"
-            )
-        , attribute "aria-label" label
-        , attribute "data-testid" "ribbon-room-media"
-        , disabled (model.activeChannel == Nothing)
-        , onClick MediaIndexOpen
-        ]
-        [ text "Media" ]
 
 
 {-| Nick reclaim dialog, mirroring the connect form's GHOST reclaim:
@@ -424,20 +303,3 @@ connectionLabel model =
             "Live"
 
 
-activeTopic : Model -> String
-activeTopic model =
-    case model.activeChannel of
-        Nothing ->
-            "No channel selected"
-
-        Just name ->
-            case Dict.get (String.toLower name) model.channels of
-                Nothing ->
-                    name
-
-                Just channel ->
-                    if String.isEmpty channel.topic then
-                        channel.name ++ " — no topic set"
-
-                    else
-                        channel.name ++ " — " ++ channel.topic

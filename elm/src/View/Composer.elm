@@ -52,6 +52,9 @@ composer model =
         -- oracle `canSend` edit branch: nonempty draft, no staged
         -- attachments). The normal path keeps the existing
         -- ready-only gate; its own guards live in update.
+        toolsShown =
+            model.composerToolsOpen || model.scheduleOpen || not (List.isEmpty model.attachments)
+
         canSaveOrSend =
             case editingNow of
                 Nothing ->
@@ -76,19 +79,15 @@ composer model =
         , editBar model
         , coach model
         , suggestions model
-        , if App.composerAudienceOffered model then
-            button
-                [ type_ "button"
-                , class "onyx-audience-toggle"
-                , classList [ ( "onyx-audience-toggle-set", model.composerAudience /= Nothing ) ]
-                , attribute "title" "Choose who sees this message"
-                , attribute "aria-label" ("Message audience: " ++ App.audienceLabel model.composerAudience)
-                , onClick ComposerAudienceCycle
-                ]
-                [ text (App.audienceLabel model.composerAudience) ]
-
-          else
-            text ""
+        , button
+            [ type_ "button"
+            , class "onyx-composer-tools-toggle"
+            , attribute "aria-label" "More message options"
+            , attribute "aria-expanded" (boolString toolsShown)
+            , attribute "aria-controls" "onyx-composer-tools"
+            , onClick ComposerToolsToggle
+            ]
+            [ span [ class "onyx-icon", attribute "data-icon" "plus", attribute "aria-hidden" "true" ] [] ]
         , input
             [ type_ "text"
             , placeholder
@@ -141,7 +140,27 @@ composer model =
                     "Send"
                 )
             ]
-        , sendLater model
+        , -- Audience, attachments, and send-later: inline beside the
+          -- input on wide screens; on phones a tray behind the + button
+          -- (opened automatically while files are staged or the
+          -- schedule picker is open).
+          div [ class "onyx-composer-tools", attribute "id" "onyx-composer-tools", attribute "data-open" (boolString toolsShown) ]
+            [ if App.composerAudienceOffered model then
+                button
+                    [ type_ "button"
+                    , class "onyx-audience-toggle"
+                    , classList [ ( "onyx-audience-toggle-set", model.composerAudience /= Nothing ) ]
+                    , attribute "title" "Choose who sees this message"
+                    , attribute "aria-label" ("Message audience: " ++ App.audienceLabel model.composerAudience)
+                    , onClick ComposerAudienceCycle
+                    ]
+                    [ text (App.audienceLabel model.composerAudience) ]
+
+              else
+                text ""
+            , attachments model
+            , sendLater model
+            ]
         , case model.composerError of
             Just err ->
                 p [ class "onyx-composer-error", attribute "role" "alert" ] [ text err ]
@@ -174,7 +193,6 @@ composer model =
                       else
                         text ""
                     ]
-        , attachments model
         , conversation model
         ]
 
@@ -466,7 +484,9 @@ attachments model =
             , attribute "aria-label" "Attach files"
             , onClick AttachPick
             ]
-            [ text "Attach" ]
+            [ span [ class "onyx-icon", attribute "data-icon" "attach", attribute "aria-hidden" "true" ] []
+            , span [ class "onyx-tool-label" ] [ text "Attach" ]
+            ]
          ]
             ++ List.map stagedRow model.attachments
         )
@@ -618,7 +638,9 @@ sendLater model =
                         [ attribute "aria-expanded" "false" ]
                    )
             )
-            [ text "Send later" ]
+            [ span [ class "onyx-icon", attribute "data-icon" "clock", attribute "aria-hidden" "true" ] []
+            , span [ class "onyx-tool-label" ] [ text "Send later" ]
+            ]
          ]
             ++ (if model.scheduleOpen then
                     [ schedulePopover model ]
@@ -729,3 +751,12 @@ schedulePreset model index preset =
                 , title "The local time is still loading."
                 ]
                 [ text preset.label ]
+
+
+boolString : Bool -> String
+boolString on =
+    if on then
+        "true"
+
+    else
+        "false"

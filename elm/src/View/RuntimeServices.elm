@@ -4,13 +4,36 @@ import App exposing (Msg)
 import Html exposing (Html, button, div, h2, input, label, li, node, p, section, text, ul)
 import Html.Attributes exposing (class, maxlength, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput)
+import Json.Decode
 import RuntimeDomain
 
 
-view : Maybe RuntimeDomain.ResultView -> Maybe RuntimeDomain.SessionRecoveryView -> Maybe RuntimeDomain.WebAuthnView -> Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool } -> Bool -> Maybe String -> String -> Int -> Maybe String -> Maybe String -> String -> Bool -> Bool -> Bool -> Bool -> Html Msg
-view result recoveryView webAuthnView accountStatus busy activeTarget draftText draftRevision accountName configuredNetwork backupRoomInput accountProven mediaActive muted deafened =
-    node "details" [ class "runtime-services-disclosure" ]
-        [ node "summary" [ Html.Attributes.attribute "aria-label" "Local services and recovery" ] [ text "Local services and recovery" ]
+view : Maybe RuntimeDomain.ResultView -> Maybe RuntimeDomain.SessionRecoveryView -> Maybe RuntimeDomain.WebAuthnView -> Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool } -> Bool -> Maybe String -> String -> Int -> Maybe String -> Maybe String -> String -> Bool -> Bool -> Bool -> Bool -> List String -> Html Msg
+view result recoveryView webAuthnView accountStatus busy activeTarget draftText draftRevision accountName configuredNetwork backupRoomInput accountProven mediaActive muted deafened serverNotices =
+    Html.aside
+        [ class "onyx-advanced"
+        , Html.Attributes.id "advanced-panel"
+        , Html.Attributes.attribute "tabindex" "-1"
+        , Html.Attributes.attribute "aria-labelledby" "advanced-title"
+        , Html.Attributes.attribute "data-testid" "advanced-panel"
+        , Html.Events.on "keydown"
+            (Json.Decode.field "key" Json.Decode.string
+                |> Json.Decode.andThen
+                    (\key ->
+                        if key == "Escape" then
+                            Json.Decode.succeed App.AdvancedClose
+
+                        else
+                            Json.Decode.fail "other key"
+                    )
+            )
+        ]
+        [ div [ class "onyx-advanced-head" ]
+            [ h2 [ Html.Attributes.id "advanced-title" ] [ text "Advanced" ]
+            , button [ type_ "button", class "onyx-advanced-close", Html.Attributes.attribute "aria-label" "Close Advanced", onClick App.AdvancedClose ] [ text "Close" ]
+            ]
+        , p [ class "onyx-advanced-lede" ] [ text "Local services and recovery: attachments, devices, room encryption, backups, and notification registration for this browser." ]
+        , serverMessages serverNotices
         , section [ class "runtime-services", Html.Attributes.attribute "aria-label" "Local service controls" ]
         [ h2 [] [ text "Local services" ]
         , p [] [ text "Inspect attachment, message delivery, update, and notification state. Results are scoped to this connection." ]
@@ -428,3 +451,17 @@ deviceTrustLabel trust =
         "trusted" -> "You have verified this device."
         "untrusted" -> "You have not verified this device."
         _ -> "This device's identity is unknown."
+
+
+{-| Notices the server addressed to us (connect banners, service
+replies): shown here instead of filing a direct message. -}
+serverMessages : List String -> Html Msg
+serverMessages notices =
+    if List.isEmpty notices then
+        text ""
+
+    else
+        Html.details [ class "onyx-advanced-server" ]
+            [ Html.summary [] [ text ("Server messages (" ++ String.fromInt (List.length notices) ++ ")") ]
+            , ul [ class "onyx-advanced-server-list" ] (List.map (\line -> li [] [ text line ]) (List.reverse notices))
+            ]

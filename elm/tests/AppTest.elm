@@ -2071,6 +2071,7 @@ suite =
                                 | runtimeOwnerStamp = Just testRuntimeOwner
                                 , channels = Dict.singleton "#c" (shellOf "#c" 0 0)
                                 , activeChannel = Just "#other"
+                                , caps = [ "draft/metadata-2" ]
                             }
 
                         ( opened, openOut ) =
@@ -8180,10 +8181,16 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [ ( "hi me", Just "bob", Just "#c" ) ] (List.map (\n -> ( n.text, n.from, n.channel )) (mentions m1))
                     , \_ -> Expect.equal 1 (List.length (mentions m2))
+                    -- Deliberate (audit H1): a mention in the conversation on
+                    -- screen arrives already read, so it never badges.
+                    , \_ -> Expect.equal 0 (unreadAttentionCount m2)
                     , \_ -> Expect.equal [] (mentions m3)
                     , \_ -> Expect.equal [] (mentions m4)
                     , \_ -> Expect.equal [] (mentions m5)
-                    , \_ -> Expect.equal 1 (List.length (mentions m6))
+                    -- Deliberate (UI slice 2, audit C3): an ignored sender's
+                    -- mention files no inbox row (the oracle notified
+                    -- before dropping; the inbox now matches the transcript).
+                    , \_ -> Expect.equal 0 (List.length (mentions m6))
                     , \_ -> Expect.equal 0 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m6.channels))))
                     , \_ -> Expect.equal [ ( "hello", Just "bob", Nothing ) ] (List.map (\n -> ( n.text, n.from, n.channel )) (dms m7))
                     , \_ -> Expect.equal [] (dms m8)
@@ -11269,6 +11276,9 @@ suite =
                                   , channel = Nothing
                                   , topic = Nothing
                                   , atMs = 0
+                                  , msgid = Nothing
+                                  , count = 1
+                                  , key = "n1"
                                   }
                                 ]
                         }
@@ -13433,17 +13443,34 @@ suite =
         , test "001 enters IRCX, publishes the device key, and flushes the outbox" <|
             \_ ->
                 let
+                    -- Deliberate (UI slice 2): the device key publishes
+                    -- only when metadata was negotiated, and EVENT waits
+                    -- for RPL_IRCX (see "event media subscription").
                     ( _, outbound ) =
+                        feed { blank | caps = [ "draft/metadata-2" ] } ":s 001 me :welcome"
+
+                    ( _, bare ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "LUSERS\r\n" ] outbound
+                    , \_ -> Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "LUSERS\r\n" ] bare
+                    ]
+                    ()
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
                     ( _, outbound ) =
+                        update (ChannelSelect "dave") { blank | caps = [ "draft/metadata-2" ] }
+
+                    ( _, withoutMetadata ) =
                         update (ChannelSelect "dave") blank
                 in
-                Expect.equal [ SendLine "METADATA dave GET ocean.dm-key\r\n", SendLine "MONITOR + dave\r\n" ] outbound
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "METADATA dave GET ocean.dm-key\r\n", SendLine "MONITOR + dave\r\n" ] outbound
+                    , \_ -> Expect.equal [ SendLine "MONITOR + dave\r\n" ] withoutMetadata
+                    ]
+                    ()
         , test "001 skips device-key publish when e2eeDms is off" <|
             \_ ->
                 let
@@ -13454,7 +13481,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "LUSERS\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -17393,6 +17420,7 @@ suite =
                                 | ourNick = "me"
                                 , endpoint = Just "wss://harbor.test/ws"
                                 , accountName = Just "alice"
+                                , caps = [ "draft/metadata-2" ]
                             }
 
                         ( opened, _ ) =
@@ -18321,7 +18349,7 @@ suite =
                 \_ ->
                     let
                         base =
-                            { blank | ourNick = "me" }
+                            { blank | ourNick = "me", caps = [ "draft/metadata-2" ] }
 
                         ( sent, sentOut ) =
                             update (OwnMetadataSet "ocean.bio" "hello world") base
@@ -19321,7 +19349,7 @@ suite =
                     Expect.all
                         [ \_ ->
                             Expect.equal
-                                [ { id = "notif-0", kind = NotifMention, text = "hi", from = Just "alice", channel = Just "#c", topic = Just "t", atMs = 0 } ]
+                                [ { id = "notif-0", kind = NotifMention, text = "hi", from = Just "alice", channel = Just "#c", topic = Just "t", atMs = 0, msgid = Nothing, count = 1, key = "mention|alice|#c|hi" } ]
                                 added.notifications
                         , \_ -> Expect.equal 1 added.notifSeq
                         , \_ -> Expect.equal Nothing (Maybe.andThen .from (List.head badEntities.notifications))
@@ -19410,8 +19438,8 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal 3 (unreadAttentionCount mixed)
                         , \_ -> Expect.equal 2 (unreadAttentionCount readMention)
-                        , \_ -> Expect.equal "alice in #c" (notificationContext { id = "x", kind = NotifMention, text = "t", from = Just "alice", channel = Just "#c", topic = Nothing, atMs = 0 })
-                        , \_ -> Expect.equal "Error" (notificationContext { id = "x", kind = NotifError, text = "t", from = Nothing, channel = Nothing, topic = Nothing, atMs = 0 })
+                        , \_ -> Expect.equal "alice in #c" (notificationContext { id = "x", kind = NotifMention, text = "t", from = Just "alice", channel = Just "#c", topic = Nothing, atMs = 0, msgid = Nothing, count = 1, key = "x" })
+                        , \_ -> Expect.equal "Error" (notificationContext { id = "x", kind = NotifError, text = "t", from = Nothing, channel = Nothing, topic = Nothing, atMs = 0, msgid = Nothing, count = 1, key = "x" })
                         , \_ -> Expect.equal "Mention" (notificationKindLabel NotifMention)
                         , \_ -> Expect.equal "!" (notificationKindGlyph NotifError)
                         ]
@@ -24968,13 +24996,13 @@ suite =
                         ()
             ]
         , describe "event media subscription"
-            [ test "001 subscribes to live voice/video presence" <|
+            [ test "EVENT waits for RPL_IRCX, then subscribes once per socket" <|
                 \_ ->
+                    -- Deliberate (UI slice 2): EVENT is an IRCX command and
+                    -- Onyx Server answers it 421 until IRCX mode is on, so
+                    -- the subscription follows RPL_IRCX state 1, not 001.
                     let
-                        ( _, outs ) =
-                            feed blank ":irc.example 001 kai :welcome"
-
-                        sends =
+                        sends outs =
                             List.filterMap
                                 (\o ->
                                     case o of
@@ -24985,9 +25013,37 @@ suite =
                                             Nothing
                                 )
                                 outs
+
+                        ( welcomed, welcomeOuts ) =
+                            feed blank ":irc.example 001 kai :welcome"
+
+                        ( ircx, ircxOuts ) =
+                            feed welcomed ":irc.example 800 kai 1 0 PLAIN 512 :OID=visible"
+
+                        ( _, againOuts ) =
+                            feed ircx ":irc.example 800 kai 1 0 PLAIN 512 :OID=visible"
+
+                        ( _, offOuts ) =
+                            feed welcomed ":irc.example 800 kai 0 0 PLAIN 512 :OID=visible"
+
+                        ( _, earlyOuts ) =
+                            feed { blank | connection = Registering } ":irc.example 800 kai 1 0 PLAIN 512 :OID=visible"
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = False, reason = "x" }) ircx
+
+                        ( _, reOuts ) =
+                            feed (Tuple.first (feed closed ":irc.example 001 kai :welcome")) ":irc.example 800 kai 1 0 PLAIN 512 :OID=visible"
                     in
-                    Expect.equal True
-                        (List.member "EVENT ADD MEDIA *\r\n" sends)
+                    Expect.all
+                        [ \_ -> Expect.equal False (List.member "EVENT ADD MEDIA *\r\n" (sends welcomeOuts))
+                        , \_ -> Expect.equal [ "EVENT ADD MEDIA *\r\n" ] (sends ircxOuts)
+                        , \_ -> Expect.equal [] (sends againOuts)
+                        , \_ -> Expect.equal [] (sends offOuts)
+                        , \_ -> Expect.equal [] (sends earlyOuts)
+                        , \_ -> Expect.equal [ "EVENT ADD MEDIA *\r\n" ] (sends reOuts)
+                        ]
+                        ()
             ]
         , describe "client cert bindings"
             [ test "add list and delete send with a live context" <|
@@ -26164,7 +26220,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal [] outMe
                         , \_ -> Expect.equal (Just "bob invited you to #room") (Maybe.map .text lastNote)
-                        , \_ -> Expect.equal (Just NotifSystem) (Maybe.map .kind lastNote)
+                        , \_ -> Expect.equal (Just NotifInvite) (Maybe.map .kind lastNote) -- deliberate: invites are attention rows with Join (audit M5)
                         , \_ -> Expect.equal [] outOther
                         , \_ -> Expect.equal (Just "bob invited sam to #room") (Maybe.map .text lastEvent)
                         , \_ -> Expect.equal (Just EventJoin) (Maybe.map .kind lastEvent)

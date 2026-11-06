@@ -123,9 +123,13 @@ async function composerSend(actor: Actor, text: string): Promise<void> {
 }
 
 function services(actor: Actor) { return actor.page.locator('section.runtime-services'); }
+// Local services moved from a disclosure docked under every screen to the
+// Advanced panel opened from You (UI overhaul slice 2).
 async function openServices(actor: Actor): Promise<void> {
-  const details = actor.page.locator('details.runtime-services-disclosure');
-  if (!await details.evaluate(element => (element as HTMLDetailsElement).open)) await details.locator('> summary').click();
+  if (await services(actor).isVisible()) return;
+  await actor.page.locator('.onyx-primary-nav, .onyx-mobile-nav').getByTestId('nav-you').locator('visible=true').first().click();
+  await actor.page.getByTestId('you-advanced').click();
+  await expect(services(actor)).toBeVisible();
 }
 /** Click a group control and return the settled `group.<action> — <status>` line. */
 async function groupAction(actor: Actor, buttonName: string, action: string, failure: string, scope: ReturnType<typeof services> | null = null): Promise<string> {

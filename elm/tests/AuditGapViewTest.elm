@@ -69,7 +69,7 @@ journalResult state =
 
 services : Maybe RuntimeDomain.ResultView -> Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool } -> Query.Single Msg
 services result status =
-    View.RuntimeServices.view result Nothing Nothing status False Nothing "" 0 Nothing Nothing "" False False False False
+    View.RuntimeServices.view result Nothing Nothing status False Nothing "" 0 Nothing Nothing "" False False False False []
         |> Query.fromHtml
 
 

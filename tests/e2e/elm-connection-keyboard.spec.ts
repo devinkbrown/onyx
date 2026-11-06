@@ -111,8 +111,9 @@ test('connection recovery remains keyboard operable after a failed mock registra
   await expect(connectionOpener).toBeFocused();
   await expect(connectionOpener).toHaveAccessibleName('Connect. Live');
 
-  // The replacement physical owner quarantines notifications from the first
-  // socket. Verify that old-owner row is gone before creating a fresh row.
+  // UI slice 2 (audit C1/C2): a reconnect no longer wipes the inbox; the one
+  // coalesced connection-lost row is cleared by the successful
+  // re-registration instead. Verify it is gone before creating a fresh row.
   await tabUntil(page, active => active.testId === 'inbox-bell');
   await page.keyboard.press('Enter');
   await expect(inbox).toBeVisible();

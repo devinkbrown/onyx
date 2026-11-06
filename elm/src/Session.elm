@@ -833,6 +833,9 @@ supportedClientCaps =
     , "message-redaction"
     , "msgid"
     , "draft/webpush"
+    -- Onyx Server only accepts METADATA after this cap is negotiated; without
+    -- it every METADATA (DM keys, display names) is refused with 421.
+    , "draft/metadata-2"
     , "echo-message"
     , "extended-join"
     , "invite-notify"

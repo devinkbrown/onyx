@@ -1,0 +1,732 @@
+/* Onyx Elm shell — conversation surfaces (UI overhaul slice 2).
+   The room header, the transcript, the composer, and the inbox sheet.
+   Loaded after app.css and rail.css; tokens only (themes repaint it). */
+
+/* ── Icons: one mask system, painted with currentColor ─────────────── */
+.onyx-icon {
+  display: inline-block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask: var(--onyx-glyph) center / contain no-repeat;
+  mask: var(--onyx-glyph) center / contain no-repeat;
+}
+.onyx-icon[data-icon="bell"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z'/%3E%3Cpath d='M10 20.5a2.2 2.2 0 0 0 4 0'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="close"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6 6 18'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="search"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6'/%3E%3Cpath d='m15 15 5 5'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="members"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 19.5c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5'/%3E%3Cpath d='M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.5c1.6.8 2.6 2.6 3 5'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="pin"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3.5h6l-1 5 3.5 3.5v1.5h-11V12L10 8.5l-1-5Z'/%3E%3Cpath d='M12 13.5v7'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="media"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='4.5' width='17' height='15' rx='2'/%3E%3Ccircle cx='9' cy='10' r='1.8'/%3E%3Cpath d='m4 17.5 5-4.5 4 3.5 3-2.5 4.5 3.5'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="more"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Ccircle cx='5.5' cy='12' r='1.9'/%3E%3Ccircle cx='12' cy='12' r='1.9'/%3E%3Ccircle cx='18.5' cy='12' r='1.9'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="plus"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="attach"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="clock"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.5'/%3E%3Cpath d='M12 7.5V12l3 2'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="up"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M6 11l6-6 6 6'/%3E%3C/svg%3E"); }
+
+/* Labels that ride along for assistive tech and the phone menus. */
+.onyx-tool-label {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ── Top bar: bell pinned, a spacer instead of the old topic line ──── */
+.onyx-topbar-spacer { flex: 1 1 auto; min-width: 0; }
+.shell-ribbon-inbox { position: relative; flex: none; }
+.onyx-shell .shell-ribbon-bell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--onyx-text);
+  cursor: pointer;
+}
+.onyx-shell .shell-ribbon-bell:hover { background: var(--onyx-panel-2); }
+.onyx-shell .shell-ribbon-bell[aria-expanded="true"] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+.shell-ribbon-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ── Room header ───────────────────────────────────────────────────── */
+.onyx-room-head {
+  position: relative;
+  z-index: 6;
+  flex: none;
+  background: var(--onyx-bg);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-room-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 16px;
+}
+.onyx-room-id { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
+.onyx-room-glyph {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-dim);
+  font-size: 18px;
+  font-weight: 700;
+}
+.onyx-room-avatar { display: inline-flex; flex: none; }
+.onyx-room-titles { display: flex; flex-direction: column; min-width: 0; }
+.onyx-shell .onyx-room-name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  color: var(--onyx-text);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.onyx-shell .onyx-room-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 1px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--onyx-dim);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+}
+.onyx-shell .onyx-room-summary:hover { color: var(--onyx-text); }
+.onyx-room-count { flex: none; white-space: nowrap; }
+.onyx-room-sep { flex: none; color: var(--onyx-faint); }
+.onyx-room-topic { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-room-topic--empty { font-style: italic; }
+.onyx-room-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 3px 3px 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 120ms ease;
+}
+.onyx-room-summary[aria-expanded="true"] .onyx-room-chevron { transform: translateY(3px) rotate(-135deg); }
+
+.onyx-room-tools { position: relative; display: flex; align-items: center; gap: 2px; flex: none; }
+.onyx-shell .onyx-room-tools .onyx-convo-tool {
+  position: relative;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--onyx-dim);
+  cursor: pointer;
+}
+.onyx-room-tools > .onyx-convo-tool:not(.onyx-client-panel-toggle),
+.onyx-room-more > .onyx-convo-tool { display: inline-grid; }
+.onyx-shell .onyx-room-tools .onyx-convo-tool:hover { background: var(--onyx-panel-2); color: var(--onyx-text); }
+.onyx-shell .onyx-room-tools .onyx-convo-tool:is([aria-pressed="true"], [aria-expanded="true"]) {
+  border-color: var(--onyx-line);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-accent);
+}
+.onyx-shell .onyx-room-tools .onyx-convo-tool:disabled { opacity: 0.45; }
+.onyx-tool-count {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+}
+.onyx-shell .onyx-room-tools .onyx-room-more-toggle { display: none; }
+.onyx-room-more { display: contents; }
+
+/* Room details: a panel under the header, over the transcript. */
+.onyx-room-details {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 12px;
+  z-index: 8;
+  width: min(34rem, calc(100% - 24px));
+  max-height: min(70dvh, 38rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.onyx-room-details[hidden] { display: none; }
+.onyx-room-section + .onyx-room-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--onyx-line); }
+.onyx-shell .onyx-room-section-title {
+  margin: 0 0 8px;
+  color: var(--onyx-faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.onyx-room-hint { margin: 8px 0 0; color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
+.onyx-room-topic-view { display: flex; align-items: flex-start; gap: 12px; }
+.onyx-room-topic-full { flex: 1; margin: 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.onyx-room-topic-form { display: flex; flex-direction: column; gap: 8px; }
+.onyx-room-topic-input { width: 100%; min-height: 40px; }
+.onyx-room-topic-actions, .onyx-room-details .history-catch-up, .onyx-room-details .shell-topic-actions, .onyx-room-details .shell-topic-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.onyx-room-details .onyx-topic-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.onyx-room-details .shell-topic-create-input { flex: 1 1 12rem; min-width: 0; min-height: 40px; }
+.onyx-room-details button { min-height: 40px; padding: 8px 12px; border-radius: 8px; }
+.onyx-room-details button[aria-pressed="true"] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+.onyx-shell .onyx-room-primary { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; }
+.onyx-room-details .onyx-history-policy { margin: 0 0 8px; color: var(--onyx-dim); line-height: 1.5; }
+.onyx-room-details-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+/* ── Transcript ────────────────────────────────────────────────────── */
+.onyx-thread-pane { padding: 8px 12px 12px; }
+/* Block flow, not flex: a thousand-row flex column re-runs the flex
+   algorithm over every row on each append. */
+.onyx-transcript { display: block; min-width: 0; }
+.onyx-thread { display: block; padding-bottom: 4px; }
+
+.onyx-message {
+  /* Static block flow with a floated gutter: the cheapest row layout for
+     a thousand-row transcript. Measured in the mobile perf lane, a grid
+     per row and an absolutely positioned gutter both cost far more
+     layout; only the hovered/focused row becomes positioned (for its
+     action button). */
+  display: flow-root;
+  margin-top: 12px;
+  padding: 4px 8px 4px 8px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.onyx-thread > .onyx-message:first-child { margin-top: 4px; }
+.onyx-continuation { margin-top: 0; padding-top: 1px; padding-bottom: 1px; }
+.onyx-message:hover,
+.onyx-message:focus-within { background: color-mix(in srgb, var(--onyx-text) 4%, transparent); }
+.onyx-mention { background: color-mix(in srgb, var(--onyx-accent) 9%, transparent); box-shadow: inset 2px 0 0 var(--onyx-accent); }
+.onyx-mention:hover, .onyx-mention:focus-within { background: color-mix(in srgb, var(--onyx-accent) 13%, transparent); }
+.onyx-whisper { box-shadow: inset 2px 0 0 var(--onyx-accent); padding-left: 8px; border-left: 0; }
+
+.onyx-message > .onyx-row-avatar { float: left; display: inline-flex; margin: 2px 0 0 4px; }
+.onyx-message > .onyx-gutter-ts { float: left; width: 44px; text-align: center; }
+.onyx-message > .onyx-row-head, .onyx-message > .onyx-body, .onyx-message > .onyx-row-notes, .onyx-message > .boost-bar, .onyx-message > .onyx-thread-indicator, .onyx-message > .onyx-msg-menu-pop, .onyx-message > .onyx-react-pop { margin-left: 52px; }
+.onyx-row-notes { display: block; }
+.onyx-row-avatar .onyx-avatar { background: var(--onyx-panel-2); }
+.onyx-message > .onyx-row-head, .onyx-message > .onyx-body { max-width: 46rem; }
+.onyx-row-head { display: block; line-height: 1.4; }
+.onyx-row-head .onyx-sender { margin: 0 8px 0 0; font-weight: 650; }
+.onyx-row-head .onyx-audience { margin: 0 8px 0 0; }
+.onyx-ts { color: var(--onyx-faint); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Continuations keep their time in the gutter, shown on hover or focus. */
+.onyx-gutter-ts {
+  visibility: hidden;
+  padding-top: 0.28em;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+.onyx-message:hover > .onyx-gutter-ts, .onyx-message:focus > .onyx-gutter-ts, .onyx-message:focus-within > .onyx-gutter-ts { visibility: visible; }
+.onyx-shell .onyx-body { display: block; line-height: 1.55; white-space: pre-wrap; }
+.onyx-pending-note, .onyx-edited { color: var(--onyx-faint); font-size: 12px; white-space: nowrap; }
+
+/* Row actions: hover/focus on pointers; on touch, tap the message (it
+   takes focus) to reveal its one trigger — long-press opens the menu. */
+.onyx-shell .onyx-msg-menu-trigger {
+  float: right;
+  margin: 0 0 0 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: 8px;
+  background: var(--onyx-panel);
+  color: var(--onyx-dim);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.onyx-shell .onyx-message:not(:hover):not(:focus):not(:focus-within) .onyx-msg-menu-trigger:not([aria-expanded="true"]) { opacity: 0; }
+.onyx-shell .onyx-msg-menu-trigger:hover { color: var(--onyx-text); }
+@media (hover: none) {
+  .onyx-shell .onyx-msg-menu-trigger { width: 44px; height: 44px; margin: -3px -2px 0 6px; }
+  /* Touch: no reserved space; tapping a message (it takes focus) shows
+     its trigger, and long-press opens the menu directly. */
+  .onyx-shell .onyx-message:not(:focus):not(:focus-within) .onyx-msg-menu-trigger:not([aria-expanded="true"]) { display: none; }
+  .onyx-message:hover:not(:focus-within):not(:focus) { background: transparent; }
+  .onyx-message { -webkit-touch-callout: none; }
+}
+.onyx-message:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 0; }
+
+/* System events: one dim line aligned with message text. */
+.onyx-thread > .onyx-system {
+  margin: 4px 0;
+  padding: 2px 8px 2px 60px;
+  color: var(--onyx-dim);
+  font-size: 12.5px;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+.onyx-day-divider { margin: 20px 0 8px; font-size: 12px; font-weight: 600; }
+.onyx-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+  color: var(--onyx-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.onyx-unread-divider::after { content: ''; flex: 1; height: 1px; background: var(--onyx-accent); opacity: 0.7; }
+.onyx-unread-divider-label { white-space: nowrap; text-transform: uppercase; letter-spacing: 0.06em; }
+.onyx-unread-divider:focus { outline: none; }
+
+.onyx-unread-jump-wrap {
+  position: sticky;
+  top: 6px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
+}
+.onyx-shell .onyx-unread-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px 6px 10px;
+  border: 1px solid var(--onyx-accent);
+  border-radius: 999px;
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.onyx-unread-jump .onyx-icon { width: 16px; height: 16px; }
+
+.onyx-earlier { padding: 8px 0 4px; }
+.onyx-shell .onyx-earlier-button { min-height: 40px; padding: 8px 16px; font-size: 13px; color: var(--onyx-dim); }
+.onyx-shell .onyx-earlier-button:hover:not(:disabled) { color: var(--onyx-text); border-color: var(--onyx-dim); }
+.onyx-earlier-count {
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font-size: 12px;
+}
+
+.onyx-intro, .onyx-empty-conversation { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 28px 8px 16px; }
+.onyx-empty-conversation { align-items: center; text-align: center; }
+.onyx-intro-glyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 16px;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-dim);
+  font-size: 28px;
+  font-weight: 700;
+}
+.onyx-shell .onyx-intro-title { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 26px; font-weight: 400; }
+.onyx-intro-text { margin: 0; color: var(--onyx-dim); }
+.onyx-typing { padding: 4px 8px 0 60px; color: var(--onyx-dim); font-size: 12.5px; font-style: italic; }
+
+/* ── Composer: one row (input + send), tools beside or behind + ────── */
+.onyx-composer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+}
+.onyx-composer > div, .onyx-composer > p, .onyx-composer > span, .onyx-composer > ul, .onyx-composer > form { order: 0; flex: 1 1 100%; min-width: 0; }
+.onyx-composer > .onyx-reading-bar { order: -1; }
+.onyx-shell .onyx-composer-target { display: none; }
+.onyx-composer > .onyx-composer-tools-toggle { display: none; }
+.onyx-composer > input { order: 2; flex: 1 1 0; min-height: 44px; }
+.onyx-composer-tools { display: contents; }
+.onyx-composer-tools > .onyx-audience-toggle { order: 1; flex: none; min-height: 44px; }
+.onyx-composer-tools > .onyx-attachments { order: 3; flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.onyx-composer-tools > .onyx-schedule { order: 4; flex: none; position: relative; }
+.onyx-composer > button[type="submit"] { order: 5; flex: none; min-height: 44px; }
+.onyx-composer > p, .onyx-composer > div:not(.onyx-reading-bar):not(.onyx-composer-tools) { order: 6; }
+.onyx-composer-tools > .onyx-attachments:has(.onyx-attach-row) { order: 6; flex: 1 1 100%; }
+.onyx-shell .onyx-composer .onyx-attach-open, .onyx-shell .onyx-composer .onyx-schedule-open, .onyx-shell .onyx-composer .onyx-composer-tools-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--onyx-text);
+}
+.onyx-shell .onyx-composer .onyx-attach-open:hover:not(:disabled), .onyx-shell .onyx-composer .onyx-schedule-open:hover:not(:disabled), .onyx-shell .onyx-composer .onyx-composer-tools-toggle:hover:not(:disabled) { background: var(--onyx-panel-2); }
+.onyx-shell .onyx-composer .onyx-attach-open:disabled, .onyx-shell .onyx-composer .onyx-schedule-open:disabled { color: var(--onyx-faint); background: transparent; }
+.onyx-shell .onyx-composer .onyx-attach-remove { min-height: 36px; padding: 4px 10px; }
+.onyx-attach-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.onyx-composer .onyx-reading-bar {
+  justify-content: center;
+  gap: 10px;
+}
+.onyx-shell .onyx-composer .onyx-reading-bar button {
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--onyx-panel-2);
+}
+
+/* ── Inbox sheet ───────────────────────────────────────────────────── */
+.notif-center-layer { position: fixed; inset: 0; z-index: 70; }
+.notif-center-veil { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.notif-center {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100dvh - 80px);
+  overflow: hidden;
+  color: var(--onyx-text);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+.notif-center:focus { outline: none; }
+.notif-center button { font: inherit; cursor: pointer; }
+.notif-center__grip { display: none; }
+.notif-center__head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 16px; }
+.notif-center__title { flex: 1; margin: 0; font-size: 17px; font-weight: 650; }
+.notif-center__action {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--onyx-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--onyx-text);
+  font-size: 13px;
+}
+.notif-center__action:disabled { opacity: 0.45; cursor: default; }
+.notif-center__close, .notif-center__dismiss {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--onyx-dim);
+}
+.notif-center__close:hover, .notif-center__dismiss:hover { background: var(--onyx-panel-2); color: var(--onyx-text); }
+.notif-center__dismiss .onyx-icon { width: 16px; height: 16px; }
+.notif-center__filters { display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--onyx-line); }
+.notif-center__filter {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--onyx-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--onyx-dim);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.notif-center__filter[aria-pressed="true"] { border-color: var(--onyx-accent); background: var(--onyx-panel-2); color: var(--onyx-text); }
+.notif-center__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.notif-center__list { margin: 0; padding: 4px 0 8px; list-style: none; }
+.notif-center__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 44px;
+  align-items: center;
+  border-left: 3px solid transparent;
+}
+.notif-center__row + .notif-center__row { border-top: 1px solid color-mix(in srgb, var(--onyx-line) 60%, transparent); }
+.notif-center__row[data-unread="true"][data-attention="true"] {
+  border-left-color: var(--onyx-accent);
+  background: color-mix(in srgb, var(--onyx-accent) 6%, transparent);
+}
+.notif-center__open {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 4px 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--onyx-text);
+  text-align: start;
+}
+button.notif-center__open:hover { background: color-mix(in srgb, var(--onyx-text) 5%, transparent); }
+.notif-center__open--static { cursor: default; }
+.notif-center__glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+.notif-center__row[data-attention="true"] .notif-center__glyph { color: var(--onyx-accent); }
+.notif-center__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-center__meta { display: flex; flex-wrap: wrap; gap: 2px 8px; color: var(--onyx-dim); font-size: 12px; line-height: 1.4; }
+.notif-center__kind { color: var(--onyx-text); font-weight: 650; }
+.notif-center__context { min-width: 0; overflow-wrap: anywhere; }
+.notif-center__count { font-weight: 700; }
+.notif-center__when { color: var(--onyx-faint); }
+.notif-center__read { color: var(--onyx-faint); }
+.notif-center__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.notif-center__join {
+  min-height: 34px;
+  padding: 4px 12px;
+  border: 1px solid var(--onyx-accent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--onyx-accent);
+  font-size: 13px;
+  font-weight: 650;
+}
+.notif-center__empty { margin: 0; padding: 36px 24px; color: var(--onyx-dim); text-align: center; line-height: 1.6; }
+@media (forced-colors: active) {
+  .notif-center, .notif-center__row, .onyx-room-details { border: 1px solid CanvasText; }
+  .notif-center__row[data-unread="true"] { border-left: 3px solid Highlight; }
+  .onyx-icon { background: CanvasText; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onyx-room-chevron { transition: none; }
+}
+
+/* ── Phones ────────────────────────────────────────────────────────── */
+@media (max-width: 47.99rem) {
+  .onyx-topbar-spacer { display: none; }
+  .onyx-topbar > .shell-ribbon-inbox { order: 1; }
+  .onyx-shell .shell-ribbon-bell { width: 44px; height: 44px; }
+
+  .onyx-room-bar { gap: 6px; min-height: 52px; padding: 4px 6px 4px 14px; }
+  .onyx-room-glyph, .onyx-room-avatar, .onyx-shell .onyx-room-name { display: none; }
+  .onyx-shell .onyx-room-summary { min-height: 44px; font-size: 13.5px; }
+  .onyx-shell .onyx-room-tools .onyx-convo-tool { width: 44px; height: 44px; }
+  .onyx-shell .onyx-room-tools .onyx-room-more-toggle { display: inline-grid; }
+  .onyx-room-more { display: none; }
+  .onyx-room-tools[data-more-open="true"] > .onyx-room-more {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 13rem;
+    padding: 6px;
+    background: var(--onyx-panel);
+    border: 1px solid var(--onyx-line);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+  .onyx-shell .onyx-room-more > .onyx-convo-tool {
+    display: flex;
+    justify-content: flex-start;
+    gap: 12px;
+    width: 100%;
+    padding: 0 12px;
+    color: var(--onyx-text);
+  }
+  .onyx-room-more .onyx-tool-label { position: static; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; }
+  .onyx-room-more .onyx-tool-count { position: static; margin-left: auto; }
+  .onyx-room-details { left: 8px; right: 8px; width: auto; max-height: min(75dvh, 40rem); }
+
+  .onyx-thread-pane { padding: 4px 8px 8px; }
+  .onyx-message { margin-top: 10px; padding: 3px 6px; }
+  .onyx-message > .onyx-row-avatar { margin-left: 2px; }
+  .onyx-message > .onyx-gutter-ts { width: 40px; }
+  .onyx-message > .onyx-row-head, .onyx-message > .onyx-body, .onyx-message > .onyx-row-notes, .onyx-message > .boost-bar, .onyx-message > .onyx-thread-indicator, .onyx-message > .onyx-msg-menu-pop, .onyx-message > .onyx-react-pop { margin-left: 46px; }
+  .onyx-continuation { margin-top: 0; padding-top: 1px; padding-bottom: 1px; }
+  .onyx-message > .onyx-row-head, .onyx-message > .onyx-body { max-width: none; }
+  .onyx-shell .onyx-body { font-size: 16px; line-height: 1.5; }
+  .onyx-thread > .onyx-system { padding-left: 52px; }
+  .onyx-typing { padding-left: 52px; }
+
+  .onyx-composer { gap: 6px; padding: 8px 10px max(8px, env(safe-area-inset-bottom)); }
+  .onyx-composer > .onyx-composer-tools-toggle { display: inline-flex; order: 1; flex: none; }
+  .onyx-composer-tools { display: none; order: 0; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .onyx-composer-tools[data-open="true"] { display: flex; }
+  .onyx-composer-tools > .onyx-audience-toggle, .onyx-composer-tools > .onyx-attachments, .onyx-composer-tools > .onyx-schedule { order: 0; }
+  .onyx-composer > input { font-size: 16px; }
+  .onyx-shell .onyx-composer-tools .onyx-attach-open, .onyx-shell .onyx-composer-tools .onyx-schedule-open { width: auto; padding: 0 14px 0 12px; }
+  .onyx-composer-tools .onyx-tool-label { position: static; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; }
+  .onyx-composer-tools-toggle[aria-expanded="true"] .onyx-icon { transform: rotate(45deg); }
+  .onyx-shell .onyx-composer > button[type="submit"] { padding: 0 16px; }
+
+  .notif-center {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - 24px);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+  }
+  .notif-center__grip { display: block; width: 40px; height: 4px; margin: 8px auto 0; border-radius: 999px; background: var(--onyx-line); }
+  .notif-center__head { padding-top: 6px; }
+  .notif-center__action, .notif-center__filter, .notif-center__join { min-height: 44px; }
+  .notif-center__close, .notif-center__dismiss { width: 44px; height: 44px; }
+}
+
+/* ── Advanced (local services and recovery), opened from You ───────── */
+.onyx-main.onyx-main-advanced { grid-template-columns: 280px minmax(0, 1fr) 380px; }
+.onyx-main.onyx-main-advanced > .onyx-roster { display: none; }
+.onyx-advanced {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  background: var(--onyx-panel);
+  border-left: 1px solid var(--onyx-line);
+}
+.onyx-advanced:focus { outline: none; }
+.onyx-advanced-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  background: var(--onyx-panel);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-shell .onyx-advanced-head h2 { margin: 0; font-size: 17px; font-weight: 650; }
+.onyx-shell .onyx-advanced-close { min-height: 40px; padding: 6px 14px; }
+.onyx-advanced-lede { margin: 0; padding: 12px 16px 0; color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
+.onyx-advanced .runtime-services { padding: 12px 16px 20px; }
+.onyx-advanced .runtime-services h2 { font-size: 13px; }
+@media (max-width: 68.74rem) {
+  .onyx-main.onyx-main-advanced { grid-template-columns: 280px minmax(0, 1fr); }
+  .onyx-advanced {
+    position: fixed;
+    z-index: 46;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 100vw);
+    box-shadow: -16px 0 48px rgba(0, 0, 0, 0.45);
+  }
+}
+@media (max-width: 47.99rem) {
+  .onyx-main.onyx-main-advanced { grid-template-columns: minmax(0, 1fr); }
+  .onyx-advanced { width: 100%; padding-top: env(safe-area-inset-top); border-left: 0; }
+  .onyx-shell .onyx-advanced-close { min-height: 44px; }
+}
+.onyx-shell .onyx-composer .onyx-audience-toggle {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--onyx-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--onyx-dim);
+  font-size: 13px;
+  font-weight: 650;
+}
+.onyx-shell .onyx-composer .onyx-audience-toggle-set { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+
+/* Layering fixes (kept last so they win over the shared button rules). */
+.onyx-shell .onyx-composer > .onyx-composer-tools-toggle { display: none; }
+.onyx-room-people .onyx-facepile { padding: 0; }
+.onyx-room-people .onyx-facepile-face .onyx-avatar { background: var(--onyx-panel-2); box-shadow: 0 0 0 2px var(--onyx-panel); }
+.onyx-unread-jump-wrap { justify-content: flex-end; padding-right: 8px; }
+.onyx-room-details .shell-topic-actions { justify-content: flex-start; width: 100%; }
+.onyx-room-details .shell-topic-actions > button { margin: 0; }
+@media (max-width: 47.99rem) {
+  .onyx-shell .onyx-composer > .onyx-composer-tools-toggle { display: inline-flex; }
+  .onyx-shell .onyx-unread-jump { min-height: 44px; }
+  .onyx-room-details button, .onyx-room-details input, .onyx-advanced button, .onyx-advanced input { min-height: 44px; }
+}
+@media (max-width: 47.99rem) {
+  .onyx-room-details .shell-topic-create-input, .onyx-room-details .onyx-room-topic-input { min-height: 44px; }
+}
+@media (max-width: 47.99rem) {
+  .onyx-room-people .onyx-facepile-face { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; }
+  .onyx-room-people .onyx-facepile-face + .onyx-facepile-face { margin-left: 0; }
+}
+.onyx-advanced-server { margin: 12px 16px 0; padding: 10px 12px; border: 1px solid var(--onyx-line); border-radius: 10px; }
+.onyx-advanced-server > summary { min-height: 32px; color: var(--onyx-dim); font-weight: 600; cursor: pointer; }
+.onyx-advanced-server-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; color: var(--onyx-dim); overflow-wrap: anywhere; }
+.onyx-row-notes { line-height: 1.3; }

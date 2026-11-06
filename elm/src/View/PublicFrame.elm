@@ -244,8 +244,12 @@ footer currentPath exploreTitle =
                     [ img [ class "site-brand-mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
                     , span [ class "site-brand-name" ] [ text "Onyx" ]
                     ]
-                , p [] [ text "Rooms, messages, and calls for friends, clubs, and creators." ]
+                , p [] [ text "Rooms, DMs, and voice calls for your people. Runs in your browser." ]
                 , a [ class "site-foot-open", href "/app/" ] [ text "Open Onyx" ]
+                , p [ class "site-foot-legal" ]
+                    [ text "Free and open source under AGPL-3.0. "
+                    , a [ href "https://github.com/devinkbrown/onyx" ] [ text "Source on GitHub" ]
+                    ]
                 ]
             , nav [ class "site-foot-nav", attribute "aria-label" "Footer navigation" ]
                 [ column exploreTitle footerLinks

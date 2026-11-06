@@ -365,8 +365,6 @@
   .onyx-main, .onyx-main-home { grid-template-columns: 248px minmax(0, 1fr); }
   /* With the icon rail beside it the bar keeps one row. */
   .onyx-shell .onyx-topbar { flex-wrap: nowrap; }
-  .onyx-shell .onyx-topbar > .onyx-topic { order: 0; flex: 1 1 0; flex-basis: 0; }
-  .onyx-shell .onyx-topbar > .onyx-topbar-tools { order: 0; flex: none; overflow: visible; padding: 0; }
   .onyx-shell .onyx-topbar > .onyx-conn { order: 0; margin-left: 0; }
   .onyx-topbar > .onyx-conn .onyx-conn-name { display: none; }
 }
@@ -437,10 +435,6 @@
   .onyx-back-chevron { width: 10px; height: 10px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-left: 6px; }
   .onyx-topbar > .onyx-conn { order: 2; margin-left: 0; padding-inline: 12px; }
   .onyx-topbar > .onyx-conn .onyx-conn-name { display: none; }
-  .onyx-topbar > .onyx-topbar-tools { order: 1; flex: none; overflow: visible; padding: 0; }
-  .onyx-topbar > .onyx-topbar-tools:has(.onyx-convo-tool) { order: 3; flex: 1 1 100%; overflow-x: auto; padding: 2px; }
-  .onyx-shell[data-collection-open="true"] .onyx-topbar > .onyx-topbar-tools { order: 1; flex: none; overflow: visible; padding: 0; }
-  .onyx-shell[data-collection-open="true"] .onyx-convo-tool { display: none; }
 
   .onyx-rail .onyx-rail-conversation { min-height: 52px; padding: 10px 12px; font-size: 16px; }
   .onyx-rail-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; }
@@ -450,7 +444,7 @@
   /* A pushed conversation keeps the transcript: the keep-name chip and
      the closed local-services disclosure stay on Home and the collection
      pages ("Keep this name" is also in You). */
-  .onyx-shell:is([data-nav="rooms"], [data-nav="messages"]):not([data-collection-open="true"]) :is(.guest-claim-chip, .runtime-services-disclosure:not([open])) { display: none; }
+  .onyx-shell:is([data-nav="rooms"], [data-nav="messages"]):not([data-collection-open="true"]) .guest-claim-chip { display: none; }
 }
 
 /* The 280px sidebar keeps the four filters on one row. */

@@ -32,7 +32,7 @@ for (const width of [320, 390, 768, 1440]) {
 test('primary action is legible and public navigation stays keyboard reachable', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto('/');
-  const contrast = await page.locator('.site-intro .site-cta-primary').evaluate(element => {
+  const contrast = await page.locator('.site-hero .site-cta-primary').evaluate(element => {
     const style = getComputedStyle(element);
     const luminance = (color: string) => {
       const rgb = color.match(/[\d.]+/g)!.slice(0, 3).map(value => {
@@ -83,7 +83,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const page = await context.newPage();
     await page.goto('/');
     await expect(page.locator('#onyx-boot-splash')).toHaveCount(0);
-    for (const selector of ['.site-lede', '.site-note', '.site-claim dd', '.site-ledger-go', '.site-foot-links a', '.site-intro .site-cta-primary']) {
+    for (const selector of ['.site-lede', '.site-note', '.site-fact-copy span', '.site-card p', '.site-checks li', '.site-trust-list span', '.site-foot-links a', '.site-hero .site-cta-primary']) {
       const ratio = await page.locator(selector).first().evaluate(contrastOf);
       expect(ratio, selector).toBeGreaterThanOrEqual(4.5);
     }
@@ -122,7 +122,46 @@ test('reduced motion disables transitions on public pages', async ({ browser }) 
   const context = await browser.newContext({ reducedMotion: 'reduce' });
   const page = await context.newPage();
   await page.goto('/');
-  const duration = await page.locator('.site-intro .site-cta-primary').evaluate(element => getComputedStyle(element).transitionDuration);
+  const duration = await page.locator('.site-hero .site-cta-primary').evaluate(element => getComputedStyle(element).transitionDuration);
   expect(duration.split(',').every(value => parseFloat(value) === 0)).toBe(true);
   await context.close();
 });
+
+// iOS chrome: Safari tints its bars from theme-color (and, on newer
+// releases, from the page/sticky-header ground), and rubber-band
+// overscroll shows the <html> background. All three must agree with the
+// active scheme on public pages; the dark-only app shell keeps its own.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`browser chrome and overscroll ground match the ${colorScheme} scheme`, async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const ground = colorScheme === 'light' ? 'rgb(247, 244, 236)' : 'rgb(14, 21, 24)';
+    const tint = colorScheme === 'light' ? '#f7f4ec' : '#0e1518';
+    const chrome = () => page.evaluate((scheme) => {
+      const active = [...document.querySelectorAll('meta[name="theme-color"]')]
+        .find((meta) => !meta.getAttribute('media') || meta.getAttribute('media')!.includes(scheme));
+      return {
+        tint: active?.getAttribute('content'),
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        html: getComputedStyle(document.documentElement).backgroundColor,
+        body: getComputedStyle(document.body).backgroundColor,
+        mast: document.querySelector('.site-mast') ? getComputedStyle(document.querySelector('.site-mast')!).backgroundColor : null,
+        viewport: document.querySelector('meta[name="viewport"]')?.getAttribute('content'),
+      };
+    }, colorScheme);
+    for (const route of ['/', '/about/', '/nope-xyz']) {
+      await page.goto(route);
+      await expect(page.locator('#onyx-boot-splash')).toHaveCount(0);
+      const seen = await chrome();
+      expect(seen, route).toEqual({ tint, scheme: colorScheme, html: ground, body: ground, mast: ground, viewport: expect.stringContaining('viewport-fit=cover') });
+    }
+    // In-app navigation is a pushState move: the tint follows the shell.
+    await page.goto('/');
+    await page.locator('.site-mast .site-mast-open').click();
+    await expect(page).toHaveURL(/\/app\/$/);
+    await expect.poll(async () => (await chrome()).tint).toBe('rgb(14, 21, 24)');
+    await page.goBack();
+    await expect.poll(async () => (await chrome()).tint).toBe(tint);
+    await context.close();
+  });
+}

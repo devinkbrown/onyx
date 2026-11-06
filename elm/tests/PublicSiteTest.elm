@@ -54,18 +54,42 @@ suite =
                         , \_ ->
                             q
                                 |> Query.find [ Selector.tag "h1" ]
-                                |> Query.has [ Selector.text "Good company.", Selector.text "Great nights." ]
+                                |> Query.has [ Selector.text "Rooms, DMs, and calls", Selector.text "for your people." ]
                         , \_ -> Query.has [ Selector.text "Skip to content" ] q
                         ]
                         ()
-            , test "room sketch is decorative and says it is not live" <|
+            , test "every product picture is a real screenshot with alt text, WebP first" <|
+                \_ ->
+                    let
+                        q =
+                            query { blank | route = Route.Landing }
+                    in
+                    Expect.all
+                        [ \_ -> q |> Query.findAll [ Selector.class "site-shot-img" ] |> Query.count (Expect.atLeast 4)
+                        , \_ -> q |> Query.findAll [ Selector.tag "source", Selector.attribute (Attr.attribute "type" "image/webp") ] |> Query.count (Expect.atLeast 4)
+                        , \_ -> q |> Query.hasNot [ Selector.attribute (Attr.src "/brand/mascot-still.png") ]
+                        , \_ -> q |> Query.hasNot [ Selector.class "site-sketch" ]
+                        , \_ ->
+                            q
+                                |> Query.find [ Selector.class "site-hero" ]
+                                |> Query.findAll [ Selector.tag "img", Selector.attribute (Attr.attribute "loading" "eager") ]
+                                |> Query.count (Expect.atLeast 1)
+                        ]
+                        ()
+            , test "one primary call to action in the hero goes to the app" <|
                 \_ ->
                     query { blank | route = Route.Landing }
-                        |> Query.find [ Selector.class "site-sketch" ]
-                        |> Query.has
-                            [ Selector.attribute (Attr.attribute "aria-hidden" "true")
-                            , Selector.text "Illustration, not a live room."
+                        |> Query.find [ Selector.class "site-hero" ]
+                        |> Query.findAll [ Selector.class "site-cta-primary" ]
+                        |> Expect.all
+                            [ Query.count (Expect.equal 1)
+                            , Query.first >> Query.has [ Selector.attribute (Attr.href "/app/"), Selector.text "Open Onyx" ]
                             ]
+            , test "the page never claims group rooms are end-to-end encrypted" <|
+                \_ ->
+                    query { blank | route = Route.Landing }
+                        |> Query.find [ Selector.class "site-trust" ]
+                        |> Query.has [ Selector.text "Shared with the room so it can stay open; not end-to-end encrypted." ]
             , test "stateless masthead offers a native phone menu with every destination" <|
                 \_ ->
                     let
@@ -85,16 +109,16 @@ suite =
                                 |> Query.count (Expect.equal (List.length primaryNav + List.length moreNav))
                         ]
                         ()
-            , test "trust claims carry icons hidden from assistive tech" <|
+            , test "feature icons are hidden from assistive tech" <|
                 \_ ->
                     query { blank | route = Route.Landing }
-                        |> Query.findAll [ Selector.class "site-claim-icon", Selector.attribute (Attr.attribute "aria-hidden" "true") ]
-                        |> Query.count (Expect.equal 4)
+                        |> Query.findAll [ Selector.class "site-icon", Selector.attribute (Attr.attribute "aria-hidden" "true") ]
+                        |> Query.count (Expect.equal 10)
             , test "landing footer explores the site" <|
                 \_ ->
                     query { blank | route = Route.Landing }
                         |> Query.find [ Selector.tag "footer" ]
-                        |> Query.has [ Selector.text "More to explore", Selector.text "Trust and help" ]
+                        |> Query.has [ Selector.text "Explore Onyx", Selector.text "Trust and help", Selector.text "Source on GitHub" ]
             ]
         , describe "frame"
             [ test "footer reaches every product and trust page" <|
@@ -151,5 +175,45 @@ suite =
                     query { blank | route = Route.NotFound, navPath = "/nope" }
                         |> Query.find [ Selector.tag "main" ]
                         |> Query.has [ Selector.text "Route terminus", Selector.attribute (Attr.attribute "aria-label" "Onyx page not found") ]
+            ]
+        , describe "appearance page"
+            [ test "one h1, no duplicate title in the bar, and real controls back and home" <|
+                \_ ->
+                    let
+                        q =
+                            query { blank | route = Route.Appearance }
+                    in
+                    Expect.all
+                        [ \_ -> q |> Query.findAll [ Selector.tag "h1" ] |> Query.count (Expect.equal 1)
+                        , \_ -> q |> Query.find [ Selector.tag "h1" ] |> Query.has [ Selector.text "Appearance" ]
+                        , \_ -> q |> Query.find [ Selector.class "ap-bar" ] |> Query.hasNot [ Selector.text "Appearance" ]
+                        , \_ ->
+                            q
+                                |> Query.find [ Selector.class "ap-back" ]
+                                |> Query.has [ Selector.attribute (Attr.href "/app/"), Selector.text "Back to app" ]
+                        , \_ ->
+                            q
+                                |> Query.find [ Selector.class "ap-home" ]
+                                |> Query.has [ Selector.attribute (Attr.href "/"), Selector.attribute (Attr.attribute "aria-label" "Onyx home") ]
+                        ]
+                        ()
+            , test "choice rows are single-select radio groups with one checked option" <|
+                \_ ->
+                    query { blank | route = Route.Appearance }
+                        |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Text size") ]
+                        |> Expect.all
+                            [ Query.has [ Selector.class "ap-chips--choices", Selector.attribute (Attr.attribute "role" "radiogroup") ]
+                            , Query.findAll [ Selector.attribute (Attr.attribute "aria-checked" "true") ] >> Query.count (Expect.equal 1)
+                            , Query.findAll [ Selector.attribute (Attr.attribute "role" "radio") ] >> Query.count (Expect.equal 3)
+                            ]
+            , test "privacy rows keep label, description and the switch state as separate parts" <|
+                \_ ->
+                    query { blank | route = Route.Appearance }
+                        |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Preview web links") ]
+                        |> Expect.all
+                            [ Query.has [ Selector.class "ap-choice-toggle", Selector.attribute (Attr.attribute "role" "switch") ]
+                            , Query.find [ Selector.tag "small" ] >> Query.has [ Selector.text "Show link details fetched through this server." ]
+                            , Query.find [ Selector.tag "b" ] >> Query.has [ Selector.text "On" ]
+                            ]
             ]
         ]
