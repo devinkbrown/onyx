@@ -141,6 +141,9 @@ test('Elm browser identifies a private account and sends an authenticated canary
   await expect(dialog).toBeHidden();
   await page.locator('#client-rooms').getByRole('button', { name: new RegExp(room) }).click();
   await expect(page.getByRole('region', { name: 'Conversation', exact: true })).toHaveAttribute('data-conversation', room);
+  // A signed-in, connected account can start the room's voice call.
+  const callButton = page.locator('.onyx-call-toggle');
+  await expect(callButton, `call title: ${await callButton.getAttribute('title').catch(() => 'missing')}`).toBeEnabled({ timeout: 10_000 });
 
   const isCanaryPrivmsg = (message: ReturnType<typeof parseIRCMessage>) =>
     message.command === 'PRIVMSG' && message.params[0] === room && message.params[1] === canary;

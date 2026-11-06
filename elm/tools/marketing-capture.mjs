@@ -56,6 +56,8 @@ function wire(socket) {
     else if (cmd === 'CAP' && rest[0] === 'END') {
       send(`:onyx.test 001 ${nick} :Welcome to Onyx`,
         `:onyx.test 005 ${nick} CASEMAPPING=rfc1459 CHANTYPES=#& PREFIX=(qaohv)~&@%+ NETWORK=Onyx :are supported`,
+        // Signed in, so account-only controls (the room call button) render live.
+        `:onyx.test 900 ${nick} ${nick}!u@onyx.test ${nick} :You are now logged in as ${nick}`,
         `:${nick}!u@onyx.test JOIN #lounge`, `:${nick}!u@onyx.test JOIN #game-night`, `:${nick}!u@onyx.test JOIN #photography`,
         `@time=${at(18, 2)} :nova!n@onyx.test PRIVMSG ${nick} :are you coming to the call tonight?`,
         `@time=${at(18, 3)} :nova!n@onyx.test PRIVMSG ${nick} :theo's starting it in #lounge at 9`,

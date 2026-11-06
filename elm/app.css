@@ -811,7 +811,7 @@ html, body {
   background: var(--onyx-panel);
   color: var(--onyx-text);
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 8px 10px;
 }
 
@@ -848,7 +848,7 @@ html, body {
   align-items: center;
   gap: 8px;
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 6px 10px;
   background: var(--onyx-panel);
 }
@@ -1452,7 +1452,7 @@ html, body {
 .onyx-profile-sheet {
   background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1506,7 +1506,7 @@ html, body {
 .onyx-member-card {
   background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1553,7 +1553,7 @@ html, body {
 .onyx-moderation-review {
   background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1574,7 +1574,7 @@ html, body {
 .person-safety__panel {
   background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1906,7 +1906,7 @@ html, body {
 .onyx-gate-input {
   width: 100%; min-height: 44px; padding: 8px 12px;
   font: inherit; font-size: 16px; color: var(--onyx-text);
-  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 8px;
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: var(--r-sm);
 }
 .onyx-gate-input::placeholder { color: var(--onyx-dim); opacity: 1; }
 .onyx-gate-input:disabled { opacity: 0.6; }
@@ -1973,7 +1973,7 @@ html, body {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   width: 100%; min-height: 52px; padding: 10px 14px; text-align: left;
   color: var(--onyx-text); text-decoration: none;
-  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 8px;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: var(--r-sm);
 }
 .onyx-you-door small { color: var(--onyx-dim); font-size: 12px; }
 @media (max-width: 47.99rem) {
@@ -2296,3 +2296,18 @@ html, body {
 #onyx-private-account-security > [role="dialog"] input, #onyx-private-runtime-presentation > [role="dialog"] input { min-height: 44px; padding: 0 var(--sp-3); border: 1px solid var(--onyx-line); border-radius: var(--r-sm); background: var(--onyx-bg); color: var(--onyx-text); font: inherit; }
 #onyx-private-account-security > [role="dialog"] button, #onyx-private-runtime-presentation > [role="dialog"] button { min-height: 44px; padding: 0 var(--sp-4); margin: var(--sp-2) var(--sp-2) 0 0; border: 1px solid var(--onyx-line); border-radius: var(--r-md); background: var(--onyx-panel-2); color: var(--onyx-text); font: inherit; cursor: pointer; }
 #onyx-private-account-security > [role="dialog"] button[type="submit"], #onyx-private-runtime-presentation > [role="dialog"] button[type="submit"] { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; }
+
+/* Session-restore status line under the top bar (restoring, failed, expired). */
+.onyx-session-recovery {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 0; padding: 8px 16px;
+  font-size: 0.875rem; line-height: 1.4;
+  color: var(--onyx-dim);
+  background: var(--onyx-panel);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-session-recovery button {
+  font: inherit; font-weight: 600; padding: 4px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--onyx-line);
+  background: transparent; color: inherit; cursor: pointer;
+}

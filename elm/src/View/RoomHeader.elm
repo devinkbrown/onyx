@@ -206,9 +206,6 @@ callButton model =
         inThisCall =
             model.calls.lifecycle /= Media.Idle && model.calls.channel == Just room
 
-        signedIn =
-            model.accountName /= Nothing
-
         live =
             model.connection == App.Live
     in
@@ -230,16 +227,13 @@ callButton model =
             , attribute "data-onyx-media-conversation" room
             , attribute "aria-label" ("Voice call in " ++ room)
             , attribute "title"
-                (if not signedIn then
-                    "Sign in to start or join calls"
-
-                 else if not live then
+                (if not live then
                     "Calls need a connection"
 
                  else
                     "Start or join the voice call"
                 )
-            , disabled (not signedIn || not live || String.isEmpty room)
+            , disabled (not live || String.isEmpty room)
             ]
             [ icon "call", span [ class "onyx-tool-label" ] [ text "Call" ] ]
 

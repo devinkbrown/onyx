@@ -280,7 +280,9 @@ sessionRecoveryBanner : Model -> Html Msg
 sessionRecoveryBanner model =
     case model.sessionReclaim of
         Nothing ->
-            if not (List.isEmpty model.sessionTokens.credentials) then
+            -- A saved credential sitting idle is the normal signed-in state:
+            -- no banner (Remember this device lives in the services panel).
+            if not (List.isEmpty model.sessionTokens.credentials) && model.sessionCredentialIssuance /= Session.CredentialIdle then
                 div [ class "onyx-session-recovery", attribute "role" "group", attribute "aria-label" "Session attachments" ]
                     (credentialStatus model ++ rememberControl model)
 
@@ -290,12 +292,8 @@ sessionRecoveryBanner model =
             else if model.sessionCredentialIssuance == Session.CredentialUnknown then
                 div [ class "onyx-session-recovery", attribute "role" "status" ] [ text "The new session credential outcome is unknown; the previous credential was retained." ]
 
-            else if model.connection == App.Live && model.accountName /= Nothing && not model.sessionTokenIssuanceRequested then
-                div [ class "onyx-session-recovery", attribute "role" "group", attribute "aria-label" "Session attachments" ]
-                    [ span [] [ text "This sign-in has no saved attachment to restore." ]
-                    , button [ type_ "button", onClick SessionNewAttachmentRequested ] [ text "Create a new attachment" ]
-                    ]
-
+            -- A fresh sign-in with no saved attachment is the normal case;
+            -- it is not worth a banner.
             else
                 text ""
 

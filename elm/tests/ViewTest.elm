@@ -103,14 +103,20 @@ roomCallTests =
                         [ Query.has [ Selector.attribute (Attr.attribute "data-onyx-media-conversation" "#c") ]
                         , Query.hasNot [ Selector.disabled True ]
                         ]
-        , test "guests see the call button disabled with a sign-in hint" <|
+        , test "guests can join calls too (the server allows guest MEDIA JOIN)" <|
             \_ ->
                 View.RoomHeader.roomHeader { channelModel | accountName = Nothing, connection = App.Live }
                     |> Query.fromHtml
                     |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
+                    |> Query.hasNot [ Selector.disabled True ]
+        , test "the call button waits for a connection" <|
+            \_ ->
+                View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Offline }
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
                     |> Expect.all
                         [ Query.has [ Selector.disabled True ]
-                        , Query.has [ Selector.attribute (Attr.attribute "title" "Sign in to start or join calls") ]
+                        , Query.has [ Selector.attribute (Attr.attribute "title" "Calls need a connection") ]
                         ]
         ]
 
