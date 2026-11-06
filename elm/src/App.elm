@@ -2801,6 +2801,7 @@ type Msg
     | ClientLineRejected { endpoint : Maybe String, physicalConnectionGeneration : Int, runtimeOwnerStamp : Maybe { ownerRef : String, networkId : String, accountId : Maybe String, accountGeneration : Int, connectionGeneration : Int } }
     | ReconnectNow
     | ConnectionDialogOpen
+    | ConnectionSignInOpen
     | ConnectionDialogClose
     | ConnectionNickInput String
     | ConnectionAccountInput String
@@ -45402,6 +45403,14 @@ updateRaw msg initialModel =
               }
             , []
             )
+
+        ConnectionSignInOpen ->
+            -- Opened from account-only actions (calls): land on Sign in.
+            let
+                ( opened, out ) =
+                    update ConnectionDialogOpen model
+            in
+            ( { opened | connectionSignIn = True }, out )
 
         ConnectionDialogClose ->
             ( { model | connectionDialogOpen = False, connectionDialogError = Nothing }, [] )

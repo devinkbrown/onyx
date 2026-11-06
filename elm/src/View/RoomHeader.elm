@@ -206,6 +206,9 @@ callButton model =
         inThisCall =
             model.calls.lifecycle /= Media.Idle && model.calls.channel == Just room
 
+        signedIn =
+            model.accountName /= Nothing
+
         live =
             model.connection == App.Live
     in
@@ -218,6 +221,18 @@ callButton model =
             , onClick (RuntimeDomainActionRequested (RuntimeDomain.MediaLeave (Just room)))
             ]
             [ icon "call-end", span [ class "onyx-tool-label" ] [ text "Leave call" ] ]
+
+    else if not signedIn then
+        -- Calls are end-to-end encrypted, and the encryption keys belong
+        -- to an account, so a guest is taken to Sign in instead.
+        button
+            [ type_ "button"
+            , class "onyx-call-toggle onyx-convo-tool"
+            , attribute "aria-label" "Sign in to join voice calls"
+            , attribute "title" "Calls are end-to-end encrypted. Sign in to join."
+            , onClick ConnectionSignInOpen
+            ]
+            [ icon "call", span [ class "onyx-tool-label" ] [ text "Call" ] ]
 
     else
         button

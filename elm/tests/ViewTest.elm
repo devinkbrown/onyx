@@ -103,12 +103,16 @@ roomCallTests =
                         [ Query.has [ Selector.attribute (Attr.attribute "data-onyx-media-conversation" "#c") ]
                         , Query.hasNot [ Selector.disabled True ]
                         ]
-        , test "guests can join calls too (the server allows guest MEDIA JOIN)" <|
+        , test "guests are sent to Sign in (calls are end-to-end encrypted)" <|
             \_ ->
                 View.RoomHeader.roomHeader { channelModel | accountName = Nothing, connection = App.Live }
                     |> Query.fromHtml
-                    |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
-                    |> Query.hasNot [ Selector.disabled True ]
+                    |> Query.find [ Selector.class "onyx-call-toggle" ]
+                    |> Expect.all
+                        [ Query.hasNot [ Selector.disabled True ]
+                        , Query.hasNot [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
+                        , Event.simulate Event.click >> Event.expect App.ConnectionSignInOpen
+                        ]
         , test "the call button waits for a connection" <|
             \_ ->
                 View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Offline }
@@ -375,6 +379,17 @@ suite =
                 query (Tuple.first (update ConnectionDialogOpen blank))
                     |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-dialog") ]
                     |> Query.has [ Selector.text "Your connection", Selector.text blank.ourNick ]
+        , test "the guest call button opens the dialog on Sign in" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        update ConnectionSignInOpen blank
+                in
+                Expect.all
+                    [ \m -> Expect.equal True m.connectionDialogOpen
+                    , \m -> Expect.equal True m.connectionSignIn
+                    ]
+                    opened
         , test "Connect is on the home screen and in the top bar" <|
             \_ ->
                 let
