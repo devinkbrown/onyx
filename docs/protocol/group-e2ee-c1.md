@@ -5,6 +5,15 @@ truthful activation (`hold` → `active` after verified genesis bootstrap) are
 product-wired; persistent higher-epoch recovery and production dual-node
 acceptance remain incomplete.
 
+**2026-11-06:** the local-server lab (`elm/tools/lab/run.mjs --suite group`)
+passes all 8 stages with two browsers on one node, including member trust
+review, rotation and device removal to a new epoch. Rooms with three or more
+members, cross-node delivery and real devices are unproven, and device-trust
+review is pending independent security review. Elm-side codecs mirror the
+modules below (`elm/src/GroupControl.elm`, `GroupEnvelope.elm`,
+`GroupSession.elm`, `GroupWelcome.elm`, `GroupCommit.elm`, `GroupDirectory.elm`);
+keys stay in `elm/runtime/private-crypto-provider.ts`.
+
 This document defines the current **versioned client payload** that rides the
 opaque `E2EEGROUP` trailing parameter. It is an Onyx in-house control format.
 It does **not** claim MLS or RFC 9420 wire interoperability.

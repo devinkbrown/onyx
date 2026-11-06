@@ -1,8 +1,12 @@
 # Onyx desktop host (Zig + Native SDK)
 
 Minimal **Zig** desktop shell that loads the **same** Elm web client and
-static site (`pnpm build` → `dist/`; `pnpm dev` serves it on `127.0.0.1:3000`
-for `native dev`). No Tauri, Electron, or Rust host.
+static site (`node tools/build-elm-site.mjs dist` → `dist/`). No Tauri,
+Electron, or Rust host.
+
+> **Note (2026-11-06):** `pnpm build` and `pnpm dev` now build the Elm client
+> (`pnpm dev` serves `dist/` on `http://127.0.0.1:3000`, the host's dev
+> origin). The desktop host itself has not been re-verified on the Elm build.
 
 Onyx host/application code is **Zig**. The Native SDK platform backend still
 includes **native platform glue**, and the Windows cross-build compiles SDK
@@ -13,7 +17,7 @@ SDK backend, not in Onyx application sources — state it honestly; do not claim
 This is a **system WebView** host (macOS WKWebView / Linux WebKitGTK 6 /
 Windows WebView2). It does **not** claim Chromium/CEF engine parity.
 
-Public-launch tracking: **[`PUBLIC_LAUNCH_ROADMAP.md`](./PUBLIC_LAUNCH_ROADMAP.md)**.
+Public-launch tracking (historical): [`archive/PUBLIC_LAUNCH_ROADMAP.md`](archive/PUBLIC_LAUNCH_ROADMAP.md).
 
 | Piece | Path |
 |-------|------|
@@ -71,7 +75,7 @@ the minimal host. Runtime code does **not** hardcode scaffold/progress claims
   while still serving the configured `index.html` entry. This keeps SPA router
   location `/`; loading `zero://app/index.html` leaves the client router unmatched
   and produces a background-only window.
-- Dev source: `NATIVE_SDK_FRONTEND_URL` + `pnpm dev` (`tools/serve.mjs`) on
+- Dev source: `NATIVE_SDK_FRONTEND_URL` + `tools/serve.mjs` on
   **`http://127.0.0.1:3000`** (exact allowlisted origin; no path).
 - External links: **deny** in **both** `app.zon` and runtime
   `SecurityPolicy` in `desktop/main.zig` (not one side only).
@@ -233,7 +237,7 @@ Chromium-parity claim).
 
 ```bash
 pnpm install                       # applies patched @native-sdk/cli@0.6.2
-pnpm build                         # SPA → dist/
+pnpm build                        # client + site → dist/ (tools/build-elm-site.mjs)
 pnpm desktop:validate              # native validate app.zon
 pnpm desktop:doctor                # host WebView / GTK checks
 pnpm desktop:check                 # native check (structural)
@@ -297,7 +301,7 @@ checked-in pnpm patch (`pnpm exec native …` or scripts that resolve
 
 ## SPA invariants
 
-- Keep the site build output at `dist/` (`tools/build-site.mjs`).
+- Keep the site build output at `dist/` (`tools/build-elm-site.mjs dist`).
 - Do not point builds at `out/` (only `deploy.sh` writes production `out/`).
 - Same routes, assets, and tests for browser, PWA, and zig-desktop host.
 - Packaged entry URL stays `zero://app/` so the browser router starts at `/`;

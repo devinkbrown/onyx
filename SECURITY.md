@@ -25,7 +25,13 @@ Please call out issues involving:
 
 - plaintext or ciphertext disclosure in messages, vault, notifications, or
   browser storage;
-- E2EE key substitution, downgrade, replay, or trust-boundary failures;
+- E2EE key substitution, downgrade, replay, or trust-boundary failures,
+  including encrypted-room device-trust review (new, not yet independently
+  reviewed);
+- secrets crossing from the private runtime (`elm/runtime`) into the Elm model,
+  logs, URLs or storage;
+- service-worker update or precache behaviour that serves mixed or stale
+  builds;
 - XSS, unsafe URL handling, SSRF through preview/upload boundaries, or unsafe
   file parsing;
 - authentication, session resume, passkey, recovery-code, or credential

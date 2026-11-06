@@ -1,202 +1,179 @@
 # Onyx
 
-Onyx is a browser-first IRC client for the **Onyx Server** network: fast text
-chat, local-first history, end-to-end encrypted direct messages, and realtime
-voice/video through the Cadence media stack.
+Onyx is a chat app for the open IRC network of the same name. It gives you rooms,
+direct messages, voice calls and end-to-end encrypted conversations in the
+browser, and you can install it like an app on desktop and phone. Under the hood
+it speaks IRCv3 and IRCX to an [Onyx Server](https://github.com/devinkbrown/onyx-server)
+over secure WebSocket.
 
-The live first-party network is available at [eshmaki.me](https://eshmaki.me/).
-This repository contains the Elm web client. The daemon is maintained in the
-separate [Onyx Server repository](https://github.com/devinkbrown/onyx-server).
+- **Live network:** <https://eshmaki.me>
+- **This repository:** the Elm web client and the public product website
+- **Daemon:** the separate [Onyx Server](https://github.com/devinkbrown/onyx-server) repository
+- **License:** [AGPL-3.0-or-later](LICENSE)
 
-Onyx is released under the [GNU Affero General Public License v3.0 or later](LICENSE).
-The source is public, while the hosted network remains a separately operated
-service. See [`NOTICE.md`](NOTICE.md) for the project and licensing boundary.
+<p align="center">
+  <img src="elm/marketing/room-desktop-2x.jpg" alt="An Onyx room on desktop: navigation rail, room list, grouped conversation and composer" width="820">
+</p>
 
-## Why Onyx
+<p align="center">
+  <img src="elm/marketing/room-phone-2x.jpg" alt="An Onyx room on a phone" width="240">
+  <img src="elm/marketing/dm-phone-2x.jpg" alt="A direct message conversation on a phone" width="240">
+  <img src="elm/marketing/inbox-phone-2x.jpg" alt="The Onyx inbox on a phone" width="240">
+</p>
 
-Onyx keeps the openness and interoperability of IRC while giving a web client
-the conveniences people expect from a modern conversation app:
+## Features
 
-- **Open wire, modern shell.** IRCv3 and IRCX run over WebSocket, with CAP
-  negotiation, SASL, session resume, reconnect, and mesh-aware node selection.
-- **Memory that stays with you.** Conversation history is retained in the
-  browser's IndexedDB vault, with device-local exact, related-term, and hybrid
-  search. The default bound is 400 messages per target and can be adjusted by
-  the user.
-- **End-to-end encrypted direct messages.** The wired DM path seals before
-  socket admission, handles device-key changes and multi-device fan-out, fails
-  closed when a ciphertext cannot be opened, and never writes decrypted bodies
-  to the history vault.
-- **Cadence media.** Voice and video are first-class conversation surfaces,
-  with device controls, captions, spatial audio, quality feedback, and an
-  explicit security state rather than an unconditional privacy claim.
-- **A useful return path.** Home catch-up, unread boundaries, followed rooms,
-  rich invite links, time-based jumps, pins, drafts, notifications, and a
-  command palette make a returning browser session understandable.
-- **A real web app.** The client is a responsive installable PWA with themes,
-  reduced-motion/data preferences, keyboard navigation, and layouts tested at
-  narrow widths and high zoom.
+- **Get in fast.** A connect screen lets you join as a guest, sign in, or create
+  an account.
+- **Five places.** Home, Rooms, Messages, Calls and You. Desktop has an icon rail
+  and a sidebar; phones get a bottom bar and full-screen conversation pages.
+- **Conversations.** A room header with topic, member count and details;
+  messages grouped by author with day and "new" dividers; replies, reactions,
+  edits, deletes, pins, search and shared media; a one-row composer that grows
+  as you type.
+- **Inbox.** Mentions, DMs, invites and kicks in one sheet. Each row jumps to
+  its message.
+- **Voice calls** in rooms, with a call bar that follows you around the app.
+- **End-to-end encryption.** Encrypted DMs and encrypted rooms between enrolled
+  devices. The new device-trust review is pending independent security review.
+- **History on your device.** Conversations are kept in the browser's IndexedDB
+  (400 messages per conversation by default, adjustable), with on-device search.
+- **Looks.** Ocean, Pearl, "match device" (the default), Graphite, Sepia, Mist,
+  Plum, High contrast and more, plus custom themes in Appearance. Themes apply
+  before first paint and are checked for AA contrast.
+- **Installable PWA** that picks up new deploys automatically when it's safe to
+  reload (no draft, call or private operation in progress).
+- **Advanced** tools under You: local services, recovery, devices and backups.
 
-## Current status
+## Status
 
-The client is active software, not a finished protocol specification. The
-following table is intentionally conservative:
+Onyx is in active development. Most of the client is implemented and covered by
+tests, but formal roadmap acceptance is deliberately strict.
 
-| Surface | Status | Notes |
-| --- | --- | --- |
-| IRC/IRCX text chat | Available | WebSocket transport, CAP/IRCv3, SASL, reconnect, and session resume. |
-| Local history and search | Available | Browser-local IndexedDB vault; see [`docs/search-and-history.md`](docs/search-and-history.md). |
-| E2EE direct messages | Implemented | Device keys, TOFU/key-change handling, multi-device fan-out, and fail-closed open/seal behavior are wired in the Elm `DmCipher` / `Keyring` modules and the `ports.js` crypto ports. The connected server still has to publish the peer-key contract. |
-| Cadence voice/video and media E2EE | Implemented | Media capability and the actual negotiated security state remain visible in the UI. |
-| Passkeys | Server-gated | The client supports the WebAuthn ceremony; the connected server must expose `WEBAUTHN`. |
-| Group E2EE | Staged | Control-record foundations exist; full room key installation and production acceptance are not claimed. See [`docs/protocol/group-e2ee-c1.md`](docs/protocol/group-e2ee-c1.md). |
-| Self-hosted deployment | Buildable | Point the client at your own Onyx Server with `?ws=wss://…`; the first-party `deploy.sh` is host-specific. |
+- The [acceptance ledger](docs/elm-roadmap/acceptance-ledger.json) shows 4 of
+  53 packages accepted. Acceptance needs receipts bound to a frozen source cut,
+  and most recent work doesn't have them yet.
+- Encrypted rooms pass an 8-stage two-browser journey against a local Onyx
+  Server. Rooms with three or more members and cross-node delivery are unproven.
+- Browser evidence comes from Chromium (desktop and phone emulation) and, as an
+  opt-in, stock Firefox. Real Safari, iOS and Android device runs are pending.
+- Lab source provenance is blocked while Onyx Server is mid-change.
 
-The code and tests are the source of truth. Roadmap documents are historical
-planning material and may describe work before or after the current checkout.
+The evidence log, newest first, is [`docs/elm-roadmap/README.md`](docs/elm-roadmap/README.md).
 
-## Screenshots
+## Quick start
 
-![Onyx desktop room](public/screenshots/app-wide.png)
-
-![Onyx mobile chat](public/screenshots/app-mobile.png)
-
-## Run the client locally
-
-### Requirements
-
-- Node.js 20 or newer.
-- [pnpm](https://pnpm.io/) — this repository intentionally uses pnpm, not npm
-  or yarn.
-- The [Elm 0.19.1](https://github.com/elm/compiler/releases/tag/0.19.1) compiler on
-  `PATH` (a sandbox-friendly bootstrap is in [`elm/README.md`](elm/README.md)).
-- A reachable Onyx Server WebSocket endpoint for connected chat. The default
-  build probes the first-party mesh nodes; `?ws=` pins another node.
-
-### Install and start
+You need Node.js 20+, [pnpm](https://pnpm.io/) (never npm or yarn), the
+[Elm 0.19.1](https://github.com/elm/compiler/releases/tag/0.19.1) compiler on
+`PATH`, and Chromium for the browser tests. [`elm/README.md`](elm/README.md)
+shows how to install Elm and elm-test without touching the app's dependencies.
 
 ```bash
 git clone https://github.com/devinkbrown/onyx.git
 cd onyx
 pnpm install
-pnpm dev
+node tools/build-elm-site.mjs /tmp/onyx-site
+node tools/serve-dir.mjs /tmp/onyx-site 8080
 ```
 
-`pnpm dev` builds the client and static site into `dist/` and serves it at
-[http://127.0.0.1:3000](http://127.0.0.1:3000). With no pin the client probes the
-configured public nodes and attaches to the fastest reachable one. To use a
-different server, open `/app/?ws=wss://your.host/ws`. The client has no
-build-time environment variables.
+Open <http://127.0.0.1:8080/app/>. With no pin the client probes the public node
+list in `elm/src/Nodes.elm`. To use another server, open
+`/app/?ws=wss://your.host/ws` (only `wss:` endpoints are accepted). There are no
+build-time environment variables. See [`docs/configuration.md`](docs/configuration.md).
 
-For the full configuration table, endpoint expectations, media upload boundary,
-and static hosting notes, read [`docs/configuration.md`](docs/configuration.md).
+> `pnpm build` stages the site into `dist/` (via `tools/build-elm-site.mjs`),
+> `pnpm preview` serves `dist/` on port 4173, and `pnpm dev` builds and serves it
+> on `http://127.0.0.1:3000` (the desktop host's dev origin).
 
-### Production build and preview
+## Development
 
-```bash
-pnpm build
-pnpm preview
-```
-
-`pnpm build` writes only to `dist/`. It is safe for local verification and
-preview. It never writes the production `out/` tree.
-
-## Commands
-
-| Command | Purpose |
+| Area | Where |
 | --- | --- |
-| `pnpm dev` | Build, then serve `dist/` on port 3000. |
-| `pnpm build` | Elm build + static site generation into `dist/`. |
-| `pnpm preview` | Serve the current `dist/` bundle on port 3000. |
-| `pnpm typecheck` | Run strict TypeScript checking (the bundled engine). |
-| `pnpm lint` | Run ESLint. |
-| `pnpm test` | Run the Vitest suites (engine, static-site generator, release tooling). |
-| `pnpm test:smoke` | Run every `elm/*.smoke.mjs` jsdom suite. |
-| `pnpm site:check` | Run typecheck, lint, unit tests, and a production build. |
-| `pnpm site:workbench` | Open the safe local build/check/preview workbench. |
-| `pnpm check:server-contract` | Compare the client contract against a sibling Onyx Server checkout when available. |
-| `pnpm desktop:test` | Build and test the native desktop host through the pinned Zig/native toolchain. |
+| UI, routing, protocol folds | `elm/src` (`Main.elm` ports, `App.elm` model/update, `View/*`) |
+| Private runtime (socket, keys, storage owners) | `elm/runtime` (TypeScript, bundled to `runtime.js`) |
+| Browser bridge | `elm/ports.js` |
+| Styles | `elm/app.css`, `rail.css`, `convo.css`, `site.css` |
+| Service worker | `elm/sw.js` |
+| Shared TS (Cadence media, E2EE, IRC parser) | `src/lib` |
 
-Before opening a pull request, run the Elm compile and `elm-test` (see
-[`elm/README.md`](elm/README.md)), then:
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
+
+## Testing
 
 ```bash
-pnpm test:smoke && pnpm typecheck && pnpm lint && pnpm test
+pnpm exec tsc -p elm/runtime/tsconfig.json --noEmit   # runtime strict typecheck
+pnpm typecheck && pnpm lint                          # root TS + ESLint
+pnpm test:elm-runtime                                # runtime Vitest
+pnpm test                                            # root Vitest (src/, tools/)
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)
+node --test elm/*.smoke.mjs                          # ports.js smokes
+pnpm test:e2e:elm                                    # Chromium, mock socket
+pnpm test:e2e:elm:audit                              # 628-check UI audit
 ```
 
-The longer release and browser-evidence checklist is in
-[`docs/testing-and-release.md`](docs/testing-and-release.md).
+The audit runs on Chromium (dark, light, reduced motion) and emulated iPhone 13,
+iPhone 13 light and iPhone SE. Add stock Firefox with
+`ONYX_FIREFOX_EXECUTABLE=/path/to/firefox`. Local-server labs and performance
+runs are described in [`docs/testing-and-release.md`](docs/testing-and-release.md).
 
-## Documentation map
+## Deployment
 
-Start at [`docs/README.md`](docs/README.md), then choose the path that matches
-your role:
+`./deploy.sh` is the first-party deploy for eshmaki.me, not a general
+installer. It builds `dist/`, checks the service-worker build envelope, backs up
+the live tree, syncs it into `out/` (served by nginx), and restores the backup
+automatically if the post-sync checks fail. After every deploy:
 
-- **New contributor:** [`docs/getting-started.md`](docs/getting-started.md),
-  [`CONTRIBUTING.md`](CONTRIBUTING.md), and
-  [`docs/architecture.md`](docs/architecture.md).
-- **User:** [`docs/features.md`](docs/features.md),
-  [`docs/search-and-history.md`](docs/search-and-history.md), and
-  [`docs/importing.md`](docs/importing.md).
-- **Operator/integrator:** [`docs/configuration.md`](docs/configuration.md) and
-  [`ONYX_SERVER_PROTOCOL.md`](ONYX_SERVER_PROTOCOL.md).
-- **Desktop packager:** [`docs/desktop-host.md`](docs/desktop-host.md) and the
-  browser-facing [`/download/`](https://eshmaki.me/download/) release page.
-- **Security reviewer:** [`docs/security.md`](docs/security.md) and
-  [`SECURITY.md`](SECURITY.md).
-- **Maintainer:** [`docs/testing-and-release.md`](docs/testing-and-release.md)
-  and [`ROADMAP.md`](ROADMAP.md).
+```bash
+node tools/verify-live-shell.mjs https://eshmaki.me
+```
 
-## Architecture in one paragraph
+A single precache hash mismatch makes the service-worker install fail and
+leaves returning visitors on their old build.
 
-The app is an Elm 0.19.1 SPA. `elm/src/Main.elm` owns ports, subscriptions and
-routing; `elm/src/App.elm` owns the model and `update`; pure modules (`Wire`,
-`Session`, `DmCipher`, `GroupControl`, …) parse and validate the IRC/IRCX wire and
-the crypto-adjacent formats; `elm/src/View/` renders every surface. Side effects —
-the WebSocket, the IndexedDB history vault, WebCrypto, WebAuthn, uploads — sit
-behind ports in `elm/ports.js`, and the Cadence voice engine and canvas
-backgrounds are TypeScript in `elm/engine/` bundled by esbuild. See
-[`docs/architecture.md`](docs/architecture.md) for the source map and the
-invariants that matter when changing any of these layers.
+To self-host, build with `tools/build-elm-site.mjs` and serve the output as
+static files (every route has its own `index.html`; unknown paths get
+`404.html`) next to an Onyx Server WebSocket listener.
 
-## Deployment boundary
+## Architecture
 
-The checked-in `deploy.sh` is the first-party eshmaki.me deployment path. It
-expects the private community-site overlay and nginx layout used by that host,
-builds the Elm client and its route-specific documents (`pnpm build`), stamps the
-service worker, and then syncs `dist/` to the live-served `out/` directory. It is not a generic
-self-hosting installer.
+```
+ elm/src (Elm)            elm/ports.js             elm/runtime (TypeScript)
+ Main ─ ports ──────────▶ vault, prefs, uploads,   transport-owner (IRC socket)
+ App  (pure update)       notifications, media ◀──▶ credentials, identity, sessions
+ View/* (all UI)          socket                   private crypto, outbox, owned
+                                                   IndexedDB, media, SW lifecycle
+                                   │
+                                   ▼  wss://
+                              Onyx Server (IRCv3 + IRCX, Event Spine, MEDIA)
+```
 
-For a different host, build with `pnpm build` and serve `dist/` from a static
-server (every route has its own document; unknown paths get `404.html`) with
-WebSocket connectivity. Do not
-point a test, preview, or generic build at `out/`; only the reviewed deployment
-script may write that tree. Details are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Elm holds no secrets: passwords, tokens and keys stay in the runtime. The full
+map is in [`docs/architecture.md`](docs/architecture.md).
 
-## Privacy and security boundaries
+## Security
 
-The browser is a security boundary, not a vault of server-side truth:
+- Wire text is untrusted and rendered as text only.
+- Encrypted DMs and rooms fail closed. The vault stores ciphertext, never
+  decrypted bodies.
+- History is local to the browser profile. It is not a cloud backup.
+- Device-trust review for encrypted rooms is new and not yet independently
+  reviewed.
 
-- ordinary local history lives in this browser's IndexedDB and is not a cloud
-  sync service;
-- imported Discord, Slack, and IRC history is parsed locally and is not
-  uploaded by the client;
-- E2EE DM plaintext is view-only and is not written to the vault;
-- group E2EE is clearly labeled staged and should not be described as complete
-  room encryption yet;
-- media security is represented by the actual negotiated state.
+Read [`docs/security.md`](docs/security.md) before touching crypto, rendering,
+storage or uploads. Report vulnerabilities privately as described in
+[`SECURITY.md`](SECURITY.md).
 
-Read [`docs/security.md`](docs/security.md) before changing crypto, message
-rendering, storage, upload, or notification code. Report vulnerabilities using
-[`SECURITY.md`](SECURITY.md), not a public issue with exploit details.
+## Documentation
 
-## Contributing and license
+- [`docs/README.md`](docs/README.md): documentation hub
+- [`docs/getting-started.md`](docs/getting-started.md), [`docs/features.md`](docs/features.md)
+- [`docs/architecture.md`](docs/architecture.md), [`docs/configuration.md`](docs/configuration.md)
+- [`docs/testing-and-release.md`](docs/testing-and-release.md), [`docs/security.md`](docs/security.md)
+- [`ONYX_SERVER_PROTOCOL.md`](ONYX_SERVER_PROTOCOL.md): client-facing server protocol
+- [`ROADMAP.md`](ROADMAP.md), [`CHANGELOG.md`](CHANGELOG.md)
 
-Pull requests are welcome for focused fixes, documentation, tests, accessibility,
-protocol work, and user-facing improvements. Please read
-[`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
-first.
+## License
 
-Onyx is AGPL-3.0-or-later. Third-party packages retain their own licenses; see
-their package metadata and the lockfile. The separate Onyx Server project has
-its own repository and release notes.
+Onyx is free software under the GNU Affero General Public License v3.0 or later.
+See [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md). Third-party packages keep
+their own licenses.

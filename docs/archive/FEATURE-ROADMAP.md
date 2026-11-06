@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 <!-- SPDX-FileCopyrightText: 2026 Devin Brown <devin.kyle.brown@gmail.com> -->
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 

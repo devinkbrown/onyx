@@ -2,7 +2,9 @@
 
 Everything a client needs to talk to **Onyx Server**, the pure-Zig clean-room
 sovereign-mesh IRC daemon (modern-only successor to C "Ophion"). This is the
-authoritative surface for refactoring Onyx's IRC layer (`src/lib/irc/`).
+authoritative surface for Onyx's IRC layer (Elm `elm/src/Wire.elm`,
+`Session.elm`, `Isupport.elm`, `Ircx.elm`, `Spine.elm`, `Media.elm`, and the
+private runtime's `elm/runtime/transport-owner.ts`).
 
 Onyx Server is **modern-only**: there is **no STARTTLS**, **no WEBIRC**, **no identd /
 RFC1413**, **no DCC proxy/filehost**, **no `OPER` command** (operator status is
@@ -18,7 +20,8 @@ commands (`REGISTER`, `CHANNEL`, `MEMO`, …), never ChanServ/NickServ fake user
 ## 1. Transport & Endpoints
 
 The live network is **Onyx** (the consumer brand; the daemon behind it is
-**Onyx Server**), two nodes: `eshmaki.me` and `ircx.us`. Listeners are **dual-stack
+**Onyx Server**). The client's node list (`elm/src/Nodes.elm`) currently has one
+node, `eshmaki.me`; `ircx.us` is retired. Listeners are **dual-stack
 IPv6** (`[listen] host = "::"`). The wire `NETWORK` name is operator-set via
 `[network] name` (default `Onyx Server`); see §3.
 
@@ -187,8 +190,9 @@ Passwordless login via the `WEBAUTHN` command, paired with browser
 challenges/results arrive as caller-targeted `EVENT <nick> WEBAUTHN <SUBCODE> …`
 messages, and failures use `FAIL WEBAUTHN …`. The client answers with `WEBAUTHN
 <SUBCOMMAND> …`. All binary fields on the wire are **base64url, no padding**
-(IRC-token-safe). Onyx's half is `src/lib/webauthn/passkey.ts`; the store handler
-is `src/lib/store/store.ts:4710`.
+(IRC-token-safe). Onyx's half is `elm/src/Passkey.elm` (state machine) with the
+ceremony in the private runtime (`elm/runtime/private-passkey-management.ts`,
+`private-webauthn-reply.ts`).
 
 **Register a passkey** (must already be logged in):
 
@@ -233,8 +237,7 @@ Onyx should reconnect instantly into its live session instead of a JOIN storm.
 - **`onyx/session-sync` cap**: multi-client "keep both" — when set, on login the
   server syncs the new connection into the same channels as your other same-account
   sessions. **Gate your `001` autojoin storm behind `!sessionSyncActive`** — the
-  server drives the JOINs when the cap is present (this is already the pattern in
-  Onyx's `src/lib/store`).
+  server drives the JOINs when the cap is present (the Elm client follows this pattern).
 - **`onyx/bouncer` cap**: automatic history rewind on join/rejoin. Combine with
   CHATHISTORY; **dedup by `msgid`** on reconnect (auto-reconnect preserves channel
   state, so replayed history would otherwise duplicate).

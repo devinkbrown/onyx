@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Onyx overhaul — execution roadmap
 
 Status: active execution plan · Date: 2026-10-04 · Branch: `onyx-solid`

@@ -1,110 +1,168 @@
-# Onyx — IRC webchat (Elm)
+# Onyx — IRC web client (Elm)
 
 Modern web client for the **Onyx** network, running on the **Onyx Server** engine
-(pure-Zig mesh daemon). Public source; default branch `onyx-elm`.
+(pure-Zig mesh daemon). Public source; default branch **`onyx-elm`**. Live at
+<https://eshmaki.me>.
 
-**The product client is the Elm app in `elm/`** (Elm UI in `elm/src`, private
-TypeScript runtime in `elm/runtime`, browser bridge `elm/ports.js`). The SolidJS
-tree under `src/` is deprecated; `elm/runtime` still imports a few `src/lib`
-helpers. Ship with `ONYX_CLIENT=elm ./deploy.sh`. The Stack/Layout notes below
-describe the legacy SolidJS client unless they say otherwise.
+**The product client is the Elm app in `elm/`.** The SolidJS client was removed
+(merge `a6f98902`; last commit with it is the tag `solid-client-final`). `src/`
+now holds only the shared TypeScript modules that `elm/runtime` imports (Cadence
+media, E2EE helpers, the IRC parser, `net/boundedAbort`). Don't add UI to `src/`.
+
+## Brand and wire rules (do not change)
+
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 Branded house: **Onyx** = network/product/client; **Onyx Server** = engine/daemon/
 protocol; "IRCXNet" = retired public identity, legacy/wire token only.
 Wire/config leftovers: `onyx/*` caps/tags; DM envelopes seal as `ONYXDM1 `;
-`TSUMUGI1 ` remains only as frozen E2EE envelope legacy bytes in
-`src/lib/e2ee/dmCipher.ts` (open-path dual-accept for vault/history rows — not
-a command). Offline memos use `MEMO` only. Media E2EE outbound uses
-`E2EE-HANDSHAKE` / `E2EE-GROUPKEY` (inbound may dual-accept historical
-`TSUMUGI_*` subtypes). Wire media codecs: `cadencevox` / `cadencevis`. Those
-historical envelope/subtype bytes are **crypto/interop literals**, not product
-names — do not reintroduce Japanese names in new code or UI.
-English subsystem names: Cadence (CadenceVox/CadenceVis), MooringSession/MooringGroup,
-Event Spine.
+`TSUMUGI1 ` remains only as frozen E2EE envelope legacy bytes (open-path
+dual-accept for vault/history rows — not a command). Offline memos use `MEMO`
+only. Media E2EE outbound uses `E2EE-HANDSHAKE` / `E2EE-GROUPKEY` (inbound may
+dual-accept historical `TSUMUGI_*` subtypes). Wire media codecs: `cadencevox` /
+`cadencevis`. Those historical envelope/subtype bytes are **crypto/interop
+literals**, not product names — do not reintroduce Japanese names in new code
+or UI. English subsystem names: Cadence (CadenceVox/CadenceVis),
+MooringSession/MooringGroup, Event Spine.
 
-**License: AGPL-3.0-or-later** (see `LICENSE`). The client source is public under
-that license. The hosted Onyx network and the separately maintained Onyx Server
-daemon are operational products with their own deployment and release boundaries.
+Where the legacy literals live today: `TSUMUGI1 ` is in the E2EE prefix list in
+`elm/runtime/owned-storage.ts` (it classifies a stored row as ciphertext). No
+current source accepts `TSUMUGI_*` media subtypes.
 
-## Stack
-- **SolidJS 1.9** + `@solidjs/router` — SPA, no SSR
-- **Vite 7** (`pnpm build` → static export in `dist/`; only `deploy.sh` writes `out/`)
-- **Zustand vanilla** store + `useStore` Solid bridge (`src/lib/store/`)
-- **Tailwind 4** + hand-rolled CSS tokens; **TypeScript**
-- **pnpm always, never npm**
+**License: AGPL-3.0-or-later** (see `LICENSE`). The hosted Onyx network and the
+separately maintained Onyx Server daemon have their own deployment and release
+boundaries.
 
 ## Layout
-- Entry: `src/index.tsx` — routes `/` (Landing), `/about`, `/app` (AppShell),
-  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/guides`,
-  `/community`, `/privacy`, `/guidelines`, and `/contact`. Keep this table in
-  sync with `ROUTE_ENTRYPOINTS` in
-  `tools/materialize-route-entrypoints.mjs`, which owns their static metadata.
-  First import is `src/lib/migrateStorage.ts` (legacy `ocean-*` →
-  `onyx:*` localStorage migration, runs as an import side effect) — keep it first.
-- IRC layer: `src/lib/irc/` — `client.ts` (WS client, SASL PLAIN/SCRAM,
-  CAP/IRCv3, IRCX), `parser.ts`, `types.ts`
-- Store: `src/lib/store/store.ts` — single Zustand vanilla store; most UI
-  prefs persist to localStorage under the `onyx:` prefix
-- Node selection: `src/app/nodes.ts` — probes mesh nodes, attaches to the
-  fastest; `VITE_IRC_WS` pins an endpoint and disables probing
-- Theming: `src/theme/` — `ThemeProvider.tsx`, `themes.ts` (14 built-in
-  themes, `DEFAULT_THEME_ID = 'ocean'` — a THEME name, not the brand),
-  `ThemeStudio.tsx`, `customThemes.ts`
-- Tokens: `src/styles/tokens.css` (+ `global.css`)
-- Primitives: `src/primitives/` — reusable UI building blocks
-- Media engine: `src/lib/cadence-media/` — **Cadence** (wire codecs
-  `cadencevox` / `cadencevis`, Cadence frames). Internals: MooringSession
-  ECDH/AES-GCM, MediaEngine, MooringGroup, ChunkAssembler, PeerRegistry.
-  Outbound media E2EE subtypes are English (`E2EE-*`); historical `TSUMUGI_*`
-  subtypes remain dual-accepted on inbound only.
-  Signaling = `MEDIA` subcommands + Event Spine `EVENT ... MEDIA ...` events.
-- Backgrounds: `src/backgrounds/` — animated canvas scenes
-- Uploads: `src/lib/upload/` — multipart POST (field `file`) to
-  `${VITE_MEDIA_URL}/upload`; prod default is same-origin `/upload`
-- Link previews: `src/lib/preview/linkPreview.ts` → same-origin
-  `/linkpreview?url=` (an SSRF-guarded deployment proxy); preference-gated
-  (`linkPreviews`)
+
+| Path | What it owns |
+| --- | --- |
+| `elm/src/Main.elm` | `Browser.application`, every port, subscriptions; interprets `App`'s outbound effects. Only `Main` talks to ports. |
+| `elm/src/App.elm` | The model, `Msg`, pure `update`, and the inbound IRC line fold (very large; edit surgically). |
+| `elm/src/View.elm`, `elm/src/View/*.elm` | All rendering: app shell (`Nav`, `Rail`, `Topbar`, `RoomHeader`, `Thread`, `Composer`, `Inbox`, `Calls`, `Profile`, `Appearance`, …) and public pages (`Landing`, `PublicFrame`, `About`, `Stats`, …). |
+| `elm/src/Nav.elm`, `ConnectGate.elm` | Five-destination navigation (Home, Rooms, Messages, Calls, You) and the connect gate. |
+| `elm/src/Wire.elm`, `Session.elm`, `Isupport.elm`, `Labels.elm`, `Modes.elm`, `Ircx.elm`, `Spine.elm`, `Media.elm` | Pure IRC/IRCv3/IRCX parsing, CAP/SASL/session policy, Event Spine and MEDIA control. |
+| `elm/src/DmCipher.elm`, `Keyring.elm`, `Group*.elm` | Pure crypto-adjacent codecs and validators (DM envelopes, room envelopes, group control/commit/welcome/directory). Keys never live in Elm. |
+| `elm/src/ThemeLook.elm`, `ThemeTokens.elm`, `Theme.elm` | Built-in looks, "match device" (the default when nothing is stored), custom themes. `defaultThemeId = "ocean"` is a THEME name, not the brand. |
+| `elm/src/Route.elm` | Route parser. Keep in sync with `ELM_ROUTE_ENTRYPOINTS` in `tools/materialize-elm-routes.mjs`. |
+| `elm/runtime/` | Private TypeScript runtime, bundled by Vite into `runtime.js` (`window.OnyxRuntime`). Owns the IRC WebSocket (`transport-owner.ts`), credentials, identity, session recovery, private crypto provider, outbox journal, owned IndexedDB stores, drafts, read anchors, scheduled sends, media capture/engine, service-worker lifecycle. Strict tsconfig. |
+| `elm/ports.js` | Browser bridge for Elm ports: history vault (`onyx-vault`), localStorage prefs, uploads, link previews, notifications/Web Push, clipboard, crypto helpers, media socket. Every change needs an `elm/*.smoke.mjs` test. |
+| `elm/index.html` | Base document: pre-paint theme script, stylesheet order, runtime boot. |
+| `elm/sw.js` | Service worker with a content-addressed build envelope (precache hashes). |
+| `elm/app.css`, `rail.css`, `convo.css`, `site.css` | Hand-written CSS, loaded in that order (the `<link>` order in `index.html` is the cascade). No Tailwind. |
+| `elm/tests/` | elm-test suites (vectors for every fold, parser and view contract). |
+| `elm/tools/` | Lab (`lab/run.mjs`), perf (`perf/run.mjs`), `screens.mjs`, `marketing-capture.mjs`, roadmap runner and source-manifest tools. |
+| `elm/marketing/` | Product screenshots used by the public site (generated by `marketing-capture.mjs`). |
+| `src/lib/` | Shared TS used by `elm/runtime` (`@/` alias): `cadence-media/`, `e2ee/`, `irc/` parser, `net/`. |
+| `tools/` | `build-elm-site.mjs`, route materialisers, `serve-dir.mjs`, `verify-live-shell.mjs`, deploy-controller tests, desktop/release tooling. |
+| `tests/e2e/` | Playwright: `elm.config.ts` (mock suite), `elm-audit.config.ts` (audit), `elm-local.config.ts` (labs). |
+| `docs/elm-roadmap/` | Roadmap evidence (newest first) and `acceptance-ledger.json`. |
+
+## Runtime ownership and security boundaries
+
+- **Elm never holds secrets.** Passwords, session tokens, private keys, room
+  epoch keys and decrypted private payloads stay in `elm/runtime` (or
+  WebCrypto). Elm sees typed, UI-safe projections.
+- **The runtime owns the IRC socket.** Elm asks for sends; the runtime
+  validates outbound lines (`client-line-validator.ts`) and journals them.
+- **All inbound wire text is untrusted.** Render text nodes only, never
+  `innerHTML`. Bound every parse.
+- **Encrypted DMs and rooms fail closed.** No plaintext fallback; the vault
+  stores ciphertext only; notifications show a neutral placeholder.
+- **Device-trust review** (`group.trust-preview` / `trust-confirm`) is new and
+  still pending independent security review. Don't describe it as audited.
+- **Only `deploy.sh` writes `out/`.** Builds and tests write `dist/` or `/tmp`.
 
 ## Persistence conventions
-- localStorage keys: `onyx:` prefix. Legacy `ocean-*` keys are migrated
-  (copied, never deleted) by `src/lib/migrateStorage.ts`; `ruri:` shims in
-  ThemeProvider/preferences/etc. stay as read-old-write-new fallbacks.
+
+- localStorage keys use the **`onyx:`** prefix (`onyx:theme`, `onyx:preferences`,
+  `onyx:vault-retention-policy`, …). There's no general `ocean-*` migration any
+  more; `ports.js` purges a few specific legacy identity keys on access.
+- History vault: IndexedDB `onyx-vault` (v5 owner-scoped stores in
+  `elm/runtime/migrations.ts`); default keep 400 rows per conversation,
+  adjustable in settings.
 - IRCX METADATA keys `ocean.display-name` / `ocean.accent` / `ocean.links`
-  are WIRE FORMAT (server-persisted) — never rename them.
+  (and other `ocean.*` keys) are WIRE FORMAT (server-persisted) — never rename them.
 
-## Env (Vite exposes only `VITE_*`)
-- `VITE_IRC_WS` — pin the Onyx Server WS endpoint (unset = auto node selection)
-- `VITE_DEFAULT_CHANNEL` — reserved, not currently read
-- `VITE_MEDIA_URL` — upload base (unset = `/upload` in prod builds)
+## Configuration
 
-## Tests
-- Unit: Vitest, co-located `*.test.ts(x)` next to sources (`pnpm test`)
-- E2E: Playwright in `tests/e2e/` (`pnpm test:e2e`); connected e2e must hit
-  the live origin (WS is origin-sensitive); `tests/_legacy-ocean-e2e/` is dead
-- `pnpm typecheck` and `pnpm lint` must pass before finishing
+No build-time env vars. `?ws=wss://host/path` pins an endpoint (the runtime
+accepts only `wss:`); otherwise the client probes the node list in
+`elm/src/Nodes.elm` (currently `eshmaki.me` only). Uploads POST to same-origin
+`/upload`; link previews use same-origin `/linkpreview`.
 
-## Build & deploy
+## Toolchain
+
+pnpm only, never npm. Elm 0.19.1 and elm-test 0.19.1-revision17 installed
+outside the app dependency graph (see `elm/README.md`). Chromium for Playwright
+via `ONYX_CHROMIUM_EXECUTABLE` (default `/usr/bin/chromium`).
+
+**Build scripts:** `pnpm build` = clean `dist/` + `node tools/build-elm-site.mjs dist`;
+`pnpm preview` serves `dist/` on :4173; `pnpm dev` builds and serves on :3000
+(the desktop host's dev origin); `pnpm test:e2e` = the Elm Chromium suite.
+
+## Gates (run before finishing)
+
 ```bash
-pnpm dev        # dev server
-pnpm build      # → dist/ (safe: NEVER touches production)
-./deploy.sh     # first-party dist/ build + route entrypoints + sw stamp,
-                # host-specific site overlay, then rsync --delete dist/ → out/
+pnpm exec tsc -p elm/runtime/tsconfig.json --noEmit
+pnpm typecheck && pnpm lint
+pnpm test:elm-runtime
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)
+node --test elm/*.smoke.mjs
+pnpm test:e2e:elm            # Chromium, mock socket
+pnpm test:e2e:elm:audit      # 628 checks: Chromium, light, reduced motion, iPhone 13/13-light/SE
+bash tools/deploy-controller.test.sh   # when deploy.sh changes
 ```
-nginx serves `out/` at eshmaki.me. ONLY deploy.sh writes out/ — plain builds
-go to dist/, so tests/e2e can never wipe or half-replace production.
+
+`pnpm test` runs the root Vitest suites (`src/**`, `tools/**`). Optional Firefox:
+`ONYX_FIREFOX_EXECUTABLE=/path/to/firefox pnpm test:e2e:elm:audit -- --project firefox`.
+
+## Labs and performance (local server only)
+
+```bash
+node elm/tools/lab/run.mjs --server-bin <onyx-server> --server-source <checkout> \
+  --scratch-parent /tmp --topology two --suite foundation|sessions|history|group \
+  --scenario logical --receipt /tmp/lab.json
+node elm/tools/perf/run.mjs --suite=measure
+```
+
+`group` is the two-browser encrypted-room journey (8 stages). Never test against
+production servers. Lab source provenance is blocked while onyx-server is
+mid-change; record results as functional, not accepted.
+
+## Deploy and live verification
+
+```bash
+./deploy.sh                                  # ONYX_CLIENT=elm by default
+node tools/verify-live-shell.mjs https://eshmaki.me
+```
+
+`deploy.sh` builds `dist/` with `tools/build-elm-site.mjs`, verifies the service
+worker envelope, hard-link backs up the live tree, rsyncs into `out/` (nginx
+serves it at eshmaki.me), and auto-restores the backup if post-sync checks fail.
+Always run `verify-live-shell.mjs` after a deploy: one precache hash mismatch
+fails the service-worker install and strands returning visitors on the old build.
+
+## Status and evidence
+
+`docs/elm-roadmap/README.md` (newest first) and `acceptance-ledger.json`. Only
+4 of 53 packages are formally accepted, because acceptance needs source-bound
+receipts. Much more is implemented and tested than accepted. Real-device
+Safari/iOS/Android cohorts are still pending.
 
 ## IRC → Onyx concept mapping
+
 | IRC | Onyx |
 |-----|------|
-| #channel | Text channel |
-| Private message | DM |
-| +q / +o / +v | Owner / Op / Voice roles |
+| #channel | Room (Rooms) |
+| Private message | DM (Messages) |
+| Status prefixes (`! . ~ & @ % +`) | Founders / Owners / Admins / Moderators / Helpers / Voiced (`Modes.elm`) |
 | Onyx Server account (built-in services) | Onyx account |
 | CHATHISTORY | Message history |
-| IRCX PROP / ACCESS / METADATA | Channel & profile properties |
-| MEDIA subcommands + Event Spine MEDIA | Voice/video channel |
+| IRCX PROP / ACCESS / METADATA | Room & profile properties |
+| MEDIA subcommands + Event Spine MEDIA | Voice call |
 
 ## Services (Onyx Server built-in — NO NickServ pseudo-clients)
+
 Account and session replies use source-shaped `NOTICE`, `FAIL`, and `WARN`
 messages; session credentials arrive as `NOTICE SESSION TOKEN` and, when
 available, `NOTICE SESSION MTOKEN`. Reclaim them with `SESSION RESUME`.

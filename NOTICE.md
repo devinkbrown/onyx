@@ -2,8 +2,10 @@
 
 ## Project boundary
 
-This repository is the **Onyx browser client**. It is an Elm application
-with a small JavaScript/TypeScript port layer that connects to an Onyx Server network over IRC/IRCX WebSocket transport.
+This repository is the **Onyx browser client** and its public website. The
+client is an Elm application with a private TypeScript runtime and a JavaScript
+port bridge. It connects to an Onyx Server network over IRC/IRCX secure
+WebSocket transport.
 
 **Onyx Server** is the separate pure-Zig daemon and has its own repository,
 source tree, operational configuration, and release notes:

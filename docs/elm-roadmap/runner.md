@@ -56,9 +56,12 @@ OS, network, and declared limits. Local/mock receipts are not live-server
 acceptance. CI uploads these receipts as an artifact; it does not update the
 ledger's acceptance status automatically.
 
-## Current known baseline observations
+## Earlier baseline observations (historical)
 
-These are failure observations, not retained green results:
+These failure observations predate candidate 57. At `d1025b7f` (2026-11-06)
+the Chromium mock suite passes 36/36 and the JS smokes 60/60; see the
+[evidence log](README.md). The contract-validator disagreement below has not
+been re-checked since.
 
 - `pnpm test:e2e:elm` with mocked Chromium: **16 passed, 4 failed**, all at
   stale “Open connection dialog” selectors. The `Connect.` accessible name is

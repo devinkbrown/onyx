@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Era 3 — 20× platform wave (2026-07-25)
 
 Integration ledger for the **onyx-platform-20x** expansion wave on branch

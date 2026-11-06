@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Importing from Discord
 
 Onyx lets you import your own Discord server history directly into your device's local vault. No Discord API token needed, no server upload—everything runs on your device.

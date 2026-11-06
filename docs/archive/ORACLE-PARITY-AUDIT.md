@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 
 ## parity audit: modes + statuses (server modes.md vs oracle vs Elm)
 - Source: `onyx-server/docs/reference/protocol/modes.md` (CHANMODES=`beIZ,k,lfj,imnstCTNMSgWOAVUFD`; PREFIX=`(YQqov)*!.@+`; user-mode catalog; `max_list_entries = 100` at `world.zig:376`; `ERR_BANLISTFULL = 478`; extban `parseTyped`: bare `$o`/`$z` admit, empty `$o:`/`$z:` rejected, other types require non-empty `:<pattern>`, whole-mask cap `MAX_MASK_BYTES = 512`).

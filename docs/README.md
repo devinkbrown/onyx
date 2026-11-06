@@ -1,94 +1,59 @@
 # Onyx documentation
 
-Onyx is an Elm web client for the Onyx Server network: IRC/IRCX text chat,
-local-first history, end-to-end encrypted direct messages, and Cadence
-voice/video over WebSocket transport.
+Onyx is the Elm web client for the Onyx network: rooms, DMs, voice calls,
+encrypted DMs and rooms, history on your device, and an installable PWA, talking
+IRCv3/IRCX to [Onyx Server](https://github.com/devinkbrown/onyx-server) over
+secure WebSocket.
 
-This hub separates user guides, contributor reference, integration contracts,
-and maintainer notes. Status language is deliberate: **available** means the
-client path is present and tested; **server-gated** means the connected daemon
-must advertise or implement the feature; **staged** means the source foundation
-exists but the complete product path is not claimed.
+If a page here disagrees with the code or tests, the code wins; please fix the
+page.
 
-> **Historical documents.** The roadmap, audit and redesign documents in this
-> directory (`*ROADMAP*`, `GAMER-REDESIGN-*`, `CLIENT-COMMERCIAL-OVERHAUL-AUDIT`,
-> `era3-*`, `features/GAME-CHANGERS-50`, …) were written while a SolidJS client
-> existed, and cite its `src/…` files. That client was removed; the last commit
-> that contains it is the annotated tag `solid-client-final`. The Elm client in
-> `elm/` is the only client — its status documents start at
-> [`../elm/design/INDEX.md`](../elm/design/INDEX.md).
+## Start here
 
-## Naming and project boundary
-
-- **Onyx** is the network and browser client in this repository.
-- **Onyx Server** is the separate pure-Zig daemon:
-  <https://github.com/devinkbrown/onyx-server>.
-- **Cadence** is the client media stack. Its wire codec identifiers are
-  `cadencevox` and `cadencevis`.
-- `ocean.*` IRCX metadata keys and historical crypto literals are wire
-  compatibility, not current product names.
-
-The client is licensed under [AGPL-3.0-or-later](../LICENSE). See
-[`../NOTICE.md`](../NOTICE.md) for the hosted-service and third-party boundary.
-
-## Choose a path
-
-### New contributor
-
-| Document | What it answers |
+| Document | For |
 | --- | --- |
-| [`getting-started.md`](getting-started.md) | What to install, how to run the client, and how to connect it to a server. |
-| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Repository conventions, tests, deployment safety, and pull-request expectations. |
-| [`architecture.md`](architecture.md) | The Elm/port/engine map and the state, protocol, storage, media, and routing invariants. |
-| [`testing-and-release.md`](testing-and-release.md) | Local gates, browser evidence, release review, and deployment boundaries. |
+| [`../README.md`](../README.md) | What Onyx is, quick start, status |
+| [`getting-started.md`](getting-started.md) | Build and run the client locally |
+| [`features.md`](features.md) | What the app does, from a user's point of view |
+| [`architecture.md`](architecture.md) | Elm / runtime / bridge map, security boundaries, build chain |
+| [`configuration.md`](configuration.md) | `?ws=`, nodes, uploads, storage, static hosting |
+| [`testing-and-release.md`](testing-and-release.md) | Gates, audit, labs, perf, deploy and live verification |
+| [`security.md`](security.md) | Threat model and what each layer protects |
+| [`desktop-host.md`](desktop-host.md) | Native desktop host (Zig + Native SDK) |
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Conventions and deploy safety |
+| [`../CLAUDE.md`](../CLAUDE.md), [`../AGENTS.md`](../AGENTS.md) | Working guide for coding agents |
+| [`../elm/README.md`](../elm/README.md) | Elm toolchain and client-specific tooling |
 
-### User
+## Protocol
 
-| Document | What it answers |
+| Document | For |
 | --- | --- |
-| Public `/guides/` and `/community/` | How to join a room in the official app, invite a friend, send messages, start a call, and keep Onyx on this device. |
-| [`features.md`](features.md) | Passkeys, Home catch-up, notifications, and everyday client behavior. |
-| [`search-and-history.md`](search-and-history.md) | Device-local history, search modes, time travel, and E2EE privacy boundaries. |
-| [`importing.md`](importing.md) | Local Discord, Slack, and IRC-log imports. |
-| [`security.md`](security.md) | What is protected locally, what is sent to a server, and where encryption is scoped. |
+| [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md) | Client-facing transport, CAP/IRCv3/IRCX, SASL, session resume, media signaling |
+| [`protocol/group-e2ee-c1.md`](protocol/group-e2ee-c1.md) | Encrypted-room control payload |
+| [`protocol/push-notify-modes.md`](protocol/push-notify-modes.md) | Web Push payloads and client handling |
+| [`protocol/halloy-cap-matrix.md`](protocol/halloy-cap-matrix.md) | CAP interoperability notes (July 2026) |
+| [`protocol/onyx-client-contract.v1.json`](protocol/onyx-client-contract.v1.json), [`v2`](protocol/onyx-client-contract.v2.json) | Machine-readable client/server contract (`pnpm check:server-contract*`) |
 
-### Operator or integrator
+## Roadmap and evidence
 
-| Document | What it answers |
+| Document | For |
 | --- | --- |
-| [`configuration.md`](configuration.md) | Runtime settings (`?ws=`), endpoint selection, uploads, static hosting, and reverse-proxy expectations. |
-| [`desktop-host.md`](desktop-host.md) | Native host architecture, pinned toolchain, package targets, and release commands. |
-| [`../ONYX_SERVER_PROTOCOL.md`](../ONYX_SERVER_PROTOCOL.md) | Client-facing transport, CAP/IRCv3/IRCX, SASL, session resume, and media signaling. |
-| [`protocol/onyx-client-contract.v1.json`](protocol/onyx-client-contract.v1.json) | Machine-readable client/server contract, including the current group-E2EE status. |
-| [`protocol/halloy-cap-matrix.md`](protocol/halloy-cap-matrix.md) | Capability interoperability notes and evidence. |
+| [`../ROADMAP.md`](../ROADMAP.md) | Where things stand and what's next |
+| [`elm-roadmap/README.md`](elm-roadmap/README.md) | Evidence log, newest first |
+| [`elm-roadmap/acceptance-ledger.json`](elm-roadmap/acceptance-ledger.json) | Formal package acceptance |
+| [`elm-roadmap/runner.md`](elm-roadmap/runner.md) | Deterministic verification lanes and receipts |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | Notable changes |
 
-### Maintainer or security reviewer
+## Archive
 
-| Document | What it answers |
-| --- | --- |
-| [`testing-and-release.md`](testing-and-release.md) | What counts as evidence before a public release or deploy. |
-| [`../SECURITY.md`](../SECURITY.md) | How to report a vulnerability privately. |
-| [`protocol/group-e2ee-c1.md`](protocol/group-e2ee-c1.md) | The group-room E2EE control payload and its explicit staged boundary. |
-| [`../ROADMAP.md`](../ROADMAP.md) | Historical strategy and item-level implementation archaeology. |
-| [**`FEATURE-ROADMAP.md`**](FEATURE-ROADMAP.md) | **0.7 unified roadmap: client P0/P1/P2, owner agents, gates; cross-repo authority lives in `onyx-server/docs/FEATURE-ROADMAP.md`.** |
-| [`ROADMAP-2026-Q4.md`](ROADMAP-2026-Q4.md) | Q4 2026 client feature spine (C-01…C-33, CP-xx, CL-xx) with detailed descriptions. |
-| [`../CHANGELOG.md`](../CHANGELOG.md) | Public-source milestones and notable changes. |
-| [`../AGENTS.md`](../AGENTS.md) | Agent-specific implementation rules for this checkout. |
+[`archive/`](archive/README.md) holds roadmaps, audits and guides from the
+SolidJS era. They cite files that no longer exist and are kept as history only.
 
-## Source-backed status snapshot
+## Names
 
-- IRC/IRCX chat, reconnect, session resume, device-local history, importers,
-  search, notifications, and the responsive PWA are active client surfaces.
-- Direct-message E2EE is implemented end to end: device keys, TOFU/key-change
-  handling, multi-device fan-out, fail-closed rendering, ciphertext-only DM
-  vault persistence, and a connected browser proof live in the client.
-- Cadence media has a separate implemented E2EE path and exposes its actual
-  negotiated security state.
-- Passkeys are implemented in the client but require server `WEBAUTHN` support.
-- Group-room E2EE has a strict envelope, keyring, opaque control routing, and
-  signed payload foundation. The current store/transport/key-wrap integration
-  is explicitly staged; see [`protocol/group-e2ee-c1.md`](protocol/group-e2ee-c1.md).
+- **Onyx**: the network and this client. **Onyx Server**: the daemon.
+- **Cadence**: the media stack; `cadencevox` / `cadencevis` are wire codec ids.
+- `ocean.*` IRCX metadata keys and `TSUMUGI*` bytes are wire-compatibility
+  literals, not product names.
 
-If a page here disagrees with a source file or test, fix the documentation drift
-and prefer the code-backed behavior. Load-bearing claims should cite a real
-`src/…` path where practical.
+The client is [AGPL-3.0-or-later](../LICENSE); see [`../NOTICE.md`](../NOTICE.md).

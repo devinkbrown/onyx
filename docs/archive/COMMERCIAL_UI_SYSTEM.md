@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Onyx commercial UI system
 
 **Status:** Complete — rooms/network language locked; experience mode id is `network-ops` (migrates legacy `irc-ops`); public surfaces say network report / peer channel; protocol essays keep real CAP/config tokens under open-wire framing.

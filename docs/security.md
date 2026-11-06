@@ -1,81 +1,97 @@
 # Security and privacy model
 
-This page describes the client-side boundaries that contributors must preserve.
-It is not a guarantee that every deployment, browser extension, reverse proxy,
-or server is trustworthy.
+The client-side boundaries contributors must preserve. This isn't a guarantee
+about any deployment, browser extension, proxy or server.
 
 ## Threat model
 
-IRC messages, metadata, history rows, media signaling, uploads, and server
-replies are untrusted input. The client should assume that a peer or relay can
-send malformed wire text, forged-looking metadata, unknown ciphertext, replayed
-frames, oversized payloads, and capability lies.
+IRC lines, metadata, history rows, media signaling, uploads and server replies
+are untrusted. Expect malformed wire text, forged-looking metadata, unknown
+ciphertext, replayed frames, oversized payloads and capability lies.
 
-The browser profile, operating system, installed extensions, developer tools,
-and a compromised server host are outside the client's full control. A hosted
-network can still observe connection metadata and any content that is not
-end-to-end encrypted.
+The browser profile, OS, extensions, devtools and a compromised server host are
+outside the client's control. The network can see connection metadata and any
+content that isn't end-to-end encrypted.
 
-## Direct-message E2EE
+## Where secrets live
 
-The DM path in `src/lib/e2ee/` uses device-held Web Crypto keys and the
-`ONYXDM1`/`ONYXDMN1` envelope families. The store integrates sealing before
-socket admission and opening after ciphertext is stored. The important
-invariants are:
+- **Elm (`elm/src`) holds no secrets.** Passwords, session tokens, private keys,
+  room epoch keys and decrypted private payloads stay in the private runtime
+  (`elm/runtime`) or in WebCrypto. Elm gets UI-safe projections.
+- **The runtime owns the IRC socket** (`transport-owner.ts`) and validates
+  outbound lines (`client-line-validator.ts`).
+- Sign-in on the connect gate goes through the runtime; the password never
+  enters the Elm model.
 
-- a designated encrypted DM never silently falls back to plaintext;
-- a missing, invalid, or changed peer key fails closed;
-- TOFU/key-change state is visible to the user;
+## Encrypted DMs
+
+Device-held WebCrypto keys and the `ONYXDM1` / `ONYXDMN1` envelopes
+(`elm/src/DmCipher.elm`, `src/lib/e2ee/dmCipher.ts`). Invariants:
+
+- an encrypted DM never falls back to plaintext;
+- a missing, invalid or changed peer key fails closed, and key changes are
+  visible;
 - multi-device fan-out encrypts to the published device set;
-- the server and ordinary message search see the envelope, not the DM body;
-- the history vault stores ciphertext and never decrypted DM plaintext;
-- notifications and accessibility text use a neutral locked placeholder rather
-  than leaking the envelope or plaintext.
+- the server and search see the envelope, not the body;
+- the vault stores ciphertext only;
+- notifications and accessibility text use a neutral locked placeholder.
 
-DM encryption is not the same as account authentication, transport TLS, or
-server-side access control. Verify device identity and key-change warnings when
-the conversation matters.
+DM keys are published as `ocean.dm-key(s)` metadata, which needs the server to
+negotiate `draft/metadata-2`.
 
-## Cadence media E2EE
+## Encrypted rooms
 
-Cadence media has its own client-held room-key path in
-`src/lib/cadence-media/`. The UI derives a security state from the negotiated
-Mooring/session, seal, MAC, and relay conditions. A padlock is permitted only
-when the actual media payload is sealed and authenticated; an authenticated
-transport or relay alone is not described as private.
+Rooms with required encryption use `ONYXROOM1` envelopes, signed group control
+records (`E2EE.KEYPACKAGE`, `E2EE.COMMIT`, `E2EE.WELCOME`), a device directory,
+and epoch keys installed per room.
 
-Media security state can degrade during a call. Contributors must preserve the
-fail-closed startup, replay-window, membership-rotation, and teardown behavior.
+- Epoch keys are ephemeral (never persisted); a reload re-provisions them.
+- A required-encryption room never accepts or sends plaintext.
+- Group control input is consumed by the private crypto provider before any
+  public projection.
+- **Device-trust review** (`group.trust-preview` → `group.trust-confirm`) shows a
+  device before trusting it and writes the pin only on confirm. This is new
+  code and **pending independent security review**.
 
-## Group-room E2EE boundary
+Tested: an 8-stage two-browser journey against a local Onyx Server passes.
+Not proven: rooms with three or more members, cross-node delivery, real
+devices. The payload format is in
+[`protocol/group-e2ee-c1.md`](protocol/group-e2ee-c1.md); it's an in-house
+format, not MLS.
 
-`ONYXROOM1`, the in-memory room keyring, opaque `E2EEGROUP` routing, and the
-signed OGC1 control payload are implemented foundations. The current client
-contract intentionally marks full group-room E2EE as **staged**: live store
-send/open integration, trusted-directory verification, pairwise welcome
-key-wrap, and production acceptance must not be inferred from the pure codecs.
+## Cadence media
 
-When adding room encryption, do not persist raw room secrets in IndexedDB, do
-not trust the embedded signer key without external trust, and do not accept
-plaintext when a room's `encryption-policy` is `required`.
+Media E2EE uses MooringSession/MooringGroup (`src/lib/cadence-media/`) with
+`E2EE-HANDSHAKE` / `E2EE-GROUPKEY`. The UI shows a padlock only when the media
+payload is actually sealed and authenticated; an authenticated relay alone is
+not "private". Keep fail-closed startup, the replay window, membership
+rotation and teardown intact.
 
-## Local data and imports
+## Local data
 
-- IndexedDB history and `localStorage` preferences belong to the browser
-  profile; they are not a hosted backup.
-- Discord, Slack, and IRC-log import parsing is local to the browser. The client
-  does not upload the source export as part of the import flow.
-- Portable vault/identity exports are deliberate user downloads. Treat them as
-  sensitive files.
-- Saved credentials/session material, if enabled by the user, is local browser
-  state and should be cleared on a shared computer.
+- History (IndexedDB `onyx-vault`) and preferences (`onyx:*` localStorage)
+  belong to the browser profile. They aren't a cloud backup.
+- Device keys (`onyx-keys`), key pins and trusted signers live in separate
+  databases and survive clearing history.
+- Backups and exports are deliberate user downloads; treat them as sensitive.
+- Remembered sign-in material is local browser state; clear it on shared
+  computers.
 
-## Contributor security rules
+## Service worker
 
-Do not use `innerHTML` for untrusted message content, add plaintext fallback to
-an E2EE failure, log secrets or message bodies, or commit `.env` files, private
-keys, browser profiles, generated deployment trees, or real user exports.
+The worker precaches only hashed shell assets listed in its build envelope,
+activates a new build only when the page is idle (no unsaved draft, active
+call or pending private mutation). Web Push notifications never show message
+text: the body is always generic, and DM titles never name the sender.
 
-For a new crypto or storage sink, add a focused adversarial test and document
-the boundary in the relevant guide. Report a suspected vulnerability privately
-using [`../SECURITY.md`](../SECURITY.md).
+## Contributor rules
+
+- Never use `innerHTML` for untrusted content.
+- Never add a plaintext fallback to an E2EE failure.
+- Never log secrets or message bodies.
+- Never commit `.env` files, keys, browser profiles, deployment trees or real
+  user exports.
+- A new crypto or storage sink needs a focused adversarial test and a note
+  here.
+
+Report suspected vulnerabilities privately via [`../SECURITY.md`](../SECURITY.md).

@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Era 3 — 40 game-changing platform items (2026-07-25)
 
 Evidence ledger for the “40 big things” Onyx platform wave. Item-level truth:

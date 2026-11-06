@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Onyx Solid continuous-wave checkpoint — 2026-08-13
 
 ## Repository state

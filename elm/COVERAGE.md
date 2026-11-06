@@ -7,49 +7,17 @@ record. A row marked **done** means the bounded source/vector work described in
 that row exists; it does not mean its full user journey, browser cohort,
 configuration, deployment, or server behavior has passed acceptance.
 
-Last complete affected source cut is candidate 26: `c2f3a40addd912cd6f8115a1388ac6cc059899974f2eb5a51faa6a09cbf88ed0`; restored
-archive SHA-256 `4178c8d274d2c328491a7feedfef54aa56e3cd4d6ea6df64f63967afeb1fffae`. Full Elm 2,613, Chromium mock 20/20, stress 8/8,
-and two-node foundation five assertions/cleanup passed. Runtime TS 131 tests
-across 22 files and lint 25 are unchanged-scope reuse from candidate 25.
-Subsequent E01 catalog/consumer work is outside this cut; its final hashes and
-E04 mutation proof are pending review and gates.
-
-Candidate 27 was a frozen but failed cut: strict runtime TypeScript passed;
-runtime tests passed 146/148 with two fixture assertion failures. Candidate 30
-is the latest affected checkpoint. Production and test Elm modules compile,
-but Elm reports 2,635/2,664 tests passing with 29 failures. Runtime TypeScript
-(148 tests across 23 files) and strict TypeScript are unchanged-scope reuse from
-candidate 28, not candidate-30 runs. Later Node, expected-failure, lint,
-Chromium, stress, and real-foundation stages were not run after the Elm failure.
-Wave 31 E22/E24 source authoring is subsequent and unverified. The E13
-keyboard fixture is mock-wire source only; it does not establish screen-reader
-or real-server acceptance.
-
-Candidate 25's storage path uses immutable admitted-row reuse before
-normalization with bounded exact-version/owner cleanup; canonical-target
-retention reuse per put; atomic message+metadata merge with a monotonic expiry
-floor; one prune per target; and strict 400-row/TTL limits including
-late-expired inserts. The 121-snapshot regression passed (123 puts, two
-transactions); redaction returned 122 public rows and an exact scoped durable
-tombstone confirmed 123 stored.
-
-Earlier scoped ordinary paths passed for logical session (raw 8 assertions plus
-Elm bootstrap), exact session (raw 9 plus bootstrap), and logical history
-(observation 7: grouped cases containing 101 raw assertions plus one Elm
-bootstrap assertion). Aggregate session/history receipts exited 2 for
-explicitly untested fault-injection/equal-time/rate gates, not ordinary-path
-failures.
-Three-node exact local RESUME deadline and logical DM mirror timeout remain
-unresolved observations, not proven deadlocks. Candidate-26 paired performance
-exited 2 before metrics (baseline init failure; current 180-second
-`joinConfiguredRooms` timeout). Its empty observations make
-`thresholds-met` vacuous, not a pass. Later docs are outside this cut.
-
-
+Current verification status is not tracked here. See the evidence log
+[`../docs/elm-roadmap/README.md`](../docs/elm-roadmap/README.md) (newest first)
+and the acceptance ledger. As of 2026-11-06 (`d1025b7f`): elm-test 2895,
+runtime 385, Chromium mock 36, audit 628 and JS smokes 60 pass; the local
+foundation and encrypted-room labs pass functionally; 4 of 53 packages are
+formally accepted. The candidate-26/30 checkpoint that used to sit here is in
+the evidence log's history.
 
 Individual dated notes below record the vectors and source comparisons made
 when those rows were authored. Their historical test totals are not a current
-suite total; use the evidence checkpoint above and the roadmap ledger for
+suite total; use the evidence log and the roadmap ledger for
 current verification status.
 
 Authoritative server surface:

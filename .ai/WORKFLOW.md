@@ -10,9 +10,9 @@ Codex owns the primary checkout, integration, Git, full verification, commit, me
 2. Dispatch only independent evidence questions. Use at most one writer and two reviewers.
 3. Require file:line or reproducible browser/command evidence; discard generic advice.
 4. Implement the smallest change in the primary checkout, with a co-located regression test; before integration, check base and owned-path scope with `node scripts/ai/check-scope.mjs`.
-5. Run focused tests, then `pnpm typecheck`, `pnpm lint`, and `pnpm test`; add Playwright/browser evidence for UI work.
+5. Run focused tests, then the ship gate in `CLAUDE.md` (runtime tsc, `pnpm typecheck`, `pnpm lint`, `pnpm test:elm-runtime`, `elm make` + `elm-test`, `node --test elm/*.smoke.mjs`, `pnpm test:e2e:elm`); add `pnpm test:e2e:elm:audit` for UI work.
 6. Ask one adversarial reviewer to inspect the actual diff when risk is meaningful.
-7. Codex alone commits and, when authorized, runs `./deploy.sh` plus public smoke checks.
+7. Codex alone commits and, when authorized, runs `./deploy.sh` plus `node tools/verify-live-shell.mjs https://eshmaki.me`.
 
 ## Dispatch matrix
 

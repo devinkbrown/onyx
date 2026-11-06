@@ -19,12 +19,12 @@ Stay in Onyx. Do not modify `/home/kain/onyx-server`. Choose one observable, tes
 
 ## Implement
 
-Trace the behavior from the view through `App.update` (the Elm folds), the wire modules (`Wire`, `Ircx`, …), the ports in `elm/ports.js`, persistence, and rendering. Keep effects as data (`Outbound`), put new logic in its own module wired through a `-- v3/<slice>` block, and keep `onyx:` storage keys and `ocean.*` wire keys unchanged.
+Trace the behavior from the view through `App.update` (the Elm folds), the wire modules (`Wire`, `Ircx`, …), the ports in `elm/ports.js` and the private runtime in `elm/runtime`, persistence, and rendering. Keep effects as data, put new logic in its own module, keep secrets in `elm/runtime`, and keep `onyx:` storage keys and `ocean.*` wire keys unchanged.
 
-Add or update an elm-test vector (and a smoke test for `ports.js` changes). Update `ROUTE_ENTRYPOINTS` in `tools/site/routes.mjs` together with `elm/src/Route.elm` whenever routes change. Keep changes narrow; do not refactor adjacent code opportunistically.
+Add or update an elm-test vector (and a smoke test for `ports.js` changes). Update `ELM_ROUTE_ENTRYPOINTS` in `tools/materialize-elm-routes.mjs` together with `elm/src/Route.elm` whenever routes change. Keep changes narrow; do not refactor adjacent code opportunistically.
 
 ## Verify and release
 
-Run focused tests (`elm-test`, the relevant `elm/*.smoke.mjs`, focused Vitest), then `pnpm typecheck`, `pnpm lint`, and `pnpm test`. Run `elm/tools/screens.mjs` (real Chromium against the local fake server) for UI work. Only `./deploy.sh` may write `out/`; do not deploy unless the user asks or the current release task explicitly authorizes it.
+Run focused tests (`elm-test`, the relevant `elm/*.smoke.mjs`, focused runtime Vitest), then the full gate in `CLAUDE.md` (runtime tsc, `pnpm typecheck`, `pnpm lint`, `pnpm test:elm-runtime`, `elm make` + `elm-test`, `node --test elm/*.smoke.mjs`, `pnpm test:e2e:elm`). For UI work run `pnpm test:e2e:elm:audit` and `elm/tools/screens.mjs`. Record evidence in `docs/elm-roadmap/README.md`; acceptance needs source-bound receipts. Only `./deploy.sh` may write `out/`; do not deploy unless the user asks or the current release task explicitly authorizes it.
 
 Use `cross-model-handoff` for independent evidence or review when the slice has meaningful UI, security, wire, or architecture risk.

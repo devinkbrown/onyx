@@ -8,12 +8,15 @@ Link the issue or explain the user/protocol problem this solves.
 
 ## Evidence
 
-- [ ] `pnpm typecheck`
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `elm-test` and the relevant `elm/*.smoke.mjs` suites (Elm changes)
-- [ ] Relevant focused Vitest (engine / site changes)
-- [ ] Real-browser screenshots (`elm/tools/screens.mjs`) for UI changes
+- [ ] `pnpm exec tsc -p elm/runtime/tsconfig.json --noEmit`
+- [ ] `pnpm typecheck` and `pnpm lint`
+- [ ] `pnpm test:elm-runtime` (runtime changes) / `pnpm test` (shared `src/` or `tools/`)
+- [ ] `elm make src/Main.elm` and `elm-test` (Elm changes)
+- [ ] `node --test elm/*.smoke.mjs` (`ports.js` changes)
+- [ ] `pnpm test:e2e:elm`
+- [ ] `pnpm test:e2e:elm:audit` and screenshots (`elm/tools/screens.mjs`) for UI changes
+- [ ] `bash tools/deploy-controller.test.sh` (`deploy.sh` changes)
+- [ ] Local-server lab receipt (protocol, session, history or crypto changes)
 - [ ] `git diff --check`
 
 ## Security and release boundaries
@@ -24,4 +27,5 @@ Link the issue or explain the user/protocol problem this solves.
       changes include fail-closed/adversarial coverage.
 - [ ] Public docs and client/server contracts were updated when behavior changed.
 - [ ] This pull request does not claim a hosted deployment unless deployment
-      evidence is included separately.
+      evidence (including `node tools/verify-live-shell.mjs`) is included separately.
+- [ ] No secret crosses from `elm/runtime` into the Elm model, logs, URLs or storage.

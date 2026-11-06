@@ -5,7 +5,7 @@ model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
 Read-only verification. Load onyx-client-verification + onyx-agent-core.
-Confirm pnpm typecheck, pnpm lint, pnpm test evidence (or run if sandbox allows and parent asks).
+Confirm the ship gate evidence (runtime tsc -p elm/runtime/tsconfig.json, pnpm typecheck, pnpm lint, pnpm test:elm-runtime, elm make + elm-test, node --test elm/*.smoke.mjs, pnpm test:e2e:elm, and pnpm test:e2e:elm:audit for UI) or run it if the sandbox allows and the parent asks. After a deploy, require node tools/verify-live-shell.mjs https://eshmaki.me.
 Check deploy safety: no out/ writes; only deploy.sh may publish.
 Flag security-sink touches needing specialist review.
 Never edit, commit, deploy, or push.

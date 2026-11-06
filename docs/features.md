@@ -1,133 +1,93 @@
-# Passkeys & catching up
+# Using Onyx
 
-*Audience: end-user.* Two everyday features: signing in without a password
-using a **passkey**, and the **"since you were away"** digest on your Home
-screen that tells you what happened while you were gone.
+*Audience: people using the app.* A tour of what the current client does. The
+in-app Guides (`/guides/`) cover the same ground step by step.
 
-## Passkeys — sign in without a password
+## Getting in
 
-A passkey lets you sign in with Face ID, a fingerprint, or a hardware security
-key instead of typing a password. You manage them from the account panel
-(settings icon, bottom right) under **Passkeys**. (`src/shell/PasskeysSection.tsx:123`)
+Open `/app/`. The connect screen offers three ways in:
 
-### Add a passkey
+- **Continue as guest.** Chat straight away with a guest name. You can keep the
+  name later ("Keep this name" under You) without reconnecting.
+- **Sign in** with an Onyx account.
+- **Create account.**
 
-1. Sign in to your account first — the section stays inert for guests.
-   (`src/shell/PasskeysSection.tsx:70`)
-2. Open the account panel and find **Passkeys**.
-3. Optionally give the passkey a name (e.g. *My laptop*) so you can tell your
-   devices apart later. (`src/shell/PasskeysSection.tsx:156`)
-4. Click **Add a passkey**. The button changes to *Waiting for your device…*
-   while your browser prompts you for Face ID, a fingerprint, or your security
-   key. (`src/shell/PasskeysSection.tsx:163`)
-5. On success you'll see *Passkey added* and the new key appears in **Your
-   passkeys**. (`src/lib/store/store.ts:4936`)
+Passwords go to the client's private runtime, never into the app's view state.
 
-If you cancel the device prompt, or anything goes wrong, Onyx shows the error
-and **never** quietly falls back to a weaker sign-in — you stay exactly as
-secure as before. (`src/shell/PasskeysSection.tsx:11`)
+## The five places
 
-### Your passkeys list
+| Place | What's there |
+| --- | --- |
+| **Home** | What needs you: conversations with mentions or unread DMs, plus next steps. |
+| **Rooms** | Your rooms, filterable by All, Unread, @Mentions and Favorites. Browse or start a room. |
+| **Messages** | Direct messages, with the same filters. |
+| **Calls** | Voice calls in your rooms. |
+| **You** | Account settings, connection, Appearance, Guides, and Advanced. |
 
-Each registered passkey shows its name, when it was added, and how many times
-it has signed you in (*Used N×*). (`src/shell/PasskeysSection.tsx:222`) Use
-**Refresh** to re-fetch the list from the server.
-(`src/shell/PasskeysSection.tsx:186`)
+On desktop you get a slim icon rail and a sidebar. On phones there's a bottom
+bar, conversations open as full pages with Back, and You opens full screen.
 
-- **Rename** — give a passkey a clearer name.
-  (`src/shell/PasskeysSection.tsx:239`)
-- **Remove** — deletes a passkey. Onyx asks you to confirm inline (*Remove?* /
-  *Cancel*) so a single stray click can't delete a key.
-  (`src/shell/PasskeysSection.tsx:244`) On success you'll see *Passkey removed*.
-  (`src/lib/store/store.ts:4973`)
+## Conversations
 
-### When passkeys aren't available
+- **Room header** with topic and member count; open it for room details and
+  the member list, grouped Owners, Admins, Moderators, Helpers, Voiced and
+  Members, with presence. Tap a name to open the profile.
+- **Messages** are grouped by author with times in the gutter, day dividers, a
+  "new" divider, "load older" and jump-to-latest.
+- **Message menu** (hover, right-click or long-press): six one-tap reactions, the main
+  actions (reply, quote, edit, delete, pin, copy text or link), and "More". Arrow keys move
+  through it; on phones it's a bottom sheet.
+- **Composer**: one row that grows as you type, with the reply bar above it.
+  On phones, attachments and extras sit behind a **+** tray.
+- **Search, pins and media** open as sheets from the room header.
+- Failed sends, refused sign-ins and stuck sign-ins tell you what happened.
 
-The section is honest about what your browser and server can actually do:
+## Inbox
 
-- **"This browser does not support passkeys."** — your browser can't do
-  WebAuthn. Try a current Chrome, Safari, Firefox, or Edge on a device with a
-  screen lock. (`src/shell/PasskeysSection.tsx:190`)
-- **"This server does not offer passkey sign-in yet."** — passkeys are not
-  currently available on the network you're connected to. You can still protect
-  your account with a password and two-factor authentication.
-  (`src/shell/PasskeysSection.tsx:198`)
+A sheet (bottom sheet on phones) with mentions, DMs, invites and kicks. Each row
+shows its type, where it came from and when, and jumps to the message. Invites
+and kicks are actionable. Server notices never land here as DMs or mentions, and
+ignored people are filtered out.
 
-Onyx does not receive a passkey capability advertisement up front. When a
-signed-in user opens the panel, the client probes with `WEBAUTHN LIST`; a
-successful reply enables the manager. If the command is unavailable, the
-server does not answer, or passkeys are temporarily unavailable, the client
-fails closed and the section reports that the server does not offer passkey
-sign-in. (`src/shell/PasskeysSection.tsx:125`, `src/lib/store/store.ts:8677`, `src/lib/store/store.ts:8687`)
+## Voice calls
 
-The client supports the passkey manager, and Onyx Server implements the
-`WEBAUTHN` command. Server success replies are targeted IRCX `EVENT` messages
-such as `:server EVENT <nick> WEBAUTHN CRED …`; the client consumes that event
-plane. The server requires `[webauthn]` configuration with an RP ID and at least
-one allowed origin, and fails closed when either is missing.
-(client: `src/lib/webauthn/passkey.ts:6`, `src/lib/store/store.ts:10539`;
-Onyx Server: `src/daemon/server.zig:57172`,
-`etc/onyx-server.reference.toml:795`)
+Start or join a call from a room or from Calls. While you're in a call, a call bar
+stays visible across the app with microphone, camera, sharing and caption
+controls. Calls need a signed-in account on the server.
 
-If a network's server has the base passkey commands but does not implement
-`WEBAUTHN RENAME`, Onyx hides **Rename** after the server rejects that
-subcommand and explains that renaming is unavailable there.
-(`src/lib/store/store.ts:10561`, `src/shell/PasskeysSection.tsx:233`)
+## Encryption
 
-## "Since you were away" — the Home catch-up digest
+- **Encrypted DMs** between devices that have published keys. If a key is
+  missing or changes, the conversation fails closed and tells you.
+- **Encrypted rooms** for rooms that require encryption. Members' devices are
+  enrolled, and you review a new device before trusting it. Device-trust review
+  is new and still waiting for an independent security review.
 
-When you're connected, your Home screen leads with a **Catch up** card that
-sorts everything you missed into three tiers, loudest first, so mentions and
-DMs surface while ambient chatter stays out of your way.
-(`src/shell/HomeView.tsx:485`)
+Encrypted messages are stored on your device only as ciphertext, and
+notifications never show their text.
 
-The header summarises the totals — unread count, mentions (bold), and how many
-**followed** channels have activity — or shows *You're all caught up ✓* when
-there's nothing waiting. (`src/shell/HomeView.tsx:490`)
+## History and search
 
-### The three tiers
+Conversations are saved in this browser (IndexedDB), so rooms open from local
+history and stay readable offline. The default is the newest 400 messages per
+conversation, adjustable in settings, with optional age limits. Search covers
+loaded messages and your saved history, with exact, related-terms and hybrid
+modes. History isn't synced between devices.
 
-- **Needs you** — your DMs and any channel where you were **mentioned**. Mute
-  is Discord-style hard silence: a muted room or DM never appears here, even
-  with @ or a keyword highlight. Mentions-only is the middle All / @ / Mute
-  level and still badges @.
-  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:511`)
-- **Followed** — channels you follow that have unread messages but no mention.
-  Summarised on their own, never bumped up into *Needs you*.
-  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:521`)
-- **Quiet activity** — the collapsed tail: everything else with unread that is
-  not hard-silenced. Folded into an expandable *Quiet activity (N)* section and
-  capped so it never floods the card.
-  (`src/lib/notifications/awayDigest.ts`, `src/shell/HomeView.tsx:529`)
+## Appearance
 
-Muting a channel or DM is hard silence — no badge, no OS ping, no digest row.
-Mentions-only still badges @. (`src/lib/notifications/awayDigest.ts`)
+Under **You → Appearance**: pick a look (Ocean, Pearl, Match device, Graphite,
+Sepia, Mist, Plum, High contrast, and more), text size, density and motion.
+"Match device" is the default and follows your system's light or dark setting.
+You can also build custom themes. Your choice applies before the page paints.
 
-### How your calm preset changes it
+## Install and updates
 
-Your calm-mode preset governs how loud the digest is:
+Onyx is an installable web app (Add to Home Screen on iOS, Install in desktop
+browsers). New versions download in the background and switch over
+automatically when nothing is in progress (no unsent draft, call or private
+operation), with a single reload.
 
-- **Calm / Regular** — followed channels stay in their own **Followed** tier and
-  never escalate into *Needs you*. (`src/lib/notifications/awayDigest.ts:69`)
-- **Power** — followed channels are pulled up into *Needs you* alongside your
-  mentions and DMs, so a power user sees everything up top.
-  (`src/lib/notifications/awayDigest.ts:69`)
+## Advanced
 
-Within each tier the order is deterministic: *Needs you* leads with the loudest
-mention, then DMs, then most recent; the other tiers sort busiest-first.
-(`src/lib/notifications/awayDigest.ts:75`, `src/lib/notifications/awayDigest.ts:89`)
-Click any row to jump straight into that conversation.
-(`src/shell/HomeView.tsx:249`)
-
-## Mentions, DMs, and calls when the tab is closed
-
-You → **Notifications** is the short page for what can ping after this tab
-closes: mentions, DMs, and calls. Turning alerts on uses this browser's
-service worker and the network you already joined — not a third-party push
-vendor. A room you are in can still be set to all messages, mentions only, or
-mute. (`src/shell/YouNotifications.tsx`)
-
-Onyx asks once, quietly, after you have sent or received a real message — never
-as a wall on Connect. The desktop app does not claim system notifications while
-its host flag is off. (`src/shell/FirstRunNotifyPrompt.tsx`,
-`docs/protocol/push-notify-modes.md`)
+**You → Advanced** holds local services and recovery, devices, and backups.

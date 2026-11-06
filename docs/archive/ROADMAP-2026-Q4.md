@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Onyx client roadmap — Q4 2026
 
 **Audience: contributor and maintainer.** The feature plan for the Onyx web

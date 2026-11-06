@@ -1,153 +1,128 @@
 # Contributing to Onyx
 
-**Audience: contributor.** How to set up, test, gate, and safely deploy the Onyx
-web client. Onyx is an **Elm** single-page app with a small JavaScript/TypeScript
-port layer — see the docs hub ([`docs/README.md`](docs/README.md)),
-[`docs/architecture.md`](docs/architecture.md) for the source map,
-[`elm/README.md`](elm/README.md) for the toolchain bootstrap, and
-[`CLAUDE.md`](CLAUDE.md) for working conventions. (The SolidJS client this
-replaced was removed; it is recoverable at the `solid-client-final` tag.)
+**Audience: contributors.** How to set up, test, and safely ship the Onyx web
+client. Onyx is an Elm app with a private TypeScript runtime and a JavaScript
+port bridge. Start with [`README.md`](README.md), then
+[`docs/architecture.md`](docs/architecture.md) and [`CLAUDE.md`](CLAUDE.md).
+The default branch is `onyx-elm`.
 
 ## Prerequisites
 
-- **pnpm only — never npm or yarn.** The lockfile is `pnpm-lock.yaml` and this is
-  a pnpm workspace (`pnpm-workspace.yaml`). Mixing package managers corrupts the
-  install.
-- Node 20+ (`@types/node` is pinned to `^20`).
-- The **Elm 0.19.1** compiler on `PATH` (and `elm-test` for the Elm suite). The
-  sandbox-friendly bootstrap is in [`elm/README.md`](elm/README.md).
+- **pnpm only, never npm or yarn.** The lockfile is `pnpm-lock.yaml`.
+- Node.js 20+.
+- Elm 0.19.1 and elm-test 0.19.1-revision17, installed outside the app's
+  dependency graph. See [`elm/README.md`](elm/README.md#toolchain).
+- Chromium for Playwright (`ONYX_CHROMIUM_EXECUTABLE`, default `/usr/bin/chromium`).
 
 ```bash
 pnpm install
-export PATH=/tmp:$PATH ELM_HOME=/tmp/elmhome   # wherever your elm binary / package cache live
-pnpm dev          # builds the Elm client + site, serves dist/ on http://127.0.0.1:3000
+node tools/build-elm-site.mjs /tmp/onyx-site
+node tools/serve-dir.mjs /tmp/onyx-site 8080     # http://127.0.0.1:8080/app/
 ```
 
-## Scripts (`package.json`)
+## Scripts that work
 
 | Command | What it does |
-|---|---|
-| `pnpm dev` | `pnpm build`, then serve `dist/` on port 3000 (`tools/serve.mjs`). |
-| `pnpm build` | `elm/tools/build.sh` → `elm/dist-elm/`, then `tools/build-site.mjs` → **`dist/`** (never `out/`). |
-| `pnpm preview` | Serve the existing `dist/` (no rebuild). |
-| `pnpm typecheck` | `tsc -p tsconfig.json --noEmit` over `elm/engine` + `elm/media`. |
-| `pnpm lint` | ESLint (`eslint --cache`) over `elm/*.js`, the smoke suites, and the TypeScript engine. |
-| `pnpm test` | Vitest: the `elm/engine` suites, `tools/` tests and the static-site contract tests. |
-| `pnpm test:smoke` | Every `elm/*.smoke.mjs` suite (jsdom over the real bundle and `ports.js`). |
-| `pnpm test:deploy` | `tools/deploy-controller.test.sh` — deploy.sh path validation, rollback and allowlist safety. |
-| `pnpm test:watch` / `test:coverage` | Vitest watch / V8 coverage. |
-| `pnpm site:check` | Safe website gate: typecheck, lint, tests, then build to `dist/`. |
-| `pnpm site:workbench` | Interactive local menu for build/serve, safe gates and preview. Never writes `out/`. |
+| --- | --- |
+| `node tools/build-elm-site.mjs <dir>` | Elm `--optimize` build, runtime bundle, CSS, service worker envelope and route documents into `<dir>`. |
+| `node tools/serve-dir.mjs <dir> <port>` | Static server with SPA fallback for a staged build. |
+| `pnpm typecheck` | `tsc` over the shared `src/` modules. |
+| `pnpm exec tsc -p elm/runtime/tsconfig.json --noEmit` | Strict typecheck of the private runtime. |
+| `pnpm lint` | ESLint. |
+| `pnpm test` | Root Vitest (`src/**`, `tools/**`). |
+| `pnpm test:elm-runtime` | Runtime Vitest (`elm/vitest.runtime.config.ts`). |
+| `pnpm test:e2e:elm` | Playwright mock-socket suite on Chromium (builds into `/tmp/onyx-elm-e2e`). |
+| `pnpm test:e2e:elm:audit` | 628-check UI audit across six Chromium projects (optional Firefox). |
+| `pnpm check:server-contract` / `check:server-contract-v2` | Compare client contract JSON with a sibling `../onyx-server` checkout. |
+| `pnpm desktop:*` | Native desktop host; see [`docs/desktop-host.md`](docs/desktop-host.md). |
 
-## Quality gates (run before you finish)
+`pnpm build` (clean `dist/` + Elm site build), `pnpm preview` (serve `dist/` on
+:4173), `pnpm dev` (build + serve on :3000) and `pnpm test:e2e` (the Elm
+Chromium suite) all target the Elm client.
+
+## Gates (run before you finish)
 
 ```bash
-(cd elm && elm make src/Main.elm --output /dev/null && elm-test)   # Elm compiles + vectors pass
-pnpm test:smoke
+pnpm exec tsc -p elm/runtime/tsconfig.json --noEmit
 pnpm typecheck
 pnpm lint
-pnpm test
-node elm/tools/css-coverage.mjs      # 0 unstyled classes, 0 undefined CSS variables
+pnpm test:elm-runtime
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)
+node --test elm/*.smoke.mjs
+pnpm test:e2e:elm
 ```
 
-UI changes also need real-browser evidence: `node elm/tools/screens.mjs --vp all`
-(see [`elm/README.md`](elm/README.md)). TypeScript is **strict**, and
-`noUncheckedIndexedAccess` is on (`tsconfig.json`) — indexed access yields
-`T | undefined`, so handle the `undefined` case rather than asserting it away.
+Also run, when relevant:
+
+- UI changes: `pnpm test:e2e:elm:audit`, and screenshots with
+  `node elm/tools/screens.mjs --site /tmp/onyx-site`.
+- `deploy.sh` changes: `bash tools/deploy-controller.test.sh`.
+- Shared `src/` changes: `pnpm test`.
+- Protocol, session, history or crypto changes: the matching local-server lab
+  (see [`docs/testing-and-release.md`](docs/testing-and-release.md)).
 
 ## Tests
 
-- **Elm (`elm/tests/`, elm-test + elm-program-test):** vectors for every protocol
-  fold, parser and view contract; new behaviour gets a vector first.
-- **Smoke (`elm/*.smoke.mjs`):** jsdom suites over the real `ports.js` and the
-  built bundle, with stubbed WebSocket/IndexedDB. Every change to `ports.js`
-  needs one.
-- **Unit (Vitest):** co-located `*.test.ts` next to the engine sources in
-  `elm/engine/` (setup in `vitest.setup.ts`, IndexedDB faked with
-  `fake-indexeddb`), plus `tools/**/*.test.{mjs,ts}` for the site generator, the
-  service worker contract and the release tooling.
-- **Screens (`elm/tools/screens*.mjs`):** headless Chromium against a fake local
-  IRC server — never the live network. Connected checks against production are
-  not part of the gates.
+- **Elm (`elm/tests/`):** vectors for every protocol fold, parser and view
+  contract. New behaviour gets a vector first.
+- **Smokes (`elm/*.smoke.mjs`):** `node:test` suites that load the real
+  `ports.js` with stubbed browser APIs. Every `ports.js` change needs one.
+- **Runtime (`elm/runtime/*.test.ts`):** Vitest node, DOM and worker projects
+  with fake IndexedDB and WebCrypto.
+- **Playwright (`tests/e2e/`):** the mock suite and audit answer the page's
+  WebSocket with `page.routeWebSocket`. Nothing reaches the live network.
+- **Labs (`elm/tools/lab/`):** a real local Onyx Server binary. Never test
+  against production servers.
 
-## Elm conventions
+## Conventions
 
-- Effects are data: `update` returns state plus `List Outbound`; only `Main.elm`
-  talks to ports. Pure protocol folds live in their own modules with vectors.
-- New feature code goes in its own module, wired into `App.elm` through a
-  `-- v3/<slice>` block and the `settleSteps` list; keep `App.elm` edits minimal.
-- Security-sensitive paths (auth, crypto, storage, uploads) fail closed, never log
-  secrets and never put secrets in URLs.
-- CSS: tokens live in `elm/app.css`; the `<link>` order in `elm/index.html` is the
-  cascade order; run the CSS gates in `elm/README.md` after touching a stylesheet.
+- Effects are data: `update` returns state plus outbound effects; only
+  `Main.elm` talks to ports. Pure logic gets its own module.
+- Secrets (passwords, tokens, keys, decrypted private payloads) stay in
+  `elm/runtime`. Elm sees UI-safe projections only.
+- Wire text is untrusted: render text nodes, never `innerHTML`; bound every
+  parse; fail closed on crypto and auth.
+- CSS: tokens and the base layer live in `elm/app.css`; `<link>` order in
+  `elm/index.html` is the cascade order.
+- Use English subsystem names; `TSUMUGI*` bytes are legacy interop literals.
 
-## Persistence & wire-key contract
+## Persistence and wire keys
 
-- `localStorage` keys use the `onyx:` prefix. Legacy `ocean-*` keys are migrated
-  (copied, never deleted) by `migrateLegacyStorage` at the top of `elm/ports.js`,
-  which runs when the script loads — keep it ahead of anything that reads flags.
-- IRCX METADATA/PROP keys prefixed `ocean.` (e.g. `ocean.display-name`,
-  `ocean.accent`, `ocean.links`, `ocean.watch`) are **wire format** —
-  server-persisted and shared with other clients. Never rename them.
+- localStorage keys use the `onyx:` prefix.
+- IRCX METADATA/PROP keys prefixed `ocean.` (`ocean.display-name`,
+  `ocean.accent`, `ocean.links`, …) are **wire format**, server-persisted and
+  shared with other clients. Never rename them.
 
-## Deploy safety — the `dist/` vs live-`out` invariant
+## Deploy safety
 
-**Only `deploy.sh` writes `out/`.** nginx serves this checkout's `out/` tree
-directly at eshmaki.me, so `out/` *is* production. To keep a plain build, a test run, or a
-screenshot server from ever wiping or half-replacing the live site, `pnpm build`
-writes only `dist/` (`tools/build-site.mjs` refuses any `out` directory), and
-`deploy.sh` is the single path that syncs `dist/ → out/`. There is one client and
-one build path: `deploy.sh` has no client switch.
+**Only `deploy.sh` writes `out/`.** nginx serves `out/` at eshmaki.me, so `out/`
+is production. Builds and tests write to `dist/` or `/tmp`.
 
-The generated **Elm documents** (root, every route, the flat 404) are authoritative
-for the public root and all SPA routes. `/home/kain/landing` is **legacy support
-only**: deploy builds it and stages **allowlisted** non-conflicting paths
-(`self-host`, `why`, `memory`, `onyxOS`, `fonts`). `/guides/` and `/community/` are
-SPA Getting started how-tos. It never overlays root documents (`index.html`,
-`robots.txt`, `sitemap.xml`, favicons) or SPA-owned routes/assets/service worker.
-SPA-owned content is fingerprinted before staging and re-verified afterward.
+`./deploy.sh` (or `DEPLOY_DRY_RUN=1 ./deploy.sh` to build and check only):
 
-`./deploy.sh` (or `DEPLOY_DRY_RUN=1 …` for build/stage/assert only — no live
-mutation; `DEPLOY_DRY_RUN` must be exactly `0` or `1`):
+1. Validates `ONYX_LIVE_OUT` (absolute, basename `out`, not a symlink).
+2. Builds the Elm site into `dist/` (`ONYX_CLIENT=elm` is the default; `solid`
+   fails because its sources are gone) and checks `index.html`, `app.js`,
+   `ports.js`, `sw.js`, route documents and a flat `404.html`.
+3. Verifies the service-worker build envelope.
+4. Stages allowlisted legacy support paths from the host's landing tree.
+5. Hard-link backs up the live tree, rsyncs into `out/`, verifies, and restores
+   the backup automatically on failure.
 
-1. Resolves and validates `ONYX_LIVE_OUT` (absolute, basename `out`, not `/`,
-   not the checkout root, not `dist`, not a symlink).
-2. `pnpm build` → `dist/` (aborts unless the root document boots the Elm client and
-   `dist/sw.js`, `dist/app/index.html`, `dist/download/index.html` and a flat
-   `dist/404.html` exist, and no document loads a legacy `/assets/index-*` bundle).
-   `tools/build-site.mjs` writes route-correct canonical, Open Graph, title and
-   description metadata so hard loads do not 404 and pre-hydration crawlers see
-   the right page. **Keep `ROUTE_ENTRYPOINTS` in `tools/site/routes.mjs` in sync
-   with the parser in `elm/src/Route.elm`** (a test fails when they drift).
-3. Stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`.
-4. Overlays the separately managed community-site build configured on the
-   first-party host.
-5. Hard-link snapshot of the current live tree, `rsync` into `out/` (`--delete`
-   except `assets/`, which keeps earlier hashed files), post-sync verification,
-   and automatic proven rollback on failure.
+Then verify the live site:
 
-Controller unit tests: `pnpm test:deploy` (never mutates `/home/kain/onyx/out`).
+```bash
+node tools/verify-live-shell.mjs https://eshmaki.me
+```
 
-Never point a build, test, or script at the live `out/` yourself.
+Keep `elm/src/Route.elm` and `ELM_ROUTE_ENTRYPOINTS` in
+`tools/materialize-elm-routes.mjs` in sync.
 
-## Interactive website workbench
+## Pull requests
 
-Use `pnpm site:workbench` for an operator-facing local loop. It offers only
-safe actions: build and serve, run the full `site:check` gate, or preview the
-current `dist/` build. It intentionally has no deploy action: `./deploy.sh`
-remains an explicit, separately reviewed operator decision and the sole writer of
-the nginx-served `out/` tree.
-
-## Public repository conventions
-
-The brand is **Onyx** (formerly
-Ocean, briefly Ruri — both are dead names; do not reintroduce them except as the
-documented `ocean.*` wire keys and legacy `ocean-*` migration shims). The client
-source is public under AGPL-3.0-or-later. Do not commit credentials, private
-deployment output, generated `out/`, or machine-specific secrets.
-
-Keep pull requests focused and explain the observable behavior they change.
-Include tests for store, protocol, vault, crypto, or accessibility behavior and
-update the relevant guide when a user-visible contract changes. The code of
-conduct is [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md); security reports belong
-in [`SECURITY.md`](SECURITY.md), not in a public issue.
+The brand is **Onyx** (Ocean and Ruri are dead names, except the `ocean.*` wire
+keys). Don't commit credentials, `.env` files, deployment output or user data.
+Keep pull requests focused, describe the observable behaviour, include tests,
+and update the relevant guide when a user-visible contract changes. See
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md); report security issues through
+[`SECURITY.md`](SECURITY.md).

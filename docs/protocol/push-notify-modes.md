@@ -8,20 +8,22 @@
 | `mention` | Channel PRIVMSG nick-token match | `{type,from,text,channel}` |
 | `call` | MEDIA JOIN first kind in room | `{type,from,text,channel}` |
 
-Body text that looks like E2EE envelope is redacted in the **service worker** (`New encrypted message`).
+The client service worker (`elm/sw.js`) never shows payload text: the body is
+always generic ("You have a new notification."), DM titles never name the
+sender, and the title depends on the user's preview policy (`private`,
+`sender-only`, `message-preview`).
 
 ## Client
 
 | Layer | Role |
 |-------|------|
-| `shouldNotify` (`decision.ts`) | Desktop/sound gate: DND, mute, focus, throttle; alert kinds include `mention`/`dm`/`follow`/`call` |
-| Channel notify mode | Per-channel `all` / `mentions` / `mute` via `channelNotifyMode` |
-| `recoverWebPush` | Re-bind after reconnect / SW update |
-| You → Notifications | Short product page: Mentions, DMs, Calls + existing room mute/mentions-only. Uses this browser's service worker and the server `WEBPUSH` contract — no third-party vendor. |
-| First-run ask | One quiet sheet after the first successful send on this device (never first paint or Connect; never the marketing site). iOS only from the Home Screen standalone web app — a Safari tab does not claim push. Already granted, denied, or dismissed stays quiet. The Zig desktop host does not claim system notifications while `notifications: false`. |
+| `elm/src/Notify.elm`, `QuietHours.elm` | Desktop/sound gate: do-not-disturb, quiet hours, mute, focus |
+| Per-room notify level | `onyx:channel-notify` (`all` / `mentions` / `mute`) |
+| `elm/src/Push.elm`, `PushLifecycle.elm`, `elm/runtime/push-lifecycle.ts` | Web Push subscription via the server `WEBPUSH` contract and this browser's service worker; re-bind after reconnect or worker update |
+| `elm/sw.js` | `push` handler and owner-checked `notificationclick` routing |
 
 ## Operator check
 
-1. You → Notifications → turn on alerts while connected  
-2. Close tab; send a mention / start MEDIA JOIN from another client  
-3. Lock-screen shows mention/call title, never ciphertext  
+1. Turn on notifications in the app while connected (the browser must grant permission)
+2. Close tab; send a mention / start MEDIA JOIN from another client
+3. Lock screen shows a generic notification, never message text or ciphertext

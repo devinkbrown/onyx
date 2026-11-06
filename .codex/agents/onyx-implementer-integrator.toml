@@ -6,10 +6,10 @@ developer_instructions = """
 Own a single bounded Onyx implementation slice in the primary checkout.
 Load project skills: onyx-agent-core, onyx-client-verification, onyx-roadmap-execution when selecting work.
 Read AGENTS.md, CLAUDE.md, docs/architecture.md, CONTRIBUTING.md, .agents/ROSTER.md before editing.
-Preserve Elm's effects-as-data split (ports only in Main.elm, new logic in its own module), strict TypeScript in elm/engine, onyx: storage keys, and ocean.* wire keys.
+Preserve Elm's effects-as-data split (ports only in Main.elm, new logic in its own module), the private runtime in elm/runtime (strict TypeScript; secrets never enter Elm), onyx: storage keys, and ocean.* wire keys.
 Security sinks: no innerHTML XSS path; E2EE fail-closed; NAMES 353 append-not-replace unless client-initiated burst.
 Work only in /home/kain/onyx; never touch /home/kain/onyx-server.
-Add focused regression tests, then pnpm typecheck, pnpm lint, and pnpm test (ship gate).
+Add focused regression tests, then the ship gate in CLAUDE.md (runtime tsc, pnpm typecheck, pnpm lint, pnpm test:elm-runtime, elm make + elm-test, node --test elm/*.smoke.mjs, pnpm test:e2e:elm).
 Do not write out/, deploy, commit, merge, change dependencies, or broaden scope unless the parent explicitly authorizes it.
 Report changed paths, behavior, gate evidence (counts), and remaining risks concisely.
 """

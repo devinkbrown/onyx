@@ -1,5 +1,68 @@
 # Elm roadmap evidence
 
+Newest first. Formal acceptance is recorded only in
+[`acceptance-ledger.json`](acceptance-ledger.json) (4 of 53 packages accepted:
+E00, E02, E03, E04). Runs not bound to a frozen source cut promote nothing.
+
+## Session 2026-11-05/06 (Claude): UI overhaul, Fable audit pass, wire and update fixes
+
+No ledger row was promoted: none of these runs is bound to a frozen source
+manifest or archive. Commits: `a6f98902` (SolidJS removed), `c2261070`,
+`cb8b7697`, `254190c2`, `dbb3a375`, `d1025b7f`; deployed to eshmaki.me.
+
+- **UI overhaul slice 1 (`c2261070`).** Connect gate (guest, sign in, create
+  account through the existing runtime flows; no password in the Elm model).
+  Five-destination shell (Home, Rooms, Messages, Calls, You) with a 56px rail
+  and 280px sidebar on desktop and a bottom bar with pushed pages on phones.
+  Public site redesign.
+- **UI overhaul slice 2 (`dbb3a375`).** Room header with details panel; grouped
+  transcript with gutter times, day/new dividers, load-older and jump pills;
+  one-row composer with a + tray on phones; inbox as a real modal sheet with
+  typed, actionable rows; "Local services and recovery" moved to You >
+  Advanced; invite links read on first load; new public site built from real
+  screenshots (`elm/tools/marketing-capture.mjs`).
+- **Fable audit pass (`d1025b7f`).** Theme token layer, working Pearl, "match
+  device" default, Graphite/Sepia/Mist/Plum/High contrast looks, applied before
+  first paint and AA-checked. Real modal layers with inert backgrounds and focus
+  restore. Message menu as anchored popover / phone bottom sheet with quick
+  reactions and arrow-key navigation. Members grouped by role. Plain-language
+  sweep and clear feedback for failed sends and refused or stuck sign-ins.
+  44px touch targets on phones. `/stats` charts fixed (CSS custom properties via
+  the style attribute). Retired `ircx.us` removed from the node list. Dead
+  Solid-era site generator removed.
+- **Wire fixes (`dbb3a375`).** Request `draft/metadata-2` (METADATA had always
+  been refused with 421, breaking DM keys and display names); send `EVENT` only
+  after IRCX `800`; no `CHATHISTORY` before `001`.
+- **Service-worker update fixes.** `cb8b7697`: the legacy worker's
+  `onyx-shell-*` cache-first cache kept phones on the October build; the new
+  worker takes over, deletes it and reloads once, and the runtime activates a
+  waiting build when the page is idle. `254190c2`: `/onyxos/` (served by
+  another site) never matched its precache hash, which failed every install;
+  it's now excluded, and `tools/verify-live-shell.mjs` checks every shell asset
+  hash at the public origin (42/42 after deploy).
+- **Encrypted-room lab still passing.** `--suite group` 8/8 stages and
+  foundation 4/4 after each slice. Functional only: server source provenance
+  is pending onyx-server changes, so these aren't source-bound receipts.
+- **Firefox.** Opt-in stock Firefox (WebDriver BiDi, `moz-firefox` channel) in
+  both `tests/e2e/elm.config.ts` and the new audit config. Firefox against the
+  real lab server is still not run.
+- **New permanent audit suite.** `pnpm test:e2e:elm:audit`: 628 checks across
+  Chromium dark, light and reduced motion, and iPhone 13, iPhone 13 light and
+  iPhone SE emulation. Chromium emulation only, not device evidence.
+
+Final gates at `d1025b7f`: elm-test 2895/2895, runtime 385/385, Chromium mock
+36/36, audit 628/628, JS smokes 60/60, lint 0 errors, deploy controller
+122/122, foundation lab 4/4, encrypted-room lab 8/8 (functional), live shell
+42/42.
+
+Still open: real-device Safari/iOS/Android cohorts; lab source provenance;
+independent review of device-trust review; rooms with 3+ members and
+cross-node delivery; mobile ingest long task.
+
+Known tooling leftovers found while updating docs: `pnpm dev`, `pnpm build`,
+`pnpm preview`, `pnpm site:check` and `pnpm test:e2e` still invoke Vite and
+fail (no `index.html`/Vite config since the Solid removal).
+
 ## Session 2026-11-05 (Claude): audit fixes, encrypted rooms, Firefox, deploy
 
 No ledger row was promoted. These runs are not bound to a frozen source cut,

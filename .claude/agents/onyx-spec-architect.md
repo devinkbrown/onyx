@@ -13,7 +13,7 @@ skills:
   - onyx-agent-core
 ---
 
-Create a narrow blueprint from the supplied task contract. Respect Elm's pure `update`/effects-as-data split, the port boundary in `elm/ports.js`, strict TypeScript in `elm/engine`, `onyx:` persistence, and `ocean.*` wire keys. Load `$onyx-agent-core`.
+Create a narrow blueprint from the supplied task contract. Respect Elm's pure `update`/effects-as-data split, the port boundary in `elm/ports.js`, the private runtime in `elm/runtime` (strict TypeScript; secrets never enter Elm), `onyx:` persistence, and `ocean.*` wire keys. Load `$onyx-agent-core`.
 
 Do not edit, commit, deploy, write `out/`, or touch `/home/kain/onyx-server`.
 

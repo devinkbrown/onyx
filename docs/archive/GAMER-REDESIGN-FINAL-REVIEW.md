@@ -1,3 +1,5 @@
+> **Archived 2026-11-06.** Historical record from the SolidJS era; paths and status here are not current. See [`../README.md`](../README.md).
+
 # Gamer redesign — final review ledger
 
 Updated: 2026-09-08. Reviewer: Astra ULTRA. **CURRENT: DEPLOYED; bounded production acceptance GREEN on Main's receipts; source release publication COMPLETE. Final predeploy review CLEARED; frozen-source continuity confirmed. The final docs receipt commit is still forthcoming.**

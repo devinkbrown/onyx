@@ -1,45 +1,80 @@
 # Changelog
 
-Notable user-visible and public-source changes are recorded here. The project
-does not yet promise semantic-version compatibility for every client/server
-extension; wire contracts are documented separately.
+Notable user-visible and public-source changes. The project doesn't yet promise
+semantic-version compatibility for every client/server extension; wire
+contracts are documented separately.
 
 ## Unreleased
 
+### Interface overhaul (2026-11-05/06)
+
+- **Connect gate** before the app: continue as guest, sign in, or create an
+  account. Passwords stay in the private runtime.
+- **Five destinations:** Home, Rooms, Messages, Calls and You. Desktop has an
+  icon rail and sidebar; phones get a bottom bar, full-page conversations with
+  Back, and a full-screen You.
+- **Conversation view:** room header with topic, member count and details;
+  grouped messages with gutter times, day and "new" dividers, load-older and
+  jump pills; message menu as a popover or phone bottom sheet with quick
+  reactions; reply bar; growing one-row composer with a + tray on phones.
+- **Inbox** as a modal sheet with typed rows that jump to their message;
+  actionable invites and kicks; server notices no longer filed as DMs.
+- **Themes:** token layer, working Pearl light theme, "match device" default,
+  new Graphite, Sepia, Mist, Plum and High contrast looks; applied before first
+  paint and AA-checked.
+- Real modal dialogs with inert backgrounds and focus restore; members grouped
+  by role with badges; plain-language error messages; 44px touch targets on
+  phones; call bar across the shell; `/stats` charts fixed.
+- "Local services and recovery" moved to **You > Advanced**.
+- New public website built from real app screenshots
+  (`elm/tools/marketing-capture.mjs`), light and dark, iOS theme-color and
+  safe-area handling.
+- Retired the `ircx.us` node from the node list.
+
+### Wire fixes
+
+- Request `draft/metadata-2`; without it METADATA was refused, breaking DM keys
+  and display names.
+- Send `EVENT` subscriptions only after IRCX `800`.
+- No `CHATHISTORY` before registration (`001`).
+
+### Updates and deploys
+
+- Returning visitors get new deploys: the legacy `onyx-shell-*` cache is
+  removed on takeover, and the runtime activates a waiting build when the page
+  is idle, then reloads once.
+- `/onyxos/` is excluded from the service-worker precache (its bytes come from
+  another site and failed the install everywhere).
+- New `tools/verify-live-shell.mjs` checks every precached asset hash at the
+  public origin.
+- `deploy.sh` defaults to `ONYX_CLIENT=elm` and supports the Elm service-worker
+  envelope.
+
+### Testing
+
+- Permanent Playwright UI audit (`pnpm test:e2e:elm:audit`): 628 checks across
+  Chromium dark/light/reduced-motion and iPhone 13, iPhone 13 light and iPhone SE
+  emulation, with opt-in stock Firefox.
+- Encrypted-room lab (`elm/tools/lab/run.mjs --suite group`) passes all 8
+  stages against a local Onyx Server.
+
 ### The SolidJS client is removed
 
-- The Elm client in `elm/` is the only client. The SolidJS client, its Vite /
-  Tailwind / Playwright setup and the `ONYX_CLIENT` deploy switch are deleted;
-  the last commit containing them is the annotated tag `solid-client-final`.
-- `pnpm build` is now the Elm build plus `tools/build-site.mjs`, which writes
-  every route document, the root `index.html` and the flat `404.html` directly
-  (no Vite pass, no overlay). `./deploy.sh` has one path and builds the Elm client.
-- The Cadence media engine and canvas background renderer the Elm build bundles
-  moved from `src/` to `elm/engine/` with their Vitest suites; the legacy
-  `ocean-*` → `onyx:*` localStorage migration now runs from `elm/ports.js`.
+- Merge `a6f98902`: the Elm client in `elm/` is the only client. The SolidJS
+  app, routes, shell and store are deleted; the last commit containing them is
+  the tag `solid-client-final`.
+- `src/` keeps only the shared modules `elm/runtime` imports (Cadence media,
+  E2EE helpers, IRC parser).
+- `pnpm build`/`dev`/`preview`/`test:e2e` now target the Elm client (clean
+  `dist/` + `tools/build-elm-site.mjs`; dev serves on :3000); SolidJS packages
+  and config removed.
 
 ### Public source release
 
-- Publish the Onyx client under AGPL-3.0-or-later.
-- Replace the private/internal documentation posture with a public README,
-  contributor setup, configuration, testing/release, security, and conduct
-  guidance.
-- Add accurate package and repository descriptions and document the boundary
-  between the browser client, the hosted network, and Onyx Server.
-- Label E2EE scope precisely: direct-message and Cadence media paths are wired;
-  group-room control/key-wrap integration remains separately staged.
-- Ignore local deployment backup trees so generated public-site snapshots do
-  not enter source publication.
-
-### Product work included in the publication branch
-
-- Continue the responsive product-shell overhaul, public route work, OnyxOS
-  route integration, network status surfaces, and associated Vitest/Playwright
-  coverage already present in the working branch.
+- Onyx client published under AGPL-3.0-or-later with public README,
+  contributor, configuration, testing, security and conduct guides.
 
 ## 0.1.1
 
-- Current application package version before the first public-source release.
-- Included the SolidJS/Vite client (since removed), local history vault, IRC/IRCX transport,
-  E2EE direct messages, Cadence media, PWA shell, public information routes,
-  account/session surfaces, imports, search, and accessibility coverage.
+- Last application version before the public-source release. Shipped the
+  SolidJS/Vite client (since removed) alongside the early Elm build.
