@@ -25,6 +25,8 @@ import Html exposing (Html, button, div, form, h2, header, input, label, p, sect
 import Html.Attributes exposing (attribute, class, classList, disabled, for, hidden, id, type_, value)
 import Html.Events exposing (custom, onClick, onInput, onSubmit)
 import Json.Decode as Decode
+import Media
+import RuntimeDomain
 import Nav
 import Set
 import View.Thread
@@ -142,7 +144,12 @@ tools model isRoom =
           else
             class ""
         ]
-        [ button
+        [ if isRoom then
+            callButton model
+
+          else
+            text ""
+        , button
             [ type_ "button"
             , class "onyx-search-toggle onyx-convo-tool"
             , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
@@ -183,6 +190,58 @@ tools model isRoom =
             , mediaToggle model
             ]
         ]
+
+
+{-| Start or join this room's voice call, or leave it while you're in it.
+The join button carries the `data-onyx-media-capture` hook: ports.js asks for
+the microphone inside this click (browsers require a user gesture) and the
+runtime then joins the call. Calls need a signed-in account and a live
+connection. -}
+callButton : Model -> Html Msg
+callButton model =
+    let
+        room =
+            Maybe.withDefault "" model.activeChannel
+
+        inThisCall =
+            model.calls.lifecycle /= Media.Idle && model.calls.channel == Just room
+
+        signedIn =
+            model.accountName /= Nothing
+
+        live =
+            model.connection == App.Live
+    in
+    if inThisCall then
+        button
+            [ type_ "button"
+            , class "onyx-call-toggle onyx-call-toggle--leave onyx-convo-tool"
+            , attribute "aria-label" "Leave call"
+            , attribute "title" "Leave call"
+            , onClick (RuntimeDomainActionRequested (RuntimeDomain.MediaLeave (Just room)))
+            ]
+            [ icon "call-end", span [ class "onyx-tool-label" ] [ text "Leave call" ] ]
+
+    else
+        button
+            [ type_ "button"
+            , class "onyx-call-toggle onyx-convo-tool"
+            , attribute "data-onyx-media-capture" "voice"
+            , attribute "data-onyx-media-conversation" room
+            , attribute "aria-label" ("Voice call in " ++ room)
+            , attribute "title"
+                (if not signedIn then
+                    "Sign in to start or join calls"
+
+                 else if not live then
+                    "Calls need a connection"
+
+                 else
+                    "Start or join the voice call"
+                )
+            , disabled (not signedIn || not live || String.isEmpty room)
+            ]
+            [ icon "call", span [ class "onyx-tool-label" ] [ text "Call" ] ]
 
 
 {-| Pinned-messages toggle (channel-gated, labelled with the live pin

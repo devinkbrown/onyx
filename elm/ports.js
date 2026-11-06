@@ -3217,6 +3217,18 @@ function fetchPublicFeed(url) {
         });
       });
     }
+    /* A send the server confirmed (its echo matched): clears the row's
+       "queued" state in Elm. */
+    if (runtime && typeof runtime.subscribeSendAccepted === "function" && app.ports.runtimeSendAccepted) {
+      try {
+        var stopSendAccepted = runtime.subscribeSendAccepted(function (event) {
+          if (!event || typeof event.clientIntentId !== "string" || !event.clientIntentId || typeof event.ownerRef !== "string") return;
+          app.ports.runtimeSendAccepted.send({ clientIntentId: event.clientIntentId, ownerRef: event.ownerRef,
+            accountGeneration: event.accountGeneration, connectionGeneration: event.connectionGeneration });
+        });
+        if (typeof stopSendAccepted === "function" && typeof runtime.onDispose === "function") runtime.onDispose(stopSendAccepted);
+      } catch (_error) { /* delivery state stays conservative */ }
+    }
     if (runtime && typeof runtime.subscribeDomainObservations === "function" && app.ports.runtimeDomainObservation) {
       try {
         var stopDomainObservations = runtime.subscribeDomainObservations(function (event) {

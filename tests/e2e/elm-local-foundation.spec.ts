@@ -62,6 +62,9 @@ test('Elm browser registers over the isolated local WSS listener', async ({ page
   await expect.poll(() => parseFrames(received).some(message => message.nick === nick && isCanaryPrivmsg(message))).toBe(true);
   await expect(page.getByText(canary, { exact: true })).toBeVisible();
   expect(sent.every(frame => !frame.includes('\r') && !frame.includes('\n'))).toBe(true);
+  // The server echo confirms the send: the row must stop saying "queued".
+  const guestRow = page.locator('.onyx-message', { hasText: canary });
+  await expect(guestRow.locator('.onyx-pending-note'), JSON.stringify({ sent: sent.filter(f => f.includes(canary)), echo: received.filter(f => f.includes(canary)) })).toHaveCount(0, { timeout: 10_000 });
 });
 
 test('Elm browser identifies a private account and sends an authenticated canary', async ({ page, context, baseURL }) => {
@@ -188,6 +191,9 @@ test('Elm browser identifies a private account and sends an authenticated canary
     expect(isCanaryPrivmsg(authEcho)).toBe(true);
   }
   await expect(page.getByText(canary, { exact: true })).toBeVisible();
+  // Once the held echo is released, the signed-in row must stop saying "queued".
+  const authRow = page.locator('.onyx-message', { hasText: canary });
+  await expect(authRow.locator('.onyx-pending-note'), JSON.stringify({ sent: sent.filter(f => f.includes(canary)), echo: intercepted.echo })).toHaveCount(0, { timeout: 10_000 });
 });
 
 function isPrivateAuthenticationFrame(frame: string): boolean {

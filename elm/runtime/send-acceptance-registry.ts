@@ -33,6 +33,8 @@ export interface SendAcceptanceProofReady {
   readonly context: RequestContext;
   readonly messageIds: readonly string[];
   readonly storageKind: 'durable' | 'memory';
+  /** The send's original intent id; the UI keys its queued row by it. */
+  readonly clientIntentId: string;
 }
 export interface SendAcceptanceRegistryDependencies {
   readonly ownerSnapshot: () => OwnerSnapshot;
@@ -212,7 +214,7 @@ export function createSendAcceptanceRegistry(deps: SendAcceptanceRegistryDepende
     attempt.proofRef = proofRef;
     attempt.state = 'accepted';
     trim();
-    try { deps.onProofReady({ recordId: attempt.recordId, proofRef, context: attempt.context, messageIds, storageKind: attempt.storageKind }); } catch { /* bootstrap will reconcile only from its own queue */ }
+    try { deps.onProofReady({ recordId: attempt.recordId, proofRef, context: attempt.context, messageIds, storageKind: attempt.storageKind, clientIntentId: attempt.clientIntentId }); } catch { /* bootstrap will reconcile only from its own queue */ }
   };
   const releaseAttempt = (attempt: AcceptanceAttempt, state: AcceptanceAttempt['state']): void => {
     attempt.state = state;

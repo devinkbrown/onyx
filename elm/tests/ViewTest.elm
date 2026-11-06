@@ -30,6 +30,7 @@ import Test.Html.Event as Event
 import Time
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
+import View.RoomHeader
 import Url
 import View
 import View.About exposing (accessibilityTopics)
@@ -88,6 +89,30 @@ newestRowKey model url =
 
         Nothing ->
             url
+
+
+roomCallTests : Test
+roomCallTests =
+    describe "room header call button"
+        [ test "a signed-in, connected member can start the room's voice call" <|
+            \_ ->
+                View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Live }
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
+                    |> Expect.all
+                        [ Query.has [ Selector.attribute (Attr.attribute "data-onyx-media-conversation" "#c") ]
+                        , Query.hasNot [ Selector.disabled True ]
+                        ]
+        , test "guests see the call button disabled with a sign-in hint" <|
+            \_ ->
+                View.RoomHeader.roomHeader { channelModel | accountName = Nothing, connection = App.Live }
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
+                    |> Expect.all
+                        [ Query.has [ Selector.disabled True ]
+                        , Query.has [ Selector.attribute (Attr.attribute "title" "Sign in to start or join calls") ]
+                        ]
+        ]
 
 
 channelModel : Model
@@ -252,7 +277,8 @@ bigModel =
 suite : Test
 suite =
     describe "View"
-        [ test "sending from history returns to the live window despite old unread anchors" <|
+        [ roomCallTests
+        , test "sending from history returns to the live window despite old unread anchors" <|
             \_ ->
                 let
                     reading = { bigModel | composer = "new own message", threadPageStart = Just 0, historyLanding = Just "old", searchOpen = True, viewUnreadDividerId = Dict.singleton "#c" 1 }

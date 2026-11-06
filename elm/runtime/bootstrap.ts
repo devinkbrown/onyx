@@ -2144,17 +2144,26 @@ export function createBrowserRuntime(config: BrowserRuntimeConfig) {
   let scheduledCustody: ReturnType<typeof createScheduledCustody> | null = null;
   let memorySend: ReturnType<typeof createMemorySendOwner> | null = null;
   const pendingAcceptanceProofs=new Map<symbol,import('./send-acceptance-registry').SendAcceptanceProofReady>();
+  // Tell the UI a send was proven accepted by the server (its echo matched), so
+  // the row's "queued" state clears. Without this the UI only ever saw the
+  // initial transport-admitted result and kept every sent message queued.
+  const sendAcceptedListeners=new Set<(event:{readonly clientIntentId:string;readonly ownerRef:string;readonly accountGeneration:number;readonly connectionGeneration:number})=>void>();
+  const announceSendAccepted=(proof:import('./send-acceptance-registry').SendAcceptanceProofReady):void=>{
+    const owner=proof.context.owner;if(!isCurrent(owner))return;
+    const event={clientIntentId:proof.clientIntentId,ownerRef:owner.ownerRef,accountGeneration:Number(owner.accountGeneration),connectionGeneration:Number(owner.connectionGeneration)};
+    for(const listener of [...sendAcceptedListeners]){try{listener(event);}catch{/* observer failures do not affect delivery state */}}
+  };
   const flushAcceptanceProofs=(recordId?:string):void=>{
     for(const [proofRef,proof] of pendingAcceptanceProofs){
       if(recordId&&proof.recordId!==recordId)continue;
       if(!isCurrent(proof.context.owner)){pendingAcceptanceProofs.delete(proofRef);continue;}
       if(proof.storageKind==='memory'){
         void memorySend?.reconcileAccepted({context:proof.context,recordId:proof.recordId,proofRef}).then(result=>{
-          if(result.status==='server-accepted'){acceptance.acceptanceProofCommitted(proofRef);pendingAcceptanceProofs.delete(proofRef);}
+          if(result.status==='server-accepted'){acceptance.acceptanceProofCommitted(proofRef);pendingAcceptanceProofs.delete(proofRef);announceSendAccepted(proof);}
         });
       }else if(journal){
         void journal.reconcileAccepted({...proof.context,recordId:proof.recordId,proofRef}).then(result=>{
-          if(result==='server-accepted'){acceptance.acceptanceProofCommitted(proofRef);pendingAcceptanceProofs.delete(proofRef);}
+          if(result==='server-accepted'){acceptance.acceptanceProofCommitted(proofRef);pendingAcceptanceProofs.delete(proofRef);announceSendAccepted(proof);}
         });
       }
     }
@@ -4936,6 +4945,9 @@ export function createBrowserRuntime(config: BrowserRuntimeConfig) {
       mediaElements.set(elementRef,element);while(mediaElements.size>8)mediaElements.delete(mediaElements.keys().next().value as string);return true;
     },
     retirePrivateMediaElement(elementRef:string):void{const element=mediaElements.get(elementRef);if(element?.srcObject)element.srcObject=null;mediaElements.delete(elementRef);},
+    subscribeSendAccepted(listener:(event:{readonly clientIntentId:string;readonly ownerRef:string;readonly accountGeneration:number;readonly connectionGeneration:number})=>void):()=>void{
+      if(disposed)return()=>{};sendAcceptedListeners.add(listener);return()=>{sendAcceptedListeners.delete(listener);};
+    },
     subscribeDomainObservations(listener: (event: RuntimeDomainObservation) => void): () => void {
       if (disposed) return () => {};
       domainListeners.add(listener);

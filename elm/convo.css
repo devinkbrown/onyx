@@ -733,3 +733,8 @@ button.notif-center__open:hover { background: color-mix(in srgb, var(--onyx-text
 
 /* The jump pill is redundant while the unread divider itself is visible. */
 .onyx-thread-pane[data-unread-visible] .onyx-unread-jump-wrap { display: none; }
+
+/* Room header call button (start/join, leave). */
+.onyx-icon[data-icon="call"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 4.5h3l1.5 4-2 1.5a11 11 0 0 0 4.5 4.5l1.5-2 4 1.5v3c0 1-1 1.5-2 1.5C10 18.5 5.5 14 5.5 6.5c0-1 0.5-2 1.5-2Z'/%3E%3C/svg%3E"); }
+.onyx-icon[data-icon="call-end"] { --onyx-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 13.5c4.7-4 12.3-4 17 0l-2 2.5-3.5-1v-2.5a9 9 0 0 0-6 0V15l-3.5 1Z'/%3E%3C/svg%3E"); }
+.onyx-shell .onyx-call-toggle--leave { color: var(--onyx-bad, #e5484d); }

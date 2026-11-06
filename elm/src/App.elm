@@ -2778,6 +2778,7 @@ type Msg
     | RuntimeCapturePrepared { ownerRef : String, connectionGeneration : Int, accountGeneration : Int, conversationId : String, captureRef : String, kind : String, available : Bool, reason : Maybe String, deviceRef : Maybe String, callRef : Maybe String }
     | RuntimeMediaGestureResult { ownerRef : String, accountGeneration : Int, connectionGeneration : Int, gesture : String, conversationId : String, callRef : String, state : String, reason : Maybe String }
     | RuntimeDomainResultReceived RuntimeDomain.ResultView
+    | RuntimeSendAccepted { clientIntentId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int }
     | RuntimeDomainObservationReceived { ownerRef : String, accountGeneration : Int, connectionGeneration : Int, domain : String, sequence : Int, securityStatus : Maybe { action : String, phase : String, outcome : String, reason : Maybe String, targetAccount : Maybe String, requiresLogin : Bool }, scheduledView : Maybe RuntimeDomain.ScheduledListView, sessionRecovery : Maybe RuntimeDomain.SessionRecoveryView, passkeyManagement : Maybe RuntimeDomain.PasskeyManagementView, webAuthn : Maybe RuntimeDomain.WebAuthnView, sessionInventory : Maybe RuntimeDomain.SessionInventoryView, sessionRevocation : Maybe RuntimeDomain.SessionRevocationView, accountCommunity : Maybe RuntimeDomain.AccountCommunityView, serviceIntegration : Maybe RuntimeDomain.ServiceIntegrationView, draftRecovery : Maybe RuntimeDomain.DraftRecoveryView, mediaQuality : Maybe RuntimeDomain.MediaQualityView, mediaControl : Maybe RuntimeDomain.MediaControlView }
     | RuntimeNotificationNavigationReceived { requestId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int, kind : String, conversationId : Maybe String }
     | ComposerCompositionStarted
@@ -41762,6 +41763,41 @@ updateRaw msg initialModel =
                 )
             else
                 ( model, [] )
+
+        RuntimeSendAccepted event ->
+            -- The runtime matched the server's echo to this send: the row is
+            -- delivered, so it stops showing "queued" and leaves the outbox.
+            case model.runtimeOwnerStamp of
+                Just stamp ->
+                    if stamp.ownerRef == event.ownerRef && stamp.accountGeneration == event.accountGeneration then
+                        ( { model
+                            | channels =
+                                Dict.map
+                                    (\_ channel ->
+                                        { channel
+                                            | messages =
+                                                List.map
+                                                    (\row ->
+                                                        if row.outboxId == Just event.clientIntentId then
+                                                            { row | pending = False, outboxId = Nothing }
+
+                                                        else
+                                                            row
+                                                    )
+                                                    channel.messages
+                                        }
+                                    )
+                                    model.channels
+                            , outbox = List.filter (\entry -> entry.id /= event.clientIntentId) model.outbox
+                          }
+                        , []
+                        )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
 
         RuntimeDomainObservationReceived observation ->
             let

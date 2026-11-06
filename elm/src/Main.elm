@@ -194,6 +194,9 @@ port runtimeDraftAutosaveTimerCancel : { target : String, revision : Int, ownerR
 port runtimeDraftAutosaveTimerFired : (Decode.Value -> msg) -> Sub msg
 port runtimeDomainResult : (Decode.Value -> msg) -> Sub msg
 port runtimeDomainObservation : (Decode.Value -> msg) -> Sub msg
+
+
+port runtimeSendAccepted : ({ clientIntentId : String, ownerRef : String, accountGeneration : Int, connectionGeneration : Int } -> msg) -> Sub msg
 port runtimeClientSafetyState : Encode.Value -> Cmd msg
 port runtimeNotificationNavigation : (Decode.Value -> msg) -> Sub msg
 port runtimeNotificationNavigationReceipt : Encode.Value -> Cmd msg
@@ -2321,6 +2324,7 @@ subscriptions model =
         , runtimeDomainResult runtimeDomainResultMessage
         , runtimeDraftAutosaveTimerFired runtimeDraftAutosaveTimerMessage
         , runtimeDomainObservation runtimeDomainObservationMessage
+        , runtimeSendAccepted App.RuntimeSendAccepted
         , runtimeNotificationNavigation runtimeNotificationNavigationMessage
         , runtimePrivateFileSelected runtimePrivateFileSelectedMessage
         , runtimePrivateOutputSelected runtimePrivateOutputSelectedMessage
