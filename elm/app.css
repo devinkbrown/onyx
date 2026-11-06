@@ -3,17 +3,34 @@
    titles over a system-sans working surface. No gradients, no shadows. */
 
 :root {
+  /* ---- Design tokens (shared scale; see the audit design plan §3) ---- */
+  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 15px; --fs-body: 16px; --fs-lg: 18px; --fs-xl: 22px; --fs-2xl: 28px;
+  --lh-tight: 1.25; --lh-body: 1.45;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-pill: 999px;
+  --el-1: 0 1px 2px rgba(0, 0, 0, 0.25); --el-2: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --dur-fast: 120ms; --dur-base: 180ms; --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --hit: 44px; --hit-compact: 32px;
+  /* ---- Dark (Ocean) palette ---- */
   --onyx-bg: #0e1518;
   --onyx-panel: #151e22;
   --onyx-panel-2: #1b252b;
   --onyx-line: #27343b;
+  --onyx-line-strong: #3a4a54;
   --onyx-text: #e9e5d8;
   --onyx-dim: #9fa9a2;
   --onyx-faint: #96a39b;
   --onyx-accent: #e8a33d;
+  --onyx-accent-hover: #f0b355;
+  --onyx-accent-soft: rgba(232, 163, 61, 0.14);
   --onyx-accent-ink: #14100a;
+  --onyx-info: #65adf5;
+  --onyx-ok: #5fcf8a;
   --onyx-warn: #e8a33d;
   --onyx-bad: #e5484d;
+  --onyx-bad-soft: rgba(229, 72, 77, 0.14);
+  --onyx-focus: #e8a33d;
+  --onyx-veil: rgba(0, 0, 0, 0.5);
   /* Identity-avatar swatch ground (ocean defaults from
      src/styles/tokens.css, so the Avatar gradients resolve). */
   --ink: #000101;
@@ -32,9 +49,71 @@
   --shu: #e95145;
   --shu-bright: #ff7f71;
   --line: color-mix(in oklab, var(--paper) 40%, transparent);
-  --r-pill: 999px;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
     Consolas, monospace;
+  color-scheme: dark;
+}
+
+/* ---- Light (Pearl) palette: an explicit light look, or "match device"
+   on a light system. Only the paint changes; every component reads the
+   same --onyx-* tokens. ---- */
+:root[data-theme="pearl"],
+:root[data-theme="frost"] {
+  --onyx-bg: #f6f3ec;
+  --onyx-panel: #ffffff;
+  --onyx-panel-2: #efeae0;
+  --onyx-line: #d9d2c4;
+  --onyx-line-strong: #b9b0a0;
+  --onyx-text: #1a1a17;
+  --onyx-dim: #5a5a53;
+  --onyx-faint: #6f6f67;
+  --onyx-accent: #9a5f00;
+  --onyx-accent-hover: #7f4e00;
+  --onyx-accent-soft: rgba(154, 95, 0, 0.12);
+  --onyx-accent-ink: #fffaf0;
+  --onyx-info: #0065b0;
+  --onyx-ok: #1f7a46;
+  --onyx-warn: #9a5f00;
+  --onyx-bad: #b3261e;
+  --onyx-bad-soft: rgba(179, 38, 30, 0.1);
+  --onyx-focus: #0065b0;
+  --onyx-veil: rgba(30, 24, 12, 0.35);
+  --el-1: 0 1px 2px rgba(0, 0, 0, 0.08); --el-2: 0 6px 24px rgba(0, 0, 0, 0.12);
+  --ink: #f5f0e5; --stone: #e5e0d6; --stone-2: #dbd6cc; --stone-3: #d0cbc1;
+  --lapis: #0065b0; --lapis-bright: #086fbe; --lapis-deep: #003e70;
+  --gold: #896100; --gold-bright: #ad7c0a; --shu: #c83319; --shu-bright: #e5462b;
+  --paper: #251e15; --paper-dim: #494136;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"],
+  :root:not([data-theme]) {
+    --onyx-bg: #f6f3ec;
+    --onyx-panel: #ffffff;
+    --onyx-panel-2: #efeae0;
+    --onyx-line: #d9d2c4;
+    --onyx-line-strong: #b9b0a0;
+    --onyx-text: #1a1a17;
+    --onyx-dim: #5a5a53;
+    --onyx-faint: #6f6f67;
+    --onyx-accent: #9a5f00;
+    --onyx-accent-hover: #7f4e00;
+    --onyx-accent-soft: rgba(154, 95, 0, 0.12);
+    --onyx-accent-ink: #fffaf0;
+    --onyx-info: #0065b0;
+    --onyx-ok: #1f7a46;
+    --onyx-warn: #9a5f00;
+    --onyx-bad: #b3261e;
+    --onyx-bad-soft: rgba(179, 38, 30, 0.1);
+    --onyx-focus: #0065b0;
+    --onyx-veil: rgba(30, 24, 12, 0.35);
+    --el-1: 0 1px 2px rgba(0, 0, 0, 0.08); --el-2: 0 6px 24px rgba(0, 0, 0, 0.12);
+    --ink: #f5f0e5; --stone: #e5e0d6; --stone-2: #dbd6cc; --stone-3: #d0cbc1;
+    --lapis: #0065b0; --lapis-bright: #086fbe; --lapis-deep: #003e70;
+    --gold: #896100; --gold-bright: #ad7c0a; --shu: #c83319; --shu-bright: #e5462b;
+    --paper: #251e15; --paper-dim: #494136;
+    color-scheme: light;
+  }
 }
 
 /* Identity avatars (mirrors src/primitives avatar rules). */
@@ -985,7 +1064,7 @@ html, body {
   border: 1px solid var(--onyx-line);
   border-radius: 6px;
   color: var(--onyx-text);
-  color-scheme: dark;
+  color-scheme: inherit;
   font: inherit;
   padding: 6px 8px;
   width: 100%;
@@ -1904,3 +1983,316 @@ html, body {
     padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
   }
 }
+
+/* =====================================================================
+   Fable fix pass — layers, rows, composer, collections, targets.
+   Later in the cascade than the component rules above on purpose.
+   ===================================================================== */
+
+/* ---- Profile / member card / moderation review: a modal layer, never in
+   the column flow. Right sheet on wide screens, bottom sheet on phones.
+   Every descendant wraps inside the panel (long nicks, hosts, URLs). ---- */
+.onyx-profile-pop { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: flex-end; align-items: stretch; }
+.onyx-profile-pop > .onyx-profile-backdrop { position: absolute; inset: 0; background: var(--onyx-veil); }
+.onyx-profile-pop > .onyx-profile-sheet,
+.onyx-profile-pop > .onyx-member-card,
+.onyx-profile-pop > .onyx-moderation-review {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(400px, 100vw);
+  max-width: 100vw;
+  min-width: 0;
+  height: 100%;
+  max-height: 100dvh;
+  margin: 0;
+  padding: var(--sp-4);
+  padding-top: calc(var(--sp-4) + env(safe-area-inset-top));
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  border: 0;
+  border-left: 1px solid var(--onyx-line);
+  border-radius: 0;
+  background: var(--onyx-panel);
+  box-shadow: var(--el-2);
+}
+.onyx-profile-pop > .onyx-moderation-review { margin: auto; height: auto; max-height: calc(100dvh - 32px); width: min(440px, calc(100vw - 32px)); border: 1px solid var(--onyx-line); border-radius: var(--r-lg); }
+.onyx-profile-pop :where(.onyx-profile-sheet, .onyx-member-card, .onyx-moderation-review) :where(*) { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.onyx-profile-pop :where(.onyx-profile-sheet, .onyx-member-card) :where(a, code, dd, dt, p, li, span, strong, b, time) { white-space: normal; }
+.onyx-profile-pop :where(.onyx-profile-sheet, .onyx-member-card) :where(img, video, canvas) { max-width: 100%; height: auto; }
+.onyx-profile-pop :where(.onyx-profile-sheet, .onyx-member-card) :where(pre, table) { max-width: 100%; overflow-x: auto; }
+.onyx-profile-pop :where(.onyx-profile-sheet, .onyx-member-card) :where(dl, .onyx-profile-field, .onyx-member-identity, .onyx-member-copy) { display: block; }
+.onyx-profile-pop .onyx-member-identity { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.onyx-profile-pop .onyx-member-copy { flex: 1 1 auto; min-width: 0; }
+.onyx-profile-pop .onyx-profile-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title close" "desc close"; column-gap: var(--sp-3); align-items: start; position: sticky; top: calc(-1 * var(--sp-4) - env(safe-area-inset-top)); margin: calc(-1 * var(--sp-4) - env(safe-area-inset-top)) calc(-1 * var(--sp-4)) 0; padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--sp-4) var(--sp-3); background: var(--onyx-panel); border-bottom: 1px solid var(--onyx-line); z-index: 2; }
+.onyx-profile-pop .onyx-profile-title { grid-area: title; font-size: var(--fs-lg); line-height: var(--lh-tight); }
+.onyx-profile-pop .onyx-profile-desc { grid-area: desc; }
+.onyx-profile-pop .onyx-profile-close,
+.onyx-profile-pop .onyx-member-actions .onyx-member-action[aria-label^="Close"] { grid-area: close; align-self: start; min-width: var(--hit-compact); min-height: var(--hit-compact); padding: 0 var(--sp-3); margin: 0; border: 1px solid var(--onyx-line); border-radius: var(--r-sm); background: var(--onyx-panel-2); color: var(--onyx-text); cursor: pointer; }
+.onyx-profile-pop .onyx-member-actions { position: sticky; bottom: calc(-1 * var(--sp-4) - env(safe-area-inset-bottom)); margin: var(--sp-3) calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4) - env(safe-area-inset-bottom)); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom)); background: var(--onyx-panel); border-top: 1px solid var(--onyx-line); }
+.onyx-profile-pop .onyx-member-action { min-height: var(--hit-compact); padding: 0 var(--sp-3); border: 1px solid var(--onyx-line); border-radius: var(--r-sm); background: var(--onyx-panel-2); color: var(--onyx-text); cursor: pointer; }
+.onyx-profile-pop .onyx-profile-field dd, .onyx-profile-pop .onyx-profile-field dt { overflow-wrap: anywhere; }
+@media (hover: none), (max-width: 60rem) {
+  .onyx-profile-pop { align-items: flex-end; justify-content: stretch; }
+  .onyx-profile-pop > .onyx-profile-sheet,
+  .onyx-profile-pop > .onyx-member-card { width: 100vw; height: auto; max-height: 92dvh; border-left: 0; border-top: 1px solid var(--onyx-line); border-radius: var(--r-lg) var(--r-lg) 0 0; padding-top: var(--sp-4); }
+  .onyx-profile-pop .onyx-profile-head { top: calc(-1 * var(--sp-4)); margin-top: calc(-1 * var(--sp-4)); padding-top: var(--sp-3); }
+  .onyx-profile-pop .onyx-profile-close,
+  .onyx-profile-pop .onyx-member-action { min-width: var(--hit); min-height: var(--hit); }
+}
+
+/* ---- Message menu: fixed layer; popover near the pointer on wide screens,
+   bottom sheet on phones. ---- */
+.onyx-msg-menu-pop { position: fixed; inset: 0; z-index: 65; margin: 0 !important; }
+.onyx-msg-menu-pop > .onyx-msg-menu-backdrop { position: absolute; inset: 0; z-index: 0; background: transparent; }
+.onyx-msg-menu-pop > .onyx-msg-menu {
+  position: absolute;
+  z-index: 1;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 296px;
+  max-height: min(70dvh, 480px);
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--sp-2);
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-md);
+  box-shadow: var(--el-2);
+  outline: none;
+}
+.onyx-msg-menu-pop--anchored > .onyx-msg-menu {
+  left: clamp(8px, calc(var(--menu-x) - 280px), calc(100vw - 304px));
+  top: clamp(8px, var(--menu-y), calc(100dvh - 8px - min(70dvh, 480px)));
+  transform: none;
+}
+.onyx-msg-menu-pop .onyx-msg-menu-item { display: flex; align-items: center; min-height: 36px; padding: 6px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: var(--onyx-text); background: transparent; border: 0; text-align: left; text-decoration: none; cursor: pointer; }
+.onyx-msg-menu-pop .onyx-msg-menu-item:hover, .onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { background: var(--onyx-panel-2); outline: none; }
+.onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { box-shadow: inset 0 0 0 2px var(--onyx-focus); }
+.onyx-msg-menu-pop .onyx-msg-menu-item--danger { color: var(--onyx-bad); }
+.onyx-msg-menu-quick { display: flex; gap: 4px; justify-content: space-between; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--onyx-line); }
+.onyx-msg-menu-emoji { flex: 1 1 0; min-height: 40px; font-size: 20px; line-height: 1; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.onyx-msg-menu-emoji:hover, .onyx-msg-menu-emoji:focus-visible { background: var(--onyx-panel-2); outline: none; box-shadow: inset 0 0 0 2px var(--onyx-focus); }
+.onyx-msg-menu-delete-confirm { padding: var(--sp-2); }
+.onyx-msg-menu-delete-confirm-title { margin: 0 0 4px; font-weight: 650; }
+.onyx-msg-menu-delete-confirm-copy { margin: 0 0 var(--sp-3); color: var(--onyx-dim); font-size: var(--fs-sm); }
+.onyx-msg-menu-delete-confirm-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.onyx-msg-menu-delete-confirm-actions button { min-height: 36px; padding: 0 var(--sp-3); border-radius: var(--r-sm); border: 1px solid var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-text); cursor: pointer; }
+.onyx-msg-menu-delete-confirm-delete { background: var(--onyx-bad) !important; border-color: var(--onyx-bad) !important; color: #fff !important; }
+@media (hover: none), (max-width: 60rem) {
+  .onyx-msg-menu-pop > .onyx-msg-menu-backdrop { background: var(--onyx-veil); }
+  .onyx-msg-menu-pop > .onyx-msg-menu, .onyx-msg-menu-pop--anchored > .onyx-msg-menu {
+    left: 0; right: 0; top: auto; bottom: 0; transform: none;
+    width: auto; max-height: 75dvh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  }
+  .onyx-msg-menu-pop .onyx-msg-menu-item { min-height: var(--hit); font-size: var(--fs-body); }
+  .onyx-msg-menu-emoji { min-height: var(--hit); font-size: 24px; }
+}
+
+/* ---- Reaction picker: modal layer. ---- */
+.onyx-react-pop { position: fixed; inset: 0; z-index: 66; margin: 0 !important; display: flex; align-items: center; justify-content: center; }
+.onyx-react-pop > .onyx-react-backdrop { position: absolute; inset: 0; background: var(--onyx-veil); }
+.onyx-react-pop > .onyx-react-picker { position: relative; z-index: 1; width: min(360px, calc(100vw - 32px)); max-height: min(70dvh, 520px); margin: 0; padding: var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r-md); box-shadow: var(--el-2); }
+.onyx-react-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.onyx-react-title { margin: 0; font-size: var(--fs-md); font-weight: 650; }
+.onyx-react-close { min-width: var(--hit-compact); min-height: var(--hit-compact); border: 1px solid var(--onyx-line); border-radius: var(--r-sm); background: var(--onyx-panel-2); color: var(--onyx-text); font-size: 18px; cursor: pointer; }
+.onyx-react-pop .onyx-react-grid { overflow-y: auto; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
+.onyx-react-pop .onyx-react-choice { min-height: 40px; font-size: 22px; }
+@media (hover: none), (max-width: 60rem) {
+  .onyx-react-pop { align-items: flex-end; }
+  .onyx-react-pop > .onyx-react-picker { width: 100vw; max-height: 70dvh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom)); }
+  .onyx-react-close, .onyx-react-pop .onyx-react-choice { min-width: var(--hit); min-height: var(--hit); }
+}
+
+/* ---- Members: one full-width row control per member. ---- */
+.onyx-member { display: block; padding: 0; }
+.onyx-member-row { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-text); text-align: left; cursor: pointer; }
+.onyx-member-row:hover, .onyx-member-row:focus-visible { background: var(--onyx-panel-2); }
+.onyx-member-row .onyx-member-nick { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.onyx-member-badge { flex: none; font-size: 11px; font-weight: 650; letter-spacing: 0.02em; text-transform: uppercase; color: var(--onyx-dim); border: 1px solid var(--onyx-line); border-radius: var(--r-pill); padding: 1px 6px; }
+.onyx-member-presence-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--onyx-ok); }
+.onyx-member-presence-dot.is-away { background: transparent; border: 1.5px solid var(--onyx-faint); }
+.onyx-away .onyx-member-nick { color: var(--onyx-dim); }
+@media (hover: none), (max-width: 60rem) { .onyx-member-row { min-height: var(--hit); } }
+
+/* ---- Collections: unread pill / @ pill only; no member count on rows. ---- */
+.onyx-rail-conversation .onyx-rail-count { display: none; }
+.onyx-rail-conversation { align-items: center; }
+.onyx-rail-row-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.onyx-rail-preview { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--onyx-dim); font-size: var(--fs-sm); font-weight: 400; }
+.onyx-rail-time { flex: none; color: var(--onyx-faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.onyx-rail-conversation .onyx-rail-avatar { flex: none; }
+.onyx-rail-unread { border-radius: var(--r-pill); }
+.onyx-rail-mention::before { content: "@ "; }
+.onyx-rail-filters { gap: 6px; }
+
+/* ---- Composer: one row, growing field, quiet context strip. ---- */
+.onyx-composer > textarea.onyx-composer-field { order: 2; flex: 1 1 0; min-width: 0; min-height: 44px; max-height: 9.5em; height: auto; resize: none; overflow-y: auto; line-height: 1.4; padding: 11px 12px; font: inherit; font-size: var(--fs-body); color: var(--onyx-text); background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: var(--r-md); field-sizing: content; }
+.onyx-composer > textarea.onyx-composer-field:focus { outline: 2px solid var(--onyx-focus); outline-offset: 1px; border-color: var(--onyx-line-strong); }
+.onyx-composer > textarea.onyx-composer-field:disabled { color: var(--onyx-faint); }
+.onyx-composer > .shell-composer-context { order: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: var(--sp-2); padding: 6px 8px 6px 12px; border-left: 3px solid var(--onyx-accent); border-radius: var(--r-sm); background: var(--onyx-panel-2); font-size: var(--fs-sm); }
+.onyx-composer > .shell-composer-context .shell-composer-context-label { color: var(--onyx-dim); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.onyx-composer > .shell-composer-context .shell-composer-context-text { color: var(--onyx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-composer > .shell-composer-context .shell-composer-context-close { min-width: var(--hit-compact); min-height: var(--hit-compact); padding: 0; margin: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-dim); font-size: 18px; line-height: 1; cursor: pointer; }
+.onyx-composer > .shell-composer-context .shell-composer-context-close:hover { background: var(--onyx-panel); color: var(--onyx-text); }
+.onyx-composer > .onyx-suggest { order: 0; list-style: none; margin: 0 0 4px; padding: 4px; max-height: 264px; overflow-y: auto; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r-md); box-shadow: var(--el-2); }
+.onyx-suggest-row button { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-text); text-align: left; font: inherit; cursor: pointer; }
+.onyx-suggest-row.is-active button, .onyx-suggest-row button:hover { background: var(--onyx-panel-2); }
+.onyx-suggest-name { font-weight: 650; }
+.onyx-suggest-detail { color: var(--onyx-dim); font-size: var(--fs-sm); }
+.onyx-topic-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.onyx-shell .onyx-composer .onyx-topic-option { min-height: 28px; padding: 2px 10px; border: 1px solid var(--onyx-line); border-radius: var(--r-pill); background: transparent; color: var(--onyx-dim); font-size: var(--fs-sm); cursor: pointer; }
+.onyx-shell .onyx-composer .onyx-topic-option[aria-pressed="true"], .onyx-shell .onyx-composer .onyx-topic-option.is-active { color: var(--onyx-text); border-color: var(--onyx-line-strong); }
+.onyx-shell .onyx-composer .onyx-audience-toggle { border-radius: var(--r-pill); font-size: var(--fs-sm); }
+@media (hover: none), (max-width: 60rem) { .onyx-composer > .shell-composer-context .shell-composer-context-close { min-width: var(--hit); min-height: var(--hit); } }
+
+/* ---- Transcript polish ---- */
+.onyx-ts { font-size: 12px; }
+.onyx-shell .onyx-sender { padding: 0; margin: 0 8px 0 0; border: 0; background: transparent; font: inherit; font-weight: 650; cursor: pointer; text-align: left; }
+.onyx-shell .onyx-sender:hover { text-decoration: underline; }
+.onyx-shell .onyx-sender:focus-visible { outline: 2px solid var(--onyx-focus); outline-offset: 1px; border-radius: 3px; }
+.onyx-intro { padding: var(--sp-4) var(--sp-3) var(--sp-2); color: var(--onyx-dim); font-size: var(--fs-sm); }
+.onyx-intro-text { margin: 0; }
+
+/* ---- Inbox dismiss is a full target ---- */
+.notif-center__dismiss { min-width: var(--hit); min-height: var(--hit); }
+
+/* ---- Calls: one column on phones ---- */
+@media (max-width: 60rem) { .onyx-main-calls { flex-direction: column; align-items: stretch; } .onyx-calls { padding: 20px 16px; max-width: none; } }
+
+/* ---- Brand once: the rail gem is the mark on wide screens ---- */
+@media (min-width: 60.01rem) { .onyx-shell .onyx-topbar > .onyx-brand { display: none; } }
+.onyx-primary-nav-mark { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-md); text-decoration: none; }
+.onyx-primary-nav-mark:focus-visible { outline: 2px solid var(--onyx-focus); outline-offset: 2px; }
+
+/* ---- Keep-name prompt: a compact card, not a shell-wide strip ---- */
+.onyx-shell .guest-claim-chip { align-items: center; gap: var(--sp-2); min-height: 0; max-height: 56px; padding: 6px var(--sp-3); font-size: var(--fs-sm); }
+@media (min-width: 60.01rem) { .onyx-shell .guest-claim-chip { position: fixed; right: var(--sp-4); bottom: var(--sp-4); z-index: 30; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--onyx-line); border-radius: var(--r-md); background: var(--onyx-panel); box-shadow: var(--el-2); } }
+
+/* ---- Touch targets: close buttons in sheets, checkbox rows, faces ---- */
+@media (hover: none), (max-width: 60rem) {
+  .onyx-shell [role="dialog"] button[aria-label^="Close"] { min-width: var(--hit); min-height: var(--hit); }
+  .chb-create label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--hit); }
+  .chb-create input[type="checkbox"] { width: 22px; height: 22px; }
+  .onyx-shell .onyx-facepile-face, .onyx-shell .onyx-facepile .onyx-avatar--sm { width: 2.25rem; height: 2.25rem; }
+}
+
+/* ---- Focus ring that survives the accent fill ---- */
+.onyx-shell button[type="submit"]:focus-visible, .onyx-shell .onyx-gate-primary:focus-visible { outline: 2px solid var(--onyx-text); outline-offset: -4px; }
+
+/* ---- Fix-pass follow-ups ---- */
+.onyx-shell .onyx-convo .onyx-composer > div.shell-composer-context { order: 0; }
+.onyx-shell .onyx-msg-menu-trigger:focus-visible { opacity: 1; outline: 2px solid var(--onyx-focus); outline-offset: 1px; }
+@media (hover: none) {
+  /* Touch: the trigger is always there (quiet), 36px, at the row's top-right. */
+  .onyx-shell .onyx-msg-menu-trigger { display: inline-grid !important; opacity: 0.55; width: 36px; height: 36px; margin: -2px 0 0 6px; }
+  .onyx-shell .onyx-message:focus-within .onyx-msg-menu-trigger, .onyx-shell .onyx-msg-menu-trigger[aria-expanded="true"] { opacity: 1; }
+}
+.onyx-shell .guest-claim-chip { box-sizing: border-box; height: 48px; max-height: 48px; padding: 0 var(--sp-3); overflow: hidden; }
+.onyx-shell .guest-claim-chip__keep, .onyx-shell .guest-claim-chip__dismiss { min-height: 36px; }
+
+/* ---- Touch-target sweep (phones / touch) ---- */
+@media (hover: none), (max-width: 60rem) {
+  .onyx-shell .guest-claim-chip__keep, .onyx-shell .guest-claim-chip__dismiss { min-height: var(--hit); min-width: var(--hit); }
+  .onyx-shell .guest-claim-chip { height: auto; max-height: 56px; }
+  .onyx-shell .onyx-message-search__button, .onyx-shell .onyx-message-search__recall-chip, .onyx-shell .onyx-message-search__vault-mode { min-width: var(--hit); min-height: var(--hit); }
+  .onyx-shell .onyx-reading-bar button, .onyx-shell .onyx-earlier-button, .onyx-shell .onyx-latest-button { min-height: var(--hit); }
+  .onyx-shell .onyx-profile-pop .onyx-member-actions .onyx-member-action, .onyx-shell .onyx-profile-pop .onyx-profile-close { min-height: var(--hit); min-width: var(--hit); }
+  .onyx-shell .onyx-member-advanced-toggle { display: flex; align-items: center; min-height: var(--hit); }
+  .onyx-shell .onyx-suggest-row button { min-height: var(--hit); }
+  .onyx-shell .onyx-schedule-close { min-width: var(--hit); min-height: var(--hit); }
+  .onyx-shell .chb-ledger, .onyx-shell .chb-actions a, .onyx-shell .chb-actions button { display: inline-flex; align-items: center; min-height: var(--hit); padding-inline: 8px; }
+  /* Checkbox rows: the whole row is the control; the native box is the hit area. */
+  .onyx-shell .chb-check { position: relative; align-items: center; min-height: var(--hit); padding-left: 36px; }
+  .onyx-shell .chb-check input[type="checkbox"] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .onyx-shell .chb-check::before { content: ""; position: absolute; left: 2px; top: 50%; width: 22px; height: 22px; transform: translateY(-50%); border: 2px solid var(--onyx-line-strong); border-radius: 6px; background: var(--onyx-bg); }
+  .onyx-shell .chb-check:has(input:checked)::before { background: var(--onyx-accent); border-color: var(--onyx-accent); }
+  .onyx-shell .chb-check:has(input:checked)::after { content: ""; position: absolute; left: 9px; top: calc(50% - 8px); width: 6px; height: 12px; border: solid var(--onyx-accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .onyx-shell .chb-check:has(input:focus-visible)::before { outline: 2px solid var(--onyx-focus); outline-offset: 2px; }
+}
+/* Named-conversation chips are a power feature; they live in room details,
+   not under every message field. */
+.onyx-shell .onyx-composer > .onyx-topic { display: none; }
+
+/* ---- Fix-pass: specificity follow-ups ---- */
+.onyx-shell .onyx-msg-menu-trigger:focus { box-shadow: 0 0 0 2px var(--onyx-focus); outline: 2px solid var(--onyx-focus) !important; }
+@media (hover: none) {
+  .onyx-shell .onyx-message .onyx-msg-menu-trigger { width: 32px !important; height: 28px !important; margin: -1px 0 0 6px !important; }
+}
+@media (min-width: 60.01rem) {
+  /* Desktop keep-name card sits over the rail's quiet bottom, never over the composer. */
+  .onyx-shell .guest-claim-chip { left: 72px; right: auto; width: 296px; }
+}
+@media (hover: none), (max-width: 60rem) {
+  .onyx-shell .onyx-composer .onyx-reading-bar > button { min-height: var(--hit) !important; }
+  .onyx-shell .onyx-thread-pane .onyx-earlier-button, .onyx-shell .onyx-thread-pane .onyx-latest-button { min-height: var(--hit) !important; }
+  .onyx-shell .onyx-advanced-server > summary, .onyx-shell #advanced-panel summary { display: flex; align-items: center; min-height: var(--hit); }
+  .onyx-shell .pins-ledger, .onyx-shell .shell-ribbon-stats { display: inline-flex; align-items: center; min-height: var(--hit); padding-inline: 8px; }
+  .onyx-shell .chb-join, .onyx-shell .chb-actions > * { min-width: var(--hit); }
+}
+
+/* ---- Every other built-in look: the shell tokens read the look's own
+   palette (committed inline on <html> by the appearance port). Ocean,
+   Pearl and "match device" keep their hand-tuned sets above. ---- */
+:root[data-theme]:not([data-theme="system"]):not([data-theme="ocean"]):not([data-theme="pearl"]) {
+  --onyx-bg: var(--ink);
+  --onyx-panel: var(--stone);
+  --onyx-panel-2: var(--stone-2);
+  --onyx-line: var(--stone-line);
+  --onyx-line-strong: color-mix(in srgb, var(--stone-line) 70%, var(--paper));
+  --onyx-text: var(--paper);
+  --onyx-dim: var(--paper-dim);
+  --onyx-faint: var(--paper-mute);
+  --onyx-accent: var(--lapis-bright);
+  --onyx-accent-hover: var(--lapis);
+  --onyx-accent-soft: color-mix(in srgb, var(--lapis-bright) 14%, transparent);
+  --onyx-accent-ink: var(--ink);
+  --onyx-info: var(--lapis);
+  --onyx-ok: var(--ok, #5fcf8a);
+  --onyx-warn: var(--warn, var(--gold));
+  --onyx-bad: var(--danger, var(--shu));
+  --onyx-bad-soft: color-mix(in srgb, var(--shu) 14%, transparent);
+  --onyx-focus: var(--lapis-bright);
+}
+:root[data-theme="contrast"] { --onyx-line: #8a8a8a; --onyx-line-strong: #ffffff; --onyx-focus: #ffffff; }
+:root[data-theme="contrast"] .onyx-shell :where(button, input, textarea, select) { border-width: 2px; }
+@media (hover: none), (max-width: 60rem) { .onyx-shell .guest-claim-chip { height: 44px; max-height: 44px; padding-block: 0; } }
+
+/* Phones: the gem (no wordmark) marks the brand on Home and the collection
+   pages, where there is no icon rail and no back control. */
+@media (max-width: 60rem) {
+  .onyx-shell:is([data-nav="home"], [data-nav="calls"], [data-collection-open="true"]) .onyx-topbar > .onyx-brand { display: flex; order: -1; }
+  .onyx-shell:is([data-nav="home"], [data-nav="calls"], [data-collection-open="true"]) .onyx-topbar > .onyx-brand h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* Long author names wrap in place instead of dropping under the floated avatar. */
+.onyx-shell .onyx-row-head .onyx-sender { display: inline; max-width: 100%; white-space: normal; overflow-wrap: anywhere; vertical-align: baseline; }
+@media (min-width: 60.01rem) { .onyx-shell .guest-claim-chip { width: 256px; } }
+/* Persistent call bar (every shell page but the Calls hub). */
+.onyx-call-bar { display: flex; align-items: center; gap: var(--sp-2); min-height: 40px; padding: 4px var(--sp-4); background: color-mix(in srgb, var(--onyx-ok) 14%, var(--onyx-panel)); border-bottom: 1px solid var(--onyx-line); font-size: var(--fs-sm); }
+.onyx-call-bar-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--onyx-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--onyx-ok) 25%, transparent); }
+.onyx-call-bar-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-call-bar-open { min-height: 32px; padding: 0 var(--sp-3); border: 1px solid var(--onyx-line); border-radius: var(--r-pill); background: var(--onyx-panel-2); color: var(--onyx-text); cursor: pointer; }
+@media (hover: none), (max-width: 60rem) { .onyx-call-bar-open { min-height: var(--hit); } }
+/* Author tints: pale on dark looks, the same hue darkened on light looks. */
+.onyx-shell .onyx-row-head .onyx-sender { color: var(--nick-tint, var(--onyx-text)); }
+:root[data-theme="pearl"] .onyx-shell .onyx-row-head .onyx-sender,
+:root[data-theme="frost"] .onyx-shell .onyx-row-head .onyx-sender,
+:root[data-theme="sepia"] .onyx-shell .onyx-row-head .onyx-sender,
+:root[data-theme="mist"] .onyx-shell .onyx-row-head .onyx-sender { color: hsl(var(--nick-h, 200) 55% 32%); }
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] .onyx-shell .onyx-row-head .onyx-sender,
+  :root:not([data-theme]) .onyx-shell .onyx-row-head .onyx-sender { color: hsl(var(--nick-h, 200) 55% 32%); }
+}
+/* Runtime-owned private forms (passwords never pass through Elm) mount in
+   body-level hosts; they float above every shell layer as a centred card. */
+#onyx-private-account-security:has([role="dialog"]), #onyx-private-runtime-presentation:has([role="dialog"]) { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--sp-4); background: var(--onyx-veil); }
+#onyx-private-account-security > [role="dialog"], #onyx-private-runtime-presentation > [role="dialog"] { box-sizing: border-box; width: min(400px, 100%); max-height: 90dvh; overflow: auto; padding: var(--sp-4); border: 1px solid var(--onyx-line); border-radius: var(--r-lg); background: var(--onyx-panel); color: var(--onyx-text); box-shadow: var(--el-2); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+#onyx-private-account-security > [role="dialog"] h2, #onyx-private-runtime-presentation > [role="dialog"] h2 { margin: 0 0 var(--sp-3); font-size: var(--fs-lg); text-transform: capitalize; }
+#onyx-private-account-security > [role="dialog"] label, #onyx-private-runtime-presentation > [role="dialog"] label { display: grid; gap: 4px; margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--onyx-dim); }
+#onyx-private-account-security > [role="dialog"] input, #onyx-private-runtime-presentation > [role="dialog"] input { min-height: 44px; padding: 0 var(--sp-3); border: 1px solid var(--onyx-line); border-radius: var(--r-sm); background: var(--onyx-bg); color: var(--onyx-text); font: inherit; }
+#onyx-private-account-security > [role="dialog"] button, #onyx-private-runtime-presentation > [role="dialog"] button { min-height: 44px; padding: 0 var(--sp-4); margin: var(--sp-2) var(--sp-2) 0 0; border: 1px solid var(--onyx-line); border-radius: var(--r-md); background: var(--onyx-panel-2); color: var(--onyx-text); font: inherit; cursor: pointer; }
+#onyx-private-account-security > [role="dialog"] button[type="submit"], #onyx-private-runtime-presentation > [role="dialog"] button[type="submit"] { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; }

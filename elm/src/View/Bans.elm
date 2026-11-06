@@ -583,7 +583,7 @@ protocolDisclosure model channel =
                     room.modes
     in
     Html.details [ class "moderation-cockpit__protocol" ]
-        [ Html.summary [] [ text "Open-wire details" ]
+        [ Html.summary [] [ text "Technical details" ]
         , p [] [ text "This is a read-only view of the room’s last known mode state. Changes above wait for a server reply before the interface updates." ]
         , Html.code []
             [ text

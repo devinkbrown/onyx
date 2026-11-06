@@ -87,7 +87,7 @@ primaryNav model =
         , attribute "aria-label" "Primary"
         , attribute "data-primary-navigation" "desktop"
         ]
-        [ span [ class "onyx-primary-nav-mark", attribute "aria-hidden" "true" ] [ span [ class "onyx-gem" ] [] ]
+        [ a [ class "onyx-primary-nav-mark", href "/app/", attribute "aria-label" "Onyx home", attribute "data-brand-mark" "rail" ] [ span [ class "onyx-gem", attribute "aria-hidden" "true" ] [] ]
         , div [ class "onyx-primary-nav-items" ]
             (List.map (navButton model Nav.Desktop) (navItems Nav.Desktop model))
         ]
@@ -136,7 +136,7 @@ navButton model variant item =
                     Nothing
                 , Maybe.map (boolAttr "aria-expanded") item.expanded
                 , Maybe.map (attribute "aria-haspopup") item.hasPopup
-                , if item.id == Nav.You then
+                , if item.id == Nav.You && item.expanded == Just True then
                     Just (attribute "aria-controls" "you-dialog")
 
                   else

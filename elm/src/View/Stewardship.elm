@@ -74,6 +74,7 @@ panelShell model view title body =
         [ section
             [ class "onyx-steward"
             , attribute "role" "dialog"
+            , attribute "aria-modal" "true"
             , attribute "aria-label" (title ++ " " ++ view.channel)
             , attribute "data-testid" "steward-panel"
             ]

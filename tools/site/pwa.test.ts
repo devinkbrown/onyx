@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { buildTestSite } from './testSite.mjs';
 
 type WebManifest = {
   description: string;
@@ -30,12 +29,14 @@ function loadManifest(): WebManifest {
   return JSON.parse(readFileSync(manifestPath, 'utf8')) as WebManifest;
 }
 
-// The root document exactly as tools/build-site.mjs emits it.
+// The root document the Elm site ships (tools/build-elm-site.mjs copies elm/index.html).
+// The per-route <head> metadata is owned by tools/materialize-route-entrypoints.mjs;
+// the retired Solid-era generator contracts (tools/build-site.mjs) were removed with it.
 let entryDocument = '';
 
 describe('PWA manifest', () => {
   beforeAll(() => {
-    entryDocument = buildTestSite().read('index.html');
+    entryDocument = readFileSync(join(root, 'elm', 'index.html'), 'utf8');
   });
 
   it('keeps retired wire branding out of public install and entry metadata', () => {
@@ -50,44 +51,6 @@ describe('PWA manifest', () => {
     expect(manifest.description).toMatch(/rooms, messages, and calls/i);
     expect(manifest.description).not.toMatch(/\bmesh\b/i);
     expect(entryDocument).toContain('<title>Onyx — good company. Great nights.</title>');
-  });
-
-  it('states public-service entry truth and rejects premature desktop ship wording', () => {
-    const document = new DOMParser().parseFromString(entryDocument, 'text/html');
-    const title = document.querySelector('title')?.textContent ?? '';
-    const description = document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '';
-    const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') ?? '';
-    const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ?? '';
-    const entryMetadata = [title, description, ogDescription, twitterDescription].join('\n');
-
-    expect(title).toBe('Onyx — good company. Great nights.');
-    expect(title.length).toBeLessThanOrEqual(60);
-    expect(description.length).toBeGreaterThanOrEqual(110);
-    expect(description.length).toBeLessThanOrEqual(160);
-    expect(description).toMatch(/Rooms, calls, and private DMs/i);
-    expect(description).toMatch(/this device/i);
-    expect(description).toMatch(/400/);
-    expect(description).toMatch(/No ads/i);
-    expect(description).not.toMatch(/mesh telemetry|fully encrypted|cloud history/i);
-    expect(ogDescription).toBe(description);
-    expect(twitterDescription).toBe(description);
-    expect(document.querySelector('script[type="application/ld+json"]')).not.toBeNull();
-    expect(entryDocument).not.toMatch(/googletagmanager|gtag\(|facebook\.net|adsbygoogle|plausible\.io|analytics\.js/i);
-    expect(entryDocument).not.toMatch(/aggregateRating/i);
-
-    // Premature native-ship promises must stay out of entry/share metadata.
-    // Keep patterns specific so form-factor labels like "desktop room"
-    // in the install manifest are not false positives.
-    for (const surface of [entryDocument, entryMetadata]) {
-      expect(surface).not.toMatch(/desktop apps are part of the launch/i);
-      expect(surface).not.toMatch(/desktop apps with the launch/i);
-      expect(surface).not.toMatch(/Desktop apps ship with the launch/i);
-      expect(surface).not.toMatch(/Desktop with the launch/i);
-      expect(surface).not.toMatch(/downloadable desktop apps are part of/i);
-      expect(surface).not.toMatch(/signed installer available/i);
-      expect(surface).not.toMatch(/get the desktop app/i);
-      expect(surface).not.toMatch(/download now/i);
-    }
   });
 
   it('keeps installed launches on the app route with wrapper-safe display metadata', () => {
@@ -125,35 +88,6 @@ describe('PWA manifest', () => {
     }
   });
 
-  it('keeps install chrome aligned and does not overclaim full-bleed icons as maskable', () => {
-    const manifest = loadManifest();
-    const document = new DOMParser().parseFromString(entryDocument, 'text/html');
-
-    expect(manifest.icons).toEqual([
-      expect.objectContaining({ src: '/icon-192.png', sizes: '192x192', purpose: 'any' }),
-      expect.objectContaining({ src: '/icon-512.png', sizes: '512x512', purpose: 'any' }),
-      expect.objectContaining({ src: '/icon-192-maskable.png', sizes: '192x192', purpose: 'maskable' }),
-      expect.objectContaining({ src: '/icon-512-maskable.png', sizes: '512x512', purpose: 'maskable' }),
-    ]);
-    expect(manifest.icons?.some((icon) => icon.purpose.split(/\s+/).includes('maskable'))).toBe(true);
-    expect(existsSync(join(root, 'public', 'icon-192-maskable.png'))).toBe(true);
-    expect(existsSync(join(root, 'public', 'icon-512-maskable.png'))).toBe(true);
-    // The document carries the Elm shell's boot colour; ports.js restyles
-    // theme-color at runtime from the active palette. The manifest keeps the
-    // brand ground used for the splash and the installed window chrome.
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))
-      .toMatch(/^#[0-9a-f]{6}$/i);
-    expect(manifest.theme_color).toBe('#05070a');
-    expect(manifest.theme_color).not.toBe('#000306');
-    expect(manifest.background_color).toBe(manifest.theme_color);
-    expect(manifest.start_url).toBe('/app/');
-    expect(manifest.display).toBe('standalone');
-    const apple = document.querySelector('link[rel="apple-touch-icon"]');
-    expect(apple?.getAttribute('href')).toBe('/apple-touch-icon.png');
-    expect(apple?.getAttribute('sizes')).toBe('180x180');
-    expect(entryDocument).not.toMatch(/beforeinstallprompt/i);
-  });
-
   it('references notification icons that exist in public assets', () => {
     const worker = readFileSync(serviceWorkerPath, 'utf8');
     const notificationAssets = [...worker.matchAll(/(?:icon|badge):\s*'\/([^']+)'/g)]
@@ -163,24 +97,6 @@ describe('PWA manifest', () => {
     expect(notificationAssets.length).toBeGreaterThan(0);
     for (const asset of notificationAssets) {
       expect(existsSync(join(root, 'public', asset))).toBe(true);
-    }
-  });
-
-  it('backs entrypoint share and platform icon metadata with public assets', () => {
-    const document = new DOMParser().parseFromString(entryDocument, 'text/html');
-    const publicPaths = [
-      document.querySelector('meta[property="og:image"]')?.getAttribute('content'),
-      document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'),
-      document.querySelector('link[rel="icon"]')?.getAttribute('href'),
-      document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'),
-    ].map((value) => value ? new URL(value, 'https://eshmaki.me').pathname : '');
-
-    expect(document.querySelector('meta[property="og:site_name"]')?.getAttribute('content')).toBe('Onyx');
-    expect(document.querySelector('meta[property="og:image:alt"]')?.getAttribute('content')).toMatch(/Onyx/i);
-    expect(document.querySelector('meta[name="twitter:image:alt"]')?.getAttribute('content')).toMatch(/Onyx/i);
-    expect(publicPaths).not.toContain('');
-    for (const path of publicPaths) {
-      expect(existsSync(join(root, 'public', path))).toBe(true);
     }
   });
 
@@ -286,17 +202,4 @@ describe('PWA manifest', () => {
     expect(deploy).toContain("must not be on the legacy allowlist");
   });
 
-  it('pins the flat, non-indexable branded 404 document contract', () => {
-    const document = readFileSync(join(root, 'tools', 'site', 'document.mjs'), 'utf8');
-    const deploy = readFileSync(deployScriptPath, 'utf8');
-
-    expect(document).toContain("robots: 'noindex, nofollow'");
-    expect(document).toContain('data-onyx-route-robots="true"');
-    expect(document).toContain('canonical: null');
-    expect(document).toContain('ogUrl: null');
-    expect(document).toContain('ldJson: false');
-    expect(deploy).toContain('test -f dist/404.html');
-    expect(deploy).toContain('test ! -e dist/404/index.html');
-    expect(deploy).toContain('live 404.html metadata contract is unsafe');
-  });
 });

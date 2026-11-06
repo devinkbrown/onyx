@@ -16,7 +16,7 @@ a nested form, so Enter in the composer still sends.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, button, div, form, input, label, li, p, progress, span, text, ul)
+import Html exposing (Html, button, div, form, input, label, li, p, progress, span, text, textarea, ul)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
 import Html.Events exposing (on, onClick, onInput, onSubmit, preventDefaultOn)
@@ -88,11 +88,13 @@ composer model =
             , onClick ComposerToolsToggle
             ]
             [ span [ class "onyx-icon", attribute "data-icon" "plus", attribute "aria-hidden" "true" ] [] ]
-        , input
-            [ type_ "text"
+        , textarea
+            [ Attr.rows 1
+            , Attr.id "onyx-composer-input"
+            , class "onyx-composer-field"
             , placeholder
                 (if not ready then
-                    "Select a channel"
+                    "Choose a conversation"
 
                  else if editingNow /= Nothing then
                     "Edit message"
@@ -104,8 +106,9 @@ composer model =
                     "Message"
 
                  else
-                    "Offline — sends queue on this device"
+                    "Offline — sends when you reconnect"
                 )
+            , attribute "enterkeyhint" "send"
             , attribute "aria-label"
                 (if editingNow /= Nothing then
                     "Edit message"
@@ -210,8 +213,19 @@ composerKey model =
                     Decode.fail "ime"
 
                 else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen (keyAction model)
+                    Decode.map2 Tuple.pair (Decode.field "key" Decode.string) (Decode.oneOf [ Decode.field "shiftKey" Decode.bool, Decode.succeed False ])
+                        |> Decode.andThen
+                            (\( key, shift ) ->
+                                Decode.oneOf
+                                    [ keyAction model key
+                                    , -- Enter sends; Shift+Enter keeps the newline.
+                                      if key == "Enter" && not shift then
+                                        Decode.succeed ( ComposerSend, True )
+
+                                      else
+                                        Decode.fail "pass"
+                                    ]
+                            )
             )
 
 
@@ -355,12 +369,12 @@ suggestRow active msg name detail =
         , attribute "aria-selected" (if active then "true" else "false")
         ]
         [ button [ type_ "button", onClick msg ]
-            [ text name
+            [ span [ class "onyx-suggest-name" ] [ text name ]
             , if String.isEmpty detail then
                 text ""
 
               else
-                span [] [ text (" " ++ detail) ]
+                span [ class "onyx-suggest-detail" ] [ text detail ]
             ]
         ]
 
@@ -426,7 +440,7 @@ replyBar model =
                             App.resolveReplyDisplay model parent
                     in
                     div [ class "shell-composer-context", attribute "role" "status", attribute "aria-live" "polite" ]
-                        [ span [ class "shell-composer-context-label" ] [ text ("Replying to " ++ shown.from) ]
+                        [ span [ class "shell-composer-context-label" ] [ span [ class "onyx-icon", attribute "data-icon" "reply", attribute "aria-hidden" "true" ] [], text "Replying to ", Html.b [] [ text shown.from ] ]
                         , span [ class "shell-composer-context-text" ] [ text (clippedText shown.preview) ]
                         , button
                             [ type_ "button"
@@ -661,7 +675,7 @@ schedulePopover model =
         [ class "onyx-schedule-pop"
         , attribute "id" "onyx-schedule-picker"
         , attribute "role" "dialog"
-        , attribute "aria-modal" "false"
+        , attribute "aria-modal" "true"
         , attribute "aria-label" "Schedule message"
         ]
         [ div [ class "onyx-schedule-head" ]

@@ -94,7 +94,6 @@ roomHeader model =
                                     , class "onyx-room-summary"
                                     , id "room-details-toggle"
                                     , attribute "aria-expanded" (boolString model.roomDetailsOpen)
-                                    , attribute "aria-controls" "room-details"
                                     , attribute "title" "Room details"
                                     , onClick RoomDetailsToggle
                                     ]
@@ -113,7 +112,6 @@ roomHeader model =
                                                     ]
                                                 ]
                                                 [ text topicLine ]
-                                           , span [ class "onyx-room-chevron", attribute "aria-hidden" "true" ] []
                                            , span [ class "sr-only" ] [ text " — room details" ]
                                            ]
                                     )
@@ -303,8 +301,8 @@ details model channel isRoom =
             , View.Thread.ephemeralPolicyNotice model channel.name
             , View.Thread.retentionScopeNotice model channel.name
             , div [ class "history-catch-up", attribute "role" "group", attribute "aria-label" "History catch-up" ]
-                [ button [ type_ "button", onClick ThreadCatchUp, disabled (offline || busy || not hasHistory) ] [ text "Catch up after latest message" ]
-                , button [ type_ "button", onClick ThreadFillGaps, disabled (offline || busy || List.length channel.messages < 2 || not hasHistory) ] [ text "Request history between loaded bounds" ]
+                [ button [ type_ "button", onClick ThreadCatchUp, disabled (offline || busy || not hasHistory) ] [ text "Check for newer messages" ]
+                , button [ type_ "button", onClick ThreadFillGaps, disabled (offline || busy || List.length channel.messages < 2 || not hasHistory) ] [ text "Fill gaps in history" ]
                 ]
             , p [ class "onyx-room-hint" ]
                 [ text

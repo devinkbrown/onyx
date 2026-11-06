@@ -28,7 +28,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tools/**/*.test.mjs'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tools/**/*.test.mjs', 'tools/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'tests/e2e/**', '.wt/**'],
     // Full-suite IDB/materialization cases (export bounds, vault prune) and Solid
     // panel journeys exceed 5s under load; default 5s produced load flakes.

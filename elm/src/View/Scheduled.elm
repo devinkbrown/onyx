@@ -69,7 +69,7 @@ scheduledSheet model =
                 model.connection == App.Live
         in
         div [ class "onyx-scheduled-wrap" ]
-            [ div [ class "onyx-scheduled", attribute "role" "dialog", attribute "aria-label" "Scheduled messages" ]
+            [ div [ class "onyx-scheduled", attribute "role" "dialog", attribute "aria-modal" "true", attribute "aria-label" "Scheduled messages" ]
                 [ div [ class "onyx-scheduled-head" ]
                     [ span [ class "onyx-scheduled-title" ] [ text "Scheduled messages" ]
                     , button

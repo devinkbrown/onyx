@@ -50,6 +50,7 @@ browser model =
             [ div
                 [ class "chb"
                 , attribute "role" "dialog"
+                , attribute "aria-modal" "true"
                 , attribute "aria-label" "Browse rooms"
                 ]
                 [ div [ class "chb-head" ]

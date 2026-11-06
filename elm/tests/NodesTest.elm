@@ -13,7 +13,7 @@ import Test exposing (Test, describe, test)
 
 nodeA : IrcNode
 nodeA =
-    { id = "a", host = "ircx.us", wss = "wss://ircx.us:8080" }
+    { id = "a", host = "node-a.example", wss = "wss://node-a.example:8080" }
 
 
 nodeB : IrcNode

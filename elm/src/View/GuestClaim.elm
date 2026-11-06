@@ -125,6 +125,7 @@ sheet model =
         [ div
             [ class "guest-claim-sheet"
             , attribute "role" "dialog"
+            , attribute "aria-modal" "true"
             , attribute "aria-label" "Keep this name"
             , attribute "data-testid" "guest-claim-sheet"
             ]
@@ -138,7 +139,7 @@ sheet model =
                     )
                 ]
             , if verified then
-                button [ type_ "button", onClick GuestClaimClose ] [ text "Close" ]
+                button [ type_ "button", attribute "aria-label" "Close keep this name", onClick GuestClaimClose ] [ text "Close" ]
 
               else if verifying then
                 if model.runtimeOwnerStamp /= Nothing then
@@ -173,7 +174,7 @@ privateGuestForm busy title description kind action account =
             , onClick (App.RuntimePrivateAccountFormRequested { kind = kind, action = action, account = Just account })
             ]
             [ text title ]
-        , button [ type_ "button", disabled busy, onClick GuestClaimClose ] [ text "Close" ]
+        , button [ type_ "button", disabled busy, attribute "aria-label" "Close keep this name", onClick GuestClaimClose ] [ text "Close" ]
         ]
 
 

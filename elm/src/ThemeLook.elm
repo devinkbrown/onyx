@@ -15,6 +15,8 @@ module ThemeLook exposing
     , isCustomThemeId
     , isPublicThemeId
     , normalizeThemeId
+    , systemThemeId
+    , isSystemThemeId
     , publicThemeIds
     , publicThemeLabels
     , resolveBackgroundId
@@ -53,6 +55,19 @@ customThemeStorageKey =
 defaultThemeId : String
 defaultThemeId =
     "ocean"
+
+
+{-| The "match device" look: no fixed palette — the shell follows
+`prefers-color-scheme` (Ocean tokens in the dark, Pearl tokens in the
+light). It is the default when nothing is stored. -}
+systemThemeId : String
+systemThemeId =
+    "system"
+
+
+isSystemThemeId : String -> Bool
+isSystemThemeId id =
+    id == systemThemeId
 
 
 {-| Sentinel background id meaning "follow the active theme's
@@ -120,6 +135,11 @@ themeMeta =
     , { id = "teal", label = "Teal", description = "Deep teal ground, seafoam text, mint current, and seafoam marks.", scheme = "dark", signatureBg = "deep-current", swatch = [ "#009d82", "#72ccab", "#071914" ] }
     , { id = "slate", label = "Slate", description = "Warm graphite, chalk text, quiet mineral seams, and muted bronze marks.", scheme = "dark", signatureBg = "mist", swatch = [ "#949d7b", "#ae7853", "#1c1a15" ] }
     , { id = "frost", label = "Frost", description = "Cool frost paper, deep slate ink, steel-blue current, and pale steel linework.", scheme = "light", signatureBg = "frost", swatch = [ "#036884", "#00768a", "#c3d7dd" ] }
+    , { id = "graphite", label = "Graphite", description = "Deep neutral graphite — soft warm-grey text, one quiet brass accent. Restful at night.", scheme = "dark", signatureBg = "mist", swatch = [ "#c9a86a", "#9aa0a6", "#17191c" ] }
+    , { id = "sepia", label = "Sepia", description = "Warm paper and brown ink — a reading room in the afternoon.", scheme = "light", signatureBg = "paper-grain", swatch = [ "#8a5a1e", "#5d4a3a", "#efe6d6" ] }
+    , { id = "mist", label = "Mist", description = "Cool slate light — pale blue-grey ground, deep slate text, steel accent.", scheme = "light", signatureBg = "frost", swatch = [ "#2f6f8f", "#4b5a66", "#eef2f5" ] }
+    , { id = "plum", label = "Plum", description = "Rich plum dark — aubergine ground, rose-gold accent, soft ivory text.", scheme = "dark", signatureBg = "ember", swatch = [ "#e0a07a", "#c7a0b8", "#1d1420" ] }
+    , { id = "contrast", label = "High contrast", description = "Black ground, white text, a bright gold accent and thick lines — for low vision.", scheme = "dark", signatureBg = "bioluminescence", swatch = [ "#ffd166", "#ffffff", "#000000" ] }
     ]
 
 
@@ -165,7 +185,6 @@ legacyThemeMap =
     , ( "kelp", "hisui" )
     , ( "brine", "teal" )
     , ( "arctic", "frost" )
-    , ( "system", "ocean" )
     ]
 
 
@@ -193,7 +212,10 @@ normalizeThemeId raw customs =
                     |> Maybe.map Tuple.second
                     |> Maybe.withDefault raw
         in
-        if themeById mapped /= Nothing then
+        if isSystemThemeId mapped then
+            Just systemThemeId
+
+        else if themeById mapped /= Nothing then
             Just mapped
 
         else if isCustomThemeId mapped && List.any (\custom -> custom.id == mapped) customs then
@@ -284,14 +306,16 @@ buildDefaultLookEntries activeId customs =
                             Nothing
                 )
                 publicThemeIds
+        withSystem =
+            systemLook :: looks
     in
-    if List.any (\entry -> entry.id == activeId) looks then
-        looks
+    if List.any (\entry -> entry.id == activeId) withSystem then
+        withSystem
 
     else
         case themeById activeId of
             Just meta ->
-                looks ++ [ builtinLook meta True ]
+                withSystem ++ [ builtinLook meta True ]
 
             Nothing ->
                 case List.filter (\custom -> custom.id == activeId) customs |> List.head of
@@ -300,7 +324,7 @@ buildDefaultLookEntries activeId customs =
                             baseLabel =
                                 themeById custom.base |> Maybe.map .label |> Maybe.withDefault custom.base
                         in
-                        looks
+                        withSystem
                             ++ [ { id = custom.id
                                  , label = custom.name
                                  , title = "Saved look based on " ++ baseLabel
@@ -310,7 +334,18 @@ buildDefaultLookEntries activeId customs =
                                ]
 
                     Nothing ->
-                        looks
+                        withSystem
+
+
+{-| The first look on the Appearance page: follow the device. -}
+systemLook : LookEntry
+systemLook =
+    { id = systemThemeId
+    , label = "Match device"
+    , title = "Dark or light, whichever this device is set to."
+    , swatch = [ "#0e1518", "#f6f3ec", "#e8a33d" ]
+    , extra = False
+    }
 
 
 type BackgroundKind

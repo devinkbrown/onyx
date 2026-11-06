@@ -70,7 +70,7 @@ for (const width of [320, 390, 768]) {
     await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
     await expect(page.getByText('A message that should remain readable on a phone.')).toBeInViewport();
     const connectionOpen = page.getByTestId('connection-open');
-    await expect(connectionOpen).toHaveAccessibleName(/^Connect\./);
+    await expect(connectionOpen).toHaveAccessibleName(/^Connection\./);
     await connectionOpen.click();
     const connection = page.getByRole('dialog', { name: 'Your connection' });
     await expect(connection).toBeFocused();

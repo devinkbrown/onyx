@@ -5502,14 +5502,14 @@ suite =
                         update (ClipboardResult { tag = "message-copy", ok = False }) m2
                 in
                 Expect.all
-                    [ \_ -> Expect.equal (Just { target = "#c", msgid = "m1", confirmDelete = False }) opened.messageMenu
+                    [ \_ -> Expect.equal (Just { target = "#c", msgid = "m1", confirmDelete = False, more = False, x = 0, y = 0 }) opened.messageMenu
                     , \_ -> Expect.equal Nothing toggled.messageMenu
-                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = False }) switched.messageMenu
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = False, more = False, x = 0, y = 0 }) switched.messageMenu
                     , \_ -> Expect.equal Nothing unknown.messageMenu
                     , \_ -> Expect.equal Nothing replied.messageMenu
                     , \_ -> Expect.equal Nothing edited.messageMenu
                     , \_ -> Expect.equal Nothing quoted.messageMenu
-                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = True }) deleteAsked.messageMenu
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = True, more = False, x = 0, y = 0 }) deleteAsked.messageMenu
                     , \_ -> Expect.equal Nothing deleted.messageMenu
                     , \_ -> Expect.equal [ SendLine "REDACT #c m9 :Deleted\r\n" ] deleteOut
                     , \_ -> Expect.equal [ ClipboardCopy { text = "theirs", tag = "message-copy" } ] copyOut
@@ -9313,8 +9313,9 @@ suite =
         , test "001 off-live opens the Back-online window; 001 while live does not" <|
             \_ ->
                 let
+                    -- A drop after an earlier session: auto-reconnect is armed.
                     down =
-                        { blank | connection = Offline, nowMs = 7000 }
+                        { blank | connection = Offline, nowMs = 7000, autoReconnect = True }
 
                     ( registered, _ ) =
                         feed down ":irc.example 001 me :welcome"
@@ -9333,6 +9334,18 @@ suite =
                             (Just { title = "Back online", detail = "", online = True })
                             (reconnectBanner { registered | nowMs = 8000 })
                     , \_ -> Expect.equal 7000 again.backOnlineAt
+                    ]
+                    ()
+        , test "the first registration of a session does not announce Back online" <|
+            \_ ->
+                let
+                    ( first, _ ) =
+                        feed { blank | connection = Registering, nowMs = 5000 } ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Live first.connection
+                    , \_ -> Expect.equal 0 first.backOnlineAt
+                    , \_ -> Expect.equal Nothing (reconnectBanner { first | nowMs = 5500 })
                     ]
                     ()
         , test "ReconnectNow redials once from Offline and stands down elsewhere" <|
@@ -9706,12 +9719,12 @@ suite =
                         Expect.equal Nothing
                             (nextComposerAudience { statusBase | composerAudience = Just 'x' })
                     , \_ -> Expect.equal "Everyone" (audienceLabel Nothing)
-                    , \_ -> Expect.equal "Ops" (audienceLabel (Just '@'))
-                    , \_ -> Expect.equal "Voice" (audienceLabel (Just '+'))
+                    , \_ -> Expect.equal "Moderators" (audienceLabel (Just '@'))
+                    , \_ -> Expect.equal "Voiced" (audienceLabel (Just '+'))
                     , \_ -> Expect.equal "Founders" (audienceLabel (Just '!'))
                     , \_ -> Expect.equal "Owners" (audienceLabel (Just '.'))
                     , \_ -> Expect.equal "" (audienceTitle Nothing)
-                    , \_ -> Expect.equal "Only visible to ops" (audienceTitle (Just '@'))
+                    , \_ -> Expect.equal "Only visible to moderators" (audienceTitle (Just '@'))
                     ]
                     ()
         , test "WsClosed records the disconnect row and log line" <|
@@ -10566,7 +10579,7 @@ suite =
                     , \_ -> Expect.equal sending.pendingLabels afterUnknownCommand.pendingLabels
                     , \_ -> Expect.equal (Just "#c") (Dict.get label afterUnknownCommand.pendingLabels |> Maybe.map .target)
                     , \_ -> Expect.equal Dict.empty afterUnknownCommand.uncertainLabels
-                    , \_ -> Expect.equal [ "Unknown command: FROB" ] (List.map .text afterUnknownCommand.notifications)
+                    , \_ -> Expect.equal [] (List.map .text afterUnknownCommand.notifications)
                     , \_ -> Expect.equal [] outbound
                     ]
                     ()
@@ -10604,7 +10617,7 @@ suite =
                     [ \_ -> Expect.equal [ "No such channel: #nope" ] (texts ":srv 403 me #nope :No such channel")
                     , \_ -> Expect.equal [ "Cannot send to #c: muted" ] (texts ":srv 404 me #c muted :Cannot send")
                     , \_ -> Expect.equal [ "Too many channels" ] (texts ":srv 405 me :Too many channels")
-                    , \_ -> Expect.equal [ "Unknown command: FROB" ] (texts ":srv 421 me FROB :Unknown command")
+                    , \_ -> Expect.equal [] (texts ":srv 421 me FROB :Unknown command")
                     , \_ -> Expect.equal [ "No nickname given" ] (texts ":srv 431 me :No nickname given")
                     , \_ -> Expect.equal [ "bob is not in #c" ] (texts ":srv 441 me bob #c :Not in channel")
                     , \_ -> Expect.equal [ "You're not in #c" ] (texts ":srv 442 me #c :Not on channel")
@@ -16317,7 +16330,7 @@ suite =
                         , \_ -> Expect.equal [ Just True ] (List.map (Just << .pending) rows)
                         , \_ -> Expect.equal [ "hello" ] (List.map .body rows)
                         , \_ -> Expect.equal True (List.all (\row -> row.outboxId /= Nothing) rows)
-                        , \_ -> Expect.equal (Just "Message handed to this connection. Server confirmation is pending; it will not be resent automatically.") admitted.composerError
+                        , \_ -> Expect.equal Nothing admitted.composerError
                         , \_ -> Expect.equal Nothing (Maybe.map (\entry -> entry.id) (List.head admitted.outbox))
                         , \_ ->
                             Expect.equal False
@@ -21844,7 +21857,7 @@ suite =
                         [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        , \_ -> Expect.equal [ SendLine "MSG bob hi\r\n" ] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "FROB bob hi\r\n" ] (send "/frob bob hi")
                         , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [] (send "/")
                         ]

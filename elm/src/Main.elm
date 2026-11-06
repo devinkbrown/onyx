@@ -144,6 +144,9 @@ port probeNodes : { nodes : List { id : String, host : String, wss : String }, p
 port nodesProbed : ({ wss : String } -> msg) -> Sub msg
 
 
+port privateIdentifyRefused : ({ requestId : String, reason : String } -> msg) -> Sub msg
+
+
 port uploadPick : { key : String, accept : String, multiple : Bool } -> Cmd msg
 
 
@@ -2308,6 +2311,7 @@ subscriptions model =
         , wsLines App.WsBatchReceived
         , wsFrames wsFramesMessage
         , nodesProbed App.NodesProbed
+        , privateIdentifyRefused App.PrivateIdentifyRefused
         , runtimeCredentialState credentialStateMessage
         , runtimeOwnerState runtimeOwnerStateMessage
         , runtimePrivateWebhookResult runtimePrivateWebhookResultMessage

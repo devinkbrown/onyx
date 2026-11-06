@@ -13,6 +13,7 @@ Messages page (see `rail.css`).
 -}
 
 import App exposing (Channel, Model, Msg(..))
+import Avatar
 import Dict
 import Html exposing (Html, button, div, h2, h3, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, id, tabindex, type_)
@@ -304,22 +305,32 @@ railItem model channel =
             , attribute "aria-label" (channel.name ++ awayLabel ++ memberLabel ++ unreadLabel ++ mentionLabel ++ memoLabel)
             , attribute "title" channel.name
             ]
-            [ span [ class "onyx-rail-name" ] [ text channel.name ]
+            [ if room then
+                text ""
+
+              else
+                span [ class "onyx-rail-avatar", attribute "aria-hidden" "true" ]
+                    [ Avatar.view { name = channel.name, owner = False, size = Avatar.Sm, extraClass = "", hidden = True } ]
+            , span [ class "onyx-rail-row-main" ]
+                [ span [ class "onyx-rail-name" ] [ text channel.name ]
+                , case ( room, lastLine channel ) of
+                    ( False, Just preview ) ->
+                        span [ class "onyx-rail-preview", attribute "aria-hidden" "true" ] [ text preview ]
+
+                    _ ->
+                        text ""
+                ]
             , if not room && Dict.member (String.toLower channel.name) model.dmAway then
                 span [ class "onyx-rail-away", attribute "data-testid" "dm-away" ] [ text "away" ]
 
               else
                 text ""
-            , if room then
-                span
-                    [ class "onyx-rail-count"
-                    , attribute "aria-hidden" "true"
-                    , attribute "title" (countLabel (Dict.size channel.members) "member")
-                    ]
-                    [ text (String.fromInt (Dict.size channel.members)) ]
+            , case ( room, lastAt channel ) of
+                ( False, Just at ) ->
+                    span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text (App.formatRowClock model.zone model.prefs.clock at) ]
 
-              else
-                text ""
+                _ ->
+                    text ""
             , if channel.unread > 0 then
                 span
                     [ classList
@@ -344,6 +355,25 @@ railItem model channel =
                     text ""
             ]
         ]
+
+
+{-| One-line preview of the newest readable message in a conversation. -}
+lastLine : Channel -> Maybe String
+lastLine channel =
+    channel.messages
+        |> List.reverse
+        |> List.filter (\m -> not (String.isEmpty (String.trim m.body)))
+        |> List.head
+        |> Maybe.map (\m -> String.left 80 (String.replace "\n" " " m.body))
+
+
+lastAt : Channel -> Maybe Int
+lastAt channel =
+    channel.messages
+        |> List.reverse
+        |> List.filter (\m -> m.at > 0)
+        |> List.head
+        |> Maybe.map .at
 
 
 countLabel : Int -> String -> String

@@ -49,6 +49,7 @@ sheetFor model nick =
         , div
             [ class "onyx-profile-sheet"
             , attribute "role" "dialog"
+            , attribute "aria-modal" "true"
             , attribute "aria-label" ("Profile: " ++ shown)
             , on "keydown" profileEscapeDecoder
             ]
@@ -234,10 +235,14 @@ signOnField ts =
         let
             iso =
                 App.millisToIso (toFloat ts * 1000)
+
+            -- Readable, not raw ISO: "2023-11-14, 22:13 UTC".
+            shown =
+                String.replace "T" ", " (String.left 16 iso) ++ " UTC"
         in
         Just
             (profileField "Signed on"
-                [ time [ datetime iso ] [ text iso ] ]
+                [ time [ datetime iso ] [ text shown ] ]
             )
 
 
@@ -494,7 +499,8 @@ cardFor model nick channel =
             []
         , div
             ([ class "onyx-member-card"
-             , attribute "role" "region"
+             , attribute "role" "dialog"
+             , attribute "aria-modal" "true"
              , attribute "aria-labelledby" (cardId ++ "-name")
              , on "keydown" cardEscapeDecoder
              ]
@@ -920,6 +926,7 @@ moderationReview model =
                 , div
                     [ class "onyx-moderation-review"
                     , attribute "role" "dialog"
+                    , attribute "aria-modal" "true"
                     , attribute "aria-label" title
                     , attribute "aria-describedby" "moderation-review-desc"
                     , on "keydown" reviewEscapeDecoder

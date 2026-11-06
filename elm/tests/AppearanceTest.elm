@@ -77,9 +77,9 @@ suite =
                             out
                     ]
                     ( next, outbounds )
-        , test "snapshot with unknown theme falls back to the default look" <|
+        , test "snapshot with unknown theme falls back to matching the device" <|
             \_ ->
-                Expect.equal ThemeLook.defaultThemeId
+                Expect.equal ThemeLook.systemThemeId
                     (Tuple.first
                         (update
                             (AppearanceSnapshot

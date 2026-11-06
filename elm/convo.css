@@ -730,3 +730,6 @@ button.notif-center__open:hover { background: color-mix(in srgb, var(--onyx-text
 .onyx-advanced-server > summary { min-height: 32px; color: var(--onyx-dim); font-weight: 600; cursor: pointer; }
 .onyx-advanced-server-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; color: var(--onyx-dim); overflow-wrap: anywhere; }
 .onyx-row-notes { line-height: 1.3; }
+
+/* The jump pill is redundant while the unread divider itself is visible. */
+.onyx-thread-pane[data-unread-visible] .onyx-unread-jump-wrap { display: none; }

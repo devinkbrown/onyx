@@ -15,7 +15,7 @@ export default defineConfig({
   // testDir resolves against the config file, not the cwd.
   testDir: fileURLToPath(new URL('.', import.meta.url)),
   testMatch: ['elm-*.spec.ts'],
-  testIgnore: ['elm-local*.spec.ts', 'elm-performance*.spec.ts', 'elm-stress*.spec.ts'],
+  testIgnore: ['elm-local*.spec.ts', 'elm-performance*.spec.ts', 'elm-stress*.spec.ts', 'elm-audit-*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

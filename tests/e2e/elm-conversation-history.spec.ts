@@ -79,7 +79,7 @@ test('chat-name changes stay pending until confirmation and recover from rejecti
   await page.goto('/app/?ws=wss%3A%2F%2Fidentity-ui.test%2Fws&nick=guest');
   await expect(page.locator('.onyx-conn-live')).toBeVisible();
   const connectionOpen = page.getByTestId('connection-open');
-  await expect(connectionOpen).toHaveAccessibleName(/^Connect\./);
+  await expect(connectionOpen).toHaveAccessibleName(/^Connection\./);
   await connectionOpen.click();
   await page.locator('#connection-nick').fill('taken');
   await page.getByRole('button', { name: 'Use this name', exact: true }).click();

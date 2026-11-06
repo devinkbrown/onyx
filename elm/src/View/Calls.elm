@@ -17,7 +17,7 @@ Hard rules, mirroring the oracle:
 -}
 
 import App exposing (Msg(..))
-import Html exposing (Html, button, div, h1, h2, h3, h4, header, input, label, li, main_, p, span, strong, text, ul)
+import Html exposing (Html, button, div, h2, h3, h4, header, input, label, li, p, section, span, strong, text, ul)
 import Html.Attributes exposing (attribute, checked, class, disabled, step, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import Media exposing (CallHub, HubPresentation(..), TranscriptEntry)
@@ -439,9 +439,10 @@ callsHub hub activeChannel liveCallRef selfMuted selfDeafened qualityView qualit
                 _ ->
                     text ""
     in
-    main_
+    section
         [ class "onyx-calls"
         , attribute "data-call-presentation" (presentationWord presentation)
+        , attribute "aria-label" "Calls"
         ]
         [ header [ class "onyx-calls-header" ]
             [ div [ class "onyx-calls-kicker" ] [ text "Calls" ]
@@ -455,7 +456,7 @@ callsHub hub activeChannel liveCallRef selfMuted selfDeafened qualityView qualit
                     Nothing ->
                         text ""
                 ]
-            , h1 [ class "onyx-calls-title" ] [ text (hubTitle presentation) ]
+            , h2 [ class "onyx-calls-title" ] [ text (hubTitle presentation) ]
             , p [ class "onyx-calls-intro" ] [ text (hubIntro presentation label) ]
             , p [ class "onyx-calls-caption-disclosure" ]
                 [ text "Captions are sent as server-visible text and may be included in a server transcript or recording. Local speech recognition does not make caption text private." ]

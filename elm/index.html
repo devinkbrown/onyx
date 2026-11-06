@@ -21,6 +21,13 @@
    status/address bar never flash the other scheme. Dependency-free. */
 (function () {
   var d = document, root = d.documentElement;
+  /* Saved look before first paint: pearl/frost paint light, "system"
+     (or nothing saved) follows the device, everything else dark. */
+  try {
+    var saved = window.localStorage.getItem("onyx:theme");
+    if (!saved || /^custom:/.test(saved)) saved = saved ? "custom" : "system";
+    if (/^[a-z0-9:_-]{1,40}$/i.test(saved)) root.setAttribute("data-theme", saved === "custom" ? "ocean" : saved);
+  } catch (e) {}
   function isApp() { return /^\/app(\/|$)/.test(location.pathname); }
   function sync() {
     var app = isApp();
@@ -268,7 +275,7 @@
     if (Number.isInteger(parsedQuietEnd) && parsedQuietEnd >= 0 && parsedQuietEnd <= 23) dndQuietEnd = parsedQuietEnd;
     firstHourSeen = window.localStorage.getItem("onyx:first-hour-seen") === "1";
   } catch (e) {}
-  var defaultWsUrl = "wss://ircx.us:8080";
+  var defaultWsUrl = "wss://eshmaki.me:8080";
   var initialWsUrl = params.get("ws") || defaultWsUrl;
   var app = Elm.Main.init({
     node: document.getElementById("app"),

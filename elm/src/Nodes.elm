@@ -60,8 +60,7 @@ defaultMaxConcurrency =
 {-| The mesh registry (mirrors `NODES`). -}
 nodes : List IrcNode
 nodes =
-    [ { id = "a", host = "ircx.us", wss = "wss://ircx.us:8080" }
-    , { id = "b", host = "eshmaki.me", wss = "wss://eshmaki.me:8080" }
+    [ { id = "b", host = "eshmaki.me", wss = "wss://eshmaki.me:8080" }
     ]
 
 

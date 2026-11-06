@@ -17,6 +17,7 @@
     "test:elm-runtime": "vitest run --config elm/vitest.runtime.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:elm": "playwright test --config tests/e2e/elm.config.ts",
+    "test:e2e:elm:audit": "playwright test --config tests/e2e/elm-audit.config.ts",
     "test:e2e:group-control-connected": "node tools/group-control-connected.mjs",
     "site:check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "site:workbench": "node tools/site-workbench.mjs",

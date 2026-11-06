@@ -347,13 +347,13 @@ suite =
             \_ ->
                 let
                     html =
-                        query blank
+                        query { blank | connection = Offline }
                 in
                 Expect.all
                     [ \_ ->
                         html
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-open") ]
-                            |> Query.has [ Selector.text "Connect" ]
+                            |> Query.has [ Selector.text "Offline" ]
                     , \_ ->
                         html
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "connection-open") ]
@@ -449,9 +449,9 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Offline — sends queue on this device") ] q
+                        Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Offline — sends when you reconnect") ] q
                             |> Query.has
-                                [ Selector.attribute (Attr.placeholder "Offline — sends queue on this device")
+                                [ Selector.attribute (Attr.placeholder "Offline — sends when you reconnect")
                                 , Selector.disabled False
                                 ]
                     , \_ ->
@@ -470,9 +470,9 @@ suite =
                     q =
                         query blank
                 in
-                Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Select a channel") ] q
+                Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Choose a conversation") ] q
                     |> Query.has
-                        [ Selector.attribute (Attr.placeholder "Select a channel")
+                        [ Selector.attribute (Attr.placeholder "Choose a conversation")
                         , Selector.disabled True
                         ]
         , test "thread renders folded message bodies" <|
@@ -1237,7 +1237,7 @@ suite =
                     [ \_ ->
                         query armed
                             |> Query.find [ Selector.class "shell-composer-context" ]
-                            |> Query.has [ Selector.text "Replying to alice", Selector.text "hello there" ]
+                            |> Query.has [ Selector.text "Replying to", Selector.text "alice", Selector.text "hello there" ]
                     , \_ ->
                         query armed
                             |> Query.find [ Selector.class "shell-composer-context-close" ]
@@ -1280,7 +1280,7 @@ suite =
                             |> Event.expect EditCancel
                     , \_ ->
                         query armed
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Query.has [ Selector.attribute (Attr.placeholder "Edit message") ]
                     , \_ ->
                         query armed
@@ -1333,17 +1333,17 @@ suite =
                 Expect.all
                     [ \_ ->
                         query edited
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
                     , \_ ->
                         query replied
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect ReplyCancel
                     , \_ ->
                         query both
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
                     ]
@@ -1390,24 +1390,30 @@ suite =
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "More actions for message from alice") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Actions for message from alice") ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
                             |> Query.has
                                 [ Selector.text "Reply"
-                                , Selector.text "Copy"
-                                , Selector.text "Quote in composer"
-                                , Selector.text "Copy moment link"
+                                , Selector.text "Copy text"
+                                , Selector.text "More…"
+                                ]
+                    , \_ ->
+                        query (Tuple.first (update (MessageMenuMore True) opened))
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has
+                                [ Selector.text "Quote"
+                                , Selector.text "Copy link to message"
                                 , Selector.text "Search this text"
-                                , Selector.text "Start topic from here"
+                                , Selector.text "Start a topic here"
                                 , Selector.text "Ignore alice"
                                 , Selector.text "Hide alice"
                                 ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.hasNot [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
+                            |> Query.hasNot [ Selector.text "Edit", Selector.text "Delete" ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Reply to alice") ]
@@ -1417,39 +1423,39 @@ suite =
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
                             |> Event.simulate (key "Escape" False)
-                            |> Event.expect MessageMenuClose
+                            |> Event.expect MessageMenuDismiss
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu-backdrop" ]
                             |> Event.simulate Event.click
-                            |> Event.expect MessageMenuClose
+                            |> Event.expect MessageMenuDismiss
                     , \_ ->
-                        query opened
+                        query (Tuple.first (update (MessageMenuMore True) opened))
                             |> Query.find
                                 [ Selector.tag "a"
-                                , Selector.attribute (Attr.attribute "aria-label" "Room ledger for #c")
+                                , Selector.attribute (Attr.attribute "aria-label" "Room stats for #c")
                                 ]
                             |> Query.has
-                                [ Selector.text "Room ledger"
+                                [ Selector.text "Room stats"
                                 , Selector.attribute (Attr.href "/stats/?room=%23c")
                                 ]
                     , \_ ->
                         query owned
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.has [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
+                            |> Query.has [ Selector.text "Edit", Selector.text "Delete" ]
                     , \_ ->
                         query ownedCanonical
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.has [ Selector.text "Edit", Selector.text "Request deletion from server history" ]
+                            |> Query.has [ Selector.text "Edit", Selector.text "Delete" ]
                     , \_ ->
                         query owned
-                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Request server-history deletion for message from me") ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Delete message from me") ]
                             |> Event.simulate Event.click
                             |> Event.expect MessageMenuDeleteAsk
                     , \_ ->
                         query asked
                             |> Query.find [ Selector.class "onyx-msg-menu-delete-confirm" ]
-                            |> Query.has [ Selector.text "Remove from server history?", Selector.text "Keep message" ]
+                            |> Query.has [ Selector.text "Delete this message?", Selector.text "Keep message" ]
                     , \_ ->
                         query asked
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Keep message from me") ]
@@ -1459,17 +1465,17 @@ suite =
                         query asked
                             |> Query.find
                                 [ Selector.tag "button"
-                                , Selector.attribute (Attr.attribute "aria-label" "Confirm removing message from me from server history")
+                                , Selector.attribute (Attr.attribute "aria-label" "Confirm deleting message from me")
                                 ]
                             |> Event.simulate Event.click
                             |> Event.expect (MessageDeleteRequested "#c" "m9")
                     , \_ ->
-                        query opened
+                        query (Tuple.first (update (MessageMenuMore True) opened))
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Ignore alice on this device") ]
                             |> Event.simulate Event.click
                             |> Event.expect (IgnoreUser "alice")
                     , \_ ->
-                        query opened
+                        query (Tuple.first (update (MessageMenuMore True) opened))
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Hide messages from alice in this feed") ]
                             |> Event.simulate Event.click
                             |> Event.expect (MessageCollapseToggle { nick = "alice" })
@@ -1510,7 +1516,7 @@ suite =
                     [ \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
-                            |> Query.has [ Selector.text "React" ]
+                            |> Query.has [ Selector.text "Add reaction" ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Choose reaction for message from alice") ]
@@ -1576,7 +1582,7 @@ suite =
                         in
                         query missed
                             |> Query.find [ Selector.class "onyx-react-grid" ]
-                            |> Query.has [ Selector.text "no matches" ]
+                            |> Query.has [ Selector.text "No matches" ]
                     , \_ ->
                         query picked
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "React to message from alice with rocket") ]
@@ -1749,14 +1755,14 @@ suite =
                 Expect.all
                     [ \_ ->
                         query rosterBase
-                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View member card for alice") ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View network profile for alice") ]
                             |> Event.simulate Event.click
-                            |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
+                            |> Event.expect (WhoisRequest "alice")
                     , \_ ->
                         query carded
                             |> Query.find [ Selector.class "onyx-member-card" ]
                             |> Query.has
-                                [ Selector.attribute (Attr.attribute "role" "region")
+                                [ Selector.attribute (Attr.attribute "role" "dialog")
                                 , Selector.text "alice"
                                 , Selector.text "Guest"
                                 , Selector.text "Member"
@@ -2027,6 +2033,7 @@ suite =
 
                     opened =
                         Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) avail)
+                            |> (\m -> Tuple.first (update (MessageMenuMore True) m))
 
                     pending =
                         Tuple.first (update (MessageTranslate { target = "#c", msgid = "m1" }) opened)
@@ -2288,10 +2295,10 @@ suite =
                 Expect.all
                     [ \_ ->
                         query exhausted
-                            |> Query.has [ Selector.text "This is the very beginning of the conversation." ]
+                            |> Query.has [ Selector.text "This is the very beginning of #c." ]
                     , \_ ->
                         query channelModel
-                            |> Query.hasNot [ Selector.text "This is the very beginning of the conversation." ]
+                            |> Query.hasNot [ Selector.text "This is the very beginning of #c." ]
                     ]
                     ()
         , test "rail lists the joined channel" <|
@@ -2305,8 +2312,8 @@ suite =
                         query channelModel
                 in
                 Expect.all
-                    [ \_ -> Query.has [ Selector.text "Ops (1)" ] q
-                    , \_ -> Query.has [ Selector.text "Voice (1)" ] q
+                    [ \_ -> Query.has [ Selector.text "Moderators (1)" ] q
+                    , \_ -> Query.has [ Selector.text "Voiced (1)" ] q
                     , \_ -> Query.has [ Selector.text "Members (1)" ] q
                     ]
                     ()
@@ -2322,9 +2329,9 @@ suite =
                 Expect.all
                     [ \_ -> Query.has [ Selector.class "onyx-away" ] q
                     , \_ ->
-                        Query.findAll [ Selector.class "onyx-member-prefix" ] q
+                        Query.findAll [ Selector.class "onyx-member-badge" ] q
                             |> Query.first
-                            |> Query.has [ Selector.text "@" ]
+                            |> Query.has [ Selector.text "Mod" ]
                     ]
                     ()
         , test "You dialog names the nick without a badge" <|
@@ -2425,7 +2432,7 @@ suite =
                     , \_ ->
                         Query.find [ Selector.class "onyx-audience-toggle" ] aimed
                             |> Query.has
-                                [ Selector.text "Ops"
+                                [ Selector.text "Moderators"
                                 , Selector.class "onyx-audience-toggle-set"
                                 ]
                     , \_ -> Query.hasNot [ Selector.class "onyx-audience-toggle" ] plain
@@ -2452,9 +2459,9 @@ suite =
                     , \_ ->
                         badge
                             |> Query.has
-                                [ Selector.text "Ops"
+                                [ Selector.text "Moderators"
                                 , Selector.attribute
-                                    (Attr.title "Only visible to ops")
+                                    (Attr.title "Only visible to moderators")
                                 ]
                     ]
                     ()
@@ -2960,7 +2967,7 @@ suite =
                         , \_ ->
                             Query.hasNot [ Selector.text "alice ban *!*@bad.example" ] q
                         , \_ ->
-                            Query.has [ Selector.text "Open-wire details", Selector.text "MODE #c (no modes set)" ] q
+                            Query.has [ Selector.text "Technical details", Selector.text "MODE #c (no modes set)" ] q
                         , \_ ->
                             query banOpModel
                                 |> Query.has [ Selector.text "No recent server-echoed moderation activity in this room." ]
@@ -3025,13 +3032,13 @@ suite =
                             query messaged
                                 |> Query.find [ Selector.class "onyx-row-avatar" ]
                                 |> Query.has
-                                    [ Selector.style "--nick-tint" "hsl(200 74% 74%)"
+                                    [ Selector.attribute (Attr.attribute "style" "--nick-tint: hsl(200 74% 74%)")
                                     , Selector.text "AL"
                                     ]
                         , \_ ->
                             query messaged
-                                |> Query.find [ Selector.tag "strong", Selector.containing [ Selector.text "alice" ] ]
-                                |> Query.has [ Selector.style "color" "hsl(200 74% 74%)" ]
+                                |> Query.find [ Selector.tag "button", Selector.class "onyx-sender", Selector.containing [ Selector.text "alice" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "style" "--nick-tint: hsl(200 74% 74%); --nick-h: 200") ]
                         ]
                         ()
             , test "consecutive same-author rows group into continuations" <|
@@ -3157,18 +3164,18 @@ suite =
                             Query.findAll [ Selector.class "onyx-facepile-face" ] q
                                 |> Query.count (Expect.equal 3)
                         , \_ ->
-                            Query.find
-                                [ Selector.tag "button"
-                                , Selector.containing [ Selector.text "AL" ]
-                                ]
-                                q
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.containing [ Selector.text "AL" ]
+                                    ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open profile for alice, here") ]
                         , \_ ->
-                            Query.find
-                                [ Selector.tag "button"
-                                , Selector.containing [ Selector.text "AL" ]
-                                ]
-                                q
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.containing [ Selector.text "AL" ]
+                                    ]
                                 |> Event.simulate Event.click
                                 |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
                         ]
@@ -4808,7 +4815,7 @@ suite =
                                 |> Query.has [ Selector.text "Onyx is not 911." ]
                         , \_ ->
                             query { blank | route = Route.Privacy }
-                                |> Query.has [ Selector.text "Group E2EE is not live." ]
+                                |> Query.has [ Selector.text "Rooms can be end-to-end encrypted between enrolled devices" ]
                         , \_ ->
                             query { blank | route = Route.Privacy }
                                 |> Query.has [ Selector.text "about 400 recent messages" ]

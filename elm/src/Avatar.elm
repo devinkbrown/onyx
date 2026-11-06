@@ -7,6 +7,7 @@ module Avatar exposing
     , swatch
     , swatches
     , nickTint
+    , nickHue
     , view
     )
 
@@ -93,6 +94,14 @@ initials name =
                     List.foldl (\word _ -> word) first rest
             in
             String.toUpper (String.left 1 first ++ String.left 1 last)
+
+
+{-| Hue only (0–360) of a name's tint, for stylesheets that pick their
+own lightness per colour scheme (dark looks keep the pale tint, light
+looks render the same hue darker). -}
+nickHue : String -> Int
+nickHue nick =
+    186 + modBy 46 (hashName nick)
 
 
 {-| Per-nick message tint (mirroring `nickTint` in
@@ -210,9 +219,7 @@ view config =
                         []
 
                     else
-                        [ style "--onyx-avatar-bg" bg
-                        , style "--onyx-avatar-fg" fg
-                        ]
+                        [ attribute "style" ("--onyx-avatar-bg: " ++ bg ++ "; --onyx-avatar-fg: " ++ fg) ]
                    )
     in
     div baseAttrs

@@ -155,13 +155,13 @@ groupLabelFor key =
             "Admins"
 
         "op" ->
-            "Ops"
+            "Moderators"
 
         "halfop" ->
-            "Half-ops"
+            "Helpers"
 
         "voice" ->
-            "Voice"
+            "Voiced"
 
         _ ->
             "Members"

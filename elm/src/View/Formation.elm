@@ -36,6 +36,7 @@ formation model =
         [ div
             [ class "chb"
             , attribute "role" "dialog"
+            , attribute "aria-modal" "true"
             , attribute "aria-label" "Start a room"
             ]
             [ div [ class "chb-head" ]

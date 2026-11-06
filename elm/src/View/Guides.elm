@@ -63,7 +63,7 @@ guideHowtos =
       , body =
             [ "Rooms are shared conversations. Everyone in the room can read them."
             , "Direct messages are one-to-one. Those can be private: Onyx seals them on your device so the rest of the room does not see the words. If a private message cannot open, it stays locked instead of turning into plain text."
-            , "Group rooms are not end-to-end encrypted. Passkeys are not the everyday way to sign in."
+            , "Encrypted rooms are new: device trust review has not yet had an independent security review. Passkeys are not the everyday way to sign in."
             ]
       , links = []
       }

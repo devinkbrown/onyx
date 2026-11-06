@@ -76,6 +76,35 @@ rosterGroups channelName channelMembers prefixOrder modeToPrefix =
         )
 
 
+{-| Short role badge for a member row ("Owner", "Mod", …). -}
+roleBadge : Modes.ResolvedRole -> String
+roleBadge role =
+    case role.key of
+        "netop" ->
+            "Staff"
+
+        "founder" ->
+            "Founder"
+
+        "owner" ->
+            "Owner"
+
+        "admin" ->
+            "Admin"
+
+        "op" ->
+            "Mod"
+
+        "halfop" ->
+            "Helper"
+
+        "voice" ->
+            "Voice"
+
+        _ ->
+            role.label
+
+
 rosterRow : String -> Modes.ResolvedRole -> Member -> Html Msg
 rosterRow channel role member =
     li
@@ -84,26 +113,25 @@ rosterRow channel role member =
             , ( "onyx-away", member.away )
             ]
         ]
-        [ Avatar.view
-            { name = member.nick
-            , owner = role.key == "owner" || role.key == "founder"
-            , size = Avatar.Sm
-            , extraClass = ""
-            , hidden = True
-            }
-        , span [ class "onyx-member-prefix" ] [ text role.symbol ]
-        , button
+        [ button
             [ attribute "type" "button"
-            , class "onyx-member-nick"
-            , attribute "aria-label" ("View member card for " ++ member.nick)
-            , onClick (App.UserProfileOpened { nick = member.nick, channel = channel })
-            ]
-            [ text member.nick ]
-        , button
-            [ attribute "type" "button"
-            , class "onyx-member-profile"
-            , attribute "aria-label" ("View network profile for " ++ member.nick)
+            , class "onyx-member-row"
+            , attribute "aria-label" ("View network profile for " ++ member.nick ++ (if member.away then ", away" else ""))
             , onClick (App.WhoisRequest member.nick)
             ]
-            [ text "Profile" ]
+            [ Avatar.view
+                { name = member.nick
+                , owner = role.key == "owner" || role.key == "founder"
+                , size = Avatar.Sm
+                , extraClass = ""
+                , hidden = True
+                }
+            , span [ class "onyx-member-nick" ] [ text member.nick ]
+            , if String.isEmpty (String.trim role.symbol) then
+                text ""
+
+              else
+                span [ class "onyx-member-badge", attribute "title" role.label ] [ text (roleBadge role) ]
+            , span [ class "onyx-member-presence-dot", classList [ ( "is-away", member.away ) ], attribute "aria-hidden" "true" ] []
+            ]
         ]

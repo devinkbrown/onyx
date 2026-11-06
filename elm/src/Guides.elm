@@ -64,7 +64,7 @@ callRecordingNote =
 roomStarterSafetyNotes : List String
 roomStarterSafetyNotes =
     [ "Guests can choose a name; an account is optional."
-    , "Room messages are shared with everyone in the room. Group rooms are not end-to-end encrypted."
+    , "Room messages are shared with everyone in the room. Encrypted rooms seal messages between enrolled devices; device trust review is new and still awaiting independent security review."
     , "Direct messages are one-to-one. If a private message cannot open, it stays locked instead of turning into plain text."
     , "Calls are opt-in and are not recorded."
     , "Your history and sign-in stay on this device in this browser."

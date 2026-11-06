@@ -20,7 +20,7 @@ Structure (top to bottom):
     DMs, catching up.
   - "Also in the box": the rest of what ships, each claim checked
     against the client (calls are voice-first and start in a room;
-    group rooms are not end-to-end encrypted, and the page says so).
+    encrypted rooms are new and say so plainly).
   - How it works in three steps, the trust section, a closing call to
     action, then the shared footer.
 
@@ -100,7 +100,7 @@ facts : List ( String, String, String )
 facts =
     [ ( "browser", "Nothing to install", "Any modern browser" )
     , ( "ads", "No ads, no trackers", "Nobody sells your attention" )
-    , ( "lock", "Encrypted DMs", "End-to-end, between two people" )
+    , ( "lock", "Encrypted DMs and rooms", "End-to-end, between the devices you trust" )
     , ( "code", "Open source", "AGPL-3.0, code on GitHub" )
     ]
 
@@ -131,7 +131,7 @@ stories =
       , copy = "Take a conversation to a DM when it should stay between two people. When both apps support it, the message text is encrypted on your device before it leaves."
       , points =
             [ "End-to-end encrypted DMs, a setting you control"
-            , "Group rooms are shared spaces and are not end-to-end encrypted — we say so plainly"
+            , "Encrypted rooms are new — device trust review is still awaiting an independent security review, and we say so plainly"
             , "Block and report tools in every conversation"
             ]
       , picture = phone "" (shot { name = "dm-phone", w = 390, h = 844, label = "A direct message with nova in the Onyx app on a phone.", eager = False })
@@ -316,7 +316,7 @@ trustSection =
                 ]
             , ul [ class "site-trust-list" ]
                 [ li [] [ strong [] [ text "DMs" ], span [] [ text "End-to-end encrypted when both apps support it." ] ]
-                , li [] [ strong [] [ text "Rooms" ], span [] [ text "Shared with the room so it can stay open; not end-to-end encrypted." ] ]
+                , li [] [ strong [] [ text "Rooms" ], span [] [ text "Shared with the room so it can stay open. Encrypted rooms seal messages between enrolled devices (new; security review pending)." ] ]
                 , li [] [ strong [] [ text "History" ], span [] [ text "About 400 recent messages per room, kept in this browser." ] ]
                 , li [] [ strong [] [ text "Accounts" ], span [] [ text "Optional to look around; the server stores the name and email you give it." ] ]
                 ]

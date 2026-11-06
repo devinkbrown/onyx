@@ -728,8 +728,8 @@ export function createBrowserRuntime(config: BrowserRuntimeConfig) {
     dueField.addEventListener('input',()=>dueField.setCustomValidity(''));
     let capturedComposerValue:string|null=null;let copiedFromComposer=false;
     if(input.kind==='create'&&input.prefillFromComposer){
-      const composerField=document.querySelector('.onyx-composer input[aria-label="Message"]');
-      if(composerField instanceof HTMLInputElement&&composerField.value){capturedComposerValue=composerField.value;field.value=capturedComposerValue;copiedFromComposer=true;}
+      const composerField=document.querySelector('.onyx-composer textarea[aria-label="Message"], .onyx-composer input[aria-label="Message"]');
+      if((composerField instanceof HTMLInputElement||composerField instanceof HTMLTextAreaElement)&&composerField.value){capturedComposerValue=composerField.value;field.value=capturedComposerValue;copiedFromComposer=true;}
     }
     const previous=[...privateScheduledMessages.values()].find(entry=>entry.ownerRef===owner.ownerRef&&entry.kind===input.kind&&entry.expiresAt>Date.now());
     if(previous){try{field.value=new TextDecoder('utf-8',{fatal:true}).decode(previous.bytes);copiedFromComposer=false;capturedComposerValue=null;}catch{previous.bytes.fill(0);}}
@@ -751,7 +751,7 @@ export function createBrowserRuntime(config: BrowserRuntimeConfig) {
         if(bytes.byteLength===0||bytes.byteLength>65_536||/[\u0000-\u0008\u000b-\u001f\u007f\r]/u.test(value)||malformedSurrogate){
           bytes.fill(0);field.setCustomValidity('Enter a message within the supported length without control characters.');field.reportValidity();return;
         }
-        const prefilledComposer=copiedFromComposer&&capturedComposerValue!==null&&value===capturedComposerValue&&(()=>{const currentComposer=document.querySelector('.onyx-composer input[aria-label="Message"]');return currentComposer instanceof HTMLInputElement&&currentComposer.value===capturedComposerValue;})();
+        const prefilledComposer=copiedFromComposer&&capturedComposerValue!==null&&value===capturedComposerValue&&(()=>{const currentComposer=document.querySelector('.onyx-composer textarea[aria-label="Message"], .onyx-composer input[aria-label="Message"]');return (currentComposer instanceof HTMLInputElement||currentComposer instanceof HTMLTextAreaElement)&&currentComposer.value===capturedComposerValue;})();
         field.value='';
         const inputRef=randomRef();
         if(input.kind==='create'&&(!admissionRef||!scheduledCustody?.bindCreateAdmission(inputRef,admissionRef,context))){bytes.fill(0);finish(null);return;}

@@ -2790,16 +2790,10 @@ nav.onyxos-sections a.is-active { border-color: var(--s-accent-line); color: var
    page-level overrides after the port turn chips into segmented
    controls and the On/Off readout into a real switch. */
 
+/* The page's spacing/type scale. (Its --onyx-* aliases were removed: the
+   page now reads the app tokens directly through the data-theme mapping at
+   the end of this file.) */
 .ap {
-  --onyx-bg: var(--s-bg);
-  --onyx-panel: var(--s-card);
-  --onyx-panel-2: var(--s-panel-2);
-  --onyx-line: var(--s-line);
-  --onyx-text: var(--s-ink);
-  --onyx-dim: var(--s-muted);
-  --onyx-faint: var(--s-line-strong);
-  --onyx-accent: var(--s-accent);
-  --onyx-accent-ink: var(--s-accent-ink);
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -4903,3 +4897,81 @@ nav.onyxos-sections a.is-active { border-color: var(--s-accent-line); color: var
   .site-display span + span { -webkit-text-fill-color: currentColor; background: none; }
   .site-landing, .site-frame { background: #fff; color: #000; }
 }
+
+/* ---- Fix pass: touch targets on the public site (phones) ---- */
+@media (max-width: 48rem) {
+  .site-mast-open { min-height: 44px; }
+  .site-nav--panel .site-nav-more a, .site-nav.is-open .site-nav-more a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; padding: 0 0.75rem; }
+  nav.onyxos-sections a { min-height: 44px; }
+  .site-quiet-links a, .site-foot-links a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding-inline: 0.5rem; }
+}
+
+/* ===================================================================
+   Fix pass: /stats data widgets (charts, metric grids, heatmap) and
+   the Appearance page following the chosen app look.
+   =================================================================== */
+.data-chart { margin: 0.75rem 0 0; }
+.data-chart .data-bars { display: flex; align-items: flex-end; gap: 3px; height: 160px; margin-top: 0.75rem; padding: 0 2px; border-bottom: 1px solid var(--s-line-strong); }
+.data-chart .data-bar { flex: 1 1 0; min-width: 2px; height: calc(var(--h, 3) * 1%); border-radius: 3px 3px 0 0; background: var(--s-accent); opacity: 0.92; }
+.data-chart .data-bar:hover { opacity: 1; }
+.stats-chart-caption { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-top: 0.45rem; font-size: var(--s-text-xs); color: var(--s-muted); font-variant-numeric: tabular-nums; }
+.stats-chart-caption strong { color: var(--s-ink); }
+.stats-hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 120px; margin-top: 0.75rem; border-bottom: 1px solid var(--s-line-strong); }
+.stats-hour-chart i { display: block; flex: 1 1 0; height: calc(var(--h, 3) * 1%); border-radius: 2px 2px 0 0; background: var(--s-accent); }
+.stats-hour-axis { display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: var(--s-text-xs); color: var(--s-muted); font-variant-numeric: tabular-nums; }
+.stats-inspector-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0 1.25rem; }
+.stats-inspector-metrics > div { display: grid; gap: 0.2rem; min-width: 0; padding: 0.8rem 0.95rem; border: 1px solid var(--s-line); border-radius: 10px; background: var(--s-card); }
+.stats-inspector-metrics > div > span { font-size: var(--s-text-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--s-muted); }
+.stats-inspector-metrics > div > strong { font-family: var(--s-serif); font-size: 1.45rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stats-inspector-metrics > div > small { color: var(--s-muted); font-size: var(--s-text-xs); overflow-wrap: anywhere; }
+.stats-inspector-ledger { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline; color: var(--s-muted); }
+.stats-inspector-ledger p { margin: 0; }
+.stats-inspector-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; }
+.stats-flow-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 1.5rem; margin: 0.5rem 0 0; }
+.stats-flow-list > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--s-line); }
+.stats-flow-list dt { color: var(--s-muted); }
+.stats-flow-list dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stats-heatmap-scroll { overflow-x: auto; max-width: 100%; margin-top: 0.75rem; padding-bottom: 4px; }
+.stats-heatmap { border-collapse: separate; border-spacing: 2px; min-width: 100%; }
+.stats-heatmap th { padding: 0 2px 4px; font-size: 0.7rem; font-weight: 500; color: var(--s-muted); text-align: center; white-space: nowrap; }
+.stats-heatmap tbody th { text-align: left; padding-right: 6px; }
+.stats-heatmap td { min-width: 1.35rem; height: 1.35rem; border-radius: 3px; background: color-mix(in srgb, var(--s-accent) var(--heat, 4%), var(--s-panel-2)); }
+.stats-heatmap-legend { display: flex; align-items: center; gap: 6px; margin-top: 0.5rem; font-size: var(--s-text-xs); color: var(--s-muted); }
+.data-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; }
+.data-summary .data-metric { display: grid; gap: 0.15rem; padding: 0.8rem 0.95rem; border: 1px solid var(--s-line); border-top: 1px solid var(--s-line); border-radius: 10px; background: var(--s-card); }
+.data-metric .label { display: block; }
+.data-room-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; }
+.data-room-heading > span { color: var(--s-muted); font-size: var(--s-text-sm); }
+.data-room-numbers { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin: 0.5rem 0 0; }
+.data-room-numbers > div { display: grid; gap: 0.1rem; }
+.data-room-numbers dt { font-size: var(--s-text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--s-muted); }
+.data-room-numbers dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.data-room-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 1rem 1.5rem; align-items: start; }
+@media (max-width: 48rem) {
+  .data-room-row { grid-template-columns: 1fr; }
+  .data-chart .data-bars { height: 120px; }
+  .stats-hour-chart { height: 90px; }
+}
+
+/* The Appearance page paints with the look you choose (the app tokens),
+   not only the device scheme. */
+html[data-theme] .ap {
+  --s-bg: var(--onyx-bg); --s-panel: var(--onyx-panel); --s-panel-2: var(--onyx-panel-2); --s-card: var(--onyx-panel);
+  --s-line: var(--onyx-line); --s-line-strong: var(--onyx-line-strong, var(--onyx-line)); --s-ink: var(--onyx-text); --s-ink-2: var(--onyx-text);
+  --s-muted: var(--onyx-dim); --s-accent: var(--onyx-accent); --s-accent-hover: var(--onyx-accent-hover, var(--onyx-accent)); --s-accent-ink: var(--onyx-accent-ink);
+  --s-accent-line: var(--onyx-accent); --s-link: var(--onyx-accent); --s-focus: var(--onyx-focus, var(--onyx-accent)); --s-bar: var(--onyx-line-strong, var(--onyx-line));
+  --s-glow-a: transparent; --s-glow-b: transparent; --s-dot: transparent; --s-tint: var(--onyx-accent-soft, transparent);
+  --s-shadow: var(--el-2); --s-shadow-sm: var(--el-1); --s-cta-glow: none;
+  background: var(--onyx-bg); color: var(--onyx-text); color-scheme: inherit;
+}
+html[data-surface="site"][data-theme]:has(main.ap), html[data-surface="site"][data-theme]:has(main.ap) body { background-color: var(--onyx-bg) !important; }
+
+/* Look chips preview the palette as a tiny message row: ground, a text line,
+   and the accent dot. */
+.ap .ap-swatch, .ap .ap-theme-swatch { position: relative; display: inline-block; width: 56px; height: 36px; flex: none; border-radius: 8px; overflow: hidden; border: 1px solid var(--s-line); }
+.ap .ap-swatch > span, .ap .ap-theme-swatch > span { position: absolute; display: block; border-radius: 999px; }
+.ap :is(.ap-swatch, .ap-theme-swatch) > span:nth-child(3) { inset: 0; border-radius: 0; }
+.ap :is(.ap-swatch, .ap-theme-swatch) > span:nth-child(1) { left: 7px; top: 11px; width: 12px; height: 12px; }
+.ap :is(.ap-swatch, .ap-theme-swatch) > span:nth-child(2) { left: 24px; top: 12px; width: 24px; height: 4px; box-shadow: 0 7px 0 0 currentColor; opacity: 0.9; }
+.ap .ap-chip--theme.on .ap-swatch, .ap .ap-theme-chip--on .ap-theme-swatch { outline: 2px solid var(--s-accent); outline-offset: 1px; }
+.channel-spark-bars > i { display: block; flex: 1; min-height: 2px; height: calc(var(--h, 5) * 1%); background: var(--s-bar); border-radius: 1px 1px 0 0; }

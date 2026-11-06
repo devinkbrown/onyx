@@ -73,7 +73,7 @@ suite =
                                 , ( "mesh", Encode.object [ ( "quorum", Encode.bool True ), ( "partitioned", Encode.bool False ), ( "components", Encode.int 1 ) ] )
                                 , ( "peers"
                                   , Encode.list identity
-                                        [ peer "ircx.us" "up" True (Encode.int 38) 3600
+                                        [ peer "node-a.example" "up" True (Encode.int 38) 3600
                                         , peer "stale.node" "down" False Encode.null 120
                                         ]
                                   )
@@ -187,8 +187,8 @@ suite =
                                 , ( "mesh", Encode.object [ ( "quorum", Encode.bool True ), ( "partitioned", Encode.bool False ), ( "components", Encode.int 1 ) ] )
                                 , ( "peers"
                                   , Encode.list identity
-                                        [ peer "ircx.us" "up" True (Encode.int 12) 60
-                                        , peer "IRCX.US" "up" True (Encode.int 8) 90
+                                        [ peer "node-a.example" "up" True (Encode.int 12) 60
+                                        , peer "NODE-A.EXAMPLE" "up" True (Encode.int 8) 90
                                         ]
                                   )
                                 ]
@@ -201,7 +201,7 @@ suite =
                             Expect.all
                                 [ \_ ->
                                     Expect.equal
-                                        [ { name = "ircx.us", state = "up", up = True, rttMs = Just 12, sinceSeconds = 60 } ]
+                                        [ { name = "node-a.example", state = "up", up = True, rttMs = Just 12, sinceSeconds = 60 } ]
                                         status.peers
                                 , \_ -> Expect.equal False status.peersComplete
                                 , \_ -> Expect.equal Degraded (feedState (Just status) nowMs)

@@ -80,10 +80,10 @@ view model =
                 ]
             ]
         , section [ class "ap-wrap" ]
-            [ h1 [ class "ap-h1" ] [ text "Appearance" ]
+            [ h1 [ class "ap-h1", Html.Attributes.id "ap-title", tabindex -1 ] [ text "Appearance" ]
             , p [ class "ap-lede" ] [ text "Choose a look, text size, and motion. Changes apply on this device." ]
             , p [ class "ap-local-note", attribute "role" "note" ]
-                [ span [ attribute "aria-hidden" "true" ] [ text "This device" ]
+                [ b [] [ text "On this device only." ]
                 , text " Your account and messages are unchanged."
                 ]
             , section [ class "ap-group" ]

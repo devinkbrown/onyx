@@ -91,7 +91,7 @@ status model =
                 Offline ->
                     ( "Offline"
                     , if model.reconnectIn > 0 then
-                        "Trying again in " ++ String.fromInt model.reconnectIn ++ " seconds."
+                        "Trying again in " ++ String.fromInt model.reconnectIn ++ (if model.reconnectIn == 1 then " second." else " seconds.")
 
                       else
                         "Your history and drafts are still here. Reconnect to continue."

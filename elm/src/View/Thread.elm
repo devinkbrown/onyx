@@ -1,4 +1,4 @@
-module View.Thread exposing (ephemeralPolicyNotice, facepileRow, retentionScopeNotice, thread, topicTools)
+module View.Thread exposing (ephemeralPolicyNotice, facepileRow, messageMenuLayer, reactionPickerLayer, retentionScopeNotice, thread, topicTools)
 
 {-| Message thread: welcome / empty / live states for the active
 channel, newest last.
@@ -59,7 +59,11 @@ thread model =
                     , homeCoach model
                     , p [] [ text "Find a room, meet people, and make yourself at home." ]
                     , div [ class "onyx-empty-actions" ]
-                        [ button [ type_ "button", onClick ConnectionDialogOpen ] [ text "Connect" ]
+                        [ if model.connection == App.Live then
+                            text ""
+
+                          else
+                            button [ type_ "button", onClick ConnectionDialogOpen ] [ text "Connect" ]
                         , button [ type_ "button", onClick BrowserOpen ] [ text "Browse rooms" ]
                         , button [ type_ "button", onClick CreateRoomOpen ] [ text "Start a room" ]
                         , button [ type_ "button", onClick FirstHourInvite ] [ text "Invite a friend" ]
@@ -146,10 +150,7 @@ thread model =
 
                                   else if App.isHistoryExhausted model channel.name then
                                     div [ class "onyx-intro", attribute "data-testid" "channel-intro" ]
-                                        [ span [ class "onyx-intro-glyph", attribute "aria-hidden" "true" ]
-                                            [ text (introGlyph model channel.name) ]
-                                        , h2 [ class "onyx-intro-title" ] [ text channel.name ]
-                                        , p [ class "onyx-intro-text" ] [ text "This is the very beginning of the conversation." ]
+                                        [ p [ class "onyx-intro-text" ] [ text ("This is the very beginning of " ++ channel.name ++ ".") ]
                                         ]
 
                                   else
@@ -203,9 +204,7 @@ emptyConversation model channel =
             App.isChannelName model channel.name
     in
     div [ class "onyx-empty onyx-empty-conversation" ]
-        [ span [ class "onyx-intro-glyph", attribute "aria-hidden" "true" ] [ text (introGlyph model channel.name) ]
-        , h2 [] [ text channel.name ]
-        , p []
+        [ p []
             [ text
                 (if isRoom then
                     "This is the start of " ++ channel.name ++ ". No messages yet. Say hello."
@@ -245,17 +244,17 @@ ephemeralPolicyNotice model conversationId =
         case value of
             Nothing ->
                 div [ class "onyx-history-policy", attribute "role" "note" ]
-                    [ small [] [ text "Server replay retention is not currently known. This browser’s local history is a separate cache and does not prove what recipients retained." ] ]
+                    [ small [] [ text "Older messages may not be available from the server." ] ]
 
             Just seconds ->
                 div [ class "onyx-history-policy", attribute "role" "note" ]
                     [ small []
                         [ text
                             (if seconds == "0" then
-                                "Server EPHEMERAL replay is disabled for this room. This browser’s local cache follows its own retention policy; deleting server history cannot erase copies recipients saved."
+                                "This room does not keep history on the server. Messages stay only on the devices that received them."
 
                              else
-                                "Server EPHEMERAL replay window: " ++ seconds ++ " seconds. This limits server history replay; it does not erase recipient caches. This browser applies its own current cache policy."
+                                "This room keeps server history for " ++ seconds ++ " seconds. Messages people already received stay on their devices."
                             )
                         ]
                     ]
@@ -278,7 +277,7 @@ retentionScopeNotice model conversationId =
 
                 ( "unknown", _ ) ->
                     div [ class "onyx-history-policy", attribute "role" "note" ]
-                        [ small [] [ text "Local cached history is withheld or incomplete because its retention policy is unknown." ] ]
+                        [ small [] [ text "Some older messages saved on this device are not shown." ] ]
 
                 _ ->
                     text ""
@@ -373,6 +372,7 @@ threadPanelDialog model =
                         , div
                             [ class "onyx-thread-sheet"
                             , attribute "role" "dialog"
+                            , attribute "aria-modal" "true"
                             , attribute "aria-label" "Thread"
                             , on "keydown" threadEscapeDecoder
                             ]
@@ -1338,7 +1338,7 @@ messageRow model target prev parents m =
                 div
                     [ class "onyx-row-avatar"
                     , attribute "aria-hidden" "true"
-                    , style "--nick-tint" (Avatar.nickTint m.from)
+                    , attribute "style" ("--nick-tint: " ++ Avatar.nickTint m.from)
                     ]
                     [ Avatar.view
                         { name = m.from
@@ -1356,7 +1356,14 @@ messageRow model target prev parents m =
 
               else
                 div [ class "onyx-row-head" ]
-                    [ strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
+                    [ button
+                        [ type_ "button"
+                        , class "onyx-sender"
+                        , attribute "style" ("--nick-tint: " ++ Avatar.nickTint m.from ++ "; --nick-h: " ++ String.fromInt (Avatar.nickHue m.from))
+                        , attribute "aria-label" ("Open profile for " ++ m.from)
+                        , onClick (App.UserProfileOpened { nick = m.from, channel = target })
+                        ]
+                        [ text m.from ]
                     , case m.audience of
                         Nothing ->
                             text ""
@@ -1396,8 +1403,6 @@ messageRow model target prev parents m =
                 text ""
             , boostBar model target m
             , threadIndicator target parents m
-            , messageMenuPanel model target m
-            , reactionPickerPanel model target m
             ]
 
 
@@ -1434,6 +1439,7 @@ messageMenuButton model target offered m =
                 button
                     [ type_ "button"
                     , class "onyx-msg-menu-trigger"
+                    , id (App.menuTriggerId msgid)
                     , attribute "aria-haspopup" "menu"
                     , attribute "aria-label" ("Message actions for message from " ++ m.from)
                     , attribute "aria-expanded"
@@ -1443,7 +1449,12 @@ messageMenuButton model target offered m =
                          else
                             "false"
                         )
-                    , onClick (App.MessageMenuOpen { target = target, msgid = msgid })
+                    , on "click"
+                        (Decode.map2
+                            (\x y -> App.MessageMenuOpenAt { target = target, msgid = msgid, x = x, y = y })
+                            (Decode.oneOf [ Decode.field "clientX" Decode.float, Decode.succeed 0 ])
+                            (Decode.oneOf [ Decode.field "clientY" Decode.float, Decode.succeed 0 ])
+                        )
                     ]
                     [ text "⋯" ]
 
@@ -1525,281 +1536,302 @@ menuCanPin model target =
     App.isChannelName model target && App.isChannelOp model target
 
 
-{-| The open menu for one row (mirrors the oracle menu order and
-copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
-Pin, Ignore, Collapse, then Delete behind its inline confirm
-step; tiers are flattened into one menu with a light-dismiss
-backdrop). Translate sits in the same menu when the row has text. -}
-messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
-messageMenuPanel model target m =
-    case m.msgid of
+{-| The open message menu as a layer above the shell (never inside the
+scrolling transcript, whose rows use `content-visibility`): a popover
+near the pointer on wide screens, a bottom sheet on phones. Primary
+actions first; everything else behind "More". -}
+messageMenuLayer : Model -> Html Msg
+messageMenuLayer model =
+    case model.messageMenu of
         Nothing ->
             text ""
 
-        Just msgid ->
-            case model.messageMenu of
+        Just open ->
+            case App.reactionRow model open.target open.msgid of
                 Nothing ->
                     text ""
 
-                Just open ->
-                    if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
-                        text ""
+                Just m ->
+                    messageMenuPanel model open.target m
 
-                    else
-                        let
-                            caps =
-                                App.capabilities (menuInput model target m)
 
-                            actionTarget =
-                                "message from " ++ m.from
-                        in
-                        div [ class "onyx-msg-menu-pop" ]
-                            [ div
-                                [ class "onyx-msg-menu-backdrop"
-                                , onClick App.MessageMenuClose
-                                ]
-                                []
-                            , div
-                                [ class "onyx-msg-menu"
-                                , attribute "role" "menu"
-                                , attribute "aria-label" ("More actions for " ++ actionTarget)
-                                , on "keydown" (menuEscapeDecoder model)
-                                ]
-                            (List.filterMap identity
-                                [ if caps.canReply then
-                                    Just
-                                        (menuItem ("Reply to " ++ m.from)
-                                            "Reply"
-                                            (App.ReplyArm { target = target, msgid = msgid })
-                                        )
+{-| Six one-tap reactions at the top of the message menu. -}
+quickReactions : List String
+quickReactions =
+    [ "👍", "❤️", "😂", "🎉", "😮", "😢" ]
 
-                                  else
-                                    Nothing
-                                , if caps.canReact then
-                                    Just
-                                        (menuItem ("Choose reaction for " ++ actionTarget)
-                                            "React"
-                                            (App.ReactionPickerOpen { target = target, msgid = msgid })
-                                        )
 
-                                  else
-                                    Nothing
-                                , if caps.canCopy then
-                                    Just
-                                        (menuItem ("Copy text from " ++ actionTarget)
-                                            "Copy"
-                                            (App.MessageMenuCopy { target = target, msgid = msgid })
-                                        )
+messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
+messageMenuPanel model target m =
+    case ( m.msgid, model.messageMenu ) of
+        ( Just msgid, Just open ) ->
+            if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
+                text ""
 
-                                  else
-                                    Nothing
-                                , if caps.canQuote then
-                                    Just
-                                        (menuItem ("Quote " ++ actionTarget ++ " in composer")
-                                            "Quote in composer"
-                                            (App.MessageQuote { target = target, from = m.from, body = m.body })
-                                        )
+            else
+                let
+                    caps =
+                        App.capabilities (menuInput model target m)
 
-                                  else
-                                    Nothing
-                                , if caps.canCopyMoment then
-                                    Just
-                                        (menuItem ("Copy moment link for " ++ actionTarget)
-                                            "Copy moment link"
-                                            (App.MessageCopyMoment { target = target, at = m.at })
-                                        )
+                    actionTarget =
+                        "message from " ++ m.from
 
-                                  else
-                                    Nothing
-                                , if App.isChannelName model target then
-                                    Just
-                                        (a
-                                            [ class "onyx-msg-menu-item"
-                                            , attribute "role" "menuitem"
-                                            , href (App.statsRoomHref target)
-                                            , attribute "aria-label" ("Room ledger for " ++ target)
-                                            , onClick App.MessageMenuClose
+                    anchored =
+                        open.x > 0 || open.y > 0
+
+                    quick =
+                        if caps.canReact then
+                            [ div [ class "onyx-msg-menu-quick", attribute "role" "group", attribute "aria-label" "Quick reactions" ]
+                                (List.map
+                                    (\emoji ->
+                                        button
+                                            [ type_ "button"
+                                            , class "onyx-msg-menu-emoji"
+                                            , attribute "aria-label" ("React to " ++ actionTarget ++ " with " ++ emoji)
+                                            , onClick (App.MessageMenuReact { target = target, msgid = msgid, emoji = emoji })
                                             ]
-                                            [ text "Room ledger" ]
+                                            [ text emoji ]
+                                    )
+                                    quickReactions
+                                )
+                            ]
+
+                        else
+                            []
+
+                    primary =
+                        List.filterMap identity
+                            [ if caps.canReply then
+                                Just (menuItem ("Reply to " ++ m.from) "Reply" (App.ReplyArm { target = target, msgid = msgid }))
+
+                              else
+                                Nothing
+                            , if caps.canReact then
+                                Just (menuItem ("Choose reaction for " ++ actionTarget) "Add reaction" (App.ReactionPickerOpen { target = target, msgid = msgid }))
+
+                              else
+                                Nothing
+                            , if caps.canCopy then
+                                Just (menuItem ("Copy text from " ++ actionTarget) "Copy text" (App.MessageMenuCopy { target = target, msgid = msgid }))
+
+                              else
+                                Nothing
+                            , if menuCanPin model target then
+                                let
+                                    pinned =
+                                        List.member msgid (App.channelPins model target)
+                                in
+                                Just
+                                    (menuItem
+                                        ((if pinned then
+                                            "Unpin "
+
+                                          else
+                                            "Pin "
+                                         )
+                                            ++ actionTarget
                                         )
-
-                                  else
-                                    Nothing
-                                , if caps.canSearchText then
-                                    Just
-                                        (case App.loadedActionText m of
-                                            Nothing ->
-                                                text ""
-
-                                            Just query ->
-                                                menuItem ("Search text from " ++ actionTarget)
-                                                    "Search this text"
-                                                    (App.MessageSearchText { text = query })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if App.loadedActionText m /= Nothing && model.translationAvailable then
-                                    Just
-                                        (case Dict.get msgid model.translations of
-                                            Just entry ->
-                                                if entry.status == App.TranslationPending then
-                                                    button
-                                                        [ type_ "button"
-                                                        , class "onyx-msg-menu-item"
-                                                        , attribute "role" "menuitem"
-                                                        , attribute "aria-label" ("Translate " ++ actionTarget ++ " on this device")
-                                                        , disabled True
-                                                        ]
-                                                        [ text "Translate on this device" ]
-
-                                                else
-                                                    menuItem ("Translate " ++ actionTarget ++ " on this device")
-                                                        "Translate on this device"
-                                                        (App.MessageTranslate { target = target, msgid = msgid })
-
-                                            Nothing ->
-                                                menuItem ("Translate " ++ actionTarget ++ " on this device")
-                                                    "Translate on this device"
-                                                    (App.MessageTranslate { target = target, msgid = msgid })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if caps.canStartTopic then
-                                    Just
-                                        (menuItem ("Start topic from " ++ actionTarget)
-                                            "Start topic from here"
-                                            (App.MessageStartTopic { target = target, msgid = msgid })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if caps.canEdit then
-                                    Just
-                                        (menuItem ("Edit " ++ actionTarget)
-                                            "Edit"
-                                            (App.EditArm { target = target, msgid = msgid })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if menuCanPin model target then
-                                    let
-                                        pinned =
-                                            List.member msgid (App.channelPins model target)
-                                    in
-                                    Just
-                                        (menuItem
-                                            ((if pinned then
-                                                "Unpin "
-
-                                              else
-                                                "Pin "
-                                             )
-                                                ++ actionTarget
-                                            )
-                                            (if pinned then
-                                                "Unpin message"
-
-                                             else
-                                                "Pin message"
-                                            )
-                                            (App.MessagePinToggle { target = target, msgid = msgid })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if caps.canIgnore then
-                                    let
-                                        nick =
-                                            String.trim m.from
-
-                                        ignored =
-                                            Set.member (String.toLower nick) model.ignoredUsers
-                                    in
-                                    Just
-                                        (menuItem
-                                            ((if ignored then
-                                                "Stop ignoring "
-
-                                              else
-                                                "Ignore "
-                                             )
-                                                ++ m.from
-                                                ++ " on this device"
-                                            )
-                                            ((if ignored then
-                                                "Unignore "
-
-                                              else
-                                                "Ignore "
-                                             )
-                                                ++ m.from
-                                            )
-                                            (if ignored then
-                                                App.UnignoreUser nick
-
-                                             else
-                                                App.IgnoreUser nick
-                                            )
-                                        )
-
-                                  else
-                                    Nothing
-                                , if caps.canCollapse then
-                                    let
-                                        nick =
-                                            String.trim m.from
-
-                                        collapsed =
-                                            Set.member (String.toLower nick) model.collapsedNicks
-                                    in
-                                    Just
-                                        (menuItem
-                                            (if collapsed then
-                                                "Show messages from " ++ m.from
-
-                                             else
-                                                "Hide messages from " ++ m.from ++ " in this feed"
-                                            )
-                                            ((if collapsed then
-                                                "Show "
-
-                                              else
-                                                "Hide "
-                                             )
-                                                ++ m.from
-                                            )
-                                            (App.MessageCollapseToggle { nick = nick })
-                                        )
-
-                                  else
-                                    Nothing
-                                , if caps.canDelete then
-                                    Just
-                                        (if open.confirmDelete then
-                                            deleteConfirm actionTarget target msgid
+                                        (if pinned then
+                                            "Unpin"
 
                                          else
-                                            menuItem ("Request server-history deletion for " ++ actionTarget)
-                                                "Request deletion from server history"
-                                                App.MessageMenuDeleteAsk
+                                            "Pin"
                                         )
+                                        (App.MessagePinToggle { target = target, msgid = msgid })
+                                    )
 
-                                  else
-                                    Nothing
-                                ]
-                                ++ translationBlocks model open m msgid actionTarget
-                            )
+                              else
+                                Nothing
+                            , if caps.canEdit then
+                                Just (menuItem ("Edit " ++ actionTarget) "Edit" (App.EditArm { target = target, msgid = msgid }))
+
+                              else
+                                Nothing
+                            , if caps.canDelete then
+                                Just (menuItemDanger ("Delete " ++ actionTarget) "Delete" App.MessageMenuDeleteAsk)
+
+                              else
+                                Nothing
+                            ]
+
+                    more =
+                        List.filterMap identity
+                            [ if caps.canQuote then
+                                Just (menuItem ("Quote " ++ actionTarget ++ " in composer") "Quote" (App.MessageQuote { target = target, from = m.from, body = m.body }))
+
+                              else
+                                Nothing
+                            , if caps.canCopyMoment then
+                                Just (menuItem ("Copy link to " ++ actionTarget) "Copy link to message" (App.MessageCopyMoment { target = target, at = m.at }))
+
+                              else
+                                Nothing
+                            , if caps.canSearchText then
+                                Maybe.map
+                                    (\query -> menuItem ("Search text from " ++ actionTarget) "Search this text" (App.MessageSearchText { text = query }))
+                                    (App.loadedActionText m)
+
+                              else
+                                Nothing
+                            , if App.loadedActionText m /= Nothing && model.translationAvailable then
+                                Just
+                                    (case Dict.get msgid model.translations of
+                                        Just entry ->
+                                            if entry.status == App.TranslationPending then
+                                                button
+                                                    [ type_ "button"
+                                                    , class "onyx-msg-menu-item"
+                                                    , attribute "role" "menuitem"
+                                                    , attribute "aria-label" ("Translate " ++ actionTarget ++ " on this device")
+                                                    , disabled True
+                                                    ]
+                                                    [ text "Translating…" ]
+
+                                            else
+                                                menuItem ("Translate " ++ actionTarget ++ " on this device") "Translate" (App.MessageTranslate { target = target, msgid = msgid })
+
+                                        Nothing ->
+                                            menuItem ("Translate " ++ actionTarget ++ " on this device") "Translate" (App.MessageTranslate { target = target, msgid = msgid })
+                                    )
+
+                              else
+                                Nothing
+                            , if caps.canStartTopic then
+                                Just (menuItem ("Start topic from " ++ actionTarget) "Start a topic here" (App.MessageStartTopic { target = target, msgid = msgid }))
+
+                              else
+                                Nothing
+                            , if App.isChannelName model target then
+                                Just
+                                    (a
+                                        [ class "onyx-msg-menu-item"
+                                        , attribute "role" "menuitem"
+                                        , href (App.statsRoomHref target)
+                                        , attribute "aria-label" ("Room stats for " ++ target)
+                                        , onClick App.MessageMenuClose
+                                        ]
+                                        [ text "Room stats" ]
+                                    )
+
+                              else
+                                Nothing
+                            , if caps.canIgnore then
+                                let
+                                    nick =
+                                        String.trim m.from
+
+                                    ignored =
+                                        Set.member (String.toLower nick) model.ignoredUsers
+                                in
+                                Just
+                                    (menuItem
+                                        ((if ignored then
+                                            "Stop ignoring "
+
+                                          else
+                                            "Ignore "
+                                         )
+                                            ++ m.from
+                                            ++ " on this device"
+                                        )
+                                        ((if ignored then
+                                            "Stop ignoring "
+
+                                          else
+                                            "Ignore "
+                                         )
+                                            ++ m.from
+                                        )
+                                        (if ignored then
+                                            App.UnignoreUser nick
+
+                                         else
+                                            App.IgnoreUser nick
+                                        )
+                                    )
+
+                              else
+                                Nothing
+                            , if caps.canCollapse then
+                                let
+                                    nick =
+                                        String.trim m.from
+
+                                    collapsed =
+                                        Set.member (String.toLower nick) model.collapsedNicks
+                                in
+                                Just
+                                    (menuItem
+                                        (if collapsed then
+                                            "Show messages from " ++ m.from
+
+                                         else
+                                            "Hide messages from " ++ m.from ++ " in this feed"
+                                        )
+                                        ((if collapsed then
+                                            "Show "
+
+                                          else
+                                            "Hide "
+                                         )
+                                            ++ m.from
+                                        )
+                                        (App.MessageCollapseToggle { nick = nick })
+                                    )
+
+                              else
+                                Nothing
+                            ]
+
+                    body =
+                        if open.confirmDelete then
+                            [ deleteConfirm actionTarget target msgid ]
+
+                        else if open.more then
+                            more
+                                ++ [ menuItem "Back to main actions" "‹ Back" (App.MessageMenuMore False) ]
+
+                        else
+                            quick
+                                ++ primary
+                                ++ (if List.isEmpty more then
+                                        []
+
+                                    else
+                                        [ menuItem "More actions" "More…" (App.MessageMenuMore True) ]
+                                   )
+                in
+                div
+                    [ class "onyx-msg-menu-pop"
+                    , classList [ ( "onyx-msg-menu-pop--anchored", anchored ) ]
+                    , attribute "style" ("--menu-x: " ++ String.fromFloat open.x ++ "px; --menu-y: " ++ String.fromFloat open.y ++ "px")
+                    ]
+                    [ div
+                        [ class "onyx-msg-menu-backdrop"
+                        , onClick App.MessageMenuDismiss
                         ]
+                        []
+                    , div
+                        [ class "onyx-msg-menu"
+                        , id "onyx-msg-menu"
+                        , tabindex -1
+                        , attribute "role" "menu"
+                        , attribute "aria-label" ("Actions for " ++ actionTarget)
+                        , on "keydown" (menuEscapeDecoder model)
+                        ]
+                        (body ++ translationBlocks model open m msgid actionTarget)
+                    ]
+
+        _ ->
+            text ""
+
 
 
 {-| Translation section and unavailable note (mirroring the
 oracle menu translation panel copy verbatim: pending/done/busy
 and failed states, retry/copy/dismiss actions, and the copy
 status line). -}
-translationBlocks : Model -> { target : String, msgid : String, confirmDelete : Bool } -> App.ChatMessage -> String -> String -> List (Html Msg)
+translationBlocks : Model -> { open | confirmDelete : Bool, target : String } -> App.ChatMessage -> String -> String -> List (Html Msg)
 translationBlocks model open m msgid actionTarget =
     let
         note =
@@ -1932,18 +1964,29 @@ menuItem label visible msg =
         [ text visible ]
 
 
-{-| The inline delete confirmation (mirrors the oracle confirm
-step copy verbatim). -}
+menuItemDanger : String -> String -> Msg -> Html Msg
+menuItemDanger label visible msg =
+    button
+        [ type_ "button"
+        , class "onyx-msg-menu-item onyx-msg-menu-item--danger"
+        , attribute "role" "menuitem"
+        , attribute "aria-label" label
+        , onClick msg
+        ]
+        [ text visible ]
+
+
+{-| The inline delete confirmation. -}
 deleteConfirm : String -> String -> String -> Html Msg
 deleteConfirm actionTarget target msgid =
     div
         [ class "onyx-msg-menu-delete-confirm"
         , attribute "role" "group"
-        , attribute "aria-label" ("Confirm removing " ++ actionTarget ++ " from server history")
+        , attribute "aria-label" ("Confirm deleting " ++ actionTarget)
         ]
-        [ p [ class "onyx-msg-menu-delete-confirm-title" ] [ text "Remove from server history?" ]
+        [ p [ class "onyx-msg-menu-delete-confirm-title" ] [ text "Delete this message?" ]
         , p [ class "onyx-msg-menu-delete-confirm-copy" ]
-            [ text "This asks the server to remove this message from conversation history. It cannot erase copies already saved by other people or change this room’s retention policy." ]
+            [ text "It is removed from the room’s history for everyone. People may already have copies." ]
         , div [ class "onyx-msg-menu-delete-confirm-actions" ]
             [ button
                 [ type_ "button"
@@ -1955,82 +1998,96 @@ deleteConfirm actionTarget target msgid =
             , button
                 [ type_ "button"
                 , class "onyx-msg-menu-delete-confirm-delete"
-                , attribute "aria-label" ("Confirm removing " ++ actionTarget ++ " from server history")
+                , attribute "aria-label" ("Confirm deleting " ++ actionTarget)
                 , onClick (App.MessageDeleteRequested target msgid)
                 ]
-                [ text "Request server deletion" ]
+                [ text "Delete" ]
             ]
         ]
 
 
-{-| The open reaction picker for one row (mirroring the
-oracle react popover: a search field over the curated set plus a
-listbox grid of option choices labelled "React to {target} with
-{shortcode}" (with the oracle "no matches" note when the query
-matches nothing);
-choosing emits through the shared react send path and closes the
-picker, Escape and the light-dismiss backdrop close it without
-choosing). -}
-reactionPickerPanel : Model -> String -> App.ChatMessage -> Html Msg
-reactionPickerPanel model target m =
-    case m.msgid of
+{-| The emoji picker as a modal layer (bottom sheet on phones). -}
+reactionPickerLayer : Model -> Html Msg
+reactionPickerLayer model =
+    case model.reactionPicker of
         Nothing ->
             text ""
 
-        Just msgid ->
-            case model.reactionPicker of
+        Just open ->
+            case App.reactionRow model open.target open.msgid of
                 Nothing ->
                     text ""
 
-                Just open ->
-                    if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
-                        text ""
+                Just m ->
+                    reactionPickerPanel model open.target m
 
-                    else
-                        let
-                            actionTarget =
-                                "message from " ++ m.from
 
-                            results =
-                                Emoji.searchEmojis open.query 48
-                        in
-                        div [ class "onyx-react-pop" ]
-                            [ div
-                                [ class "onyx-react-backdrop"
+reactionPickerPanel : Model -> String -> App.ChatMessage -> Html Msg
+reactionPickerPanel model target m =
+    case ( m.msgid, model.reactionPicker ) of
+        ( Just msgid, Just open ) ->
+            if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
+                text ""
+
+            else
+                let
+                    actionTarget =
+                        "message from " ++ m.from
+
+                    results =
+                        Emoji.searchEmojis open.query 48
+                in
+                div [ class "onyx-react-pop" ]
+                    [ div
+                        [ class "onyx-react-backdrop"
+                        , onClick App.ReactionPickerClose
+                        ]
+                        []
+                    , div
+                        [ class "onyx-react-picker"
+                        , attribute "role" "dialog"
+                        , attribute "aria-modal" "true"
+                        , attribute "aria-label" ("Choose reaction for " ++ actionTarget)
+                        , on "keydown" (pickerEscapeDecoder model)
+                        ]
+                        [ div [ class "onyx-react-head" ]
+                            [ h3 [ class "onyx-react-title" ] [ text "Add a reaction" ]
+                            , button
+                                [ type_ "button"
+                                , class "onyx-react-close"
+                                , attribute "aria-label" "Close reaction picker"
                                 , onClick App.ReactionPickerClose
                                 ]
-                                []
-                            , div
-                                [ class "onyx-react-picker"
-                                , attribute "role" "dialog"
-                                , attribute "aria-label" ("Choose reaction for " ++ actionTarget)
-                                , on "keydown" (pickerEscapeDecoder model)
-                                ]
-                                [ input
-                                    [ type_ "text"
-                                    , class "onyx-react-search"
-                                    , placeholder "Search emoji"
-                                    , attribute "aria-label" "Search emoji"
-                                    , attribute "autocomplete" "off"
-                                    , value open.query
-                                    , onInput App.ReactionPickerSearch
-                                    ]
-                                    []
-                                , div
-                                    [ class "onyx-react-grid"
-                                    , attribute "role" "listbox"
-                                    , attribute "aria-label" "Emoji results"
-                                    ]
-                                    (List.map (reactionChoice actionTarget) results
-                                        ++ (if List.isEmpty results then
-                                                [ p [ class "onyx-react-empty" ] [ text "no matches" ] ]
-
-                                            else
-                                                []
-                                           )
-                                    )
-                                ]
+                                [ text "×" ]
                             ]
+                        , input
+                            [ type_ "search"
+                            , class "onyx-react-search"
+                            , placeholder "Search emoji"
+                            , attribute "aria-label" "Search emoji"
+                            , attribute "autocomplete" "off"
+                            , value open.query
+                            , onInput App.ReactionPickerSearch
+                            ]
+                            []
+                        , div
+                            [ class "onyx-react-grid"
+                            , attribute "role" "listbox"
+                            , attribute "aria-label" "Emoji results"
+                            ]
+                            (List.map (reactionChoice actionTarget) results
+                                ++ (if List.isEmpty results then
+                                        [ p [ class "onyx-react-empty" ] [ text "No matches" ] ]
+
+                                    else
+                                        []
+                                   )
+                            )
+                        ]
+                    ]
+
+        _ ->
+            text ""
 
 
 {-| One reaction grid choice (the unicode glyph as its visible
@@ -2063,7 +2120,7 @@ menuEscapeDecoder _ =
                         |> Decode.andThen
                             (\key ->
                                 if key == "Escape" then
-                                    Decode.succeed App.MessageMenuClose
+                                    Decode.succeed App.MessageMenuDismiss
 
                                 else
                                     Decode.fail "not-escape"

@@ -57,9 +57,9 @@ import View.Pins exposing (pinsDrawer)
 import View.Inbox
 import View.RoomHeader
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
-import View.Thread exposing (thread)
+import View.Thread exposing (messageMenuLayer, reactionPickerLayer, thread)
 import View.Toast exposing (toaster)
-import View.Topbar exposing (reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
+import View.Topbar exposing (callBar, reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
 import View.RuntimeServices
 
 
@@ -227,6 +227,7 @@ shellColumn model =
         ([ topbar model
          , recordingStatus model.mediaControlView (Maybe.map2 (==) model.mediaControlViewOwner model.runtimeOwnerStamp |> Maybe.withDefault False)
          , reconnectBanner model
+         , callBar model
          , sessionRecoveryBanner model
          , reclaimDialog model
          ]
@@ -278,6 +279,8 @@ shellColumn model =
                         , advancedPanel model
                         ]
                , toaster model
+               , messageMenuLayer model
+               , reactionPickerLayer model
                , stewardPanel model
                , guestClaim model
                , browser model

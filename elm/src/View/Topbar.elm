@@ -1,4 +1,4 @@
-module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
+module View.Topbar exposing (callBar, connectionLabel, reclaimDialog, reconnectBanner, sessionRecoveryBanner, topbar)
 
 {-| Shell top bar: brand mark (or, on phones, back control and page
 title), the inbox bell, and the connection pill. The conversation
@@ -7,6 +7,7 @@ tools and topic moved to the room header (`View.RoomHeader`).
 
 import App exposing (Model, Msg(..))
 import Dict
+import Media
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -31,7 +32,7 @@ topbar model =
           inbox model
         , button
             [ type_ "button"
-            , attribute "aria-label" ("Connect. " ++ connectionLabel model)
+            , attribute "aria-label" ("Connection. " ++ connectionLabel model)
             , attribute "aria-haspopup" "dialog"
             , attribute "data-testid" "connection-open"
             , onClick ConnectionDialogOpen
@@ -42,10 +43,23 @@ topbar model =
                 ]
             ]
             [ span [ class "onyx-dot" ] []
-            , span [ class "onyx-conn-name" ] [ text "Connect" ]
-            , span [ class "onyx-conn-state" ] [ text (connectionLabel model) ]
+            , span [ class "onyx-conn-state" ] [ text (connectionWord model) ]
             ]
         ]
+
+
+{-| The pill's visible word: a state, never a verb. -}
+connectionWord : Model -> String
+connectionWord model =
+    case model.connection of
+        App.Live ->
+            "Connected"
+
+        App.Registering ->
+            "Connecting…"
+
+        App.Offline ->
+            "Offline"
 
 
 {-| A conversation is on screen (not Home, not the calls hub). On
@@ -121,7 +135,8 @@ reclaimDialog model =
                     [ div
                         [ class "onyx-reclaim"
                         , attribute "role" "dialog"
-                        , attribute "aria-label" ("Reclaim the nick " ++ target)
+                        , attribute "aria-modal" "true"
+                        , attribute "aria-label" ("Reclaim the name " ++ target)
                         ]
                         [ p [ class "onyx-reclaim-lead" ]
                             [ text "Enter the account password for "
@@ -150,6 +165,7 @@ reclaimDialog model =
                                 , button
                                     [ type_ "button"
                                     , class "onyx-reclaim-cancel"
+                                    , attribute "aria-label" "Close reclaim"
                                     , onClick ReclaimClose
                                     ]
                                     [ text "Cancel" ]
@@ -157,6 +173,58 @@ reclaimDialog model =
                             ]
                         ]
                     ]
+
+
+{-| A slim persistent bar while a call is ringing or live, shown on every
+shell page except the Calls hub itself, so a call is never "lost" behind
+a conversation. -}
+callBar : Model -> Html Msg
+callBar model =
+    if model.callsOpen || model.calls.lifecycle == Media.Idle then
+        text ""
+
+    else
+        let
+            where_ =
+                case model.calls.channel of
+                    Just room ->
+                        room
+
+                    Nothing ->
+                        if String.isEmpty model.calls.withPeer then
+                            ""
+
+                        else
+                            model.calls.withPeer
+
+            label =
+                case model.calls.lifecycle of
+                    Media.RingingIn ->
+                        "Incoming call"
+
+                    Media.RingingOut ->
+                        "Calling…"
+
+                    _ ->
+                        "In a call"
+        in
+        div
+            [ class "onyx-call-bar"
+            , attribute "role" "status"
+            , attribute "aria-live" "polite"
+            , attribute "data-testid" "call-bar"
+            ]
+            [ span [ class "onyx-call-bar-dot", attribute "aria-hidden" "true" ] []
+            , span [ class "onyx-call-bar-text" ]
+                [ b [] [ text label ]
+                , if String.isEmpty where_ then
+                    text ""
+
+                  else
+                    text (" · " ++ where_)
+                ]
+            , button [ type_ "button", class "onyx-call-bar-open", onClick ToggleCalls ] [ text "Open call" ]
+            ]
 
 
 {-| Recovery banner strip, mirroring the oracle `ReconnectStatusBanner`:

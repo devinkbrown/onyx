@@ -261,7 +261,7 @@ suite =
                 \_ ->
                     Expect.all
                         [ \_ -> Expect.equal "Network Operators" (groupLabelFor "netop")
-                        , \_ -> Expect.equal "Ops" (groupLabelFor "op")
+                        , \_ -> Expect.equal "Moderators" (groupLabelFor "op")
                         , \_ -> Expect.equal "Members" (groupLabelFor "member")
                         , \_ -> Expect.equal "Members" (groupLabelFor "bogus")
                         ]

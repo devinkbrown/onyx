@@ -401,6 +401,29 @@ or `elm-stuff/`. The documented environment used for local verification is
 [`vendor-elm-packages.sh`](tools/vendor-elm-packages.sh) script fills the
 package cache for an offline run; it does not edit project dependencies.
 
+## UI audit suite (Playwright, mock wire)
+
+`tests/e2e/elm-audit-*.spec.ts` encode the UI audit findings (one test per
+finding id), every shell surface, keyboard-only journeys, every public route,
+the profile overlay, the brand mark, every built-in look (with AA contrast
+checks and screenshots), and the `/stats` widgets against a mocked feed. The
+specs only ever talk to a mock IRC server answered through
+`page.routeWebSocket` (`tests/e2e/elm-audit-wire.mjs`); nothing reaches the
+live network.
+
+```sh
+pnpm test:e2e:elm:audit                              # chromium, chromium-light, chromium-reduced-motion, iphone-13, iphone-13-light, iphone-se
+pnpm test:e2e:elm:audit -- --project iphone-13 elm-audit-findings
+ONYX_AUDIT_ORIGIN=http://127.0.0.1:8933 pnpm test:e2e:elm:audit   # against an already-served build
+ONYX_FIREFOX_EXECUTABLE=/path/to/firefox-wrapper pnpm test:e2e:elm:audit -- --project firefox
+```
+
+Stock Firefox runs over WebDriver BiDi (`moz-firefox` channel). Under BiDi,
+Playwright's trace/snapshot instrumentation raises a page error
+(`Permission denied to access property "length"`) on every page while plain
+Firefox logs none, so the specs ignore that one message; it is a harness
+artifact, not product code.
+
 ## Deterministic lanes
 
 From the repository root:

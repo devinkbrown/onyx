@@ -3409,14 +3409,21 @@ function fetchPublicFeed(url) {
         var input = document.getElementById("connection-password");
         var password = input && typeof input.value === "string" ? input.value : "";
         if (input) input.value = "";
+        var refuse = function (reason) {
+          try { if (app.ports.privateIdentifyRefused) app.ports.privateIdentifyRefused.send({ requestId: req.requestId, reason: reason }); }
+          catch (_error) { /* port gone */ }
+        };
         var current;
         try { current = runtime.ownerSnapshot(); } catch (_error) { current = null; }
         if (!current || current.ownerRef !== req.ownerRef || current.accountGeneration !== req.accountGeneration
-          || current.connectionGeneration !== req.connectionGeneration || !password) return;
-        try { runtime.privateIdentify({ account: req.account, password: password, requestId: req.requestId,
+          || current.connectionGeneration !== req.connectionGeneration) { password = ""; refuse("owner"); return; }
+        if (!password || new TextEncoder().encode(password).byteLength < 8) { password = ""; refuse("password"); return; }
+        var admission = null;
+        try { admission = runtime.privateIdentify({ account: req.account, password: password, requestId: req.requestId,
           ownerRef: req.ownerRef, accountGeneration: req.accountGeneration, connectionGeneration: req.connectionGeneration }); }
         catch (_error) { /* never log credentials */ }
         password = "";
+        if (!admission || admission.kind === "blocked") refuse(admission && admission.reason ? String(admission.reason) : "blocked");
       });
     }
 
@@ -3784,7 +3791,7 @@ function fetchPublicFeed(url) {
     if (app.ports.composerFocus) {
       app.ports.composerFocus.subscribe(function () {
         try {
-          var input = document.querySelector(".onyx-composer input[aria-label='Message'], .onyx-composer input[aria-label='Edit message']");
+          var input = document.querySelector(".onyx-composer textarea[aria-label='Message'], .onyx-composer textarea[aria-label='Edit message'], .onyx-composer input[aria-label='Message'], .onyx-composer input[aria-label='Edit message']");
           if (input && typeof input.focus === "function") input.focus();
         } catch (err) { /* no composer mounted */ }
       });
@@ -4679,6 +4686,35 @@ function fetchPublicFeed(url) {
        background is isolated and scroll-locked, Tab cycles inside the
        dialog, opening moves focus into it, and closing returns focus
        to the opener. A document stamp keeps re-wiring idempotent. */
+    /* Menus: arrow keys move between items (role=menu / role=menuitem),
+       Home/End jump, so the message menu is operable without a pointer. */
+    (function installMenuKeys() {
+      if (typeof document === "undefined" || !document) return;
+      try {
+        if (document.__onyxMenuKeys) return;
+        document.__onyxMenuKeys = true;
+        document.addEventListener("keydown", function (e) {
+          if (!e || e.defaultPrevented || e.isComposing) return;
+          var key = e.key;
+          if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+          var active = document.activeElement;
+          var menu = active && active.closest ? active.closest('[role="menu"]') : null;
+          if (!menu) return;
+          var items = Array.prototype.filter.call(menu.querySelectorAll('[role="menuitem"]'), function (el) {
+            return !el.disabled && el.getAttribute("aria-hidden") !== "true" && el.offsetParent !== null;
+          });
+          if (items.length === 0) return;
+          var index = items.indexOf(active);
+          var next;
+          if (key === "Home") next = 0;
+          else if (key === "End") next = items.length - 1;
+          else if (key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % items.length;
+          else next = index < 0 ? items.length - 1 : (index - 1 + items.length) % items.length;
+          e.preventDefault();
+          try { items[next].focus(); } catch (err) { /* best-effort */ }
+        }, true);
+      } catch (err) { /* no DOM events */ }
+    })();
     (function installLightboxFocus() {
       if (typeof document === "undefined" || !document) return;
       try {
@@ -4996,6 +5032,10 @@ function fetchPublicFeed(url) {
           }
           if (typeof req.scheme === "string" && req.scheme) {
             root.style.setProperty("color-scheme", req.scheme);
+          } else {
+            /* "Match device": no pinned scheme; the stylesheet follows
+               prefers-color-scheme. */
+            root.style.removeProperty("color-scheme");
           }
           /* Full token-var commit (mirroring applyThemeToDom): the Elm
              fold always sends the complete resolved map, so vars absent
@@ -5194,7 +5234,22 @@ function fetchPublicFeed(url) {
         lastFollowProjection = projection;
         app.ports.threadFollowState.send({ target: target, following: followingTail });
       }
+      /* Hide the "New messages" jump pill while the unread divider is
+         already on screen; the pane carries the state for CSS. */
+      function syncUnreadJump(pane) {
+        if (!pane || typeof pane.querySelector !== "function") return;
+        var divider = pane.querySelector(".onyx-unread-divider");
+        var visible = false;
+        if (divider && typeof divider.getBoundingClientRect === "function") {
+          var d = divider.getBoundingClientRect();
+          var p = pane.getBoundingClientRect();
+          visible = d.bottom > p.top && d.top < p.bottom;
+        }
+        if (visible) pane.setAttribute("data-unread-visible", "");
+        else pane.removeAttribute("data-unread-visible");
+      }
       function rememberTail() {
+        syncUnreadJump(followedPane);
         var pending = pendingFollowFrame;
         var automatic = lastAutomaticFollow;
         if (followingTail && followedPane && pending && automatic
@@ -5210,6 +5265,7 @@ function fetchPublicFeed(url) {
       }
       function followTranscript() {
         var pane = document.querySelector(".onyx-thread-pane");
+        syncUnreadJump(pane);
         if (pane !== followedPane) {
           if (followedPane) {
             followedPane.removeEventListener("scroll", rememberTail);

@@ -10,7 +10,9 @@ overrides on top via `Studio.diffOverrides` / `Studio.customThemeTokens`.
 import Dict exposing (Dict)
 
 
-{-| All 18 built-in theme ids, oracle order. -}
+{-| All built-in theme ids: the 18 oracle themes followed by the five
+curated looks added in the Elm client (graphite, sepia, mist, plum,
+high contrast). -}
 themeIds : List String
 themeIds =
     [ "ocean"
@@ -31,6 +33,11 @@ themeIds =
     , "teal"
     , "slate"
     , "frost"
+    , "graphite"
+    , "sepia"
+    , "mist"
+    , "plum"
+    , "contrast"
     ]
 
 
@@ -632,6 +639,176 @@ tokensFor id =
                 , ( "--r-pill", "999px" )
                 , ( "--ease", "cubic-bezier(0.16, 1, 0.3, 1)" )
                 , ( "--dur", "220ms" )
+                ]
+
+        "graphite" ->
+            Dict.fromList
+                [ ( "--ink", "#121416" )
+                , ( "--ink-2", "#17191c" )
+                , ( "--stone", "#1c1f23" )
+                , ( "--stone-2", "#23272c" )
+                , ( "--stone-3", "#2b3036" )
+                , ( "--stone-line", "#343a41" )
+                , ( "--lapis", "#c9a86a" )
+                , ( "--lapis-bright", "#d9bc85" )
+                , ( "--lapis-deep", "#9a7d47" )
+                , ( "--gold", "#c9a86a" )
+                , ( "--gold-bright", "#e2c48a" )
+                , ( "--gold-deep", "#8c6f3a" )
+                , ( "--shu", "#e06c6c" )
+                , ( "--shu-bright", "#f08585" )
+                , ( "--paper", "#e8e6e1" )
+                , ( "--paper-dim", "#aeb2b6" )
+                , ( "--paper-mute", "#8d9297" )
+                , ( "--ok", "#6cc48d" )
+                , ( "--warn", "#d8b35a" )
+                , ( "--danger", "var(--shu)" )
+                , ( "--seam", "color-mix(in oklab, var(--gold) 50%, transparent)" )
+                , ( "--seam-faint", "color-mix(in oklab, var(--gold) 20%, transparent)" )
+                , ( "--line", "color-mix(in oklab, var(--paper) 14%, transparent)" )
+                , ( "--line-faint", "color-mix(in oklab, var(--paper) 6%, transparent)" )
+                , ( "--r-0", "0px" )
+                , ( "--r-sm", "6px" )
+                , ( "--r-md", "10px" )
+                , ( "--r-pill", "999px" )
+                , ( "--ease", "cubic-bezier(0.2, 0.7, 0.2, 1)" )
+                , ( "--dur", "180ms" )
+                ]
+
+        "sepia" ->
+            Dict.fromList
+                [ ( "--ink", "#f3ead9" )
+                , ( "--ink-2", "#efe6d6" )
+                , ( "--stone", "#faf5ea" )
+                , ( "--stone-2", "#e9dfcb" )
+                , ( "--stone-3", "#dfd3bc" )
+                , ( "--stone-line", "#d2c4a9" )
+                , ( "--lapis", "#6f4713" )
+                , ( "--lapis-bright", "#7d5119" )
+                , ( "--lapis-deep", "#5e3c10" )
+                , ( "--gold", "#8a5a1e" )
+                , ( "--gold-bright", "#a86f2a" )
+                , ( "--gold-deep", "#5e3c10" )
+                , ( "--shu", "#b3392a" )
+                , ( "--shu-bright", "#cf4d3b" )
+                , ( "--paper", "#2b2118" )
+                , ( "--paper-dim", "#5d4a3a" )
+                , ( "--paper-mute", "#74604f" )
+                , ( "--ok", "#2f7a4a" )
+                , ( "--warn", "#8a5a1e" )
+                , ( "--danger", "var(--shu)" )
+                , ( "--seam", "color-mix(in oklab, var(--gold) 50%, transparent)" )
+                , ( "--seam-faint", "color-mix(in oklab, var(--gold) 22%, transparent)" )
+                , ( "--line", "color-mix(in oklab, var(--paper) 18%, transparent)" )
+                , ( "--line-faint", "color-mix(in oklab, var(--paper) 8%, transparent)" )
+                , ( "--r-0", "0px" )
+                , ( "--r-sm", "6px" )
+                , ( "--r-md", "10px" )
+                , ( "--r-pill", "999px" )
+                , ( "--ease", "cubic-bezier(0.2, 0.7, 0.2, 1)" )
+                , ( "--dur", "180ms" )
+                ]
+
+        "mist" ->
+            Dict.fromList
+                [ ( "--ink", "#eef2f5" )
+                , ( "--ink-2", "#e9eef2" )
+                , ( "--stone", "#ffffff" )
+                , ( "--stone-2", "#e2e8ed" )
+                , ( "--stone-3", "#d6dee5" )
+                , ( "--stone-line", "#c7d1da" )
+                , ( "--lapis", "#225570" )
+                , ( "--lapis-bright", "#2a6584" )
+                , ( "--lapis-deep", "#1f4d64" )
+                , ( "--gold", "#2f6f8f" )
+                , ( "--gold-bright", "#3a81a4" )
+                , ( "--gold-deep", "#1f4d64" )
+                , ( "--shu", "#b23a3a" )
+                , ( "--shu-bright", "#cc4f4f" )
+                , ( "--paper", "#1e2730" )
+                , ( "--paper-dim", "#4b5a66" )
+                , ( "--paper-mute", "#66737e" )
+                , ( "--ok", "#237a52" )
+                , ( "--warn", "#8a5f12" )
+                , ( "--danger", "var(--shu)" )
+                , ( "--seam", "color-mix(in oklab, var(--lapis) 45%, transparent)" )
+                , ( "--seam-faint", "color-mix(in oklab, var(--lapis) 18%, transparent)" )
+                , ( "--line", "color-mix(in oklab, var(--paper) 16%, transparent)" )
+                , ( "--line-faint", "color-mix(in oklab, var(--paper) 7%, transparent)" )
+                , ( "--r-0", "0px" )
+                , ( "--r-sm", "6px" )
+                , ( "--r-md", "10px" )
+                , ( "--r-pill", "999px" )
+                , ( "--ease", "cubic-bezier(0.2, 0.7, 0.2, 1)" )
+                , ( "--dur", "180ms" )
+                ]
+
+        "plum" ->
+            Dict.fromList
+                [ ( "--ink", "#1b1220" )
+                , ( "--ink-2", "#201626" )
+                , ( "--stone", "#261b2d" )
+                , ( "--stone-2", "#2f2237" )
+                , ( "--stone-3", "#392a42" )
+                , ( "--stone-line", "#45344f" )
+                , ( "--lapis", "#e0a07a" )
+                , ( "--lapis-bright", "#ecb18e" )
+                , ( "--lapis-deep", "#b57a56" )
+                , ( "--gold", "#e0a07a" )
+                , ( "--gold-bright", "#f0bd9c" )
+                , ( "--gold-deep", "#a66c49" )
+                , ( "--shu", "#ee7b7b" )
+                , ( "--shu-bright", "#ff9393" )
+                , ( "--paper", "#f1e8ea" )
+                , ( "--paper-dim", "#c0aeb8" )
+                , ( "--paper-mute", "#9d8c97" )
+                , ( "--ok", "#7fcf9e" )
+                , ( "--warn", "#e4bd6a" )
+                , ( "--danger", "var(--shu)" )
+                , ( "--seam", "color-mix(in oklab, var(--gold) 50%, transparent)" )
+                , ( "--seam-faint", "color-mix(in oklab, var(--gold) 20%, transparent)" )
+                , ( "--line", "color-mix(in oklab, var(--paper) 14%, transparent)" )
+                , ( "--line-faint", "color-mix(in oklab, var(--paper) 6%, transparent)" )
+                , ( "--r-0", "0px" )
+                , ( "--r-sm", "6px" )
+                , ( "--r-md", "10px" )
+                , ( "--r-pill", "999px" )
+                , ( "--ease", "cubic-bezier(0.2, 0.7, 0.2, 1)" )
+                , ( "--dur", "180ms" )
+                ]
+
+        "contrast" ->
+            Dict.fromList
+                [ ( "--ink", "#000000" )
+                , ( "--ink-2", "#050505" )
+                , ( "--stone", "#0a0a0a" )
+                , ( "--stone-2", "#161616" )
+                , ( "--stone-3", "#222222" )
+                , ( "--stone-line", "#8a8a8a" )
+                , ( "--lapis", "#ffd166" )
+                , ( "--lapis-bright", "#ffe08a" )
+                , ( "--lapis-deep", "#d9a93a" )
+                , ( "--gold", "#ffd166" )
+                , ( "--gold-bright", "#ffe08a" )
+                , ( "--gold-deep", "#d9a93a" )
+                , ( "--shu", "#ff6b6b" )
+                , ( "--shu-bright", "#ff8a8a" )
+                , ( "--paper", "#ffffff" )
+                , ( "--paper-dim", "#e6e6e6" )
+                , ( "--paper-mute", "#c8c8c8" )
+                , ( "--ok", "#7dff9f" )
+                , ( "--warn", "#ffd166" )
+                , ( "--danger", "var(--shu)" )
+                , ( "--seam", "color-mix(in oklab, var(--gold) 70%, transparent)" )
+                , ( "--seam-faint", "color-mix(in oklab, var(--gold) 35%, transparent)" )
+                , ( "--line", "#8a8a8a" )
+                , ( "--line-faint", "#444444" )
+                , ( "--r-0", "0px" )
+                , ( "--r-sm", "6px" )
+                , ( "--r-md", "10px" )
+                , ( "--r-pill", "999px" )
+                , ( "--ease", "cubic-bezier(0.2, 0.7, 0.2, 1)" )
+                , ( "--dur", "180ms" )
                 ]
 
         _ ->

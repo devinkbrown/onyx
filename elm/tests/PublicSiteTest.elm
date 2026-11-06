@@ -89,7 +89,7 @@ suite =
                 \_ ->
                     query { blank | route = Route.Landing }
                         |> Query.find [ Selector.class "site-trust" ]
-                        |> Query.has [ Selector.text "Shared with the room so it can stay open; not end-to-end encrypted." ]
+                        |> Query.has [ Selector.text "Encrypted rooms seal messages between enrolled devices (new; security review pending)." ]
             , test "stateless masthead offers a native phone menu with every destination" <|
                 \_ ->
                     let

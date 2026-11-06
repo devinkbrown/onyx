@@ -274,7 +274,7 @@ vaultSection model =
                     , provenanceBadge Device "Device-memory message search" ""
                     , span [ class "onyx-message-search__vault-label" ] [ text "Saved on this device" ]
                     , span [ class "onyx-message-search__server-count" ]
-                        [ text (String.fromInt (List.length hits) ++ " remembered · " ++ App.vaultSearchModeToString model.vaultSearchModeShown) ]
+                        [ text (" · " ++ String.fromInt (List.length hits) ++ " remembered · " ++ App.vaultSearchModeToString model.vaultSearchModeShown) ]
                     , button
                         [ type_ "button"
                         , class "onyx-message-search__vault-mode"
@@ -496,7 +496,7 @@ savedSection model query =
                 , provenanceBadge Device "Saved searches" ""
                 , span [ class "onyx-message-search__vault-label" ] [ text "Saved on this device" ]
                 , span [ class "onyx-message-search__server-count" ]
-                    [ text (String.fromInt (List.length model.savedSearches) ++ " saved") ]
+                    [ text (" · " ++ String.fromInt (List.length model.savedSearches) ++ " saved") ]
                 ]
             , if String.length query >= 2 then
                 form [ class "onyx-message-search__save-form", onSubmit SearchSaveCurrent ]

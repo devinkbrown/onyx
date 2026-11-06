@@ -161,7 +161,7 @@ privacyArticle =
     section [ class "site-section", attribute "aria-labelledby" "trust-privacy-body-heading" ]
         [ h2 [ class "site-h2", id "trust-privacy-body-heading" ] [ text "This device and the server" ]
         , p []
-            [ text "If you register, the server stores the account name and the email you give it. Room messages stay with the room so it can stay open. Group rooms are not end-to-end encrypted. Group E2EE is not live." ]
+            [ text "If you register, the server stores the account name and the email you give it. Room messages stay with the room so it can stay open. Rooms can be end-to-end encrypted between enrolled devices; reviewing which devices you trust is new and has not yet had an independent security review." ]
         , p []
             [ text "Private DMs are sealed on this device. If a DM cannot open, it stays locked. This page does not claim every class of message is unreadable to the operator." ]
         , p []

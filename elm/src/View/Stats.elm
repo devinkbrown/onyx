@@ -320,7 +320,7 @@ overviewSection model state _ =
                                 span
                                     [ class "data-bar"
                                     , attribute "title" (day.date ++ ": " ++ Stats.formatCount day.messages ++ " messages")
-                                    , style "--h" (Stats.barHeight day.messages peak)
+                                    , attribute "style" ("--h: " ++ Stats.barHeight day.messages peak)
                                     ]
                                     []
                             )
@@ -533,7 +533,7 @@ inspectorDetail model detail =
                         (\hour messages ->
                             Html.i
                                 [ attribute "title" (String.padLeft 2 '0' (String.fromInt hour) ++ ":00 UTC: " ++ Stats.formatCount messages ++ " messages")
-                                , style "--h" (String.fromInt (max 3 (round (toFloat messages / toFloat (max 1 hourPeak) * 100))))
+                                , attribute "style" ("--h: " ++ String.fromInt (max 3 (round (toFloat messages / toFloat (max 1 hourPeak) * 100))))
                                 ]
                                 []
                         )
@@ -567,7 +567,7 @@ inspectorDetail model detail =
                                     span
                                         [ class "data-bar"
                                         , attribute "title" (day.date ++ ": " ++ Stats.formatCount day.messages ++ " messages")
-                                        , style "--h" (String.fromInt (max 3 (round (toFloat day.messages / toFloat dayPeak * 100))))
+                                        , attribute "style" ("--h: " ++ String.fromInt (max 3 (round (toFloat day.messages / toFloat dayPeak * 100))))
                                         ]
                                         []
                                 )
@@ -627,7 +627,7 @@ inspectorDetail model detail =
                                         :: List.indexedMap
                                             (\hour messages ->
                                                 td
-                                                    [ style "--heat" (heatOf messages)
+                                                    [ attribute "style" ("--heat: " ++ heatOf messages)
                                                     , attribute "title" ((Stats.weekdayLabels |> List.drop day |> List.head |> Maybe.withDefault "") ++ " " ++ String.padLeft 2 '0' (String.fromInt hour) ++ ":00 UTC: " ++ Stats.formatCount messages ++ " messages")
                                                     ]
                                                     [ span [ class "sr-only" ] [ text (Stats.formatCount messages) ] ]
@@ -1027,7 +1027,7 @@ channelRow model channel =
 
                   else
                     span [ class "channel-spark-bars", attribute "aria-hidden" "true" ]
-                        (List.map (\n -> Html.i [ style "--h" (sparkHeight n) ] []) (List.drop (List.length channel.spark - min 18 (List.length channel.spark)) channel.spark))
+                        (List.map (\n -> Html.i [ attribute "style" ("--h: " ++ sparkHeight n) ] []) (List.drop (List.length channel.spark - min 18 (List.length channel.spark)) channel.spark))
                 ]
             , dl [ class "data-room-numbers" ]
                 [ div [] [ Html.dt [] [ text "messages" ], Html.dd [] [ text (Stats.formatCount channel.messages) ] ]

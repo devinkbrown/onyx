@@ -19,12 +19,12 @@ customs =
 suite : Test
 suite =
     describe "ThemeLook"
-        [ test "registry pins eighteen themes with swatches and signatures" <|
+        [ test "registry pins the built-in themes with swatches and signatures" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 18 (List.length themeMeta)
+                    [ \_ -> Expect.equal 23 (List.length themeMeta)
                     , \_ ->
-                        Expect.equal [ "ocean", "tide", "abyss", "reef", "onyx", "obsidian", "pearl", "ink", "shu", "hisui", "pine", "kohaku", "terracotta", "vermillion", "sapphire", "teal", "slate", "frost" ]
+                        Expect.equal [ "ocean", "tide", "abyss", "reef", "onyx", "obsidian", "pearl", "ink", "shu", "hisui", "pine", "kohaku", "terracotta", "vermillion", "sapphire", "teal", "slate", "frost", "graphite", "sepia", "mist", "plum", "contrast" ]
                             themeIds
                     , \_ -> Expect.equal "ocean" defaultThemeId
                     , \_ -> Expect.equal True (isPublicThemeId "ocean")
@@ -60,19 +60,19 @@ suite =
             \_ ->
                 Expect.all
                     [ \_ ->
-                        Expect.equal [ "ocean", "pearl" ]
+                        Expect.equal [ "system", "ocean", "pearl" ]
                             (List.map .id (buildDefaultLookEntries "ocean" customs))
                     , \_ ->
-                        Expect.equal [ "ocean", "pearl", "tide" ]
+                        Expect.equal [ "system", "ocean", "pearl", "tide" ]
                             (List.map .id (buildDefaultLookEntries "tide" customs))
                     , \_ ->
-                        Expect.equal [ "Ocean · Dark", "Pearl · Light" ]
+                        Expect.equal [ "Match device", "Ocean · Dark", "Pearl · Light" ]
                             (List.map .label (buildDefaultLookEntries "ocean" customs))
                     , \_ ->
-                        Expect.equal [ "ocean", "pearl", "custom:mine" ]
+                        Expect.equal [ "system", "ocean", "pearl", "custom:mine" ]
                             (List.map .id (buildDefaultLookEntries "custom:mine" customs))
                     , \_ ->
-                        Expect.equal [ "ocean", "pearl" ]
+                        Expect.equal [ "system", "ocean", "pearl" ]
                             (List.map .id (buildDefaultLookEntries "custom:ghost" customs))
                     , \_ ->
                         Expect.equal True

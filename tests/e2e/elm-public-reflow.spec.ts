@@ -155,11 +155,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       const seen = await chrome();
       expect(seen, route).toEqual({ tint, scheme: colorScheme, html: ground, body: ground, mast: ground, viewport: expect.stringContaining('viewport-fit=cover') });
     }
-    // In-app navigation is a pushState move: the tint follows the shell.
+    // In-app navigation is a pushState move: the tint follows the shell,
+    // which matches the device scheme by default (Pearl tokens in the light).
     await page.goto('/');
     await page.locator('.site-mast .site-mast-open').click();
     await expect(page).toHaveURL(/\/app\/$/);
-    await expect.poll(async () => (await chrome()).tint).toBe('rgb(14, 21, 24)');
+    await expect.poll(async () => (await chrome()).tint).toBe(colorScheme === 'light' ? 'rgb(246, 243, 236)' : 'rgb(14, 21, 24)');
     await page.goBack();
     await expect.poll(async () => (await chrome()).tint).toBe(tint);
     await context.close();
