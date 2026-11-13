@@ -641,6 +641,27 @@ suite =
                         |> radiogroup "Look"
                         |> Query.findAll [ Selector.attribute (Attr.attribute "role" "radio") ]
                         |> Query.count (Expect.equal 3)
+            , test "an extra look is named in the main Look section without becoming a radio" <|
+                \_ ->
+                    let
+                        q =
+                            View.Appearance.view { blank | themeId = "tide" } |> Query.fromHtml
+
+                        current =
+                            q |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "appearance-current-look") ]
+                    in
+                    Expect.all
+                        [ \_ -> current |> Query.has [ Selector.text "Current look: ", Selector.text "Ocean · Tide", Selector.text " (chosen under Advanced, All looks)" ]
+                        , \_ -> current |> Query.findAll [ Selector.attribute (Attr.attribute "role" "radio") ] |> Query.count (Expect.equal 0)
+                        , \_ -> current |> Query.findAll [ Selector.attribute (Attr.tabindex 0) ] |> Query.count (Expect.equal 0)
+                        ]
+                        ()
+            , test "the current-look line stays put for a main look" <|
+                \_ ->
+                    View.Appearance.view { blank | themeId = "ocean" }
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "appearance-current-look") ]
+                        |> Query.has [ Selector.text "Ocean · Dark" ]
             ]
         , describe "appearance wiring"
             [ test "quiet-hours and translation selects have linked labels" <|

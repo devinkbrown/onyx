@@ -656,8 +656,8 @@ html, body {
 .onyx-composer-error { margin: 0; font-size: 12px; color: var(--onyx-warn); }
 
 .runtime-services { padding: 12px 16px 20px; }
-.runtime-services-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.runtime-services-actions > button { min-height: 40px; }
+.runtime-services-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.runtime-services-actions > button { min-height: 40px; width: 100%; text-align: start; padding-inline: 12px; }
 
 .onyx-composer button {
   background: var(--onyx-accent);
@@ -2134,7 +2134,6 @@ html, body {
 .onyx-rail-time { flex: none; color: var(--onyx-faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .onyx-rail-conversation .onyx-rail-avatar { flex: none; }
 .onyx-rail-unread { border-radius: var(--r-pill); }
-.onyx-rail-mention::before { content: "@ "; }
 .onyx-rail-filters { gap: 6px; }
 
 /* ---- Composer: one row, growing field, quiet context strip. ---- */
@@ -2238,6 +2237,9 @@ html, body {
   .onyx-shell .onyx-composer .onyx-reading-bar > button { min-height: var(--hit) !important; }
   .onyx-shell .onyx-thread-pane .onyx-earlier-button, .onyx-shell .onyx-thread-pane .onyx-latest-button { min-height: var(--hit) !important; }
   .onyx-shell .onyx-advanced-server > summary, .onyx-shell #advanced-panel summary { display: flex; align-items: center; min-height: var(--hit); }
+  /* display:flex drops the native ::marker; draw the disclosure arrow back. */
+  .onyx-shell .onyx-advanced-server > summary::before, .onyx-shell #advanced-panel summary::before { content: "\25B8"; flex: none; margin-inline-end: 8px; transition: transform .15s; }
+  .onyx-shell .onyx-advanced-server[open] > summary::before, .onyx-shell #advanced-panel details[open] > summary::before { transform: rotate(90deg); }
   .onyx-shell .pins-ledger, .onyx-shell .shell-ribbon-stats { display: inline-flex; align-items: center; min-height: var(--hit); padding-inline: 8px; }
   .onyx-shell .chb-join, .onyx-shell .chb-actions > * { min-width: var(--hit); }
 }
@@ -2267,7 +2269,12 @@ html, body {
 }
 :root[data-theme="contrast"] { --onyx-line: #8a8a8a; --onyx-line-strong: #ffffff; --onyx-focus: #ffffff; }
 :root[data-theme="contrast"] .onyx-shell :where(button, input, textarea, select) { border-width: 2px; }
-@media (hover: none), (max-width: 60rem) { .onyx-shell .guest-claim-chip { min-height: var(--hit); height: auto; max-height: none; padding-block: 2px; } }
+/* Phones: 44px resting height (within the 8% docked-strip budget), still grows at zoom. */
+@media (hover: none), (max-width: 60rem) {
+  .onyx-shell .guest-claim-chip { min-height: var(--hit); height: auto; max-height: none; padding-block: 0; border-block-width: 0; border-inline-width: 0; border-radius: 0; box-shadow: inset 0 1px 0 var(--onyx-line); }
+  /* The gold fill is inset (~34px pill) while the hit box stays 44px. */
+  .onyx-shell .guest-claim-chip__keep { border-width: 5px 0; border-style: solid; border-color: transparent; background-clip: padding-box; border-radius: 11px; }
+}
 
 /* Phones: the gem (no wordmark) marks the brand on Home and the collection
    pages, where there is no icon rail and no back control. */
@@ -2277,6 +2284,9 @@ html, body {
 }
 /* Long author names wrap in place instead of dropping under the floated avatar. */
 .onyx-shell .onyx-row-head .onyx-sender { display: inline; max-width: 100%; white-space: normal; overflow-wrap: anywhere; vertical-align: baseline; }
+/* Touch: the blanket 44px button minimum would make the name line 44px tall.
+   Padding keeps a ~44px hit area; the negative margin cancels it in layout. */
+@media (max-width: 60rem) { .onyx-shell .onyx-row-head .onyx-sender { min-height: 0; padding-block: 12px; margin-block: -12px; } }
 @media (min-width: 60.01rem) { .onyx-shell .guest-claim-chip { width: 256px; } }
 /* Persistent call bar (every shell page but the Calls hub). */
 .onyx-call-bar { display: flex; align-items: center; gap: var(--sp-2); min-height: 40px; padding: 4px var(--sp-4); background: color-mix(in srgb, var(--onyx-ok) 14%, var(--onyx-panel)); border-bottom: 1px solid var(--onyx-line); font-size: var(--fs-sm); }
@@ -2320,4 +2330,9 @@ html, body {
 }
 
 /* ?ws= pinned to a non-Onyx server: shown above sign-in password fields. */
-.onyx-custom-server-warning { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--onyx-warn); border-radius: var(--r-sm, 6px); color: var(--onyx-text); background: var(--onyx-panel-2); overflow-wrap: anywhere; }
+.onyx-custom-server-warning { margin: 0 0 8px; padding: 10px 12px; border: 1px solid var(--onyx-warn); border-radius: 8px; font-size: 13px; line-height: 1.5; color: var(--onyx-text); background: var(--onyx-panel-2); overflow-wrap: anywhere; }
+
+/* Desktop keep-name card is fixed over the rail's bottom: reserve room so
+   the last conversation rows can scroll clear of it. */
+@media (min-width: 60.01rem) { .onyx-shell:has(.guest-claim-chip) .onyx-rail { padding-bottom: 88px; } }
+@media (prefers-reduced-motion: reduce) { .onyx-shell .onyx-advanced-server > summary::before, .onyx-shell #advanced-panel summary::before { transition: none; } }

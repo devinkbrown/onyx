@@ -43,7 +43,7 @@ test.describe('elm redesign', () => {
   test('masthead menu toggles and closes on Escape', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/about/');
-    const toggle = page.getByRole('button', { name: /navigation menu/ });
+    const toggle = page.getByRole('button', { name: /navigation menu/i });
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await toggle.click();

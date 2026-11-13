@@ -539,17 +539,18 @@ suite =
                 query { blank | activeChannel = Just "#c", composerError = Just "Unblock them on this device to send a message." }
                     |> Query.find [ Selector.class "onyx-composer-error" ]
                     |> Query.has [ Selector.text "Unblock them on this device to send a message." ]
-        , test "composer without a channel stays disabled" <|
+        , test "no composer or roster renders without a channel" <|
             \_ ->
                 let
                     q =
                         query blank
                 in
-                Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Choose a conversation") ] q
-                    |> Query.has
-                        [ Selector.attribute (Attr.placeholder "Choose a conversation")
-                        , Selector.disabled True
-                        ]
+                Expect.all
+                    [ \_ -> Query.findAll [ Selector.id "onyx-composer-input" ] q |> Query.count (Expect.equal 0)
+                    , \_ -> Query.findAll [ Selector.id "client-members" ] q |> Query.count (Expect.equal 0)
+                    , \_ -> Query.has [ Selector.class "onyx-main-no-convo" ] q
+                    ]
+                    ()
         , test "thread renders folded message bodies" <|
             \_ ->
                 query channelModel
@@ -4052,7 +4053,7 @@ suite =
 
                                 _ ->
                                     Expect.fail "Expected valid scheduled observation owner generations"
-            , test "composer send-later disables with reason and opens the picker" <|
+            , test "composer send-later is absent without a target and opens the picker" <|
                 \_ ->
                     let
                         noTarget =
@@ -4069,8 +4070,9 @@ suite =
                     in
                     Expect.all
                         [ \_ ->
-                            Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Send later" ] ] noTarget
-                                |> Query.has [ Selector.disabled True, Selector.attribute (Attr.title "Choose a room or message to schedule.") ]
+                            -- No conversation open: no composer at all, so no Send later.
+                            Query.findAll [ Selector.tag "button", Selector.containing [ Selector.text "Send later" ] ] noTarget
+                                |> Query.count (Expect.equal 0)
                         , \_ ->
                             Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Send later" ] ] ready
                                 |> Event.simulate Event.click

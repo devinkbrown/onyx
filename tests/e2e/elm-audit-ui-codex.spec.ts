@@ -85,7 +85,8 @@ test('back/forward does not move focus to the page main', async ({ page }) => {
   await page.goto('/about/');
   await page.locator('.site-foot').getByRole('link', { name: 'Download', exact: true }).click();
   await expect(page.locator('#site-main')).toBeFocused();
-  await page.locator('body').evaluate(element => (element as HTMLElement).focus());
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect(page.locator('#site-main')).not.toBeFocused();
   await page.goBack();
   await expect(page.getByTestId('route-announcer')).toHaveText('Rooms for people you already like.');
   await expect(page.locator('#site-main')).not.toBeFocused();

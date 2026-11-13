@@ -270,17 +270,41 @@ shellColumn model =
                         ]
 
                  else
+                    let
+                        -- Only an open room has members, rules and invites;
+                        -- with no conversation (or a DM) the third column
+                        -- and the composer would be empty chrome.
+                        hasConvo =
+                            model.activeChannel /= Nothing
+
+                        isRoom =
+                            Maybe.map (App.isChannelName model) model.activeChannel == Just True
+                    in
                     main_
                         [ id "onyx-main", tabindex -1, class "onyx-main"
                         , classList
                             [ ( "onyx-main-rooms-open", model.clientRoomsOpen )
                             , ( "onyx-main-members-open", model.clientMembersOpen )
                             , ( "onyx-main-advanced", model.advancedOpen )
+                            , ( "onyx-main-no-convo", not hasConvo )
+                            , ( "onyx-main-dm", hasConvo && not isRoom )
                             ]
                         ]
                         [ rail model
-                        , div [ class "onyx-convo" ] [ View.RoomHeader.roomHeader model, thread model, composer model ]
-                        , roster model
+                        , div [ class "onyx-convo" ]
+                            [ View.RoomHeader.roomHeader model
+                            , thread model
+                            , if hasConvo then
+                                composer model
+
+                              else
+                                text ""
+                            ]
+                        , if isRoom then
+                            roster model
+
+                          else
+                            text ""
                         , advancedPanel model
                         ]
                , toaster model

@@ -239,7 +239,7 @@ fields model current busy hasError =
     case current.mode of
         Guest ->
             [ nameField "Display name"
-                ("Optional. Leave it blank to keep " ++ String.trim model.ourNick ++ ".")
+                ("Optional. Leave it blank to keep \u{201C}" ++ String.trim model.ourNick ++ "\u{201D}.")
                 "nickname"
             , field
                 { id_ = "connect-room"

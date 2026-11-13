@@ -87,6 +87,19 @@ view model =
 
         dirty =
             backgroundDirty model
+
+        -- A stable, non-radio line: always present, so selecting a look
+        -- never moves chips or focus, yet an extra look picked under
+        -- Advanced is still visible from the main Look section.
+        currentLookInMain =
+            List.member model.themeId lookIds
+
+        currentLookLabel =
+            (List.map (\entry -> ( entry.id, entry.label )) looks ++ List.map (\item -> ( item.id, item.label )) allLookItems)
+                |> List.filter (\( lookId, _ ) -> lookId == model.themeId)
+                |> List.head
+                |> Maybe.map Tuple.second
+                |> Maybe.withDefault model.themeId
     in
     main_ [ class "ap" ]
         [ div
@@ -117,6 +130,17 @@ view model =
                 [ h2 [ class "ap-glabel" ] [ text "Look" ]
                 , div [ class "ap-chips", attribute "role" "radiogroup", attribute "aria-label" "Look" ]
                     (List.map (lookChip model lookTabbable lookIds) looks)
+                , p [ class "ap-ghint ap-current-look", attribute "data-testid" "appearance-current-look" ]
+                    [ text "Current look: "
+                    , b [] [ text currentLookLabel ]
+                    , text
+                        (if currentLookInMain then
+                            ""
+
+                         else
+                            " (chosen under Advanced, All looks)"
+                        )
+                    ]
                 ]
             , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Text size" ]

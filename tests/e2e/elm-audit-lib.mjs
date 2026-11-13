@@ -45,6 +45,8 @@ export function auditPage(phone) {
     for (const el of document.querySelectorAll(interactive)) {
       if (!visible(el)) continue;
       if (el.closest('p, .onyx-body, .onyx-message, .onyx-msg-body, .site-prose')) continue;
+      // Visually hidden until focused (skip links): not a resting touch target.
+      if (getComputedStyle(el).clip === 'rect(0px, 0px, 0px, 0px)') continue;
       const r = el.getBoundingClientRect();
       if (r.width < 44 || r.height < 44) out.smallTargets.push(`${Math.round(r.width)}x${Math.round(r.height)} ${path(el)} "${name(el).slice(0, 40)}"`);
     }

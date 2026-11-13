@@ -104,7 +104,7 @@ rail model =
         , attribute "data-collection" collection
         ]
         ([ div [ class "onyx-rail-heading" ]
-            [ h2 [] [ text title ]
+            [ h2 [ id "rail-title" ] [ text title ]
             , span [ class "onyx-rail-total", attribute "aria-label" (countLabel shownTotal "conversation") ]
                 [ text (String.fromInt shownTotal) ]
             ]
@@ -139,19 +139,19 @@ rail model =
                     []
                )
             ++ (if showRooms && not (List.isEmpty favorites) then
-                    [ conversationGroup model "rail-favorites-heading" "Favorites" favorites "" ]
+                    [ conversationGroup model True "rail-favorites-heading" "Favorites" favorites "" ]
 
                 else
                     []
                )
             ++ (if showRooms && not (filtering && List.isEmpty rooms) then
-                    [ conversationGroup model "rail-rooms-heading" "Rooms" rooms (emptyRooms model) ]
+                    [ conversationGroup model (collection /= "rooms" || not (List.isEmpty favorites)) "rail-rooms-heading" "Rooms" rooms (emptyRooms model) ]
 
                 else
                     []
                )
             ++ (if showDirect && not (filtering && List.isEmpty directMessages) then
-                    [ conversationGroup model "rail-direct-heading" "Direct messages" directMessages
+                    [ conversationGroup model (collection /= "messages") "rail-direct-heading" "Direct messages" directMessages
                         "Your direct conversations will appear here."
                     ]
 
@@ -203,19 +203,34 @@ filterEmptyCopy filter =
             ""
 
 
-conversationGroup : Model -> String -> String -> List Channel -> String -> Html Msg
-conversationGroup model headingId label conversations emptyLabel =
+{-| `showHeading` is False when the group is the only one in a single-type
+collection: the panel title already names it, so the list borrows that
+title as its accessible name instead of repeating it visibly. -}
+conversationGroup : Model -> Bool -> String -> String -> List Channel -> String -> Html Msg
+conversationGroup model showHeading headingId label conversations emptyLabel =
     div [ class "onyx-rail-group" ]
-        [ h3 [ id headingId ]
-            [ text label
-            , span [ class "onyx-rail-group-count", attribute "aria-hidden" "true" ]
-                [ text (String.fromInt (List.length conversations)) ]
-            ]
+        [ if showHeading then
+            h3 [ id headingId ]
+                [ text label
+                , span [ class "onyx-rail-group-count", attribute "aria-hidden" "true" ]
+                    [ text (String.fromInt (List.length conversations)) ]
+                ]
+
+          else
+            text ""
         , if List.isEmpty conversations then
             p [ class "onyx-rail-empty" ] [ text emptyLabel ]
 
           else
-            ul [ attribute "aria-labelledby" headingId ]
+            ul
+                [ attribute "aria-labelledby"
+                    (if showHeading then
+                        headingId
+
+                     else
+                        "rail-title"
+                    )
+                ]
                 (List.map (railItem model) conversations)
         ]
 

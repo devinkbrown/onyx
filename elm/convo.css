@@ -218,13 +218,15 @@
   gap: 8px;
   align-items: center;
 }
-.onyx-room-details .onyx-topic-tools { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.onyx-room-details .onyx-topic-tools { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 10px; }
 .onyx-room-details .shell-topic-create-input { flex: 1 1 12rem; min-width: 0; min-height: 40px; }
 .onyx-room-details button { min-height: 40px; padding: 8px 12px; border-radius: 8px; }
 .onyx-room-details button[aria-pressed="true"] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
 .onyx-shell .onyx-room-primary { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; }
 .onyx-room-details .onyx-history-policy { margin: 0 0 8px; color: var(--onyx-dim); line-height: 1.5; }
-.onyx-room-details-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+/* Done stays reachable: sticky at the scroller's bottom edge (offsets match the 16px panel padding). */
+.onyx-room-details-foot { position: sticky; bottom: -16px; z-index: 1; display: flex; justify-content: flex-end; margin: 16px -16px -16px; padding: 10px 16px; background: var(--onyx-panel); border-top: 1px solid var(--onyx-line); }
+.onyx-room-details .history-catch-up > button { flex: 1 1 10rem; }
 
 /* ── Transcript ────────────────────────────────────────────────────── */
 .onyx-thread-pane { padding: 8px 12px 12px; }
@@ -603,6 +605,8 @@
 }
 .notif-center__close:hover, .notif-center__dismiss:hover { background: var(--onyx-panel-2); color: var(--onyx-text); }
 .notif-center__dismiss .onyx-icon { width: 16px; height: 16px; }
+/* Always the last track: rows without an action leave the auto column empty (0px). */
+.notif-center__dismiss { grid-column: 3; }
 .notif-center__filters { display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--onyx-line); }
 .notif-center__filter {
   flex: none;
@@ -732,7 +736,7 @@ button.notif-center__open:hover { background: color-mix(in srgb, var(--onyx-text
   }
   .onyx-room-more .onyx-tool-label { position: static; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; }
   .onyx-room-more .onyx-tool-count { position: static; margin-left: auto; }
-  .onyx-room-details { left: 8px; right: 8px; width: auto; max-height: min(75dvh, 40rem); }
+  .onyx-room-details { left: 8px; right: 8px; width: auto; max-height: min(40rem, calc(100dvh - 240px)); }
 
   .onyx-thread-pane { padding: 4px 8px 8px; }
   .onyx-message { margin-top: 10px; padding: 3px 6px; }
@@ -803,6 +807,7 @@ button.notif-center__open:hover { background: color-mix(in srgb, var(--onyx-text
 .onyx-advanced-lede { margin: 0; padding: 12px 16px 0; color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
 .onyx-advanced .runtime-services { padding: 12px 16px 20px; }
 .onyx-advanced .runtime-services h2 { font-size: 13px; }
+.onyx-advanced .runtime-services > p { font-size: 13px; line-height: 1.5; color: var(--onyx-dim); margin: 4px 0 12px; }
 @media (max-width: 68.74rem) {
   .onyx-main.onyx-main-advanced { grid-template-columns: 280px minmax(0, 1fr); }
   .onyx-advanced {

@@ -92,18 +92,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-test('landing phone menu opens natively and masthead targets are 44px', async ({ page }) => {
+test('landing phone menu opens and masthead targets are 44px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/');
-  const summary = page.locator('.site-menu-details > summary');
-  await expect(summary).toBeVisible();
-  for (const target of [summary, page.locator('.site-mast .site-brand'), page.locator('.site-mast .site-mast-open')]) {
+  const toggle = page.locator('.site-menu-toggle');
+  await expect(toggle).toBeVisible();
+  for (const target of [toggle, page.locator('.site-mast .site-brand'), page.locator('.site-mast .site-mast-open')]) {
     const box = await target.boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(40);
   }
-  await summary.focus();
+  await toggle.focus();
   await page.keyboard.press('Enter');
-  const panel = page.getByRole('navigation', { name: 'Site menu' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const panel = page.locator('#public-primary-navigation.is-open');
   await expect(panel).toBeInViewport();
   await expect(panel.getByRole('link', { name: 'House rules' })).toBeVisible();
   const linkBox = await panel.getByRole('link', { name: 'About' }).boundingBox();
@@ -116,7 +117,7 @@ test('wide screens keep the primary pair inline and hide the menu toggle', async
   await expect(page.locator('.site-menu-toggle')).toBeHidden();
   await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Download' })).toBeVisible();
   await page.goto('/');
-  await expect(page.locator('.site-menu-details')).toBeHidden();
+  await expect(page.locator('.site-menu-toggle')).toBeHidden();
 });
 
 test('reduced motion disables transitions on public pages', async ({ browser }) => {

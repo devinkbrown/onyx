@@ -68,7 +68,7 @@ for (const width of [320, 390, 768]) {
     }
     const members = page.getByRole('button', { name: 'Members', exact: true });
     await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
-    await expect(page.getByText('A message that should remain readable on a phone.')).toBeInViewport();
+    await expect(page.getByText('A message that should remain readable on a phone.', { exact: true })).toBeInViewport();
     const connectionOpen = page.getByTestId('connection-open');
     await expect(connectionOpen).toHaveAccessibleName(/^(Connected|Connecting…|Offline), connection settings$/);
     await connectionOpen.click();
@@ -110,7 +110,7 @@ for (const width of [320, 390, 768]) {
     await page.setViewportSize({ width, height: 568 });
     await expect.poll(() => page.locator('.onyx-composer').evaluate(element => element.getBoundingClientRect().bottom))
       .toBeLessThanOrEqual(568);
-    await expect(page.getByText('A message that should remain readable on a phone.')).toBeInViewport();
+    await expect(page.getByText('A message that should remain readable on a phone.', { exact: true })).toBeInViewport();
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByRole('search', { name: 'Message search', exact: true })).toBeInViewport();
     await page.getByRole('searchbox', { name: 'Search messages' }).fill('message');

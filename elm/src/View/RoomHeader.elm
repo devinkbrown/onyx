@@ -344,6 +344,11 @@ details model channel isRoom =
         hasHistory =
             List.any (\cap -> cap == "chathistory" || cap == "draft/chathistory") model.caps
 
+        hasEphemeralPolicy =
+            Dict.get key model.props.channelProps
+                |> Maybe.andThen (Dict.get "EPHEMERAL")
+                |> (/=) Nothing
+
         busy =
             Set.member key model.historyLoading
 
@@ -381,12 +386,28 @@ details model channel isRoom =
             text ""
         , div [ class "onyx-room-section" ]
             [ h3Label "History"
-            , View.Thread.ephemeralPolicyNotice model channel.name
-            , View.Thread.retentionScopeNotice model channel.name
-            , div [ class "history-catch-up", attribute "role" "group", attribute "aria-label" "History catch-up" ]
-                [ button [ type_ "button", onClick ThreadCatchUp, disabled (offline || busy || not hasHistory) ] [ text "Check for newer messages" ]
-                , button [ type_ "button", onClick ThreadFillGaps, disabled (offline || busy || List.length channel.messages < 2 || not hasHistory) ] [ text "Fill gaps in history" ]
-                ]
+            , -- Without server history the catch-up controls and the generic
+              -- "older messages may not be available" line can never help;
+              -- the hint below is the only line shown (a room's own
+              -- EPHEMERAL policy still shows).
+              if hasHistory || hasEphemeralPolicy then
+                View.Thread.ephemeralPolicyNotice model channel.name
+
+              else
+                text ""
+            , if hasHistory then
+                View.Thread.retentionScopeNotice model channel.name
+
+              else
+                text ""
+            , if hasHistory then
+                div [ class "history-catch-up", attribute "role" "group", attribute "aria-label" "History catch-up" ]
+                    [ button [ type_ "button", onClick ThreadCatchUp, disabled (offline || busy) ] [ text "Check for newer messages" ]
+                    , button [ type_ "button", onClick ThreadFillGaps, disabled (offline || busy || List.length channel.messages < 2) ] [ text "Fill gaps in history" ]
+                    ]
+
+              else
+                text ""
             , p [ class "onyx-room-hint" ]
                 [ text
                     (if not hasHistory then

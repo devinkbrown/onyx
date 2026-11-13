@@ -164,6 +164,7 @@ for (const [name, run] of Object.entries(scenarios)) {
           const style = getComputedStyle(el);
           if (!r.width || !r.height || style.visibility === 'hidden' || r.bottom < 0 || r.top > innerHeight) continue;
           if (el.closest('.onyx-message, .onyx-body, p')) continue; // inline text links
+          if (style.clip === 'rect(0px, 0px, 0px, 0px)') continue; // visually hidden until focused (skip links)
           if (r.width < 44 || r.height < 44) found.push(`small target ${Math.round(r.width)}x${Math.round(r.height)} ${el.tagName.toLowerCase()} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)}"`);
         }
       }

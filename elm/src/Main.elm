@@ -1675,7 +1675,7 @@ perform key app outbound =
                 (Browser.Dom.focus elementId
                     |> Task.andThen
                         (\_ ->
-                            if elementId == "site-main" || elementId == "ap-title" then
+                            if elementId == "site-main" || elementId == "ap-title" || elementId == "connect-name" then
                                 Browser.Dom.setViewport 0 0
 
                             else

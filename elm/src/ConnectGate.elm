@@ -174,7 +174,7 @@ statusLine mode current reconnectIn =
         Ready ->
             case mode of
                 Guest ->
-                    "Connected. Choose a name, or leave it blank to keep the one you have."
+                    "Connected."
 
                 SignIn ->
                     "Connected. Enter your account details."

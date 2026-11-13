@@ -182,6 +182,10 @@
 
 .onyx-main { grid-template-columns: 280px minmax(0, 1fr) 240px; }
 .onyx-main-home { grid-template-columns: 280px minmax(0, 1fr); }
+/* No conversation open, or a DM: no members column to reserve. */
+@media (min-width: 68.75rem) {
+  .onyx-main:is(.onyx-main-no-convo, .onyx-main-dm):not(.onyx-main-advanced) { grid-template-columns: 280px minmax(0, 1fr); }
+}
 
 .onyx-convo {
   display: flex;
@@ -497,7 +501,8 @@
 
 @media (max-width: 360px) {
   .onyx-shell .onyx-room-bar { flex-wrap: wrap; }
-  .onyx-shell .onyx-room-id { flex-basis: 100%; }
-  .onyx-shell .onyx-room-topic { white-space: normal; overflow-wrap: anywhere; }
+  /* Summary and tools share one row; the bar only wraps when the tools
+     cannot fit beside a 7rem summary. */
+  .onyx-shell .onyx-room-id { flex: 1 1 7rem; min-width: 0; }
   .onyx-shell .onyx-room-tools { margin-left: auto; }
 }
