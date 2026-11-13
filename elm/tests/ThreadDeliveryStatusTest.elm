@@ -133,7 +133,7 @@ suite =
                     [ \_ ->
                         Query.has
                             [ Selector.text "Delivery outcome unknown"
-                            , Selector.attribute (Attr.attribute "aria-label" "Delivery outcome unknown. alice: uncertain body")
+                            , Selector.attribute (Attr.attribute "aria-label" ("Delivery outcome unknown. alice: uncertain body, " ++ App.formatRowClock threadModel.zone threadModel.prefs.clock 1))
                             , Selector.class "onyx-uncertain"
                             ]
                             unknown

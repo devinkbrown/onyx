@@ -2069,18 +2069,22 @@ html, body {
   transform: none;
 }
 .onyx-msg-menu-pop .onyx-msg-menu-item { display: flex; align-items: center; min-height: 36px; padding: 6px 10px; border-radius: var(--r-sm); font-size: var(--fs-md); color: var(--onyx-text); background: transparent; border: 0; text-align: left; text-decoration: none; cursor: pointer; }
-.onyx-msg-menu-pop .onyx-msg-menu-item:hover, .onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { background: var(--onyx-panel-2); outline: none; }
-.onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { box-shadow: inset 0 0 0 2px var(--onyx-focus); }
+.onyx-msg-menu-pop .onyx-msg-menu-item:hover, .onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { background: var(--onyx-panel-2); }
+/* A real outline (not a box-shadow) so the ring survives forced colors. */
+.onyx-msg-menu-pop .onyx-msg-menu-item:focus-visible { outline: 2px solid var(--onyx-focus); outline-offset: -2px; }
 .onyx-msg-menu-pop .onyx-msg-menu-item--danger { color: var(--onyx-bad); }
 .onyx-msg-menu-quick { display: flex; gap: 4px; justify-content: space-between; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--onyx-line); }
 .onyx-msg-menu-emoji { flex: 1 1 0; min-height: 40px; font-size: 20px; line-height: 1; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.onyx-msg-menu-emoji:hover, .onyx-msg-menu-emoji:focus-visible { background: var(--onyx-panel-2); outline: none; box-shadow: inset 0 0 0 2px var(--onyx-focus); }
+.onyx-msg-menu-emoji:hover, .onyx-msg-menu-emoji:focus-visible { background: var(--onyx-panel-2); }
+.onyx-msg-menu-emoji:focus-visible { outline: 2px solid var(--onyx-focus); outline-offset: -2px; }
 .onyx-msg-menu-delete-confirm { padding: var(--sp-2); }
 .onyx-msg-menu-delete-confirm-title { margin: 0 0 4px; font-weight: 650; }
 .onyx-msg-menu-delete-confirm-copy { margin: 0 0 var(--sp-3); color: var(--onyx-dim); font-size: var(--fs-sm); }
 .onyx-msg-menu-delete-confirm-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 .onyx-msg-menu-delete-confirm-actions button { min-height: 36px; padding: 0 var(--sp-3); border-radius: var(--r-sm); border: 1px solid var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-text); cursor: pointer; }
-.onyx-msg-menu-delete-confirm-delete { background: var(--onyx-bad) !important; border-color: var(--onyx-bad) !important; color: #fff !important; }
+/* Ink is the page ground: dark on the bright dark-look danger fill, light
+   on the deep light-look one (>= 4.5:1 both ways; #fff was ~3.9:1 on dark). */
+.onyx-msg-menu-delete-confirm-delete { background: var(--onyx-bad) !important; border-color: var(--onyx-bad) !important; color: var(--onyx-bg) !important; font-weight: 650; }
 @media (hover: none), (max-width: 60rem) {
   .onyx-msg-menu-pop > .onyx-msg-menu-backdrop { background: var(--onyx-veil); }
   .onyx-msg-menu-pop > .onyx-msg-menu, .onyx-msg-menu-pop--anchored > .onyx-msg-menu {
@@ -2170,7 +2174,7 @@ html, body {
 .onyx-primary-nav-mark:focus-visible { outline: 2px solid var(--onyx-focus); outline-offset: 2px; }
 
 /* ---- Keep-name prompt: a compact card, not a shell-wide strip ---- */
-.onyx-shell .guest-claim-chip { align-items: center; gap: var(--sp-2); min-height: 0; max-height: 56px; padding: 6px var(--sp-3); font-size: var(--fs-sm); }
+.onyx-shell .guest-claim-chip { align-items: center; gap: var(--sp-2); min-height: 0; max-height: none; padding: 6px var(--sp-3); font-size: var(--fs-sm); }
 @media (min-width: 60.01rem) { .onyx-shell .guest-claim-chip { position: fixed; right: var(--sp-4); bottom: var(--sp-4); z-index: 30; width: min(360px, calc(100vw - 32px)); border: 1px solid var(--onyx-line); border-radius: var(--r-md); background: var(--onyx-panel); box-shadow: var(--el-2); } }
 
 /* ---- Touch targets: close buttons in sheets, checkbox rows, faces ---- */
@@ -2188,17 +2192,20 @@ html, body {
 .onyx-shell .onyx-convo .onyx-composer > div.shell-composer-context { order: 0; }
 .onyx-shell .onyx-msg-menu-trigger:focus-visible { opacity: 1; outline: 2px solid var(--onyx-focus); outline-offset: 1px; }
 @media (hover: none) {
-  /* Touch: the trigger is always there (quiet), 36px, at the row's top-right. */
-  .onyx-shell .onyx-msg-menu-trigger { display: inline-grid !important; opacity: 0.55; width: 36px; height: 36px; margin: -2px 0 0 6px; }
+  /* Touch: the trigger is always there (quiet), one compact square target
+     (--hit-compact) at the row's top-right; long-press opens the menu too. */
+  .onyx-shell .onyx-msg-menu-trigger { opacity: 0.55; }
+  .onyx-shell .onyx-message .onyx-msg-menu-trigger { width: var(--hit-compact); height: var(--hit-compact); margin: -2px 0 0 6px; }
   .onyx-shell .onyx-message:focus-within .onyx-msg-menu-trigger, .onyx-shell .onyx-msg-menu-trigger[aria-expanded="true"] { opacity: 1; }
 }
-.onyx-shell .guest-claim-chip { box-sizing: border-box; height: 48px; max-height: 48px; padding: 0 var(--sp-3); overflow: hidden; }
+/* min-height, never a fixed height with clipping: the copy must reflow at zoom. */
+.onyx-shell .guest-claim-chip { box-sizing: border-box; min-height: 48px; height: auto; max-height: none; padding: 4px var(--sp-3); flex-wrap: wrap; }
 .onyx-shell .guest-claim-chip__keep, .onyx-shell .guest-claim-chip__dismiss { min-height: 36px; }
 
 /* ---- Touch-target sweep (phones / touch) ---- */
 @media (hover: none), (max-width: 60rem) {
   .onyx-shell .guest-claim-chip__keep, .onyx-shell .guest-claim-chip__dismiss { min-height: var(--hit); min-width: var(--hit); }
-  .onyx-shell .guest-claim-chip { height: auto; max-height: 56px; }
+  .onyx-shell .guest-claim-chip { height: auto; max-height: none; }
   .onyx-shell .onyx-message-search__button, .onyx-shell .onyx-message-search__recall-chip, .onyx-shell .onyx-message-search__vault-mode { min-width: var(--hit); min-height: var(--hit); }
   .onyx-shell .onyx-reading-bar button, .onyx-shell .onyx-earlier-button, .onyx-shell .onyx-latest-button { min-height: var(--hit); }
   .onyx-shell .onyx-profile-pop .onyx-member-actions .onyx-member-action, .onyx-shell .onyx-profile-pop .onyx-profile-close { min-height: var(--hit); min-width: var(--hit); }
@@ -2220,9 +2227,6 @@ html, body {
 
 /* ---- Fix-pass: specificity follow-ups ---- */
 .onyx-shell .onyx-msg-menu-trigger:focus { box-shadow: 0 0 0 2px var(--onyx-focus); outline: 2px solid var(--onyx-focus) !important; }
-@media (hover: none) {
-  .onyx-shell .onyx-message .onyx-msg-menu-trigger { width: 32px !important; height: 28px !important; margin: -1px 0 0 6px !important; }
-}
 @media (min-width: 60.01rem) {
   /* Desktop keep-name card sits over the rail's quiet bottom, never over the composer. */
   .onyx-shell .guest-claim-chip { left: 72px; right: auto; width: 296px; }
@@ -2260,7 +2264,7 @@ html, body {
 }
 :root[data-theme="contrast"] { --onyx-line: #8a8a8a; --onyx-line-strong: #ffffff; --onyx-focus: #ffffff; }
 :root[data-theme="contrast"] .onyx-shell :where(button, input, textarea, select) { border-width: 2px; }
-@media (hover: none), (max-width: 60rem) { .onyx-shell .guest-claim-chip { height: 44px; max-height: 44px; padding-block: 0; } }
+@media (hover: none), (max-width: 60rem) { .onyx-shell .guest-claim-chip { min-height: var(--hit); height: auto; max-height: none; padding-block: 2px; } }
 
 /* Phones: the gem (no wordmark) marks the brand on Home and the collection
    pages, where there is no icon rail and no back control. */

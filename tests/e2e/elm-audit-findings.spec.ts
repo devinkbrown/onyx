@@ -167,7 +167,8 @@ test('P1-4 the message menu is not clipped by the transcript and reads plainly',
   // It is layered, not pushing the transcript: the thread pane keeps its scroll height.
   const clipped = await menu.evaluate(el => { const pane = el.closest('.onyx-thread-pane') as HTMLElement | null; if (!pane) return false; const pr = pane.getBoundingClientRect(); const mr = el.getBoundingClientRect(); return mr.top < pr.top || mr.bottom > pr.bottom; });
   expect.soft(clipped, 'menu not clipped by the scroll container').toBeFalsy();
-  const items = await menu.getByRole('menuitem').allTextContents();
+  // Quick-reaction emoji are menu items too (arrow-key roster); count the text actions.
+  const items = await menu.locator('[role="menuitem"]:not(.onyx-msg-menu-emoji)').allTextContents();
   expect.soft(items.length, 'a short primary menu (more behind "More…")').toBeLessThanOrEqual(8);
   expect.soft(items.join(' | '), 'no protocol jargon in the primary menu').not.toMatch(/ledger|moment link|server-history|Start topic from here/i);
   if (!isPhone(info)) {

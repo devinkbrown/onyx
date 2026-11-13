@@ -3191,6 +3191,7 @@ type Msg
     | ThreadCatchUp
     | ThreadFillGaps
     | ThreadJumpUnread
+    | ThreadSkipToComposer
     | NavigationLoaded Decode.Value
     | DeviceSlotsLoaded Decode.Value
     | SearchOpenHistory
@@ -45286,6 +45287,11 @@ updateRaw msg initialModel =
 
         ThreadShowLatest ->
             ( resumeLatestReading model, [] )
+
+        ThreadSkipToComposer ->
+            -- Keyboard skip link above the transcript: one hop past
+            -- every row's tab stops to the message field.
+            ( model, [ FocusElement "onyx-composer-input" ] )
 
         ThreadJumpUnread ->
             case model.activeChannel of

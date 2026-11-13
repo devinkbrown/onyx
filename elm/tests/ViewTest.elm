@@ -606,7 +606,7 @@ suite =
                 in
                 query sameOrigin
                     |> Query.find [ Selector.class "shell-msg-media-open" ]
-                    |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open image") ]
+                    |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open image a.png") ]
         , test "inline media unfurl defers cross-origin video behind consent" <|
             \_ ->
                 let
@@ -1149,7 +1149,7 @@ suite =
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "shell-msg-lightbox-dialog" ]
-                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Image") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Image: a.png") ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "shell-msg-lightbox-save" ]
@@ -1213,7 +1213,7 @@ suite =
                     , \_ ->
                         query allowed
                             |> Query.find [ Selector.tag "video" ]
-                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Attached video") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Attached video v.mp4") ]
                     ]
                     ()
         , test "attached audio never unfurls inline" <|

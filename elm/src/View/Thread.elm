@@ -21,6 +21,7 @@ import Prefs
 import Time
 import Translate
 import Upload
+import Url
 
 
 homeCoach : Model -> Html Msg
@@ -106,7 +107,8 @@ thread model =
                                     dayDividerLabels model chronological win.start win.rendered
                             in
                             div [ class "onyx-transcript" ]
-                                [ case dividerId of
+                                [ skipToComposer
+                                , case dividerId of
                                     Just _ ->
                                         -- A sticky pill over the transcript (the
                                         -- tools that used to sit here live in the
@@ -158,25 +160,28 @@ thread model =
                                 , Keyed.ul [ class "onyx-thread", attribute "aria-label" ("Messages in " ++ channel.name), Html.Events.preventDefaultOn "contextmenu" (rowMenuDecoder channel.name) ]
                                     (List.concatMap
                                         (\( ( prev, m ), label ) ->
-                                            [ ( threadChildKey conversationKey "divider" m.id
-                                              , dividerAbove dividerId label m
-                                              )
-                                            , ( threadChildKey conversationKey "message" m.id
-                                              , messageRow model channel.name prev parents m
-                                              )
-                                            ]
+                                            dividersAbove conversationKey dividerId label m
+                                                ++ [ ( threadChildKey conversationKey "message" m.id
+                                                     , messageRow model channel.name prev parents m
+                                                     )
+                                                   ]
                                         )
                                         (List.map2 Tuple.pair
                                             (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
                                             dayLabels
                                         )
                                     )
-                                , case App.typingLine model channel.name of
-                                    Nothing ->
-                                        text ""
+                                , -- Always mounted (an empty polite status), so the
+                                  -- first "is typing" is announced instead of being
+                                  -- inserted together with its live region.
+                                  div [ class "onyx-typing", attribute "role" "status", attribute "aria-live" "polite", attribute "data-testid" "typing-status" ]
+                                    (case App.typingLine model channel.name of
+                                        Nothing ->
+                                            []
 
-                                    Just line ->
-                                        div [ class "onyx-typing", attribute "aria-live" "polite" ] [ text line ]
+                                        Just line ->
+                                            [ text line ]
+                                    )
                                 , if win.hiddenAfter > 0 then
                                     div [ class "onyx-latest" ]
                                         [ button
@@ -190,8 +195,124 @@ thread model =
                                   else
                                     text ""
                                 ]
+        , incomingAnnouncer model
         , mediaLightboxDialog model
         , threadPanelDialog model
+        ]
+
+
+{-| Keyboard skip link above the transcript: every row carries its own
+tab stops (sender, actions), so one hop jumps past them to the message
+field. A button, not an `a href="#…"`, so the application's link
+interception never turns it into a navigation. -}
+skipToComposer : Html Msg
+skipToComposer =
+    button
+        [ type_ "button"
+        , class "onyx-skip-composer"
+        , attribute "data-testid" "skip-to-composer"
+        , onClick App.ThreadSkipToComposer
+        ]
+        [ text "Skip to message composer" ]
+
+
+{-| How recent an incoming row must be to be announced: older rows are
+history (backfill, a fresh join's replay), never news. -}
+announceWindowMs : Float
+announceWindowMs =
+    120000
+
+
+{-| Longest announcement (sender plus body) the live region reads. -}
+announceMaxChars : Int
+announceMaxChars =
+    160
+
+
+{-| The newest message from someone else in the active conversation,
+as the polite announcement text ("nick: body"), or "" when there is
+nothing to announce: own echoes, pending rows, system events,
+withdrawn or ignored rows, and anything older than the announce
+window stay silent. Derived from the model, so a re-render with the
+same newest row leaves the text (and the screen reader) alone, and
+history prepends never change it. Edited rows stay silent so an edit
+to the newest row is not read out as a new message; nothing is
+announced until the clock has ticked once. -}
+incomingAnnouncement : Model -> String
+incomingAnnouncement model =
+    case model.activeChannel |> Maybe.andThen (\name -> Dict.get (String.toLower name) model.channels) of
+        Nothing ->
+            ""
+
+        Just channel ->
+            -- `channel.messages` is newest-first; the visible rows are
+            -- chronological and already drop topic-filtered and
+            -- collapsed rows, so the newest row on screen is their last.
+            case App.threadVisibleRows model channel |> List.reverse |> List.head of
+                Nothing ->
+                    ""
+
+                Just m ->
+                    let
+                        sender =
+                            String.toLower (String.trim m.from)
+
+                        recent =
+                            -- No clock yet (before the first Tick) means a
+                            -- restored conversation is replaying: stay silent.
+                            model.nowMs > 0 && toFloat m.at >= model.nowMs - announceWindowMs
+
+                        silent =
+                            isSystemRow m
+                                || sender == String.toLower model.ourNick
+                                || String.isEmpty sender
+                                || m.pending
+                                || m.outboxId /= Nothing
+                                || m.deleted
+                                || m.redacted
+                                || m.edited
+                                || Set.member sender model.ignoredUsers
+                                || Set.member sender model.collapsedNicks
+                                || not recent
+                    in
+                    if silent then
+                        ""
+
+                    else
+                        let
+                            full =
+                                m.from ++ ": " ++ String.trim (App.displayBody m)
+                        in
+                        if String.length full > announceMaxChars then
+                            String.left (announceMaxChars - 1) full ++ "…"
+
+                        else
+                            full
+
+
+{-| Visually hidden polite status for incoming messages. Keyed by the
+conversation so switching rooms mounts a fresh region (whose initial
+text is not read) instead of announcing the other room's last row. -}
+incomingAnnouncer : Model -> Html Msg
+incomingAnnouncer model =
+    Keyed.node "div"
+        [ class "onyx-announcer-host" ]
+        [ ( "announce:" ++ String.toLower (Maybe.withDefault "" model.activeChannel)
+          , div
+                [ class "sr-only onyx-incoming-announcer"
+                , attribute "role" "status"
+                , attribute "aria-live" "polite"
+                , attribute "aria-atomic" "true"
+                , attribute "data-testid" "incoming-announcer"
+                ]
+                (case incomingAnnouncement model of
+                    "" ->
+                        []
+
+                    line ->
+                        [ text line ]
+                )
+          )
         ]
 
 
@@ -1006,37 +1127,51 @@ facepileFace channel entry =
         ]
 
 
-dividerAbove : Maybe Int -> Maybe String -> App.ChatMessage -> Html Msg
-dividerAbove dividerId dayLabel m =
-    div []
-        [ case dayLabel of
-            Nothing ->
-                text ""
+{-| Day and unread dividers above one row, as keyed list items (every
+child of the transcript list is an `li`; the separator role and the
+existing divider classes sit on the inner element). Rows with no
+divider contribute nothing. -}
+dividersAbove : String -> Maybe Int -> Maybe String -> App.ChatMessage -> List ( String, Html Msg )
+dividersAbove conversationKey dividerId dayLabel m =
+    (case dayLabel of
+        Nothing ->
+            []
 
-            Just label ->
-                div
-                    [ class "onyx-day-divider"
-                    , attribute "role" "separator"
-                    , attribute "aria-label" label
-                    ]
-                    [ span [ class "onyx-day-divider-label" ] [ text label ] ]
-        , case dividerId of
-            Just boundary ->
-                if m.id == boundary then
-                    div
-                        [ class "onyx-unread-divider"
+        Just label ->
+            [ ( threadChildKey conversationKey "day" m.id
+              , li [ class "onyx-divider-item onyx-divider-item--day" ]
+                    [ div
+                        [ class "onyx-day-divider"
                         , attribute "role" "separator"
-                        , attribute "aria-label" "New messages"
-                        , attribute "tabindex" "-1"
+                        , attribute "aria-label" label
                         ]
-                        [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
+                        [ span [ class "onyx-day-divider-label" ] [ text label ] ]
+                    ]
+              )
+            ]
+    )
+        ++ (case dividerId of
+                Just boundary ->
+                    if m.id == boundary then
+                        [ ( threadChildKey conversationKey "divider" m.id
+                          , li [ class "onyx-divider-item onyx-divider-item--unread" ]
+                                [ div
+                                    [ class "onyx-unread-divider"
+                                    , attribute "role" "separator"
+                                    , attribute "aria-label" "New messages"
+                                    , attribute "tabindex" "-1"
+                                    ]
+                                    [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
+                                ]
+                          )
+                        ]
 
-                else
-                    text ""
+                    else
+                        []
 
-            Nothing ->
-                text ""
-        ]
+                Nothing ->
+                    []
+           )
 
 
 {-| Calendar day in the message clock zone (mirroring the
@@ -1272,7 +1407,7 @@ messageRow model target prev parents m =
                    )
 
         accessibleLabel =
-            App.messageAccessibleLabelFor model m
+            App.messageAccessibleLabelFor model m ++ rowTimeLabel model m
 
         withdrawn =
             m.deleted || m.redacted
@@ -1289,13 +1424,13 @@ messageRow model target prev parents m =
             menuMsgid model target m
     in
     if isSystemRow m then
-        div
+        li
             [ class "onyx-system"
             , attribute "data-event" m.msgType
             , attribute "data-message-id" (String.fromInt m.id)
             , attribute "role" "article"
             , attribute "tabindex" "-1"
-            , attribute "aria-label" m.body
+            , attribute "aria-label" (m.body ++ rowTimeLabel model m)
             ]
             [ text m.body ]
 
@@ -1404,6 +1539,17 @@ messageRow model target prev parents m =
             , boostBar model target m
             , threadIndicator target parents m
             ]
+
+
+{-| The row clock for the accessible row label (the visible `time`
+stays decorative, so it is not read twice). -}
+rowTimeLabel : Model -> App.ChatMessage -> String
+rowTimeLabel model m =
+    if m.at <= 0 then
+        ""
+
+    else
+        ", " ++ App.formatRowClock model.zone model.prefs.clock m.at
 
 
 rowTime : String -> Model -> App.ChatMessage -> Html Msg
@@ -1587,6 +1733,7 @@ messageMenuPanel model target m =
                                         button
                                             [ type_ "button"
                                             , class "onyx-msg-menu-emoji"
+                                            , attribute "role" "menuitem"
                                             , attribute "aria-label" ("React to " ++ actionTarget ++ " with " ++ emoji)
                                             , onClick (App.MessageMenuReact { target = target, msgid = msgid, emoji = emoji })
                                             ]
@@ -2179,7 +2326,7 @@ boostBar model target m =
         text ""
 
     else
-        div [ class "boost-bar", attribute "aria-label" "Boosts" ]
+        div [ class "boost-bar", attribute "role" "group", attribute "aria-label" "Boosts" ]
             (List.map (boostChip model target m groups) summary.chips
                 ++ (if summary.overflow > 0 then
                         [ span [ class "boost-pill boost-pill--more", attribute "aria-label" (String.fromInt summary.overflow ++ " more reaction types") ]
@@ -2215,7 +2362,7 @@ boostChip model target m groups chip =
                 [ class "boost-pill"
                 , classList [ ( "you", chip.mine ) ]
                 , attribute "aria-pressed" (if chip.mine then "true" else "false")
-                , attribute "aria-label" ((if chip.mine then "Remove " else "Add ") ++ chip.emoji ++ " boost, " ++ String.fromInt chip.count ++ " total")
+                , attribute "aria-label" (boostChipLabel chip.emoji chip.count)
                 , attribute "title" title
                 , onClick (App.ReactionSend target msgid chip.emoji)
                 ]
@@ -2223,6 +2370,21 @@ boostChip model target m groups chip =
 
         _ ->
             span [ class "boost-pill", attribute "title" title ] kids
+
+
+{-| Stable boost chip name ("👍, 3 boosts"); whether it is yours rides
+on `aria-pressed`, never in the name. -}
+boostChipLabel : String -> Int -> String
+boostChipLabel emoji count =
+    emoji
+        ++ ", "
+        ++ String.fromInt count
+        ++ (if count == 1 then
+                " boost"
+
+            else
+                " boosts"
+           )
 
 
 {-| Row body: the caption as text plus one block per `[file]`
@@ -2315,7 +2477,7 @@ mediaUnfurl model row privacy attached href =
 
             kind ->
                 if Upload.isSameOriginHttpUrl model.origin href || Upload.isPreviewableUrl href privacy then
-                    Just (mediaElement model row kind href)
+                    Just (mediaElement model row kind (mediaNameFromUrl href) href)
 
                 else
                     Nothing
@@ -2326,14 +2488,14 @@ credential-free same-origin or public http(s) hosts may load;
 cross-origin stays behind consent; errors swap to the fallback
 link; images open the lightbox dialog, whose focus trap and
 return-focus live ports-side). -}
-mediaElement : Model -> App.ChatMessage -> Upload.AttachmentKind -> String -> Html Msg
-mediaElement model row kind href =
+mediaElement : Model -> App.ChatMessage -> Upload.AttachmentKind -> Maybe String -> String -> Html Msg
+mediaElement model row kind name href =
     div [ class "shell-msg-media" ]
         [ if Set.member href model.previewMediaFailed then
             mediaFallback kind href
 
           else if Upload.isSameOriginHttpUrl model.origin href || Set.member (App.previewConsentKey row href) model.previewImagesAllowed then
-            mediaPlayer kind href
+            mediaPlayer kind name href
 
           else
             mediaConsent row kind href
@@ -2356,23 +2518,91 @@ mediaKindWord kind =
             "file"
 
 
-mediaPlayer : Upload.AttachmentKind -> String -> Html Msg
-mediaPlayer kind href =
+{-| A display name for a media URL: its last path segment, decoded and
+bounded (attribute text only, never markup). -}
+mediaNameFromUrl : String -> Maybe String
+mediaNameFromUrl href =
+    let
+        path =
+            href
+                |> String.split "#"
+                |> List.head
+                |> Maybe.withDefault ""
+                |> String.split "?"
+                |> List.head
+                |> Maybe.withDefault ""
+
+        afterHost =
+            case String.indexes "://" path of
+                i :: _ ->
+                    String.dropLeft (i + 3) path
+                        |> String.split "/"
+                        |> List.drop 1
+
+                [] ->
+                    String.split "/" path
+    in
+    afterHost
+        |> List.filter (\seg -> not (String.isEmpty seg))
+        |> List.reverse
+        |> List.head
+        |> Maybe.map (\seg -> Maybe.withDefault seg (Url.percentDecode seg))
+        |> Maybe.andThen boundedMediaName
+
+
+attachmentMediaName : Upload.ParsedAttachment -> Maybe String
+attachmentMediaName attachment =
+    case Maybe.andThen boundedMediaName attachment.name of
+        Just name ->
+            Just name
+
+        Nothing ->
+            mediaNameFromUrl attachment.url
+
+
+boundedMediaName : String -> Maybe String
+boundedMediaName raw =
+    let
+        clean =
+            String.trim raw
+    in
+    if String.isEmpty clean then
+        Nothing
+
+    else if String.length clean > 80 then
+        Just (String.left 79 clean ++ "…")
+
+    else
+        Just clean
+
+
+mediaPlayer : Upload.AttachmentKind -> Maybe String -> String -> Html Msg
+mediaPlayer kind name href =
     let
         failed =
             Decode.succeed (App.PreviewMediaFailed href)
+
+        named word =
+            case name of
+                Just n ->
+                    word ++ " " ++ n
+
+                Nothing ->
+                    word
     in
     case kind of
         Upload.KindImage ->
             button
                 [ type_ "button"
                 , class "shell-msg-media-open"
-                , attribute "aria-label" "Open image"
+                , attribute "aria-label" (named "Open image")
                 , onClick (App.MediaLightboxOpen href)
                 ]
                 [ img
                     [ src href
-                    , attribute "alt" ""
+                    , -- The button's name carries the file name; the image
+                      -- itself stays decorative so it is not read twice.
+                      attribute "alt" ""
                     , attribute "loading" "lazy"
                     , attribute "decoding" "async"
                     , attribute "referrerpolicy" "no-referrer"
@@ -2388,7 +2618,7 @@ mediaPlayer kind href =
                 , controls True
                 , preload "none"
                 , class "shell-msg-media-video"
-                , attribute "aria-label" "Attached video"
+                , attribute "aria-label" (named "Attached video")
                 , attribute "loading" "lazy"
                 , on "error" failed
                 ]
@@ -2400,7 +2630,7 @@ mediaPlayer kind href =
                 , controls True
                 , preload "none"
                 , class "shell-msg-media-audio"
-                , attribute "aria-label" "Attached audio"
+                , attribute "aria-label" (named "Attached audio")
                 , attribute "loading" "lazy"
                 , on "error" failed
                 ]
@@ -2481,12 +2711,12 @@ mediaLightboxDialog model =
                     [ class "shell-msg-lightbox-dialog"
                     , attribute "role" "dialog"
                     , attribute "aria-modal" "true"
-                    , attribute "aria-label" "Image"
+                    , attribute "aria-label" (Maybe.withDefault "Image" (Maybe.map (\n -> "Image: " ++ n) (mediaNameFromUrl url)))
                     , tabindex -1
                     ]
                     [ img
                         [ src url
-                        , attribute "alt" ""
+                        , attribute "alt" (Maybe.withDefault "" (mediaNameFromUrl url))
                         , class "shell-msg-lightbox-img"
                         , attribute "referrerpolicy" "no-referrer"
                         ]
@@ -2673,7 +2903,7 @@ attachmentCard model row attachment =
     case mediaKind of
         Just kind ->
             if attachmentCanUnfurl model attachment.url then
-                mediaElement model row kind attachment.url
+                mediaElement model row kind (attachmentMediaName attachment) attachment.url
 
             else
                 fileChip attachment
