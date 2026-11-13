@@ -2259,10 +2259,20 @@ subscriptions : Model -> Sub App.Msg
 subscriptions model =
     Sub.batch
         [ Browser.Events.onKeyDown
-            (Decode.field "key" Decode.string
+            (Decode.map4 (\key composing keyCode handled -> ( key, composing || keyCode == 229 || handled ))
+                (Decode.field "key" Decode.string)
+                (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
+                (Decode.oneOf [ Decode.field "keyCode" Decode.int, Decode.succeed 0 ])
+                (Decode.oneOf [ Decode.field "defaultPrevented" Decode.bool, Decode.succeed False ])
                 |> Decode.andThen
-                    (\key ->
-                        if key == "Escape" then
+                    (\( key, skip ) ->
+                        if key == "Escape" && skip then
+                            -- An IME composition cancel, or an Escape a field or
+                            -- dialog already handled (suggestion menu, dialog close
+                            -- button in ports.js), must not also close page chrome.
+                            Decode.fail "escape-handled"
+
+                        else if key == "Escape" then
                             -- Search closes before the transient schedule
                             -- chrome, which closes before the sheet, which
                             -- closes before the nav menu (mirroring the

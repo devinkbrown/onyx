@@ -16349,6 +16349,86 @@ suite =
                         , \_ -> Expect.equal "transport" (Maybe.withDefault "" (Maybe.map .completionScope admitted.runtimeDomainResult))
                         ]
                         ()
+            , test "a send-accepted proof that beats the queue result still clears the row" <|
+                \_ ->
+                    let
+                        requestId =
+                            mustRequestId "domainRequest000000000001"
+
+                        requestText =
+                            Ids.requestIdToRuntime requestId
+
+                        result =
+                            { requestId = requestId
+                            , ownerRef = mustOwnerRef testRuntimeOwner.ownerRef
+                            , accountGeneration = mustAccountGeneration testRuntimeOwner.accountGeneration
+                            , connectionGeneration = mustConnectionGeneration testRuntimeOwner.connectionGeneration
+                            , domain = "journal"
+                            , action = "queue"
+                            , status = RuntimeDomain.TransportAdmitted
+                            , completionScope = "transport"
+                            , reason = Nothing
+                            , items = [ { ref = "entry_ref_00000001", label = "chat", state = "transport-admitted", extra = [ "volatile" ] } ]
+                            , draftTarget = Nothing
+                            , draftText = Nothing
+                            , draftRevision = Nothing
+                            , selectedContinuationRef = Nothing
+                            , anchorTarget = Nothing
+                            , anchorAcceptedTimestamp = Nothing
+                            , anchorViewedCandidate = Nothing
+                            , scheduledMode = Nothing
+                            , scheduledLegacyHeldCount = 0
+                            , scheduledLegacyReviewUnavailable = False
+                            , scheduledViewReady = False
+                            , scheduledItems = []
+                            , sessionRecovery = Nothing
+                            , passkeyManagement = Nothing
+                            , sessionInventory = Nothing
+                            , sessionRevocation = Nothing
+                            , accountCommunity = Nothing
+                            , serviceIntegration = Nothing
+                            , draftRecovery = Nothing
+                            , mediaQuality = Nothing
+                            , mediaControl = Nothing
+                            }
+
+                        base =
+                            { blank
+                                | runtimeOwnerStamp = Just testRuntimeOwner
+                                , runtimeDomainPending = Just requestId
+                                , runtimeDomainPendingAction = Just (RuntimeDomain.QueueMessage "#c" "chat" "hello" Nothing "message" Nothing)
+                                , activeChannel = Just "#c"
+                                , composer = "hello"
+                                , composerDrafts = Dict.singleton "#c" "hello"
+                                , composerDraftVersions = Dict.singleton "#c" 2
+                                , queuedDraftRevisions = Dict.singleton requestText { target = "#c", revision = 2, text = "hello" }
+                                }
+
+                        ( early, _ ) =
+                            update
+                                (RuntimeSendAccepted
+                                    { clientIntentId = requestText
+                                    , ownerRef = testRuntimeOwner.ownerRef
+                                    , accountGeneration = testRuntimeOwner.accountGeneration
+                                    , connectionGeneration = testRuntimeOwner.connectionGeneration
+                                    }
+                                )
+                                base
+
+                        ( admitted, _ ) =
+                            update (RuntimeDomainResultReceived result) early
+
+                        rows =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" admitted.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ requestText ] early.sendAcceptedEarly
+                        , \_ -> Expect.equal [ False ] (List.map .pending rows)
+                        , \_ -> Expect.equal True (List.all (\row -> row.outboxId == Nothing) rows)
+                        , \_ -> Expect.equal [] admitted.sendAcceptedEarly
+                        , \_ -> Expect.equal [] (List.map .id admitted.outbox)
+                        ]
+                        ()
             , test "cancel and dispatch stop typing" <|
                 \_ ->
                     let

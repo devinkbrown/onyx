@@ -22,6 +22,7 @@ import App exposing (ConnectionState(..), Model, Msg(..))
 import ConnectGate exposing (Mode(..), Phase(..))
 import Html exposing (Html, button, div, form, h1, h2, input, label, main_, nav, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, maxlength, name, placeholder, type_, value)
+import Nodes
 import Html.Events exposing (onClick, onInput, onSubmit)
 
 
@@ -248,7 +249,8 @@ fields model current busy =
             ]
 
         SignIn ->
-            [ nameField "Account name" "The name you registered on Onyx." "username"
+            [ customServerWarning model
+            , nameField "Account name" "The name you registered on Onyx." "username"
             , field
                 { id_ = "connection-password"
                 , label_ = "Password"
@@ -283,3 +285,14 @@ field cfg =
         , cfg.input_
         , p [ id (cfg.id_ ++ "-hint"), class "onyx-gate-hint" ] [ text cfg.hint ]
         ]
+
+
+customServerWarning : Model -> Html Msg
+customServerWarning model =
+    case Nodes.customEndpointHost model.endpoint of
+        Just host ->
+            p [ class "onyx-custom-server-warning", attribute "role" "note", attribute "data-testid" "custom-server-warning" ]
+                [ text ("This page is connected to " ++ host ++ ", which is not an Onyx server. Only enter a password you use on that server.") ]
+
+        Nothing ->
+            text ""

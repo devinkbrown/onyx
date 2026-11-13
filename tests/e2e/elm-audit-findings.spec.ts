@@ -334,9 +334,9 @@ test('P1-17 slash-command suggestions look like a list, with name and descriptio
   const list = page.getByTestId('slash-suggestions');
   await expect(list).toBeVisible();
   const first = list.getByRole('option').first();
-  const color = await first.locator('button').first().evaluate(el => getComputedStyle(el).backgroundColor);
+  const color = await first.locator('.onyx-suggest-pick').first().evaluate(el => getComputedStyle(el).backgroundColor);
   expect.soft(color, 'options are not primary buttons').not.toMatch(ACCENT);
-  const parts = await first.evaluate(el => el.querySelectorAll('button > *').length);
+  const parts = await first.evaluate(el => el.querySelectorAll('.onyx-suggest-pick > *').length);
   expect.soft(parts, 'name and description are separate elements').toBeGreaterThanOrEqual(2);
 });
 

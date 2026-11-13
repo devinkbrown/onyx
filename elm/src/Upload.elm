@@ -375,6 +375,11 @@ sanitizeAttachmentUrl url =
     if String.isEmpty trimmed || String.length trimmed > 2048 || hasControl trimmed then
         Nothing
 
+    else if String.contains "\\" trimmed then
+        -- Browsers read `\` as `/` in http(s) URLs, so `/\evil.com/x`
+        -- resolves to `//evil.com/x`. No legitimate attachment URL needs one.
+        Nothing
+
     else if String.startsWith "//" trimmed then
         Nothing
 
@@ -1012,7 +1017,9 @@ parseAbsoluteUrl raw =
                     ( authority, rest ) =
                         splitAuthority after
                 in
-                if String.isEmpty authority || String.contains "@" authority then
+                if String.isEmpty authority || String.contains "@" authority || String.contains "\\" authority then
+                    -- `\` ends the authority for browsers, so a host such as
+                    -- `127.0.0.1\.example.com` would dodge the private-host check.
                     Nothing
 
                 else
@@ -1838,7 +1845,7 @@ credential-free absolute URLs whose scheme + authority match the
 app origin, or root-relative paths which resolve same-origin). -}
 isSameOriginHttpUrl : String -> String -> Bool
 isSameOriginHttpUrl origin url =
-    if String.isEmpty origin then
+    if String.isEmpty origin || String.contains "\\" url then
         False
 
     else if String.startsWith "/" url && not (String.startsWith "//" url) then

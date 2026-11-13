@@ -2,6 +2,7 @@ module Nodes exposing
     ( IrcNode
     , ProbeResult
     , boundedTimeout
+    , customEndpointHost
     , defaultMaxConcurrency
     , defaultProbeTimeoutMs
     , envNode
@@ -143,3 +144,48 @@ pickFastest results =
 isFinite : Float -> Bool
 isFinite ms =
     ms /= (1 / 0) && ms /= (-1 / 0) && ms == ms
+
+
+{-| The host of a connected endpoint that is NOT one of the Onyx nodes
+(a `?ws=` pin to someone else's server), so sign-in forms can warn before
+a password is typed. Known nodes, with or without a trailing slash, and an
+unknown/absent endpoint give `Nothing`.
+-}
+customEndpointHost : Maybe String -> Maybe String
+customEndpointHost endpoint =
+    let
+        strip url =
+            if String.endsWith "/" url then
+                String.dropRight 1 url
+
+            else
+                url
+    in
+    case Maybe.map (String.trim >> strip >> String.toLower) endpoint of
+        Nothing ->
+            Nothing
+
+        Just "" ->
+            Nothing
+
+        Just url ->
+            if List.any (\node -> strip (String.toLower node.wss) == url) nodes then
+                Nothing
+
+            else
+                let
+                    afterScheme =
+                        case String.indexes "://" url of
+                            i :: _ ->
+                                String.dropLeft (i + 3) url
+
+                            [] ->
+                                url
+
+                    host =
+                        afterScheme
+                            |> String.split "/"
+                            |> List.head
+                            |> Maybe.withDefault afterScheme
+                in
+                Just (String.left 253 host)

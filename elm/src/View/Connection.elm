@@ -8,6 +8,7 @@ clears the password field before issuing IDENTIFY.
 import App exposing (ConnectionState(..), Model, Msg(..))
 import Html exposing (Html, button, dd, div, dl, dt, form, h2, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, disabled, for, id, maxlength, name, placeholder, type_, value)
+import Nodes
 import Html.Events exposing (onClick, onInput, onSubmit)
 
 
@@ -168,6 +169,7 @@ signInForm model =
             , onInput ConnectionAccountInput
             ]
             []
+        , customServerWarning model
         , label [ for "connection-password" ] [ text "Password" ]
         , input
             [ id "connection-password"
@@ -219,6 +221,17 @@ error model =
     case detail of
         Just message ->
             p [ class "onyx-connect-error", attribute "role" "alert" ] [ text message ]
+
+        Nothing ->
+            text ""
+
+
+customServerWarning : Model -> Html Msg
+customServerWarning model =
+    case Nodes.customEndpointHost model.endpoint of
+        Just host ->
+            p [ class "onyx-custom-server-warning", attribute "role" "note", attribute "data-testid" "custom-server-warning" ]
+                [ text ("This page is connected to " ++ host ++ ", which is not an Onyx server. Only enter a password you use on that server.") ]
 
         Nothing ->
             text ""

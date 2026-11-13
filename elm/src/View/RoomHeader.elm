@@ -204,13 +204,20 @@ callButton model =
             Maybe.withDefault "" model.activeChannel
 
         inThisCall =
-            model.calls.lifecycle /= Media.Idle && model.calls.channel == Just room
+            model.calls.lifecycle /= Media.Idle
+                && Maybe.map (App.ircCaseKey model) model.calls.channel == Just (App.ircCaseKey model room)
+
+        inOtherCall =
+            model.calls.lifecycle /= Media.Idle && not inThisCall
 
         signedIn =
             model.accountName /= Nothing
 
         live =
             model.connection == App.Live
+
+        joined =
+            App.selfInRoom model room
     in
     if inThisCall then
         button
@@ -245,10 +252,16 @@ callButton model =
                 (if not live then
                     "Calls need a connection"
 
+                 else if not joined then
+                    "Join the room to start or join its call"
+
+                 else if inOtherCall then
+                    "Leave your current call first"
+
                  else
                     "Start or join the voice call"
                 )
-            , disabled (not live || String.isEmpty room)
+            , disabled (not live || String.isEmpty room || not joined || inOtherCall)
             ]
             [ icon "call", span [ class "onyx-tool-label" ] [ text "Call" ] ]
 
@@ -266,12 +279,14 @@ pinsToggle model =
                 Just channel ->
                     List.length (App.channelPins model channel)
 
+        -- The accessible name starts with the visible "Pins" so voice
+        -- control ("click Pins") matches (WCAG 2.5.3 label in name).
         label =
             if count > 0 then
-                String.fromInt count ++ " pinned message" ++ (if count == 1 then "" else "s")
+                "Pins, " ++ String.fromInt count ++ " pinned message" ++ (if count == 1 then "" else "s")
 
             else
-                "Pinned messages"
+                "Pins"
     in
     button
         [ type_ "button"
@@ -301,10 +316,10 @@ mediaToggle model =
         label =
             case model.activeChannel of
                 Nothing ->
-                    "Pictures, files, and links"
+                    "Media: pictures, files, and links"
 
                 Just channel ->
-                    "Pictures, files, and links for " ++ channel
+                    "Media: pictures, files, and links for " ++ channel
     in
     button
         [ type_ "button"

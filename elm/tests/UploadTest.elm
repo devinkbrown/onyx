@@ -250,6 +250,8 @@ suite =
                         [ \_ -> Expect.equal False (isPreviewableUrl "http://169.254.169.254/" previewSsrfOnly)
                         , \_ -> Expect.equal False (isPreviewableUrl "http://[::1]/" previewSsrfOnly)
                         , \_ -> Expect.equal False (isPreviewableUrl "http://[::ffff:127.0.0.1]/" previewSsrfOnly)
+                        , \_ -> Expect.equal False (isPreviewableUrl "https://127.0.0.1\\.example.test/x" previewSsrfOnly)
+                        , \_ -> Expect.equal False (isPreviewableUrl "https://10.0.0.1\\.a.test/x" previewSsrfOnly)
                         , \_ -> Expect.equal True (isPreviewableUrl "https://example.test/a" previewSsrfOnly)
                         ]
                         ()
@@ -330,6 +332,16 @@ suite =
                         , \_ -> Expect.equal [ "HTTPS://example.test/x" ] (extractHttpUrls "HTTPS://example.test/x")
                         ]
                         ()
+            , test "rejects backslash URLs that browsers resolve cross-origin" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (sanitizeAttachmentUrl "/\\evil.example.test/pixel.png")
+                        , \_ -> Expect.equal Nothing (sanitizeAttachmentUrl "\\\\evil.example.test/pixel.png")
+                        , \_ -> Expect.equal Nothing (sanitizeAttachmentUrl "https:\\\\evil.example.test/x")
+                        , \_ -> Expect.equal Nothing (sanitizeAttachmentUrl "https://127.0.0.1\\.example.test/x")
+                        , \_ -> Expect.equal (Just "/uploads/a.png") (sanitizeAttachmentUrl "/uploads/a.png")
+                        ]
+                        ()
             , test "spots same-origin targets" <|
                 \_ ->
                     Expect.all
@@ -339,6 +351,9 @@ suite =
                         , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "https://user@app.example.test/x")
                         , \_ -> Expect.equal False (isSameOriginHttpUrl "" "/linkpreview")
                         , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "//app.example.test/x")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "/\\evil.example.test/a.png")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "\\\\evil.example.test/a.png")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "https://app.example.test\\.evil.test/x")
                         ]
                         ()
             , test "names explicit media saves" <|

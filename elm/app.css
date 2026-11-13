@@ -1865,7 +1865,7 @@ html, body {
 .onyx-reading-bar { display: flex; flex: 1 1 100%; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--onyx-dim); }
 .onyx-reading-bar button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--onyx-line); border-radius: 8px; color: var(--onyx-accent); background: var(--onyx-panel); cursor: pointer; }
 .onyx-suggest { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--onyx-line); border-radius: 8px; background: var(--onyx-panel); }
-.onyx-suggest-row button, .onyx-unread-jump, .onyx-first-hour button { min-height: 44px; }
+.onyx-suggest-pick, .onyx-unread-jump, .onyx-first-hour button { min-height: 44px; }
 .onyx-first-hour { display: flex; gap: 12px; align-items: center; padding: 8px 0; }
 
 
@@ -2140,8 +2140,8 @@ html, body {
 .onyx-composer > .shell-composer-context .shell-composer-context-close { min-width: var(--hit-compact); min-height: var(--hit-compact); padding: 0; margin: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-dim); font-size: 18px; line-height: 1; cursor: pointer; }
 .onyx-composer > .shell-composer-context .shell-composer-context-close:hover { background: var(--onyx-panel); color: var(--onyx-text); }
 .onyx-composer > .onyx-suggest { order: 0; list-style: none; margin: 0 0 4px; padding: 4px; max-height: 264px; overflow-y: auto; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r-md); box-shadow: var(--el-2); }
-.onyx-suggest-row button { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-text); text-align: left; font: inherit; cursor: pointer; }
-.onyx-suggest-row.is-active button, .onyx-suggest-row button:hover { background: var(--onyx-panel-2); }
+.onyx-suggest-pick { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--onyx-text); text-align: left; font: inherit; cursor: pointer; }
+.onyx-suggest-row.is-active .onyx-suggest-pick, .onyx-suggest-row:hover .onyx-suggest-pick { background: var(--onyx-panel-2); }
 .onyx-suggest-name { font-weight: 650; }
 .onyx-suggest-detail { color: var(--onyx-dim); font-size: var(--fs-sm); }
 .onyx-topic-options { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -2203,7 +2203,7 @@ html, body {
   .onyx-shell .onyx-reading-bar button, .onyx-shell .onyx-earlier-button, .onyx-shell .onyx-latest-button { min-height: var(--hit); }
   .onyx-shell .onyx-profile-pop .onyx-member-actions .onyx-member-action, .onyx-shell .onyx-profile-pop .onyx-profile-close { min-height: var(--hit); min-width: var(--hit); }
   .onyx-shell .onyx-member-advanced-toggle { display: flex; align-items: center; min-height: var(--hit); }
-  .onyx-shell .onyx-suggest-row button { min-height: var(--hit); }
+  .onyx-shell .onyx-suggest-pick { min-height: var(--hit); }
   .onyx-shell .onyx-schedule-close { min-width: var(--hit); min-height: var(--hit); }
   .onyx-shell .chb-ledger, .onyx-shell .chb-actions a, .onyx-shell .chb-actions button { display: inline-flex; align-items: center; min-height: var(--hit); padding-inline: 8px; }
   /* Checkbox rows: the whole row is the control; the native box is the hit area. */
@@ -2311,3 +2311,6 @@ html, body {
   border: 1px solid var(--onyx-line);
   background: transparent; color: inherit; cursor: pointer;
 }
+
+/* ?ws= pinned to a non-Onyx server: shown above sign-in password fields. */
+.onyx-custom-server-warning { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--onyx-warn); border-radius: var(--r-sm, 6px); color: var(--onyx-text); background: var(--onyx-panel-2); overflow-wrap: anywhere; }

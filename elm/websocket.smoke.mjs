@@ -51,6 +51,13 @@ test('WS frames register without CRLF, remain separate, and reject outbound line
       [':a PRIVMSG #room :one', ':b PRIVMSG #room :two'],
       ['FOO alice :ordinary diagnostic'],
     ]);
+    // Fallback socket mirrors the runtime transport bounds: oversized text
+    // frames close with 1009 and never reach Elm.
+    const beforeOversize = received.length;
+    raw.listeners.message({ data: `:a PRIVMSG #room :${'x'.repeat(512 * 1024 + 1)}` });
+    assert.equal(received.length, beforeOversize);
+    assert.deepEqual(raw.closeRequest, [1009, 'Frame too large']);
+    raw.closeRequest = undefined;
     handlers.wsSend('CAP LS 302\r\n');
     handlers.wsSend('NICK guest');
     handlers.wsSend('PRIVMSG #room :bad\r\nOPER injected');
@@ -85,6 +92,32 @@ test('WS frames register without CRLF, remain separate, and reject outbound line
     handlers.wsClose();
   } finally {
     raw?.close();
+    globalThis.WebSocket = previous;
+  }
+});
+
+test('fallback socket refuses non-wss and credentialed endpoints', () => {
+  const previous = globalThis.WebSocket;
+  const handlers = {};
+  const closed = [];
+  const created = [];
+  globalThis.WebSocket = class { constructor(url) { created.push(url); } addEventListener() {} };
+  const ports = {};
+  for (const name of ['wsConnect', 'wsSend', 'wsClose', 'vaultPut', 'vaultGet', 'passkeyCreate', 'passkeyGet', 'passkeySettleRequest', 'dmSealRequest', 'dmOpenRequest', 'dmPublishKey', 'roomSealRequest', 'roomOpenRequest', 'groupControlInstall', 'groupDirectoryDerive']) {
+    ports[name] = { subscribe: callback => { handlers[name] = callback; } };
+  }
+  ports.wsOpened = { send: () => {} };
+  ports.wsClosed = { send: value => closed.push(value) };
+  ports.wsLines = { send: () => {} };
+  try {
+    globalThis.OnyxPorts.wire({ ports });
+    for (const url of ['ws://example.test/ws', 'wss://user:pw@example.test/ws', 'javascript:alert(1)', 'wss://exa mple.test/']) {
+      handlers.wsConnect({ url });
+    }
+    assert.deepEqual(created, []);
+    assert.equal(closed.length, 4);
+    assert.ok(closed.every(value => value.clean === false));
+  } finally {
     globalThis.WebSocket = previous;
   }
 });

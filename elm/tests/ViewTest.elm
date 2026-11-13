@@ -96,7 +96,7 @@ roomCallTests =
     describe "room header call button"
         [ test "a signed-in, connected member can start the room's voice call" <|
             \_ ->
-                View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Live }
+                View.RoomHeader.roomHeader { joinedChannelModel | accountName = Just "kai", connection = App.Live }
                     |> Query.fromHtml
                     |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
                     |> Expect.all
@@ -113,6 +113,27 @@ roomCallTests =
                         , Query.hasNot [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
                         , Event.simulate Event.click >> Event.expect App.ConnectionSignInOpen
                         ]
+        , test "the call button waits until we are in the room" <|
+            \_ ->
+                View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Live }
+                    |> Query.fromHtml
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-onyx-media-capture" "voice") ]
+                    |> Expect.all
+                        [ Query.has [ Selector.disabled True ]
+                        , Query.has [ Selector.attribute (Attr.attribute "title" "Join the room to start or join its call") ]
+                        ]
+        , test "the call button matches the active call case-insensitively" <|
+            \_ ->
+                let
+                    m =
+                        { joinedChannelModel | accountName = Just "kai", connection = App.Live }
+
+                    calls =
+                        m.calls
+                in
+                View.RoomHeader.roomHeader { m | calls = { calls | lifecycle = Media.InCall, channel = Just "#C" } }
+                    |> Query.fromHtml
+                    |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Leave call") ]
         , test "the call button waits for a connection" <|
             \_ ->
                 View.RoomHeader.roomHeader { channelModel | accountName = Just "kai", connection = App.Offline }
@@ -123,6 +144,13 @@ roomCallTests =
                         , Query.has [ Selector.attribute (Attr.attribute "title" "Calls need a connection") ]
                         ]
         ]
+
+
+{-| `channelModel` plus a late NAMES line listing us, so we count as a
+member of #c (the base fixture's NAMES reply leaves our own nick out). -}
+joinedChannelModel : Model
+joinedChannelModel =
+    feed channelModel ":s 353 me = #c :me"
 
 
 channelModel : Model
@@ -750,7 +778,7 @@ suite =
                     , \_ ->
                         query open
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-pins") ]
-                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "2 pinned messages") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Pins, 2 pinned messages") ]
                     ]
                     ()
         , test "pins drawer empty and feedback states" <|
@@ -957,7 +985,7 @@ suite =
                     [ \_ ->
                         query channelModel
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]
-                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Pictures, files, and links for #c") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Media: pictures, files, and links for #c") ]
                     , \_ ->
                         query channelModel
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]

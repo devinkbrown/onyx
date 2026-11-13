@@ -24,7 +24,19 @@ nodeB =
 suite : Test
 suite =
     describe "Nodes"
-        [ test "no pin yields no env node" <|
+        [ test "customEndpointHost flags only non-Onyx endpoints" <|
+            \_ ->
+                Expect.equal
+                    [ Nothing, Nothing, Nothing, Nothing, Just "attacker.example:443" ]
+                    (List.map customEndpointHost
+                        [ Nothing
+                        , Just ""
+                        , Just "wss://eshmaki.me:8080"
+                        , Just "WSS://eshmaki.me:8080/"
+                        , Just "wss://attacker.example:443/ws"
+                        ]
+                    )
+        , test "no pin yields no env node" <|
             \_ ->
                 Expect.equal Nothing (envNode Nothing)
         , test "blank pin yields no env node" <|

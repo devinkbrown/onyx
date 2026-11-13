@@ -89,7 +89,8 @@ composer model =
             ]
             [ span [ class "onyx-icon", attribute "data-icon" "plus", attribute "aria-hidden" "true" ] [] ]
         , textarea
-            [ Attr.rows 1
+            (suggestComboboxAttrs model
+                ++ [ Attr.rows 1
             , Attr.id "onyx-composer-input"
             , class "onyx-composer-field"
             , placeholder
@@ -123,6 +124,7 @@ composer model =
             , preventDefaultOn "keydown" (composerKey model)
             , disabled (not ready)
             ]
+            )
             []
         , button
             [ type_ "submit"
@@ -344,31 +346,82 @@ suggestions model =
             App.nickSuggestionMatches model
     in
     if not (List.isEmpty slash) then
-        ul [ class "onyx-suggest", attribute "role" "listbox", attribute "data-testid" "slash-suggestions", attribute "aria-label" "Commands" ]
+        ul [ class "onyx-suggest", Attr.id suggestListId, attribute "role" "listbox", attribute "data-testid" "slash-suggestions", attribute "aria-label" "Commands" ]
             (List.indexedMap (suggestButton model.slashIndex SlashSuggestPick .name .description) slash)
 
     else if not (List.isEmpty nicks) then
-        ul [ class "onyx-suggest", attribute "role" "listbox", attribute "data-testid" "nick-suggestions", attribute "aria-label" "Nicks" ]
-            (List.indexedMap (\index nick -> suggestRow (index == model.nickIndex) (NickSuggestPick nick) nick "") nicks)
+        ul [ class "onyx-suggest", Attr.id suggestListId, attribute "role" "listbox", attribute "data-testid" "nick-suggestions", attribute "aria-label" "Nicks" ]
+            (List.indexedMap (\index nick -> suggestRow index (index == model.nickIndex) (NickSuggestPick nick) nick "") nicks)
 
     else
         text ""
 
 
+suggestListId : String
+suggestListId =
+    "onyx-composer-suggest"
+
+
+suggestOptionId : Int -> String
+suggestOptionId index =
+    suggestListId ++ "-" ++ String.fromInt index
+
+
+{-| Combobox wiring for the composer textarea: focus stays in the field
+while arrows move the highlighted suggestion, so screen readers follow it
+through `aria-activedescendant`. -}
+suggestComboboxAttrs : Model -> List (Html.Attribute Msg)
+suggestComboboxAttrs model =
+    let
+        slashCount =
+            List.length (App.slashSuggestionCommands model)
+
+        nickCount =
+            List.length (App.nickSuggestionMatches model)
+
+        active =
+            if slashCount > 0 then
+                Just (clamp 0 (slashCount - 1) model.slashIndex)
+
+            else if nickCount > 0 then
+                Just (clamp 0 (nickCount - 1) model.nickIndex)
+
+            else
+                Nothing
+    in
+    attribute "role" "combobox"
+        :: attribute "aria-autocomplete" "list"
+        :: (case active of
+                Just index ->
+                    [ attribute "aria-expanded" "true"
+                    , attribute "aria-controls" suggestListId
+                    , attribute "aria-activedescendant" (suggestOptionId index)
+                    ]
+
+                Nothing ->
+                    [ attribute "aria-expanded" "false" ]
+           )
+
+
 suggestButton : Int -> (String -> Msg) -> (a -> String) -> (a -> String) -> Int -> a -> Html Msg
 suggestButton selected pick nameOf detailOf index item =
-    suggestRow (index == selected) (pick (nameOf item)) (nameOf item) (detailOf item)
+    suggestRow index (index == selected) (pick (nameOf item)) (nameOf item) (detailOf item)
 
 
-suggestRow : Bool -> Msg -> String -> String -> Html Msg
-suggestRow active msg name detail =
+suggestRow : Int -> Bool -> Msg -> String -> String -> Html Msg
+suggestRow index active msg name detail =
+    -- The option itself is the pointer target (no nested button inside an
+    -- option). It picks on mousedown, cancelled so the composer keeps focus;
+    -- keyboard users pick with Tab/Enter from the field.
     li
         [ class "onyx-suggest-row"
+        , Attr.id (suggestOptionId index)
         , classList [ ( "is-active", active ) ]
         , attribute "role" "option"
         , attribute "aria-selected" (if active then "true" else "false")
+        , preventDefaultOn "mousedown" (Decode.succeed ( msg, True ))
         ]
-        [ button [ type_ "button", onClick msg ]
+        [ span [ class "onyx-suggest-pick" ]
             [ span [ class "onyx-suggest-name" ] [ text name ]
             , if String.isEmpty detail then
                 text ""
@@ -686,7 +739,7 @@ schedulePopover model =
             , button
                 [ type_ "button"
                 , class "onyx-schedule-close"
-                , attribute "aria-label" "Cancel scheduling"
+                , attribute "aria-label" "Close scheduling"
                 , onClick ScheduleClose
                 ]
                 [ text "×" ]

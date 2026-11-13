@@ -2578,9 +2578,24 @@
     return /^(?:SESSION\s+(?:TOKEN|MTOKEN)(?:\s|$)|SESSIONTOKEN(?:\s|$)|MACKEY(?:\s|$)|ACCOUNT\s+RECOVERY\s+(?:CODE|CODES?)(?:\s|$)|RECOVERY\s+(?:CODE|CODES?)(?:\s|$)|PASSKEY\s+(?:CHALLENGE|ASSERTION)(?:\s|$)|KEYTRANS\s+(?:PROOF|CHALLENGE)(?:\s|$)|TOTP:|RECOVERYCODES:)/i.test(body);
   }
 
+  /* Same bounds the runtime's transport owner enforces, so this fallback
+     socket (used only without the private runtime) cannot be weaker. */
+  var FALLBACK_MAX_TEXT_FRAME_CHARS = 512 * 1024;
+  var FALLBACK_MAX_WS_URL_CHARS = 2048;
+
+  function fallbackSocketUrlAllowed(url) {
+    if (typeof url !== "string" || url.length === 0 || url.length > FALLBACK_MAX_WS_URL_CHARS) return false;
+    if (/[\u0000-\u0020\u007f]/.test(url)) return false;
+    try {
+      var parsed = new URL(url);
+      return parsed.protocol === "wss:" && !parsed.username && !parsed.password;
+    } catch (err) { return false; }
+  }
+
   function connectSocket(app, url, sendPort, isCurrent, onClose, runtime) {
     var socket = null;
     try {
+      if (!fallbackSocketUrlAllowed(url)) throw new Error("Only secure wss: endpoints are supported.");
       socket = new WebSocket(url, [MEDIA_TEXT_SUBPROTOCOL]);
     } catch (err) {
       if (!isCurrent || isCurrent()) app.ports.wsClosed.send({ clean: false, reason: String(err) });
@@ -2616,6 +2631,10 @@
       /* Each browser message is a complete WS frame. Onyx Server omits
          CRLF; retaining a remainder here stalls CAP and registration. */
       var frame = String(event.data);
+      if (frame.length > FALLBACK_MAX_TEXT_FRAME_CHARS) {
+        try { socket.close(1009, "Frame too large"); } catch (err) { /* already closing */ }
+        return;
+      }
       var batch = frame.split("\n").map(function (line) {
         return line.replace(/\r$/, "");
       }).filter(function (line) {
