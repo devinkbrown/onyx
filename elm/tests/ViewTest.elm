@@ -5769,7 +5769,7 @@ suite =
                                 |> Query.has [ Selector.text "Privacy" ]
                         , \_ ->
                             q
-                                |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "End-to-end encrypt direct messages") ]
+                                |> Query.find [ Selector.attribute (Attr.attribute "aria-labelledby" "ap-privacy-e2eeDms-label") ]
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-checked" "true") ]
                         , \_ ->
                             q
@@ -6002,7 +6002,7 @@ suite =
                         , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "account-totp-disable") ] q
                                 |> Event.simulate Event.click
-                                |> Event.expect TotpDisableRequested
+                                |> Event.expect TotpDisableArmed
                         , \_ ->
                             Query.has [ Selector.text "bad code" ] q
                         ]
@@ -6097,11 +6097,11 @@ suite =
                         , \_ ->
                             Query.hasNot [ Selector.text "passkey_ref_opaque_00000001" ] q
                         , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "aria-label" "Rename laptop") ] q
+                            Query.find [ Selector.attribute (Attr.attribute "aria-label" "Rename laptop (added 2023-11-14)") ] q
                                 |> Event.simulate Event.click
                                 |> Event.expect (PasskeyRenameStarted { id = "passkey_ref_opaque_00000001", label = "laptop" })
                         , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "aria-label" "Remove laptop") ] q
+                            Query.find [ Selector.attribute (Attr.attribute "aria-label" "Remove laptop (added 2023-11-14)") ] q
                                 |> Event.simulate Event.click
                                 |> Event.expect (PasskeyRemoveArmed "passkey_ref_opaque_00000001")
                         , \_ ->

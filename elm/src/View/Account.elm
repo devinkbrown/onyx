@@ -16,7 +16,8 @@ renders inline in the panel where the oracle uses a Sheet modal.
 
 import App exposing (ConnectionState(..), Model, Msg(..), TotpCopy(..), TotpStatus(..), accountCertNotices, accountKeytransNotices, dropReady, isTotpCode, millisToIso, totpCodeLength)
 import Html exposing (Html, a, button, code, dd, div, dl, dt, form, h2, h3, h4, input, label, li, nav, p, pre, section, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, pattern, placeholder, tabindex, type_, value)
+import Html exposing (Attribute)
+import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, name, pattern, placeholder, tabindex, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Passkey exposing (maxLabelLength)
@@ -24,6 +25,17 @@ import Retention
 import RuntimeDomain
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Integrations
+
+
+{-| Tie a field to its error message while the error is present. -}
+errorAttrs : Maybe String -> String -> List (Attribute Msg)
+errorAttrs err errId =
+    case err of
+        Just _ ->
+            [ attribute "aria-invalid" "true", attribute "aria-describedby" errId ]
+
+        Nothing ->
+            []
 
 
 accountPanel : Model -> Html Msg
@@ -169,7 +181,7 @@ privateManagementSection title description forms =
 
 privatePasskeySection : Model -> Html Msg
 privatePasskeySection model =
-    section [ class "onyx-account-section", id "acct-passkeys-title" ]
+    section [ class "onyx-account-section", id "acct-passkeys-title", tabindex -1 ]
         [ h3 [ class "onyx-account-section__title" ] [ text "Passkeys" ]
         , p [ class "onyx-account-hint" ]
             [ text "Passkey challenge and response bytes stay in the private browser runtime. A browser prompt may be denied if transient user activation has expired by the time the server challenge arrives." ]
@@ -203,7 +215,7 @@ sectionNav =
 
 overviewSection : Model -> Html Msg
 overviewSection model =
-    section [ class "onyx-account-section", id "acct-identity" ]
+    section [ class "onyx-account-section", id "acct-identity", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Overview" ]
          , dl [ class "onyx-account-facts" ]
             ([ fact "Account" (Maybe.withDefault "" model.accountName)
@@ -274,7 +286,7 @@ errorNote model =
 
 devicesSection : Model -> Html Msg
 devicesSection model =
-    section [ class "onyx-account-section", id "acct-sessions-title" ]
+    section [ class "onyx-account-section", id "acct-sessions-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Devices" ]
          , p [ class "onyx-account-hint" ] [ text "Signed-in browsers. Dropping one signs it out." ]
          , div [ class "onyx-account-actions" ]
@@ -301,7 +313,38 @@ sessionError model =
             []
 
         Just err ->
-            [ p [ class "onyx-account-error" ] [ text err ] ]
+            [ p [ class "onyx-account-error", attribute "role" "alert", id "account-sessions-error" ] [ text err ] ]
+
+
+sessionDropControl : Model -> Int -> String -> String -> Html Msg
+sessionDropControl model index rowRef kind =
+    if model.sessionDropArmed == Just rowRef then
+        span [ class "onyx-account-session-confirm", attribute "role" "group", attribute "aria-label" ("Confirm sign out " ++ (if String.isEmpty kind then "" else kind ++ " ") ++ "session " ++ String.fromInt index) ]
+            [ button
+                [ type_ "button"
+                , class "onyx-account-session__drop-go"
+                , id "account-session-drop-confirm"
+                , attribute "data-testid" "account-session-drop-confirm"
+                , onClick SessionDropConfirmed
+                ]
+                [ text "Sign out?" ]
+            , button
+                [ type_ "button"
+                , class "onyx-account-session__drop-cancel"
+                , onClick SessionDropCancelled
+                ]
+                [ text "Cancel" ]
+            ]
+
+    else
+        button
+            [ type_ "button"
+            , class "onyx-account-session__drop"
+            , id ("account-session-drop-" ++ String.fromInt index)
+            , attribute "aria-label" ("Sign out " ++ (if String.isEmpty kind then "" else kind ++ " ") ++ "session " ++ String.fromInt index)
+            , onClick (SessionDropArmed { rowRef = rowRef })
+            ]
+            [ text "Sign out" ]
 
 
 sessionList : Model -> Html Msg
@@ -325,7 +368,7 @@ sessionList model =
                                 [ span [ class "onyx-account-session__name" ] [ text ("Local session " ++ String.fromInt row.index) ]
                                 , span [ class "onyx-account-session__state" ] [ text row.state ]
                                 , if row.current then span [ class "onyx-account-session__current" ] [ text "This connection" ]
-                                  else button [ type_ "button", class "onyx-account-session__drop", attribute "aria-label" ("Sign out local session " ++ String.fromInt row.index), onClick (SessionDropRequested { index = row.index }) ] [ text "Sign out" ]
+                                  else sessionDropControl model row.index row.rowRef "local"
                                 ]
                         )
                         inventory.localRows
@@ -465,38 +508,9 @@ draftRecoverySection model =
         ]
 
 
-sessionRow : Session.AccountSessionRow -> Html Msg
-sessionRow row =
-    li [ class "onyx-account-session" ]
-        [ span [ class "onyx-account-session__name" ]
-            [ text ("Session " ++ String.fromInt row.index) ]
-        , span [ class "onyx-account-session__state" ]
-            [ text
-                (case row.state of
-                    Attached ->
-                        "attached"
-
-                    Detached ->
-                        "detached"
-                )
-            ]
-        , if row.current then
-            span [ class "onyx-account-session__current" ] [ text "This connection" ]
-
-          else
-            button
-                [ type_ "button"
-                , class "onyx-account-session__drop"
-                , attribute "aria-label" ("Sign out session " ++ String.fromInt row.index)
-                , onClick (SessionDropRequested { index = row.index })
-                ]
-                [ text "Sign out" ]
-        ]
-
-
 sessionSection : Model -> Html Msg
 sessionSection model =
-    section [ class "onyx-account-section", id "acct-session-title" ]
+    section [ class "onyx-account-section", id "acct-session-title", tabindex -1 ]
         [ h3 [ class "onyx-account-section__title" ] [ text "Session" ]
         , p [ class "onyx-account-hint" ]
             [ text ("Signed in as " ++ Maybe.withDefault "" model.accountName ++ ".") ]
@@ -522,7 +536,7 @@ capsSection model =
         rows =
             Session.buildCapabilityMatrix { negotiated = model.caps, available = model.capAvailable }
     in
-    section [ class "onyx-account-section", id "acct-caps-title" ]
+    section [ class "onyx-account-section", id "acct-caps-title", tabindex -1 ]
         [ h3 [ class "onyx-account-section__title" ] [ text "Session capabilities" ]
         , p [ class "onyx-account-hint" ]
             [ text "These are browser and server connection capabilities, not native-app features. Active means this connection is using it now." ]
@@ -580,7 +594,7 @@ retentionSection model =
                         "none"
 
     in
-    section [ class "onyx-account-section", id "acct-history-title" ]
+    section [ class "onyx-account-section", id "acct-history-title", tabindex -1 ]
         [ h3 [ class "onyx-account-section__title" ] [ text "On-device history" ]
         , span [ class "onyx-account-scope" ] [ text "This device" ]
         , p [ class "onyx-account-hint" ]
@@ -756,7 +770,7 @@ pushStatusCopy model =
 securitySection : Model -> Html Msg
 securitySection model =
     if model.runtimeOwnerStamp /= Nothing then
-        section [ class "onyx-account-section", id "acct-two-factor-authentication-title" ]
+        section [ class "onyx-account-section", id "acct-two-factor-authentication-title", tabindex -1 ]
             [ h3 [ class "onyx-account-section__title" ] [ text "Two-factor authentication" ]
             , p [ class "onyx-account-hint", attribute "role" "status" ]
                 [ text "Authenticator secrets and confirmation codes are handled in the private local-services panel. They are never shown in this account view." ]
@@ -768,7 +782,7 @@ securitySection model =
             ]
 
     else
-        section [ class "onyx-account-section", id "acct-two-factor-authentication-title" ]
+        section [ class "onyx-account-section", id "acct-two-factor-authentication-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Two-factor authentication" ]
          , p [ class "onyx-account-hint" ]
             [ text "A six-digit code from your authenticator app, required at every login." ]
@@ -943,16 +957,21 @@ confirmForm model =
                 [ label [ class "onyx-account-field-label", for "acct-totp-code" ]
                     [ text "Six-digit code" ]
                 , input
-                    [ class "onyx-account-field"
-                    , id "acct-totp-code"
-                    , type_ "text"
-                    , value model.totpCodeInput
-                    , onInput TotpCodeInput
-                    , placeholder "123456"
-                    , maxlength totpCodeLength
-                    , pattern "[0-9]{6}"
-                    , attribute "data-testid" "account-totp-code"
-                    ]
+                    ([ class "onyx-account-field"
+                     , id "acct-totp-code"
+                     , name "totp-code"
+                     , type_ "text"
+                     , value model.totpCodeInput
+                     , onInput TotpCodeInput
+                     , placeholder "123456"
+                     , maxlength totpCodeLength
+                     , pattern "[0-9]{6}"
+                     , attribute "autocomplete" "one-time-code"
+                     , attribute "inputmode" "numeric"
+                     , attribute "data-testid" "account-totp-code"
+                     ]
+                        ++ errorAttrs model.totp.error "acct-totp-error"
+                    )
                     []
                 , button
                     [ type_ "submit"
@@ -972,17 +991,41 @@ disableRow : Model -> List (Html Msg)
 disableRow model =
     case model.totp.status of
         TotpActive ->
-            [ div [ class "onyx-account-actions" ]
-                [ button
-                    [ type_ "button"
-                    , class "onyx-account-totp-disable"
-                    , attribute "data-testid" "account-totp-disable"
-                    , disabled model.totp.busy
-                    , onClick TotpDisableRequested
+            if model.totpDisableArmed then
+                [ div [ class "onyx-account-actions", attribute "role" "group", attribute "aria-label" "Confirm disable two-factor" ]
+                    [ span [] [ text "Disable two-factor?" ]
+                    , button
+                        [ type_ "button"
+                        , class "onyx-account-totp-disable-go"
+                        , id "account-totp-disable-confirm"
+                        , attribute "data-testid" "account-totp-disable-confirm"
+                        , disabled model.totp.busy
+                        , onClick TotpDisableConfirmed
+                        ]
+                        [ text "Confirm" ]
+                    , button
+                        [ type_ "button"
+                        , class "onyx-account-totp-disable-cancel"
+                        , attribute "data-testid" "account-totp-disable-cancel"
+                        , onClick TotpDisableCancelled
+                        ]
+                        [ text "Cancel" ]
                     ]
-                    [ text "Disable two-factor" ]
                 ]
-            ]
+
+            else
+                [ div [ class "onyx-account-actions" ]
+                    [ button
+                        [ type_ "button"
+                        , class "onyx-account-totp-disable"
+                        , id "account-totp-disable"
+                        , attribute "data-testid" "account-totp-disable"
+                        , disabled model.totp.busy
+                        , onClick TotpDisableArmed
+                        ]
+                        [ text "Disable two-factor" ]
+                    ]
+                ]
 
         _ ->
             []
@@ -995,12 +1038,12 @@ totpError model =
             []
 
         Just err ->
-            [ p [ class "onyx-account-error", attribute "role" "alert" ] [ text err ] ]
+            [ p [ class "onyx-account-error", attribute "role" "alert", id "acct-totp-error" ] [ text err ] ]
 
 
 certSection : Model -> Html Msg
 certSection model =
-    section [ class "onyx-account-section", id "acct-certificates-title" ]
+    section [ class "onyx-account-section", id "acct-certificates-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Certificates" ]
          , p [ class "onyx-account-hint" ]
             [ text "Bind this browser's certificate for password-less sign-in." ]
@@ -1058,7 +1101,7 @@ certNotices model =
 
 keytransSection : Model -> Html Msg
 keytransSection model =
-    section [ class "onyx-account-section", id "acct-transparency-title" ]
+    section [ class "onyx-account-section", id "acct-transparency-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Transparency" ]
          , p [ class "onyx-account-hint" ]
             [ text "Key transparency root for this account's device keys." ]
@@ -1089,7 +1132,7 @@ keytransNotices model =
 
 deviceKeysSection : Model -> Html Msg
 deviceKeysSection model =
-    section [ class "onyx-account-section", id "acct-device-keys-title" ]
+    section [ class "onyx-account-section", id "acct-device-keys-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Device encryption keys" ]
          , p [ class "onyx-account-hint" ]
             [ text "Publish this browser's public key so other devices on your account can encrypt to you. List entries from every device you use." ]
@@ -1133,7 +1176,7 @@ deviceKeysSection model =
 
 personasSection : Model -> Html Msg
 personasSection model =
-    section [ class "onyx-account-section", id "acct-personas-title" ]
+    section [ class "onyx-account-section", id "acct-personas-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Personas" ]
          , p [ class "onyx-account-hint" ]
             [ text "Your Guise wardrobe — change the host others see, instantly and mid-session." ]
@@ -1242,7 +1285,7 @@ personaOffer offer =
 
 emailSection : Model -> Html Msg
 emailSection model =
-    section [ class "onyx-account-section", id "acct-email-title" ]
+    section [ class "onyx-account-section", id "acct-email-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Email" ]
          , p [ class "onyx-account-hint" ]
             [ text "Used for account recovery. Changing it requires your password." ]
@@ -1254,26 +1297,34 @@ emailSection model =
             [ label [ class "onyx-account-field-label", for "acct-email" ]
                 [ text "Email address" ]
             , input
-                [ class "onyx-account-field"
-                , id "acct-email"
-                , type_ "email"
-                , value model.accountEmail
-                , onInput AccountEmailInput
-                , placeholder "you@example.com"
-                , attribute "data-testid" "account-email"
-                ]
+                ([ class "onyx-account-field"
+                 , id "acct-email"
+                 , name "email"
+                 , type_ "email"
+                 , value model.accountEmail
+                 , onInput AccountEmailInput
+                 , placeholder "you@example.com"
+                 , attribute "autocomplete" "email"
+                 , attribute "data-testid" "account-email"
+                 ]
+                    ++ errorAttrs model.accountEmailError "acct-email-error"
+                )
                 []
             , label [ class "onyx-account-field-label", for "acct-email-password" ]
                 [ text "Current password (to confirm email change)" ]
             , input
-                [ class "onyx-account-field"
-                , id "acct-email-password"
-                , type_ "password"
-                , value model.accountEmailPassword
-                , onInput AccountEmailPasswordInput
-                , placeholder "account password"
-                , attribute "data-testid" "account-email-password"
-                ]
+                ([ class "onyx-account-field"
+                 , id "acct-email-password"
+                 , name "current-password"
+                 , type_ "password"
+                 , value model.accountEmailPassword
+                 , onInput AccountEmailPasswordInput
+                 , placeholder "account password"
+                 , attribute "autocomplete" "current-password"
+                 , attribute "data-testid" "account-email-password"
+                 ]
+                    ++ errorAttrs model.accountEmailError "acct-email-error"
+                )
                 []
             , button
                 [ type_ "submit"
@@ -1295,12 +1346,12 @@ emailError model =
             []
 
         Just err ->
-            [ p [ class "onyx-account-error", attribute "role" "alert" ] [ text err ] ]
+            [ p [ class "onyx-account-error", attribute "role" "alert", id "acct-email-error" ] [ text err ] ]
 
 
 passwordSection : Model -> Html Msg
 passwordSection model =
-    section [ class "onyx-account-section", id "acct-password-title" ]
+    section [ class "onyx-account-section", id "acct-password-title", tabindex -1 ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Password" ]
          , p [ class "onyx-account-hint" ]
             [ text "Choose a new password. You'll need your current one to confirm." ]
@@ -1312,38 +1363,50 @@ passwordSection model =
             [ label [ class "onyx-account-field-label", for "acct-new-password" ]
                 [ text "New password" ]
             , input
-                [ class "onyx-account-field"
-                , id "acct-new-password"
-                , type_ "password"
-                , value model.accountNewPassword
-                , onInput AccountNewPasswordInput
-                , placeholder "new password"
-                , attribute "data-testid" "account-new-password"
-                ]
+                ([ class "onyx-account-field"
+                 , id "acct-new-password"
+                 , name "new-password"
+                 , type_ "password"
+                 , value model.accountNewPassword
+                 , onInput AccountNewPasswordInput
+                 , placeholder "new password"
+                 , attribute "autocomplete" "new-password"
+                 , attribute "data-testid" "account-new-password"
+                 ]
+                    ++ errorAttrs model.accountPasswordError "acct-password-error"
+                )
                 []
             , label [ class "onyx-account-field-label", for "acct-confirm-password" ]
                 [ text "Confirm new password" ]
             , input
-                [ class "onyx-account-field"
-                , id "acct-confirm-password"
-                , type_ "password"
-                , value model.accountConfirmPassword
-                , onInput AccountConfirmPasswordInput
-                , placeholder "repeat new password"
-                , attribute "data-testid" "account-confirm-password"
-                ]
+                ([ class "onyx-account-field"
+                 , id "acct-confirm-password"
+                 , name "new-password"
+                 , type_ "password"
+                 , value model.accountConfirmPassword
+                 , onInput AccountConfirmPasswordInput
+                 , placeholder "repeat new password"
+                 , attribute "autocomplete" "new-password"
+                 , attribute "data-testid" "account-confirm-password"
+                 ]
+                    ++ errorAttrs model.accountPasswordError "acct-password-error"
+                )
                 []
             , label [ class "onyx-account-field-label", for "acct-current-password" ]
                 [ text "Current password" ]
             , input
-                [ class "onyx-account-field"
-                , id "acct-current-password"
-                , type_ "password"
-                , value model.accountCurrentPassword
-                , onInput AccountCurrentPasswordInput
-                , placeholder "current password"
-                , attribute "data-testid" "account-current-password"
-                ]
+                ([ class "onyx-account-field"
+                 , id "acct-current-password"
+                 , name "current-password"
+                 , type_ "password"
+                 , value model.accountCurrentPassword
+                 , onInput AccountCurrentPasswordInput
+                 , placeholder "current password"
+                 , attribute "autocomplete" "current-password"
+                 , attribute "data-testid" "account-current-password"
+                 ]
+                    ++ errorAttrs model.accountPasswordError "acct-password-error"
+                )
                 []
             , button
                 [ type_ "submit"
@@ -1369,7 +1432,7 @@ passwordError model =
             []
 
         Just err ->
-            [ p [ class "onyx-account-error", attribute "role" "alert" ] [ text err ] ]
+            [ p [ class "onyx-account-error", attribute "role" "alert", id "acct-password-error" ] [ text err ] ]
 
 
 recoverySection : Model -> Html Msg
@@ -1379,6 +1442,7 @@ recoverySection model =
             [ class "onyx-account-section"
             , id "acct-recovery-title"
             , attribute "data-testid" "recovery-codes-section"
+            , tabindex -1
             ]
             [ h3 [ class "onyx-account-section__title" ] [ text "Recovery codes" ]
             , p [ class "onyx-account-hint", attribute "role" "status" ]
@@ -1396,6 +1460,7 @@ recoverySection model =
         [ class "onyx-account-section"
         , id "acct-recovery-title"
         , attribute "data-testid" "recovery-codes-section"
+        , tabindex -1
         ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Recovery codes" ]
          , p [ class "onyx-account-hint" ]
@@ -1414,10 +1479,12 @@ recoverySection model =
          , input
             [ class "onyx-account-field"
             , id "acct-recovery-password"
+            , name "current-password"
             , type_ "password"
             , value model.recoveryPassword
             , onInput RecoveryCodesPasswordInput
             , disabled model.recoveryCodes.busy
+            , attribute "autocomplete" "current-password"
             , attribute "data-testid" "recovery-password"
             ]
             []
@@ -1560,7 +1627,7 @@ freshCodesBlock model =
 
 passkeysSection : Model -> Html Msg
 passkeysSection model =
-    section [ class "onyx-account-section", id "acct-passkeys-title" ]
+    section [ class "onyx-account-section", id "acct-passkeys-title", tabindex -1 ]
         [ h3 [ class "onyx-account-section__title" ] [ text "Passkeys" ]
         , p [ class "onyx-account-hint" ]
             [ text "Sign in without a password using a device passkey — Face ID, a fingerprint, or a security key." ]
@@ -1735,7 +1802,7 @@ passkeyRow model cred =
                         button
                             [ type_ "button"
                             , class "onyx-account-passkey-rename"
-                            , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
+                            , attribute "aria-label" ("Rename " ++ passkeyDisplayName model cred)
                             , onClick (PasskeyRenameStarted { id = cred.credentialRef, label = cred.label })
                             ]
                             [ text "Rename" ]
@@ -1746,13 +1813,51 @@ passkeyRow model cred =
         ]
 
 
-passkeyDisplayName : RuntimeDomain.PasskeyRow -> String
-passkeyDisplayName cred =
-    if String.isEmpty cred.label then
-        "passkey"
+{-| Accessible name for a passkey row: label plus added date, with the
+row's position appended when another listed passkey would read the same. -}
+passkeyDisplayName : Model -> RuntimeDomain.PasskeyRow -> String
+passkeyDisplayName model cred =
+    let
+        rows =
+            model.passkeyManagementView |> Maybe.map .rows |> Maybe.withDefault []
+
+        clash =
+            List.length (List.filter (\other -> passkeyBaseName other == passkeyBaseName cred) rows) > 1
+
+        ordinal =
+            rows
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( _, other ) -> other.credentialRef == cred.credentialRef)
+                |> List.head
+                |> Maybe.map (\( i, _ ) -> ", passkey " ++ String.fromInt (i + 1))
+                |> Maybe.withDefault ""
+    in
+    if clash then
+        passkeyBaseName cred ++ ordinal
 
     else
-        cred.label
+        passkeyBaseName cred
+
+
+passkeyBaseName : RuntimeDomain.PasskeyRow -> String
+passkeyBaseName cred =
+    let
+        base =
+            if String.isEmpty cred.label then
+                "passkey"
+
+            else
+                cred.label
+
+        added =
+            case String.toFloat cred.createdUnix of
+                Nothing ->
+                    ""
+
+                Just seconds ->
+                    " (added " ++ String.left 10 (millisToIso (seconds * 1000)) ++ ")"
+    in
+    base ++ added
 
 
 passkeyMeta : RuntimeDomain.PasskeyRow -> String
@@ -1772,10 +1877,11 @@ passkeyMeta cred =
 passkeyRemoveControl : Model -> RuntimeDomain.PasskeyRow -> List (Html Msg)
 passkeyRemoveControl model cred =
     if model.passkeyRemoveArmed == Just cred.credentialRef then
-        [ span [ class "onyx-account-passkey-confirm", attribute "role" "group", attribute "aria-label" "Confirm removal" ]
+        [ span [ class "onyx-account-passkey-confirm", attribute "role" "group", attribute "aria-label" ("Confirm removal of " ++ passkeyDisplayName model cred) ]
             [ button
                 [ type_ "button"
                 , class "onyx-account-passkey-remove-go"
+                , id "account-passkey-remove-go"
                 , disabled (model.passkey.busy || Maybe.map (\view -> view.status == "pending") model.passkeyManagementView == Just True)
                 , onClick PasskeyRemoveConfirmed
                 ]
@@ -1793,7 +1899,7 @@ passkeyRemoveControl model cred =
         [ button
             [ type_ "button"
             , class "onyx-account-passkey-remove"
-            , attribute "aria-label" ("Remove " ++ passkeyDisplayName cred)
+            , attribute "aria-label" ("Remove " ++ passkeyDisplayName model cred)
             , onClick (PasskeyRemoveArmed cred.credentialRef)
             ]
             [ text "Remove" ]
@@ -1805,7 +1911,7 @@ passkeyRenameForm model cred =
     form
         [ class "onyx-account-passkey-rename"
         , onSubmit PasskeyRenameSubmitted
-        , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
+        , attribute "aria-label" ("Rename " ++ passkeyDisplayName model cred)
         ]
         [ label [ class "onyx-account-field-label", for "acct-passkey-rename" ]
             [ text "New name" ]
@@ -1840,7 +1946,7 @@ passkeyRenameForm model cred =
 dataSection : Model -> Html Msg
 dataSection model =
     div [ attribute "data-testid" "account-data-verbs" ]
-        [ section [ class "onyx-account-section", id "acct-download-store-title" ]
+        [ section [ class "onyx-account-section", id "acct-download-store-title", tabindex -1 ]
             [ h3 [ class "onyx-account-section__title" ] [ text "Download what we store" ]
             , p [ class "onyx-account-hint" ]
                 [ text "Nick, email, and rooms you own. Not the chat. History lives on this device." ]
@@ -1928,10 +2034,12 @@ dropConfirmBlock model =
             , input
                 [ class "onyx-account-field"
                 , id "acct-drop-password"
+                , name "current-password"
                 , type_ "password"
                 , value model.dropPassword
                 , onInput DropPasswordInput
                 , placeholder "account password"
+                , attribute "autocomplete" "current-password"
                 , attribute "data-testid" "account-drop-password"
                 ]
                 []

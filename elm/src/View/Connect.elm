@@ -114,7 +114,7 @@ gate model current =
                             []
                        )
                 )
-                (fields model current busy
+                (fields model current busy (errorText /= Nothing)
                     ++ [ case errorText of
                             Just message ->
                                 p [ class "onyx-gate-error", attribute "role" "alert", id "connect-error" ] [ text message ]
@@ -188,9 +188,23 @@ modeButton current busy ( mode, label_ ) =
             )
 
 
-fields : Model -> ConnectGate.Gate -> Bool -> List (Html Msg)
-fields model current busy =
+fields : Model -> ConnectGate.Gate -> Bool -> Bool -> List (Html Msg)
+fields model current busy hasError =
     let
+        describedBy hintId =
+            if hasError then
+                hintId ++ " connect-error"
+
+            else
+                hintId
+
+        invalidAttrs =
+            if hasError then
+                [ attribute "aria-invalid" "true" ]
+
+            else
+                []
+
         nameField labelText hint auto =
             field
                 { id_ = "connect-name"
@@ -198,25 +212,27 @@ fields model current busy =
                 , hint = hint
                 , input_ =
                     input
-                        [ id "connect-name"
-                        , type_ "text"
-                        , class "onyx-gate-input"
-                        , value current.name
-                        , maxlength
+                        ([ id "connect-name"
+                         , type_ "text"
+                         , class "onyx-gate-input"
+                         , value current.name
+                         , maxlength
                             (if current.mode == SignIn then
                                 64
 
                              else
                                 App.maxNickAliasLength
                             )
-                        , placeholder "your-name"
-                        , attribute "autocomplete" auto
-                        , attribute "autocapitalize" "off"
-                        , attribute "spellcheck" "false"
-                        , attribute "aria-describedby" "connect-name-hint"
-                        , disabled busy
-                        , onInput ConnectGateName
-                        ]
+                         , placeholder "your-name"
+                         , attribute "autocomplete" auto
+                         , attribute "autocapitalize" "off"
+                         , attribute "spellcheck" "false"
+                         , attribute "aria-describedby" (describedBy "connect-name-hint")
+                         , disabled busy
+                         , onInput ConnectGateName
+                         ]
+                            ++ invalidAttrs
+                        )
                         []
                 }
     in
@@ -231,19 +247,21 @@ fields model current busy =
                 , hint = "Optional. Leave it blank to start on Home and browse rooms."
                 , input_ =
                     input
-                        [ id "connect-room"
-                        , type_ "text"
-                        , class "onyx-gate-input"
-                        , value current.room
-                        , maxlength 64
-                        , placeholder "#lounge"
-                        , attribute "autocomplete" "off"
-                        , attribute "autocapitalize" "off"
-                        , attribute "spellcheck" "false"
-                        , attribute "aria-describedby" "connect-room-hint"
-                        , disabled busy
-                        , onInput ConnectGateRoom
-                        ]
+                        ([ id "connect-room"
+                         , type_ "text"
+                         , class "onyx-gate-input"
+                         , value current.room
+                         , maxlength 64
+                         , placeholder "#lounge"
+                         , attribute "autocomplete" "off"
+                         , attribute "autocapitalize" "off"
+                         , attribute "spellcheck" "false"
+                         , attribute "aria-describedby" (describedBy "connect-room-hint")
+                         , disabled busy
+                         , onInput ConnectGateRoom
+                         ]
+                            ++ invalidAttrs
+                        )
                         []
                 }
             ]
@@ -258,15 +276,17 @@ fields model current busy =
                 , input_ =
                     -- DOM-owned: no value binding, no input handler.
                     input
-                        [ id "connection-password"
-                        , name "connection-password"
-                        , type_ "password"
-                        , class "onyx-gate-input"
-                        , attribute "autocomplete" "current-password"
-                        , attribute "required" ""
-                        , attribute "aria-describedby" "connection-password-hint"
-                        , disabled busy
-                        ]
+                        ([ id "connection-password"
+                         , name "connection-password"
+                         , type_ "password"
+                         , class "onyx-gate-input"
+                         , attribute "autocomplete" "current-password"
+                         , attribute "required" ""
+                         , attribute "aria-describedby" (describedBy "connection-password-hint")
+                         , disabled busy
+                         ]
+                            ++ invalidAttrs
+                        )
                         []
                 }
             ]

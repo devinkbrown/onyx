@@ -208,7 +208,7 @@ suite =
             , test "privacy rows keep label, description and the switch state as separate parts" <|
                 \_ ->
                     query { blank | route = Route.Appearance }
-                        |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Preview web links") ]
+                        |> Query.find [ Selector.attribute (Attr.attribute "aria-labelledby" "ap-privacy-linkPreviews-label") ]
                         |> Expect.all
                             [ Query.has [ Selector.class "ap-choice-toggle", Selector.attribute (Attr.attribute "role" "switch") ]
                             , Query.find [ Selector.tag "small" ] >> Query.has [ Selector.text "Show link details fetched through this server." ]

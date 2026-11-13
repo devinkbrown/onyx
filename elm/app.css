@@ -16,7 +16,7 @@
   --onyx-panel: #151e22;
   --onyx-panel-2: #1b252b;
   --onyx-line: #27343b;
-  --onyx-line-strong: #3a4a54;
+  --onyx-line-strong: #667175;
   --onyx-text: #e9e5d8;
   --onyx-dim: #9fa9a2;
   --onyx-faint: #96a39b;
@@ -63,10 +63,10 @@
   --onyx-panel: #ffffff;
   --onyx-panel-2: #efeae0;
   --onyx-line: #d9d2c4;
-  --onyx-line-strong: #b9b0a0;
+  --onyx-line-strong: #898377;
   --onyx-text: #1a1a17;
   --onyx-dim: #5a5a53;
-  --onyx-faint: #6f6f67;
+  --onyx-faint: #66665f;
   --onyx-accent: #9a5f00;
   --onyx-accent-hover: #7f4e00;
   --onyx-accent-soft: rgba(154, 95, 0, 0.12);
@@ -92,10 +92,10 @@
     --onyx-panel: #ffffff;
     --onyx-panel-2: #efeae0;
     --onyx-line: #d9d2c4;
-    --onyx-line-strong: #b9b0a0;
+    --onyx-line-strong: #898377;
     --onyx-text: #1a1a17;
     --onyx-dim: #5a5a53;
-    --onyx-faint: #6f6f67;
+    --onyx-faint: #66665f;
     --onyx-accent: #9a5f00;
     --onyx-accent-hover: #7f4e00;
     --onyx-accent-soft: rgba(154, 95, 0, 0.12);
@@ -238,6 +238,7 @@ html, body {
   background: var(--onyx-panel-2);
   padding: 6px 10px;
 }
+:where(.onyx-shell) :where(input, textarea, select) { border-color: var(--onyx-line-strong); }
 :where(.onyx-shell) :where(button) { cursor: pointer; }
 :where(.onyx-shell) :where(button):disabled { cursor: default; opacity: 0.5; }
 :where(.onyx-shell) :where(input, textarea)::placeholder { color: var(--onyx-dim); opacity: 1; }
@@ -640,7 +641,7 @@ html, body {
   flex: 1;
   min-width: 0;
   background: var(--onyx-bg);
-  border: 1px solid var(--onyx-line);
+  border: 1px solid var(--onyx-line-strong);
   border-radius: 6px;
   color: var(--onyx-text);
   font: inherit;
@@ -648,7 +649,6 @@ html, body {
 }
 
 .onyx-composer input:focus {
-  outline: none;
   border-color: var(--onyx-accent);
 }
 
@@ -1183,7 +1183,8 @@ html, body {
 .onyx-account-hint { margin: 0 0 8px; font-size: 12px; color: var(--onyx-dim); }
 .onyx-account-guest { margin: 12px 0 0; color: var(--onyx-dim); }
 .onyx-account-pending { font-size: 12px; color: var(--onyx-dim); }
-.onyx-account-error { color: var(--onyx-bad); }
+.onyx-account-error { color: var(--onyx-bad); font-weight: 650; }
+.onyx-account-error::before { content: "\26A0\FE0E\00A0"; content: "\26A0\FE0E\00A0" / ""; }
 .onyx-account-empty { font-size: 13px; color: var(--onyx-dim); }
 
 .onyx-account-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
@@ -1833,11 +1834,12 @@ html, body {
 .onyx-connect-modes button[aria-pressed='true'] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
 .onyx-connect-form { display: flex; flex-direction: column; gap: 10px; }
 .onyx-connect-form label { font-weight: 600; }
-.onyx-connect-form input { width: 100%; min-height: 44px; background: var(--onyx-bg); }
+.onyx-connect-form input { width: 100%; min-height: 44px; background: var(--onyx-bg); border: 1px solid var(--onyx-line-strong); }
 .onyx-connect-hint, .onyx-connect-footnote { color: var(--onyx-dim); font-size: 13px; line-height: 1.6; margin: 0 0 8px; }
 .onyx-connect-footnote { margin: 24px 0 0; border-top: 1px solid var(--onyx-line); padding-top: 16px; }
 .onyx-connect-form .onyx-connect-primary { background: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; min-height: 44px; border-color: var(--onyx-accent); }
-.onyx-connect-error { color: var(--onyx-warn); margin: 16px 0 0; }
+.onyx-connect-error { color: var(--onyx-warn); margin: 16px 0 0; font-weight: 650; }
+.onyx-connect-error::before { content: "\26A0\FE0E\00A0"; content: "\26A0\FE0E\00A0" / ""; }
 .onyx-connect-status button { margin-top: 12px; }
 .onyx-conn { cursor: pointer; }
 
@@ -1906,12 +1908,13 @@ html, body {
 .onyx-gate-input {
   width: 100%; min-height: 44px; padding: 8px 12px;
   font: inherit; font-size: 16px; color: var(--onyx-text);
-  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: var(--r-sm);
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line-strong); border-radius: var(--r-sm);
 }
 .onyx-gate-input::placeholder { color: var(--onyx-dim); opacity: 1; }
 .onyx-gate-input:disabled { opacity: 0.6; }
 .onyx-gate-hint { margin: 0; color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
-.onyx-gate-error { margin: 0; color: var(--onyx-warn); line-height: 1.5; }
+.onyx-gate-error { margin: 0; color: var(--onyx-warn); line-height: 1.5; font-weight: 650; }
+.onyx-gate-error::before { content: "\26A0\FE0E\00A0"; content: "\26A0\FE0E\00A0" / ""; }
 .onyx-gate :focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
 .onyx-gate-primary,
 .onyx-gate-secondary {
