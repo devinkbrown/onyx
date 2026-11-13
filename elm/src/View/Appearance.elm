@@ -17,7 +17,7 @@ focus (as on the OnyxOS tabs).
 
 import App exposing (Model, Msg(..), backgroundDirty, renderedBackground)
 import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, img, label, main_, option, p, section, select, small, span, summary, text)
-import Html.Attributes exposing (alt, attribute, class, disabled, height, href, selected, src, style, tabindex, title, value, width)
+import Html.Attributes exposing (alt, attribute, class, disabled, for, height, href, id, selected, src, style, tabindex, title, value, width)
 import Html.Events exposing (on, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave)
 import Json.Decode as Decode
 import Prefs
@@ -52,11 +52,38 @@ clockLabels =
 view : Model -> Html Msg
 view model =
     let
+        -- Each theme lives in exactly one radiogroup, fixed regardless of
+        -- the selection: "Look" holds Match device + Ocean + Pearl, "All
+        -- looks" holds everything else. Moving a chip between groups on
+        -- select would shift focus onto a different theme's button.
         looks =
-            ThemeLook.buildDefaultLookEntries model.themeId model.customThemes
+            List.filter (not << .extra) (ThemeLook.buildDefaultLookEntries model.themeId model.customThemes)
 
         lookIds =
             List.map .id looks
+
+        lookTabbable =
+            if List.member model.themeId lookIds then
+                model.themeId
+
+            else
+                Maybe.withDefault "" (List.head lookIds)
+
+        staticLookIds =
+            ThemeLook.systemThemeId :: ThemeLook.publicThemeIds
+
+        allLookItems =
+            List.filter (\item -> not (List.member item.id staticLookIds))
+                ((ThemeLook.themeMeta |> List.map (\meta -> { id = meta.id, label = meta.label, title = meta.description, swatch = meta.swatch }))
+                    ++ List.map (\custom -> { id = custom.id, label = custom.name, title = "Saved look", swatch = [ "var(--lapis)", "var(--gold)", "var(--shu)" ] }) model.customThemes
+                )
+
+        allLookTabbable =
+            if List.any (\item -> item.id == model.themeId) allLookItems then
+                model.themeId
+
+            else
+                Maybe.withDefault "" (List.head (List.map .id allLookItems))
 
         dirty =
             backgroundDirty model
@@ -89,7 +116,7 @@ view model =
             , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Look" ]
                 , div [ class "ap-chips", attribute "role" "radiogroup", attribute "aria-label" "Look" ]
-                    (List.map (lookChip model lookIds) looks)
+                    (List.map (lookChip model lookTabbable lookIds) looks)
                 ]
             , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Text size" ]
@@ -209,20 +236,22 @@ view model =
                         , class "ap-choice-toggle"
                         , attribute "role" "switch"
                         , attribute "aria-checked" (if model.prefs.reduceMotion then "true" else "false")
+                        , attribute "aria-labelledby" "ap-reduce-motion-label"
                         , onClick AppearanceToggleReduceMotion
                         ]
-                        [ span [] [ text "Reduce motion" ]
-                        , b [] [ text (if model.prefs.reduceMotion then "On" else "Off") ]
+                        [ span [ id "ap-reduce-motion-label" ] [ text "Reduce motion" ]
+                        , b [ attribute "aria-hidden" "true" ] [ text (if model.prefs.reduceMotion then "On" else "Off") ]
                         ]
                     , button
                         [ Html.Attributes.type_ "button"
                         , class "ap-choice-toggle"
                         , attribute "role" "switch"
                         , attribute "aria-checked" (if model.sceneMotion == Prefs.SceneOff then "true" else "false")
+                        , attribute "aria-labelledby" "ap-less-data-label"
                         , onClick AppearanceToggleSceneMotion
                         ]
-                        [ span [] [ text "Use less data" ]
-                        , b [] [ text (if model.sceneMotion == Prefs.SceneOff then "On" else "Off") ]
+                        [ span [ id "ap-less-data-label" ] [ text "Use less data" ]
+                        , b [ attribute "aria-hidden" "true" ] [ text (if model.sceneMotion == Prefs.SceneOff then "On" else "Off") ]
                         ]
                     ]
                 ]
@@ -236,7 +265,7 @@ view model =
                     [ section [ class "ap-group" ]
                         [ h2 [ class "ap-glabel" ] [ text "All looks" ]
                         , div [ class "ap-chips", attribute "role" "radiogroup", attribute "aria-label" "All looks" ]
-                            (List.map (themeChip model) (ThemeLook.themeMeta |> List.map (\meta -> { id = meta.id, label = meta.label, title = meta.description, swatch = meta.swatch })) ++ List.map (themeChip model) (List.map (\custom -> { id = custom.id, label = custom.name, title = "Saved look", swatch = [ "var(--lapis)", "var(--gold)", "var(--shu)" ] }) model.customThemes))
+                            (List.map (themeChip model allLookTabbable (List.map .id allLookItems)) allLookItems)
                         ]
                     , section [ class "ap-group ap-background-stage" ]
                         [ div [ class "ap-background-stage__heading" ]
@@ -269,8 +298,8 @@ view model =
         ]
 
 
-lookChip : Model -> List String -> ThemeLook.LookEntry -> Html Msg
-lookChip model ids entry =
+lookChip : Model -> String -> List String -> ThemeLook.LookEntry -> Html Msg
+lookChip model tabbableId ids entry =
     let
         isOn =
             model.themeId == entry.id
@@ -282,7 +311,7 @@ lookChip model ids entry =
         , attribute "aria-checked" (if isOn then "true" else "false")
         , attribute "aria-label" (entry.label ++ " look")
         , title entry.title
-        , tabindex (if isOn then 0 else -1)
+        , tabindex (if entry.id == tabbableId then 0 else -1)
         , style "min-height" "44px"
         , style "touch-action" "manipulation"
         , on "keydown" (radioKey ids entry.id)
@@ -299,15 +328,17 @@ quietHours model =
     section [ class "ap-group", attribute "data-testid" "quiet-hours" ]
         [ h2 [ class "ap-glabel" ] [ text "Quiet hours" ]
         , p [ class "ap-desc" ] [ text (QuietHours.quietHoursSummary model.dndQuietStart model.dndQuietEnd) ]
-        , label [ class "ap-label" ] [ text "Start" ]
+        , label [ class "ap-label", for "ap-quiet-start" ] [ text "Start" ]
         , select
-            [ attribute "aria-label" "Quiet hours start"
+            [ id "ap-quiet-start"
+            , attribute "aria-label" "Quiet hours start"
             , on "change" (hourChange (\hour -> SetDndQuietHours hour model.dndQuietEnd))
             ]
             (List.map (hourOption model.dndQuietStart) (List.range 0 23))
-        , label [ class "ap-label" ] [ text "End" ]
+        , label [ class "ap-label", for "ap-quiet-end" ] [ text "End" ]
         , select
-            [ attribute "aria-label" "Quiet hours end"
+            [ id "ap-quiet-end"
+            , attribute "aria-label" "Quiet hours end"
             , on "change" (hourChange (\hour -> SetDndQuietHours model.dndQuietStart hour))
             ]
             (List.map (hourOption model.dndQuietEnd) (List.range 0 23))
@@ -369,9 +400,10 @@ languageTools model =
             ]
         , if model.translationAvailable then
             div [ class "ap-translation-target" ]
-                [ label [ class "ap-label" ] [ text "Translation language" ]
+                [ label [ class "ap-label", for "ap-translation-language" ] [ text "Translation language" ]
                 , select
-                    [ on "change" (Decode.at [ "target", "value" ] Decode.string |> Decode.map (\code -> TranslationTargetSet { target = code }))
+                    [ id "ap-translation-language"
+                    , on "change" (Decode.at [ "target", "value" ] Decode.string |> Decode.map (\code -> TranslationTargetSet { target = code }))
                     ]
                     (List.map
                         (\code -> option [ Html.Attributes.value code, Html.Attributes.selected (code == effective) ] [ text (Translate.languageLabel code) ])
@@ -390,6 +422,13 @@ languageTools model =
 same titles, short-form descriptions, and On/Off readout). -}
 privacySwitch : String -> Bool -> String -> String -> Html Msg
 privacySwitch key isOn title hint =
+    let
+        titleId =
+            "ap-privacy-" ++ key ++ "-label"
+
+        hintId =
+            "ap-privacy-" ++ key ++ "-hint"
+    in
     button
         [ Html.Attributes.type_ "button"
         , class "ap-choice-toggle"
@@ -401,32 +440,32 @@ privacySwitch key isOn title hint =
              else
                 "false"
             )
-        , attribute "aria-label" title
+        , attribute "aria-labelledby" titleId
+        , attribute "aria-describedby" hintId
         , onClick (AppearanceSetPref { key = key, value = if isOn then "false" else "true" })
         ]
-        [ span [] [ text title, small [] [ text hint ] ]
-        , b [] [ text (if isOn then "On" else "Off") ]
+        [ span [] [ span [ id titleId ] [ text title ], small [ id hintId ] [ text hint ] ]
+        , b [ attribute "aria-hidden" "true" ] [ text (if isOn then "On" else "Off") ]
         ]
 
 
 themeChip :
     Model
+    -> String
+    -> List String
     -> { id : String, label : String, title : String, swatch : List String }
     -> Html Msg
-themeChip model item =
+themeChip model tabbableId ids item =
     let
         isOn =
             model.themeId == item.id
-
-        ids =
-            List.map .id ThemeLook.themeMeta ++ List.map .id model.customThemes
     in
     button
         [ Html.Attributes.type_ "button"
         , class ("ap-chip ap-chip--theme" ++ (if isOn then " on" else ""))
         , attribute "role" "radio"
         , attribute "aria-checked" (if isOn then "true" else "false")
-        , tabindex (if isOn then 0 else -1)
+        , tabindex (if item.id == tabbableId then 0 else -1)
         , on "keydown" (radioKey ids item.id)
         , onClick (AppearanceSetTheme { id = item.id })
         ]
@@ -441,9 +480,9 @@ backgroundPicker model =
     div [ class "background-picker", attribute "role" "radiogroup", attribute "aria-label" "Background" ]
         (List.map
             (\( groupLabel, options ) ->
-                section [ class "background-picker__group", attribute "aria-label" groupLabel ]
-                    [ h3 [ class "background-picker__heading" ] [ text groupLabel ]
-                    , div [ class "background-picker__grid" ]
+                section [ class "background-picker__group", attribute "role" "presentation" ]
+                    [ h3 [ class "background-picker__heading", attribute "aria-hidden" "true" ] [ text groupLabel ]
+                    , div [ class "background-picker__grid", attribute "role" "presentation" ]
                         (List.map (backgroundOption model) options)
                     ]
             )

@@ -6,7 +6,7 @@ clears the password field before issuing IDENTIFY.
 -}
 
 import App exposing (ConnectionState(..), Model, Msg(..))
-import Html exposing (Html, button, dd, div, dl, dt, form, h2, input, label, p, span, text)
+import Html exposing (Attribute, Html, button, dd, div, dl, dt, form, h2, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, disabled, for, id, maxlength, name, placeholder, type_, value)
 import Nodes
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -115,19 +115,67 @@ status model =
         ]
 
 
+errorDetail : Model -> Maybe String
+errorDetail model =
+    case model.connectionDialogError of
+        Just local ->
+            Just local
+
+        Nothing ->
+            case model.accountActionError of
+                Just server ->
+                    if server.command == "IDENTIFY" then
+                        Just (if String.isEmpty server.description then "Sign-in failed. Check your account details." else server.description)
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+
+errorAttrs : Model -> List (Attribute Msg)
+errorAttrs model =
+    case errorDetail model of
+        Just _ ->
+            invalidAttrs
+
+        Nothing ->
+            []
+
+
+{-| The chat-name field is tied only to the dialog's own error, never to
+an IDENTIFY sign-in failure from the other mode. -}
+nickErrorAttrs : Model -> List (Attribute Msg)
+nickErrorAttrs model =
+    case model.connectionDialogError of
+        Just _ ->
+            invalidAttrs
+
+        Nothing ->
+            []
+
+
+invalidAttrs : List (Attribute Msg)
+invalidAttrs =
+    [ attribute "aria-invalid" "true", attribute "aria-describedby" "connection-error" ]
+
+
 nameForm : Model -> Html Msg
 nameForm model =
     form [ class "onyx-connect-form", onSubmit ConnectionNickSubmit ]
         [ label [ for "connection-nick" ] [ text "Choose a chat name" ]
         , input
-            [ id "connection-nick"
-            , type_ "text"
-            , value model.connectionNickDraft
-            , maxlength App.maxNickAliasLength
-            , attribute "autocomplete" "nickname"
-            , attribute "spellcheck" "false"
-            , onInput ConnectionNickInput
-            ]
+            ([ id "connection-nick"
+             , type_ "text"
+             , value model.connectionNickDraft
+             , maxlength App.maxNickAliasLength
+             , attribute "autocomplete" "nickname"
+             , attribute "spellcheck" "false"
+             , onInput ConnectionNickInput
+             ]
+                ++ nickErrorAttrs model
+            )
             []
         , p [ class "onyx-connect-hint" ] [ text "People see this name in rooms. The network confirms it before it changes." ]
         , button
@@ -161,24 +209,28 @@ signInForm model =
         ]
         [ label [ for "connection-account" ] [ text "Account name" ]
         , input
-            [ id "connection-account"
-            , type_ "text"
-            , value model.connectionAccountDraft
-            , attribute "autocomplete" "username"
-            , maxlength 64
-            , onInput ConnectionAccountInput
-            ]
+            ([ id "connection-account"
+             , type_ "text"
+             , value model.connectionAccountDraft
+             , attribute "autocomplete" "username"
+             , maxlength 64
+             , onInput ConnectionAccountInput
+             ]
+                ++ errorAttrs model
+            )
             []
         , customServerWarning model
         , label [ for "connection-password" ] [ text "Password" ]
         , input
-            [ id "connection-password"
-            , name "connection-password"
-            , type_ "password"
-            , attribute "autocomplete" "current-password"
-            , attribute "required" ""
-            , placeholder "Your account password"
-            ]
+            ([ id "connection-password"
+             , name "connection-password"
+             , type_ "password"
+             , attribute "autocomplete" "current-password"
+             , attribute "required" ""
+             , placeholder "Your account password"
+             ]
+                ++ errorAttrs model
+            )
             []
         , p [ class "onyx-connect-hint" ] [ text "Use an account you already have on this network." ]
         , if model.identifyReplyAccount /= Nothing then
@@ -200,27 +252,9 @@ signInForm model =
 
 error : Model -> Html Msg
 error model =
-    let
-        detail =
-            case model.connectionDialogError of
-                Just local ->
-                    Just local
-
-                Nothing ->
-                    case model.accountActionError of
-                        Just server ->
-                            if server.command == "IDENTIFY" then
-                                Just (if String.isEmpty server.description then "Sign-in failed. Check your account details." else server.description)
-
-                            else
-                                Nothing
-
-                        Nothing ->
-                            Nothing
-    in
-    case detail of
+    case errorDetail model of
         Just message ->
-            p [ class "onyx-connect-error", attribute "role" "alert" ] [ text message ]
+            p [ class "onyx-connect-error", attribute "role" "alert", id "connection-error" ] [ text message ]
 
         Nothing ->
             text ""

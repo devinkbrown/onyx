@@ -689,6 +689,7 @@ type alias Model =
     , showPinnedMessages : Bool
     , pinsLoadFeedback : String
     , totpCodeInput : String
+    , totpDisableArmed : Bool
     , certFingerprint : String
     , totpSecretCopy : TotpCopy
     , totpOtpauthCopy : TotpCopy
@@ -1031,6 +1032,7 @@ type alias Model =
     , accountSessions : List Session.AccountSessionRow
     , accountSessionsPending : Bool
     , accountSessionsError : Maybe String
+    , sessionDropArmed : Maybe String
     }
 
 
@@ -2943,6 +2945,9 @@ type Msg
     | SessionLogoutRequested
     | TotpEnrollRequested
     | TotpDisableRequested
+    | TotpDisableArmed
+    | TotpDisableConfirmed
+    | TotpDisableCancelled
     | TotpStatusRequested
     | TotpCodeInput String
     | TotpConfirmSubmitted
@@ -3036,6 +3041,9 @@ type Msg
     | CustomStatusDialogClosed
     | IdentityProfileLoaded { status : String, expiryMs : Maybe Float }
     | SessionDropRequested { index : Int }
+    | SessionDropArmed { rowRef : String }
+    | SessionDropConfirmed
+    | SessionDropCancelled
     | WhoisRequest String
     | WhoisClose
     | WhoisTimeoutElapsed { nick : String, gen : Int }
@@ -3457,6 +3465,7 @@ init nick url =
     , showPinnedMessages = False
     , pinsLoadFeedback = ""
     , totpCodeInput = ""
+    , totpDisableArmed = False
     , certFingerprint = ""
     , totpSecretCopy = TotpCopyIdle
     , totpOtpauthCopy = TotpCopyIdle
@@ -3989,6 +3998,7 @@ init nick url =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    , sessionDropArmed = Nothing
     }
 
 
@@ -4054,6 +4064,7 @@ blank =
     , showPinnedMessages = False
     , pinsLoadFeedback = ""
     , totpCodeInput = ""
+    , totpDisableArmed = False
     , certFingerprint = ""
     , totpSecretCopy = TotpCopyIdle
     , totpOtpauthCopy = TotpCopyIdle
@@ -4571,6 +4582,7 @@ blank =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    , sessionDropArmed = Nothing
     }
 
 
@@ -5607,6 +5619,7 @@ foldLine model message =
                             , vhostRefreshAccount = Nothing
                             , accountInfoReplyAccount = Nothing
                             , totpCodeInput = ""
+                            , totpDisableArmed = False
                             , certFingerprint = ""
                             , totpSecretCopy = TotpCopyIdle
                             , totpOtpauthCopy = TotpCopyIdle
@@ -5616,6 +5629,7 @@ foldLine model message =
                             , passkeyRenamingId = Nothing
                             , passkeyRenameValue = ""
                             , passkeyRemoveArmed = Nothing
+                            , sessionDropArmed = Nothing
                             , accountEmail = ""
                             , accountEmailPassword = ""
                             , accountEmailError = Nothing
@@ -10056,6 +10070,7 @@ quarantineOwnerChange model =
             , sessionRecoveryExpectedAccount = Nothing
             , passkeyManagementView = Nothing
             , sessionInventoryView = Nothing
+            , sessionDropArmed = Nothing
             , selectedContinuationRef = Nothing
             , webAuthnObservationView = Nothing
     , attachments = []
@@ -10105,6 +10120,7 @@ quarantineOwnerChange model =
             , accountInfoPending = False
             , accountActionError = Nothing
             , totp = blankTotp
+            , totpDisableArmed = False
             , banAdd = blankBanAdd
             , recoveryCodes = blankRecoveryCodes
             , personas = []
@@ -30403,7 +30419,10 @@ foldTotpNotice model message =
                         in
                         Just
                             ( logService
-                                { model | totp = { settled | busy = False } }
+                                { model
+                                    | totp = { settled | busy = False }
+                                    , totpDisableArmed = model.totpDisableArmed && settled.status == TotpActive
+                                }
                                 ("Account: " ++ text)
                             , []
                             )
@@ -40337,6 +40356,7 @@ updateRaw msg initialModel =
                             , pendingSecurityFormRequest = Nothing
                             , sessionTokenSaslRequestId = Nothing
                             , totp = blankTotp
+                            , totpDisableArmed = False
                             , recoveryCodes = blankRecoveryCodes
                             , recoveryPassword = ""
                           }
@@ -41135,6 +41155,7 @@ updateRaw msg initialModel =
                         else
                             ( { model
                                 | sessionInventoryView = Just view
+                                , sessionDropArmed = Nothing
                                 , sessionRevocationView = if view.mode == "mesh" then model.sessionRevocationView else Nothing
                                 , accountSessionsPending = List.member view.status [ "pending", "partial" ]
                                 , accountSessionsError =
@@ -43182,7 +43203,7 @@ updateRaw msg initialModel =
                 ( refreshed, openOut ++ sessionOut )
 
         SetAccountOpen False ->
-            ( { model | accountOpen = False }, [] )
+            ( { model | accountOpen = False, totpDisableArmed = False, sessionDropArmed = Nothing, passkeyRemoveArmed = Nothing }, [] )
 
         ScheduleOpen ->
             openSchedulePopover model
@@ -43938,6 +43959,15 @@ updateRaw msg initialModel =
         TotpDisableRequested ->
             requestTotpDisable model
 
+        TotpDisableArmed ->
+            ( { model | totpDisableArmed = True }, [ FocusElement "account-totp-disable-confirm" ] )
+
+        TotpDisableConfirmed ->
+            requestTotpDisable { model | totpDisableArmed = False }
+
+        TotpDisableCancelled ->
+            ( { model | totpDisableArmed = False }, [ FocusElement "account-totp-disable" ] )
+
         TotpStatusRequested ->
             requestTotpStatus model
 
@@ -44238,7 +44268,7 @@ updateRaw msg initialModel =
             ( { model | passkeyRenamingId = Nothing, passkeyRenameValue = "" }, [] )
 
         PasskeyRemoveArmed id ->
-            ( { model | passkeyRemoveArmed = Just id }, [] )
+            ( { model | passkeyRemoveArmed = Just id }, [ FocusElement "account-passkey-remove-go" ] )
 
         PasskeyRemoveConfirmed ->
             case model.passkeyRemoveArmed of
@@ -44324,6 +44354,40 @@ updateRaw msg initialModel =
 
                             Just line ->
                                 ( next, [ SendLine line ] )
+
+        SessionDropArmed { rowRef } ->
+            ( { model | sessionDropArmed = Just rowRef }, [ FocusElement "account-session-drop-confirm" ] )
+
+        SessionDropConfirmed ->
+            -- The arm holds the row's opaque ref, never the display ordinal,
+            -- so a renumbered inventory cannot retarget the confirm.
+            case model.sessionDropArmed of
+                Just rowRef ->
+                    let
+                        disarmed =
+                            { model | sessionDropArmed = Nothing }
+                    in
+                    case model.sessionInventoryView |> Maybe.map .localRows |> Maybe.withDefault [] |> List.filter (\row -> row.rowRef == rowRef) |> List.head of
+                        Just row ->
+                            update (SessionDropRequested { index = row.index }) disarmed
+
+                        Nothing ->
+                            ( { disarmed | accountSessionsPending = False, accountSessionsError = Just "Refresh the session list before selecting a session to sign out." }, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        SessionDropCancelled ->
+            let
+                refocus =
+                    case model.sessionDropArmed |> Maybe.andThen (\ref -> model.sessionInventoryView |> Maybe.map .localRows |> Maybe.withDefault [] |> List.filter (\row -> row.rowRef == ref) |> List.head) of
+                        Just row ->
+                            [ FocusElement ("account-session-drop-" ++ String.fromInt row.index) ]
+
+                        Nothing ->
+                            []
+            in
+            ( { model | sessionDropArmed = Nothing }, refocus )
 
         SessionDropRequested { index } ->
             -- Local SESSION leases use opaque row refs. The ordinal remains
