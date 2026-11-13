@@ -46,7 +46,7 @@ view model =
                 , a [ class "r-btn ghost", href "#keep-here" ] [ text "Keep it on this device" ]
                 ]
             ]
-        , section [ id "keep-here", class "r-wrap r-section dl-browser-section", attribute "aria-labelledby" "browser-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "keep-here", class "r-wrap r-section dl-browser-section", attribute "aria-labelledby" "browser-heading" ]
             [ div [ class "dl-section-intro" ]
                 [ p [ class "dl-kicker" ] [ text "Browser first" ]
                 , h2 [ id "browser-heading", class "dl-section-title" ] [ text "Keep Onyx on this device" ]

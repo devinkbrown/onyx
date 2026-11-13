@@ -50,13 +50,25 @@ view model =
                 [ text "See where people are talking, follow the network’s rhythm, and step directly into a public conversation. No member rankings. No message text." ]
              , div
                 [ class "stats-observation"
-                , attribute "data-feed-state" stateKey
                 , attribute "role" "status"
                 , attribute "aria-live" "polite"
                 , attribute "aria-atomic" "true"
+                , attribute "data-feed-state" stateKey
                 ]
                 [ span [ class "stats-observation__marker", attribute "aria-hidden" "true" ] []
                 , text (Stats.feedStateLabel state)
+                , span [ class "sr-only" ]
+                    [ text
+                        (". Window: " ++ String.fromInt model.statsWindow ++ " days."
+                        ++ (if String.isEmpty model.statsInspected then "" else " Inspecting " ++ model.statsInspected ++ ".")
+                        ++ (if List.isEmpty model.statsCompare then "" else " Comparing " ++ String.join ", " model.statsCompare ++ ".")
+                        ++ (case model.statsShare of
+                                App.StatsShareCopied -> " Comparison link copied."
+                                App.StatsShareFailed -> " Comparison link could not be copied."
+                                _ -> ""
+                           )
+                        )
+                    ]
                 ]
              ]
                 ++ heroData model state stateKey
@@ -217,7 +229,7 @@ feedTimeline model state stateKey =
                 )
                 (Stats.statsFeedTimeline state (model.statsIndex /= Nothing))
             )
-        , p [ class "stats-feed-timeline-note", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+        , p [ class "stats-feed-timeline-note" ]
             [ text (Stats.feedTimelineNote state model.statsIndex model.nowMs) ]
         ]
 
@@ -284,7 +296,7 @@ overviewSection model state _ =
                 Just index ->
                     index.networkDaysComplete
     in
-    section [ id "network-overview", class "r-wrap r-section data-grid stats-overview", attribute "aria-label" "Activity detail" ]
+    section [ Html.Attributes.tabindex -1, id "network-overview", class "r-wrap r-section data-grid stats-overview", attribute "aria-label" "Activity detail" ]
         [ article [ class "data-card" ]
             [ div [ class "stats-card-heading" ]
                 [ span [ class "label" ] [ text "network pulse" ]
@@ -306,7 +318,7 @@ overviewSection model state _ =
                     [ windowButton model windowState 7 "Latest 7 days" "7 days"
                     , windowButton model windowState 14 "Latest 14 days" "14 days"
                     ]
-                , p [ class "stats-window-status", attribute "data-window-state" windowKey, attribute "role" "status", attribute "aria-live" "polite" ]
+                , p [ class "stats-window-status", attribute "data-window-state" windowKey ]
                     [ text (Stats.activityWindowStatus state windowState model.statsWindow windowed) ]
                 ]
             , if List.isEmpty windowDays then
@@ -439,7 +451,7 @@ inspectorSection model =
             ]
         , case statsMatchingDetail model of
             Nothing ->
-                div [ class "data-empty", attribute "role" "status" ]
+                div [ class "data-empty" ]
                     [ text
                         (if statsInspectorAwaiting model then
                             "Loading " ++ (if String.isEmpty room then "room" else room) ++ " insights…"
@@ -728,7 +740,8 @@ comparisonSection model state stateKey =
                     "Copy link"
     in
     section
-        [ id "room-comparison"
+        [ Html.Attributes.tabindex -1
+        , id "room-comparison"
         , class "r-wrap r-section public-room-comparison"
         , attribute "data-feed-state" stateKey
         , attribute "data-testid" "public-room-comparison"
@@ -767,8 +780,6 @@ comparisonSection model state stateKey =
         , if model.statsShare == App.StatsShareCopied || model.statsShare == App.StatsShareFailed then
             p
                 [ class "public-room-comparison__share-status"
-                , attribute "role" (if model.statsShare == App.StatsShareFailed then "alert" else "status")
-                , attribute "aria-live" "polite"
                 ]
                 [ text
                     (if model.statsShare == App.StatsShareCopied then
@@ -783,7 +794,7 @@ comparisonSection model state stateKey =
             text ""
         , div [ class "public-room-comparison__ledger", attribute "data-state" (Stats.stepState state) ]
             [ span [ class "public-room-comparison__marker", attribute "aria-hidden" "true" ] []
-            , p [ attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+            , p []
                 [ text (Stats.feedNote state (List.length model.statsCompare) missingRooms) ]
             ]
         , if List.isEmpty channels then
@@ -802,7 +813,7 @@ comparisonSection model state stateKey =
 
           else
             div []
-                [ p [ class "public-room-comparison__selection", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+                [ p [ class "public-room-comparison__selection" ]
                     [ text (Stats.selectionCopy (List.length model.statsCompare) (List.length channels)) ]
                 , if List.isEmpty selectedRooms then
                     text ""
@@ -878,7 +889,7 @@ comparisonSection model state stateKey =
                                     ]
                                 ]
                             ]
-                        , p [ class "public-room-comparison__headline", attribute "aria-live" "polite" ]
+                        , p [ class "public-room-comparison__headline" ]
                             [ text (Stats.compareHeadline selectedRooms) ]
                         ]
                 ]
@@ -916,7 +927,7 @@ roomsSection model =
                 |> Maybe.map Tuple.second
                 |> Maybe.withDefault "Messages"
     in
-    section [ id "rooms", class "r-wrap r-section stats-rooms-section", attribute "aria-labelledby" "rooms-heading" ]
+    section [ Html.Attributes.tabindex -1, id "rooms", class "r-wrap r-section stats-rooms-section", attribute "aria-labelledby" "rooms-heading" ]
         [ span [ class "r-eyebrow" ] [ text "Public room directory" ]
         , h2 [ class "r-title", id "rooms-heading" ] [ text "Find the conversation" ]
         , p [ class "stats-section-note" ]

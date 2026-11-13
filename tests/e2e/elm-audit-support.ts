@@ -40,7 +40,7 @@ export async function boot(page: Page, query = '&nick=kai', wireOptions: Record<
 }
 
 export async function waitLive(page: Page) {
-  await expect(page.getByTestId('connection-open')).toHaveAccessibleName(/Live/, { timeout: 15_000 });
+  await expect(page.getByTestId('connection-open')).toHaveAccessibleName(/^Connected, connection settings$/, { timeout: 15_000 });
 }
 
 export async function openRooms(page: Page) {

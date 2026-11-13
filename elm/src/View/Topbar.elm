@@ -32,7 +32,7 @@ topbar model =
           inbox model
         , button
             [ type_ "button"
-            , attribute "aria-label" ("Connection. " ++ connectionLabel model)
+            , attribute "aria-label" (connectionWord model ++ ", connection settings")
             , attribute "aria-haspopup" "dialog"
             , attribute "data-testid" "connection-open"
             , onClick ConnectionDialogOpen

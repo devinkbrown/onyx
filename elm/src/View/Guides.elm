@@ -154,6 +154,7 @@ howtoCard completed howto =
                         ""
                    )
             )
+        , Attr.tabindex -1
         , id howto.id
         ]
         ([ div [ class "guides-card__meta" ]
@@ -350,7 +351,7 @@ view surface model =
                                )
                         )
                     ]
-                , article [ class "guides-card guides-card--principles", id "together" ]
+                , article [ class "guides-card guides-card--principles", id "together", Attr.tabindex -1 ]
                     [ div [ class "label" ] [ text "How we treat each other" ]
                     , h2 [] [ text "Be kind, then talk" ]
                     , p []

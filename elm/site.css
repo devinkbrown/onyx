@@ -167,6 +167,7 @@ html:has(.site-landing) { scroll-padding-top: calc(var(--s-header-h, 64px) + 16p
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
   background: var(--s-bg);
   color: var(--s-ink);
@@ -467,9 +468,11 @@ html:has(.site-landing) { scroll-padding-top: calc(var(--s-header-h, 64px) + 16p
 
   /* Phone menu: a panel under the masthead, primary pair first. */
   .site-frame .site-nav,
+  .site-landing .site-nav,
   .site-nav--inline { display: none; }
 
   .site-frame .site-nav.is-open,
+  .site-landing .site-nav.is-open,
   .site-nav--panel {
     position: absolute;
     top: 100%;
@@ -2574,6 +2577,7 @@ nav.onyxos-sections a.is-active { border-color: var(--s-accent-line); color: var
   .site-nav.is-open a[aria-current="page"],
   .site-nav--panel a[aria-current="page"] { border-radius: 0; background: none; box-shadow: inset 3px 0 0 var(--s-accent); }
   .site-frame .site-nav.is-open,
+  .site-landing .site-nav.is-open,
   .site-nav--panel {
     padding-left: max(var(--s-gutter), env(safe-area-inset-left));
     padding-right: max(var(--s-gutter), env(safe-area-inset-right));
@@ -4870,9 +4874,9 @@ nav.onyxos-sections a.is-active { border-color: var(--s-accent-line); color: var
 /* ---------- Accessibility floors ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .site-landing *,
-  .site-frame *,
-  .ap * {
+  .site-landing *, .site-landing *::before, .site-landing *::after,
+  .site-frame *, .site-frame *::before, .site-frame *::after,
+  .ap *, .ap *::before, .ap *::after {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
@@ -4975,3 +4979,17 @@ html[data-surface="site"][data-theme]:has(main.ap), html[data-surface="site"][da
 .ap :is(.ap-swatch, .ap-theme-swatch) > span:nth-child(2) { left: 24px; top: 12px; width: 24px; height: 4px; box-shadow: 0 7px 0 0 currentColor; opacity: 0.9; }
 .ap .ap-chip--theme.on .ap-swatch, .ap .ap-theme-chip--on .ap-theme-swatch { outline: 2px solid var(--s-accent); outline-offset: 1px; }
 .channel-spark-bars > i { display: block; flex: 1; min-height: 2px; height: calc(var(--h, 5) * 1%); background: var(--s-bar); border-radius: 1px 1px 0 0; }
+
+@media (forced-colors: active) {
+  .ap-back-icon, .data-bar, .data-chart .data-bar, .stats-hour-chart i,
+  .channel-spark-bars > span, .channel-spark-bars > i {
+    background-color: CanvasText;
+    forced-color-adjust: none;
+  }
+  .stats-heatmap td {
+    background: color-mix(in srgb, CanvasText var(--heat, 4%), Canvas);
+    border: 1px solid CanvasText;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+}

@@ -61,7 +61,7 @@ attentionSuffix att =
     else
         ", "
             ++ String.fromInt att.count
-            ++ " unread"
+            ++ (if att.count == 1 then " conversation with unread" else " conversations with unread")
             ++ (if att.mention then
                     ", with mentions"
 

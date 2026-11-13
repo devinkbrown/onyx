@@ -11,7 +11,7 @@ images live in `elm/marketing/` as WebP with a JPEG fallback at 1x and
 Structure (top to bottom):
 
   - Masthead shared with every public page (`PublicFrame.masthead`,
-    stateless variant — `View` renders the landing without `Model`).
+    with the same Escape-aware navigation state).
   - Hero: what Onyx is, one primary action (Open Onyx) and one
     secondary (the public room), then the app itself on a laptop and a
     phone.
@@ -26,7 +26,7 @@ Structure (top to bottom):
 
 -}
 
-import App exposing (Msg(..))
+import App exposing (Model, Msg(..))
 import Html exposing (Html, a, div, h1, h2, h3, img, li, main_, p, section, span, strong, text, ul)
 import Html.Attributes exposing (alt, attribute, class, height, href, id, src, tabindex, width)
 import View.PublicFrame as PublicFrame
@@ -154,7 +154,7 @@ extras =
     [ ( "voice", "Voice calls in the room", "Start a call inside any room, right in the browser. Joining is always a choice — a call never pulls you in. Sign in to start one." )
     , ( "install", "Keep it like an app", "Add Onyx to your home screen or dock from a supporting browser. Same rooms, same people, no app store." )
     , ( "device", "History on your device", "Recent messages are kept in this browser, so rooms open fast and your search covers what you have already seen." )
-    , ( "mesh", "Runs on Onyx Server", "Onyx connects to a mesh of linked Onyx Server nodes and picks the fastest one near you." )
+    , ( "mesh", "Runs on Onyx Server", "Onyx connects to the hosted Onyx Server node. The server engine supports linked networks." )
     , ( "palette", "Make it yours", "Light and dark looks, text size, density, and a theme studio for the details." )
     , ( "code", "Open source", "The client is AGPL-3.0. Read it, run it, or host your own Onyx Server." )
     ]
@@ -169,11 +169,11 @@ steps =
 
 
 {-| The landing surface. -}
-landing : Html Msg
-landing =
+landing : Model -> Html Msg
+landing model =
     div [ class "site-landing" ]
         [ a [ class "site-skip", href "#site-main" ] [ text "Skip to content" ]
-        , PublicFrame.masthead Nothing "/"
+        , PublicFrame.masthead (Just model.navMenuOpen) "/"
         , main_ [ id "site-main", class "site-landing-main", tabindex -1, attribute "aria-label" "Onyx home" ]
             [ hero
             , factStrip

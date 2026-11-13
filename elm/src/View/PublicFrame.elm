@@ -22,9 +22,8 @@ under the masthead carrying the primary pair plus the secondary
 destinations (ported from the v3 public frame); on wider screens the
 primary pair sits inline and the footer carries the rest.
 
-The landing page renders without `Model` (see `View`), so `masthead`
-also has a stateless mode: the same inline links on wide screens and a
-native `<details>` disclosure on phones — no state to keep in sync.
+Landing shares the stateful menu with the other public routes. The
+optional stateless masthead remains available for standalone rendering.
 
 -}
 
@@ -194,13 +193,8 @@ masthead menu currentPath =
                                     "false"
                                 )
                             , attribute "aria-controls" "public-primary-navigation"
-                            , attribute "aria-label"
-                                (if open then
-                                    "Close navigation menu"
-
-                                 else
-                                    "Open navigation menu"
-                                )
+                            , id "public-menu-toggle"
+                            , attribute "aria-label" "Navigation menu"
                             , onClick ToggleNavMenu
                             ]
                             [ menuIcon, span [ class "site-menu-label" ] [ text "Menu" ] ]
@@ -274,8 +268,5 @@ frame model currentPath mainLabel context children =
                 text ""
         , main_ [ id "site-main", class "site-body", tabindex -1, attribute "aria-label" mainLabel ] children
 
-        -- Ported from v3/rx-public: the frame node persists across
-        -- public pages, so a changed label is announced on SPA moves.
-        , p [ class "sr-only", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true", attribute "data-testid" "route-announcer" ] [ text mainLabel ]
         , footer currentPath "Explore Onyx"
         ]

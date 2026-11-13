@@ -90,7 +90,7 @@ test('connection recovery remains keyboard operable after a failed mock registra
   await expect(inboxBell).toBeFocused();
 
   const connectionOpener = page.getByTestId('connection-open');
-  await expect(connectionOpener).toHaveAccessibleName('Connection. Offline');
+  await expect(connectionOpener).toHaveAccessibleName('Offline, connection settings');
   await tabUntil(page, active => active.testId === 'connection-open');
   await expect(connectionOpener).toBeFocused();
   await page.keyboard.press('Enter');
@@ -109,7 +109,7 @@ test('connection recovery remains keyboard operable after a failed mock registra
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(connectionOpener).toBeFocused();
-  await expect(connectionOpener).toHaveAccessibleName('Connection. Live');
+  await expect(connectionOpener).toHaveAccessibleName('Connected, connection settings');
 
   // UI slice 2 (audit C1/C2): a reconnect no longer wipes the inbox; the one
   // coalesced connection-lost row is cleared by the successful

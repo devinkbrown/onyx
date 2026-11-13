@@ -339,7 +339,7 @@ railItem model channel =
                         ]
                     , attribute "aria-hidden" "true"
                     ]
-                    [ text (if channel.unread > 99 then "99+" else String.fromInt channel.unread) ]
+                    [ text ((if channel.highlights > 0 then "@" else "") ++ (if channel.unread > 99 then "99+" else String.fromInt channel.unread)) ]
 
               else
                 text ""
