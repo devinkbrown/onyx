@@ -272,7 +272,7 @@ viewSuite =
                 render (feed inRoom ":carol!u@h PRIVMSG #d :hi me")
                     |> Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "nav-rooms") ]
                     |> Query.first
-                    |> Query.has [ Selector.text ", 1 unread" ]
+                    |> Query.has [ Selector.text ", 1 conversation with unread" ]
         , test "Rooms shows only rooms; Messages only direct conversations; Home both" <|
             \_ ->
                 let

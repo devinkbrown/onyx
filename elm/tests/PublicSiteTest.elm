@@ -90,21 +90,20 @@ suite =
                     query { blank | route = Route.Landing }
                         |> Query.find [ Selector.class "site-trust" ]
                         |> Query.has [ Selector.text "Encrypted rooms seal messages between enrolled devices (new; security review pending)." ]
-            , test "stateless masthead offers a native phone menu with every destination" <|
+            , test "landing masthead offers the shared menu with every destination" <|
                 \_ ->
                     let
-                        menu =
+                        page =
                             query { blank | route = Route.Landing }
-                                |> Query.find [ Selector.class "site-menu-details" ]
                     in
                     Expect.all
-                        [ \_ -> menu |> Query.has [ Selector.tag "details" ]
+                        [ \_ ->
+                            page
+                                |> Query.find [ Selector.id "public-menu-toggle" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Navigation menu"), Selector.attribute (Attr.attribute "aria-expanded" "false") ]
                         , \_ ->
-                            menu
-                                |> Query.find [ Selector.tag "summary" ]
-                                |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Navigation menu") ]
-                        , \_ ->
-                            menu
+                            page
+                                |> Query.find [ Selector.id "public-primary-navigation" ]
                                 |> Query.findAll [ Selector.tag "a" ]
                                 |> Query.count (Expect.equal (List.length primaryNav + List.length moreNav))
                         ]
@@ -138,7 +137,7 @@ suite =
                         |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "route-announcer") ]
                         |> Query.has
                             [ Selector.attribute (Attr.attribute "aria-live" "polite")
-                            , Selector.text "Onyx network status"
+                            , Selector.text "Are the rooms up tonight?"
                             ]
             , test "main is a focus target for the skip link" <|
                 \_ ->
@@ -161,7 +160,7 @@ suite =
                                 |> Query.find [ Selector.class "site-menu-toggle" ]
                                 |> Query.has
                                     [ Selector.attribute (Attr.attribute "aria-expanded" "true")
-                                    , Selector.attribute (Attr.attribute "aria-label" "Close navigation menu")
+                                    , Selector.attribute (Attr.attribute "aria-label" "Navigation menu")
                                     ]
                         , \_ ->
                             query opened

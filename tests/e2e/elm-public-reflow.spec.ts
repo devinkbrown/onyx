@@ -49,6 +49,7 @@ test('primary action is legible and public navigation stays keyboard reachable',
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
   await page.keyboard.press('Enter');
+  await expect(page.locator('#site-main')).toBeFocused();
   const toggle = page.locator('.site-menu-toggle');
   await toggle.focus();
   await page.keyboard.press('Enter');

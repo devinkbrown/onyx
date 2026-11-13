@@ -19,8 +19,8 @@ import Dict
 import Invite exposing (inviteTitle)
 import Media
 import Browser
-import Html exposing (Html, div, main_)
-import Html.Attributes exposing (attribute, class, classList, id, style)
+import Html exposing (Html, a, div, main_, p, text)
+import Html.Attributes exposing (attribute, class, classList, href, id, style, tabindex)
 import Route
 import Guides exposing (surfaceForRoute, surfaceTitle)
 import View.Connection
@@ -67,7 +67,11 @@ view : Model -> Browser.Document Msg
 view model =
     { title = documentTitle model
     , body =
-        [ div [ id "app", style "display" "contents" ] (viewBody model) ]
+        [ div [ id "app", style "display" "contents" ]
+            [ p [ class "sr-only", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true", attribute "data-testid" "route-announcer" ] [ text (routeHeading model) ]
+            , div [ style "display" "contents" ] (viewBody model)
+            ]
+        ]
     }
 
 
@@ -87,7 +91,7 @@ viewBody model =
                     Nothing ->
                         case model.route of
                             Route.Landing ->
-                                [ landing ]
+                                [ landing model ]
 
                             Route.About ->
                                 View.About.route model
@@ -207,7 +211,8 @@ shell model =
         , attribute "data-collection-open" (boolString model.clientRoomsOpen)
         , attribute "data-calls" (boolString model.callsOpen)
         ]
-        [ View.Nav.primaryNav model
+        [ a [ class "site-skip", href "#onyx-main" ] [ text "Skip to content" ]
+        , View.Nav.primaryNav model
         , div [ class "onyx-shell-column" ] (shellColumn model)
         , View.Nav.mobileNav model
         ]
@@ -238,7 +243,7 @@ shellColumn model =
                     []
                )
             ++ [ if model.callsOpen then
-                    main_ [ class "onyx-main onyx-main-calls" ]
+                    main_ [ id "onyx-main", tabindex -1, class "onyx-main onyx-main-calls" ]
                         [ callsHub model.calls model.activeChannel ((if model.mediaControlViewOwner == model.runtimeOwnerStamp then model.mediaControlView else Nothing) |> Maybe.andThen .call |> Maybe.map .callRef) model.callSelfMuted model.callSelfDeafened model.mediaQualityView (model.mediaQualityViewOwner == model.runtimeOwnerStamp) (model.runtimeDomainPending /= Nothing)
                         , mediaControlPanel model.mediaControlView (model.mediaControlViewOwner == model.runtimeOwnerStamp) model.activeChannel
                             (model.activeChannel |> Maybe.map (String.toLower >> (\room -> Dict.get room model.media.transcripts |> Maybe.withDefault [])) |> Maybe.withDefault [])
@@ -256,7 +261,7 @@ shellColumn model =
 
                  else if model.navSection == Nav.Home then
                     main_
-                        [ class "onyx-main onyx-main-home"
+                        [ id "onyx-main", tabindex -1, class "onyx-main onyx-main-home"
                         , classList [ ( "onyx-main-rooms-open", model.clientRoomsOpen ), ( "onyx-main-advanced", model.advancedOpen ) ]
                         ]
                         [ rail model
@@ -266,7 +271,7 @@ shellColumn model =
 
                  else
                     main_
-                        [ class "onyx-main"
+                        [ id "onyx-main", tabindex -1, class "onyx-main"
                         , classList
                             [ ( "onyx-main-rooms-open", model.clientRoomsOpen )
                             , ( "onyx-main-members-open", model.clientMembersOpen )
@@ -314,3 +319,69 @@ advancedPanel model =
 
     else
         Html.text ""
+
+
+{-| Keep the announcement in the persistent document root, including Landing. -}
+routeHeading : Model -> String
+routeHeading model =
+    case pageForRoute model.route of
+        Just page ->
+            (View.PublicInfo.content page).title
+
+        Nothing ->
+            case model.route of
+                Route.Landing ->
+                    "Rooms, DMs, and calls for your people."
+
+                Route.About ->
+                    "Rooms for people you already like."
+
+                Route.Download ->
+                    "Get Onyx on this device"
+
+                Route.Stats ->
+                    "The rooms in motion"
+
+                Route.Status ->
+                    "Are the rooms up tonight?"
+
+                Route.Roadmap ->
+                    "Rooms, calls, catch-up, and a Home Screen."
+
+                Route.Guides ->
+                    "Guides — getting started"
+
+                Route.Community ->
+                    "Community — getting started"
+
+                Route.Appearance ->
+                    "Appearance"
+
+                Route.Privacy ->
+                    "What we actually keep"
+
+                Route.Guidelines ->
+                    "House rules"
+
+                Route.Contact ->
+                    "Contact"
+
+                Route.Onyxos ->
+                    "Communication, at home in the system."
+
+                Route.NotFound ->
+                    "Route terminus"
+
+                Route.Invite ->
+                    let
+                        card =
+                            inviteCard model
+                    in
+                    if card.channel == Just "#root" then
+                        "Join #root"
+
+                    else
+                        Invite.inviteHeadline card
+
+                _ ->
+                    "Onyx"

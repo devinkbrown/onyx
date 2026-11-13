@@ -49,8 +49,8 @@ accessibilityTopics =
       , summary = "Onyx uses an OKLCH theme system with mechanically-derived high-contrast variants."
       , points =
             [ "The interface honors prefers-contrast: more."
-            , "Transparency-sensitive surfaces honor prefers-reduced-transparency where supported."
-            , "Windows forced-colors mode receives system-color fallbacks instead of theme-only colors."
+            , "Transparency preferences vary by surface; reduced-transparency support has not been verified."
+            , "Navigation icons, active destinations, and public activity charts include system-color fallbacks for forced-colors mode."
             ]
       }
     , { id = "screen-readers"
@@ -217,7 +217,7 @@ view =
             , a [ href "#hosting" ] [ text "Hosting" ]
             , a [ href "#accessibility" ] [ text "Accessibility" ]
             ]
-        , section [ id "rooms", class "site-section", attribute "aria-labelledby" "rooms-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "rooms", class "site-section", attribute "aria-labelledby" "rooms-heading" ]
             [ h2 [ id "rooms-heading", class "site-h2" ] [ text "A room that stays open" ]
             , p []
                 [ text "Text rooms are the everyday place. People drop in, catch up, and leave the conversation where they found it. Messages stay with the room — not a feed that buries them." ]
@@ -230,7 +230,7 @@ view =
                 , li [] [ strong [] [ text "No ads" ], span [] [ text "Nobody is selling your attention here." ] ]
                 ]
             ]
-        , section [ id "people", class "site-section", attribute "aria-labelledby" "people-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "people", class "site-section", attribute "aria-labelledby" "people-heading" ]
             [ h2 [ id "people-heading", class "site-h2" ] [ text "Friends, clubs, creators" ]
             , p []
                 [ text "Onyx is for people who want a room of their own — not a protocol desk and not a storefront." ]
@@ -249,7 +249,7 @@ view =
                     ]
                 ]
             ]
-        , section [ id "join", class "site-section", attribute "aria-labelledby" "join-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "join", class "site-section", attribute "aria-labelledby" "join-heading" ]
             [ h2 [ id "join-heading", class "site-h2" ] [ text "Open it. Invite people." ]
             , p []
                 [ text "The door is the browser. Open Onyx, pick a name, and walk into a room. If someone sent you an invite, use it — you land in their room with the context they shared." ]
@@ -261,7 +261,7 @@ view =
                 , a [ class "site-cta-link", href "/download/" ] [ text "Get it on this device" ]
                 ]
             ]
-        , section [ id "hosting", class "site-section", attribute "aria-labelledby" "hosting-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "hosting", class "site-section", attribute "aria-labelledby" "hosting-heading" ]
             [ h2 [ id "hosting-heading", class "site-h2" ] [ text "Self-host if you want to" ]
             , p []
                 [ text "Most people never need this. If you run your own community and want the rooms on hardware you hold, you can self-host Onyx Server and keep the same client." ]
@@ -273,7 +273,7 @@ view =
                 , a [ href "/download/" ] [ text "Download" ]
                 ]
             ]
-        , section [ id "accessibility", class "site-section", attribute "aria-labelledby" "accessibility-heading" ]
+        , section [ Html.Attributes.tabindex -1, id "accessibility", class "site-section", attribute "aria-labelledby" "accessibility-heading" ]
             [ h2 [ id "accessibility-heading", class "site-h2" ] [ text "A place you can use." ]
             , p []
                 [ text "Onyx aims to make time-native chat usable without requiring a mouse, animation, perfect color perception, or a specific display mode." ]

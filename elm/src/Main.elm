@@ -1503,6 +1503,7 @@ init rawFlags url key =
     ( { app =
             { base
                 | e2eeDms = e2eeDms
+                , navPath = url.path
                 , ignoredUsers = ignoredUsers
                 , mutedDMs = mutedDMs
                 , vaultSearchMode = vaultSearchMode
@@ -1670,7 +1671,17 @@ perform key app outbound =
             wsConnect req
 
         App.FocusElement elementId ->
-            Task.attempt (\_ -> App.ShellFocusSettled) (Browser.Dom.focus elementId)
+            Task.attempt (\_ -> App.ShellFocusSettled)
+                (Browser.Dom.focus elementId
+                    |> Task.andThen
+                        (\_ ->
+                            if elementId == "site-main" || elementId == "ap-title" then
+                                Browser.Dom.setViewport 0 0
+
+                            else
+                                Task.succeed ()
+                        )
+                )
 
         App.UploadPick req ->
             uploadPick req

@@ -513,7 +513,7 @@ test('[guard] G-3 day and new-message separators, mention rows and live regions 
   await expect(page.getByRole('separator', { name: 'New messages' })).toHaveCount(1);
   await expect(page.getByRole('article', { name: /trev \(mention\)/ })).toHaveCount(1);
   await expect(page.getByRole('list', { name: 'Notifications' })).toHaveCount(1);
-  await expect(page.getByTestId('connection-open')).toHaveAccessibleName(/^Connection\. Live/);
+  await expect(page.getByTestId('connection-open')).toHaveAccessibleName(/^Connected, connection settings$/);
 });
 
 test('[guard] G-4 reduced motion: no long transitions on the connect gate and shell', async ({ page }, info) => {

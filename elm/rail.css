@@ -437,7 +437,7 @@
   .onyx-topbar > .onyx-conn .onyx-conn-name { display: none; }
 
   .onyx-rail .onyx-rail-conversation { min-height: 52px; padding: 10px 12px; font-size: 16px; }
-  .onyx-rail-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; }
+  .onyx-rail-filters { flex-wrap: wrap; margin-inline: -16px; padding-inline: 16px; }
   .onyx-rail .onyx-rail-filter { flex: none; min-height: 44px; padding: 6px 14px; font-size: 13px; }
   /* The bar already names the page. */
   .onyx-main-rooms-open > .onyx-rail > .onyx-rail-heading { display: none; }
@@ -447,8 +447,57 @@
   .onyx-shell:is([data-nav="rooms"], [data-nav="messages"]):not([data-collection-open="true"]) .guest-claim-chip { display: none; }
 }
 
-/* The 280px sidebar keeps the four filters on one row. */
+/* Compact filters wrap when labels exceed the sidebar width. */
 @media (min-width: 60.01rem) {
-  .onyx-rail-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .onyx-rail-filters { flex-wrap: wrap; }
   .onyx-rail .onyx-rail-filter { flex: none; padding: 3px 6px; font-size: 11.5px; }
+}
+
+/* Keep the shell h1 available where the brand used to be display:none
+   (wide screens, and phone conversation views); the 48-60rem band and the
+   phone Home/Calls/collection gem stay visible. */
+@media (min-width: 60.01rem) {
+  .onyx-shell .onyx-topbar > .onyx-brand {
+    display: block; position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+}
+@media (max-width: 47.99rem) {
+  .onyx-shell:not([data-nav="home"], [data-nav="calls"], [data-collection-open="true"]) .onyx-topbar > .onyx-brand {
+    display: block; position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+}
+/* Very short viewports: let the icon rail scroll. Scrolling clips the
+   hover/focus labels, so it applies only where the rail cannot fit. */
+@media (min-width: 48rem) and (max-height: 26rem) {
+  .onyx-primary-nav { overflow-y: auto; min-height: 0; }
+}
+@media (max-width: 360px) {
+  .onyx-topbar > .onyx-conn .onyx-conn-state { display: none; }
+  .onyx-topbar > .onyx-conn { min-width: 44px; justify-content: center; }
+  .onyx-back-label { display: none; }
+  .onyx-topbar-title { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onyx-primary-nav .onyx-nav-label { transition: none; }
+}
+@media (forced-colors: active) {
+  .onyx-nav-icon { background-color: CanvasText; forced-color-adjust: none; }
+  .onyx-shell .onyx-nav-btn--active { border: 2px solid Highlight; }
+  .onyx-shell .onyx-nav-btn--active .onyx-nav-icon { background-color: Highlight; }
+  .onyx-shell .onyx-nav-btn--active .onyx-nav-face { box-shadow: 0 0 0 2px Highlight; }
+}
+
+.onyx-shell > .site-skip {
+  min-height: 44px;
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink) !important;
+}
+
+@media (max-width: 360px) {
+  .onyx-shell .onyx-room-bar { flex-wrap: wrap; }
+  .onyx-shell .onyx-room-id { flex-basis: 100%; }
+  .onyx-shell .onyx-room-topic { white-space: normal; overflow-wrap: anywhere; }
+  .onyx-shell .onyx-room-tools { margin-left: auto; }
 }

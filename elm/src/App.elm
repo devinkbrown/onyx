@@ -736,6 +736,8 @@ type alias Model =
     , connectGate : Maybe ConnectGate.Gate
     , navMenuOpen : Bool
     , navPath : String
+    -- True between an in-app navigation request and its UrlChanged; popstate leaves it False.
+    , navFocusPending : Bool
     , roadmapPriority : Maybe String
     , origin : String
     , mediaUrl : Maybe String
@@ -3697,6 +3699,7 @@ init nick url =
     , connectGate = Nothing
     , navMenuOpen = False
     , navPath = ""
+    , navFocusPending = False
     , roadmapPriority = Nothing
     , origin = ""
     , mediaUrl = Nothing
@@ -4293,6 +4296,7 @@ blank =
     , connectGate = Nothing
     , navMenuOpen = False
     , navPath = ""
+    , navFocusPending = False
     , roadmapPriority = Nothing
     , origin = ""
     , mediaUrl = Nothing
@@ -40009,7 +40013,9 @@ updateRaw msg initialModel =
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, [ PushUrl (Url.toString url) ] )
+                    -- Nav.pushUrl always fires UrlChanged (even for an
+                    -- identical URL), which owns the focus move.
+                    ( { model | navFocusPending = True }, [ PushUrl (Url.toString url) ] )
 
                 Browser.External href ->
                     ( model, [ LoadUrl href ] )
@@ -40037,7 +40043,7 @@ updateRaw msg initialModel =
                             model.inviteName
 
                 navigatedRaw =
-                    { model | route = Route.fromUrl url, navMenuOpen = False, navPath = url.path, roadmapPriority = priorityFromFragment url.fragment, inviteParams = params, inviteName = reseeded, inviteNameError = Nothing, inviteCopy = CopyIdle }
+                    { model | route = Route.fromUrl url, navMenuOpen = False, navPath = url.path, navFocusPending = False, roadmapPriority = priorityFromFragment url.fragment, inviteParams = params, inviteName = reseeded, inviteNameError = Nothing, inviteCopy = CopyIdle }
 
                 -- Leaving the appearance route unmounts the studio
                 -- (mirroring the component cleanup): session vars
@@ -40053,12 +40059,33 @@ updateRaw msg initialModel =
                     else
                         navigatedRaw
 
-                leaveOut =
-                    if leavingStudio then
-                        [ appearanceApplyFor navigated ]
+                -- Only in-app navigation moves focus; browser
+                -- back/forward (popstate) keeps the restored focus
+                -- and scroll position.
+                navigationFocus =
+                    if not model.navFocusPending then
+                        []
 
                     else
-                        []
+                        case url.fragment of
+                            Just fragment ->
+                                [ FocusElement (Url.percentDecode fragment |> Maybe.withDefault fragment) ]
+
+                            Nothing ->
+                                if url.path /= model.navPath && navigated.route /= Route.App then
+                                    [ FocusElement (if navigated.route == Route.Appearance then "ap-title" else "site-main") ]
+
+                                else
+                                    []
+
+                leaveOut =
+                    navigationFocus
+                        ++ (if leavingStudio then
+                                [ appearanceApplyFor navigated ]
+
+                            else
+                                []
+                           )
             in
             if navigated.route == Route.Status then
                 let
@@ -40068,7 +40095,7 @@ updateRaw msg initialModel =
                 ( statusModel, statusOut ++ leaveOut )
 
             else if navigated.route == Route.Appearance && model.route /= Route.Appearance then
-                ( navigated, leaveOut ++ [ FocusElement "ap-title" ] )
+                ( navigated, leaveOut )
 
             else if navigated.route == Route.Download then
                 let
@@ -45417,7 +45444,7 @@ updateRaw msg initialModel =
                 href =
                     FirstHour.inviteFriendsHref (Maybe.andThen .channel model.firstHourHandoff)
             in
-            ( seen, seenOut ++ [ PushUrl href ] )
+            ( { seen | navFocusPending = True }, seenOut ++ [ PushUrl href ] )
 
         NavigationLoaded value ->
             absorbNavigation model value
@@ -45426,7 +45453,7 @@ updateRaw msg initialModel =
             ( applyDeviceSlots value model, [] )
 
         SearchOpenHistory ->
-            ( invalidateVaultSearch { model | searchOpen = False, route = Route.Appearance }, [ PushUrl "/appearance/" ] )
+            ( invalidateVaultSearch { model | searchOpen = False, route = Route.Appearance, navFocusPending = True }, [ PushUrl "/appearance/" ] )
 
         IgnoreUser _ ->
             foldBlocklistAction model msg
@@ -46001,10 +46028,10 @@ updateRaw msg initialModel =
             -- appearance route it also cancels a staged background
             -- (mirroring the page's Escape-to-cancel).
             if model.route == Route.Appearance && backgroundDirty model then
-                ( { model | navMenuOpen = False, clientMembersOpen = False, backgroundCandidate = model.backgroundId, backgroundPreview = Nothing }, [] )
+                ( { model | navMenuOpen = False, clientMembersOpen = False, backgroundCandidate = model.backgroundId, backgroundPreview = Nothing }, if model.navMenuOpen then [ FocusElement "public-menu-toggle" ] else [] )
 
             else
-                ( { model | navMenuOpen = False, clientMembersOpen = False }, [] )
+                ( { model | navMenuOpen = False, clientMembersOpen = False }, if model.navMenuOpen then [ FocusElement "public-menu-toggle" ] else [] )
 
         SelectRoadmapPriority { state } ->
             -- Legend clicks name a known priority; anything else
